@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import Iterator, List, Optional, Type
+from typing import Iterator, List, Optional, Type, Union
 from dataclasses import dataclass
 import uuid
 from loguru import logger
@@ -52,7 +52,7 @@ class Backend(ABC):
         return inner_wrapper
 
     @staticmethod
-    def create_backend(backend_type: BackendTypes, **kwargs) -> "Backend":
+    def create_backend(backend_type: Union[str, BackendTypes], **kwargs) -> "Backend":
         """
         Factory method to create a backend based on the backend type.
 

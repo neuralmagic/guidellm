@@ -1,4 +1,5 @@
 from typing import Dict, Any, Optional
+import uuid
 
 
 __all__ = ["BenchmarkRequest"]
@@ -10,11 +11,18 @@ class BenchmarkRequest:
 
     :param prompt: The input prompt for the benchmark request.
     :type prompt: str
+    :param token_count: The number of tokens to generate, defaults to None.
+    :type token_count: Optional[int]
     :param params: Optional parameters for the benchmark request, defaults to None.
     :type params: Optional[Dict[str, Any]]
     """
 
-    def __init__(self, prompt: str, params: Optional[Dict[str, Any]] = None):
+    def __init__(
+        self,
+        prompt: str,
+        token_count: Optional[int] = None,
+        params: Optional[Dict[str, Any]] = None,
+    ):
         """
         Initialize the BenchmarkRequest with a prompt and optional parameters.
 
@@ -23,8 +31,20 @@ class BenchmarkRequest:
         :param params: Optional parameters for the benchmark request, defaults to None.
         :type params: Optional[Dict[str, Any]]
         """
+        self._id = str(uuid.uuid4())
         self._prompt = prompt
+        self._token_count = token_count
         self._params = params or {}
+
+    @property
+    def id(self) -> str:
+        """
+        Get the unique identifier for the benchmark request.
+
+        :return: The unique identifier.
+        :rtype: str
+        """
+        return self._id
 
     @property
     def prompt(self) -> str:
@@ -35,6 +55,16 @@ class BenchmarkRequest:
         :rtype: str
         """
         return self._prompt
+
+    @property
+    def token_count(self) -> Optional[int]:
+        """
+        Get the number of tokens to generate for the benchmark request.
+
+        :return: The number of tokens to generate.
+        :rtype: Optional[int]
+        """
+        return self._token_count
 
     @property
     def params(self) -> Dict[str, Any]:
@@ -53,7 +83,7 @@ class BenchmarkRequest:
         :return: String representation of the BenchmarkRequest.
         :rtype: str
         """
-        return f"BenchmarkRequest(prompt={self._prompt}, params={self._params})"
+        return f"BenchmarkRequest(id={self.id}, prompt={self._prompt}, params={self._params})"
 
     def __repr__(self) -> str:
         """
@@ -62,4 +92,4 @@ class BenchmarkRequest:
         :return: Unambiguous string representation of the BenchmarkRequest.
         :rtype: str
         """
-        return f"BenchmarkRequest(prompt={self._prompt}, params={self._params})"
+        return f"BenchmarkRequest(id={self.id}, prompt={self._prompt}, params={self._params})"

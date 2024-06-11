@@ -1,27 +1,36 @@
-from typing import Optional
-from time import time
+from typing import Optional, List, Union, Dict, Any
+from time import time, perf_counter
+from dataclasses import dataclass
 from guidellm.core.distribution import Distribution
+from guidellm.core.request import BenchmarkRequest
 
 
-__all__ = ["BenchmarkResult"]
+__all__ = [
+    "BenchmarkResult",
+    "BenchmarkError",
+    "BenchmarkResultSet",
+    "BenchmarkReport",
+    "QueueMeasurement",
+]
 
 
 class BenchmarkResult:
     """
     A class to represent the result of a benchmark request for generative AI workloads.
 
-    :param id_: Unique identifier for the benchmark result.
-    :type id_: str
+    :param request: The benchmark request that generated this result.
+    :type request: BenchmarkRequest
     """
 
-    def __init__(self, id_: str):
+    def __init__(self, request: BenchmarkRequest):
         """
         Initialize the BenchmarkResult with a unique identifier.
 
-        :param id_: Unique identifier for the benchmark result.
-        :type id_: str
+        :param request: The benchmark request that generated this result.
+        :type request: BenchmarkRequest
         """
-        self.id = id_
+        self.request = request
+
         self.prompt = ""
         self.prompt_word_count = 0
         self.prompt_token_count = 0
@@ -30,6 +39,7 @@ class BenchmarkResult:
         self.output_token_count = 0
 
         self._last_time: Optional[float] = None
+        self._first_token_set: bool = False
         self.start_time: Optional[float] = None
         self.end_time: Optional[float] = None
         self.first_token_time: Optional[float] = None
@@ -43,7 +53,7 @@ class BenchmarkResult:
         :rtype: str
         """
         return (
-            f"BenchmarkResult(id={self.id}, prompt='{self.prompt}', "
+            f"BenchmarkResult(request={self.request}, prompt='{self.prompt}', "
             f"output='{self.output}', start_time={self.start_time}, "
             f"end_time={self.end_time}, first_token_time={self.first_token_time})"
         )
@@ -56,7 +66,7 @@ class BenchmarkResult:
         :rtype: str
         """
         return (
-            f"BenchmarkResult(id={self.id}, prompt='{self.prompt}', "
+            f"BenchmarkResult(request={self.request}, prompt='{self.prompt}', "
             f"prompt_word_count={self.prompt_word_count}, prompt_token_count={self.prompt_token_count}, "
             f"output='{self.output}', output_word_count={self.output_word_count}, "
             f"output_token_count={self.output_token_count}, start_time={self.start_time}, "
@@ -74,7 +84,7 @@ class BenchmarkResult:
         :rtype: bool
         """
         return (
-            self.id == other.id
+            self.request == other.request
             and self.prompt == other.prompt
             and self.output == other.output
             and self.start_time == other.start_time
@@ -94,6 +104,8 @@ class BenchmarkResult:
         self.prompt_word_count = len(prompt.split())
         self.prompt_token_count = len(prompt)  # Token count placeholder
         self.start_time = time()
+        self._last_time = perf_counter()
+        self._first_token_set = False
 
     def output_token(self, token: str):
         """
@@ -102,15 +114,16 @@ class BenchmarkResult:
         :param token: The decoded token.
         :type token: str
         """
-        if self._last_time is None:
-            # first token
-            self._last_time = time()
-            self.first_token_time = self._last_time - self.start_time
+        current_counter = perf_counter()
+
+        if not self._first_token_set:
+            self.first_token_time = current_counter - self._last_time
+            self._first_token_set = True
         else:
-            self._last_time = time()
-            decode_time = self._last_time - self._last_time
+            decode_time = current_counter - self._last_time
             self.decode_times.add_data([decode_time])
 
+        self._last_time = current_counter
         self.output += f"{token} "
 
     def end(
@@ -142,3 +155,132 @@ class BenchmarkResult:
             if prompt_token_count is not None
             else self.prompt_word_count
         )
+
+
+class BenchmarkError:
+    """
+    A class to represent an error that occurred during a benchmark request for generative AI workloads.
+
+    :param id_: Unique identifier for the benchmark result.
+    :type id_: str
+    """
+
+    def __init__(self, request: BenchmarkRequest, error: Exception):
+        """
+        Initialize the BenchmarkError with a unique identifier.
+
+        :param request: The benchmark request that generated this error.
+        :type request: BenchmarkRequest
+        :param error: The exception that occurred during the benchmark.
+        :type error: Exception
+        """
+        self.request = request
+        self.error = error
+
+
+@dataclass
+class QueueMeasurement:
+    time: float
+    completed: int
+    errored: int
+    processing: int
+
+
+class BenchmarkResultSet:
+    def __init__(self, mode: str, rate: Optional[float]):
+        self._mode = mode
+        self._rate = rate
+        self.benchmarks: List[BenchmarkResult] = []
+        self.errors: List[BenchmarkError] = []
+        self.concurrencies: List[QueueMeasurement] = []
+
+    @property
+    def args_mode(self) -> str:
+        return self._mode
+
+    @property
+    def args_rate(self) -> Optional[float]:
+        return self._rate
+
+    @property
+    def request_count(self) -> int:
+        return len(self.benchmarks)
+
+    @property
+    def error_count(self) -> int:
+        return len(self.errors)
+
+    @property
+    def request_rate(self) -> float:
+        if not self.benchmarks:
+            return 0.0
+
+        start_time = self.benchmarks[0].start_time
+        end_time = self.benchmarks[-1].end_time
+
+        return self.request_count / (end_time - start_time)
+
+    def benchmark_started(self):
+        if not self.concurrencies:
+            # Add initial measurement
+            self.concurrencies.append(
+                QueueMeasurement(time=time(), completed=0, errored=0, processing=1)
+            )
+        else:
+            # Increment processing
+            last = self.concurrencies[-1]
+            self.concurrencies.append(
+                QueueMeasurement(
+                    time=time(),
+                    completed=last.completed,
+                    errored=last.errored,
+                    processing=last.processing + 1,
+                )
+            )
+
+    def benchmark_completed(self, benchmark: Union[BenchmarkResult, BenchmarkError]):
+        if isinstance(benchmark, BenchmarkError):
+            self.errors.append(benchmark)
+            last = self.concurrencies[-1]
+            self.concurrencies.append(
+                QueueMeasurement(
+                    time=time(),
+                    completed=last.completed,
+                    errored=last.errored + 1,
+                    processing=last.processing - 1,
+                )
+            )
+        else:
+            self.benchmarks.append(benchmark)
+            last = self.concurrencies[-1]
+            self.concurrencies.append(
+                QueueMeasurement(
+                    time=time(),
+                    completed=last.completed + 1,
+                    errored=last.errored,
+                    processing=last.processing - 1,
+                )
+            )
+
+
+class BenchmarkReport:
+    def __init__(self):
+        self._benchmarks: List[BenchmarkResultSet] = []
+        self._args: List[Dict[str, Any]] = []
+
+    @property
+    def benchmarks(self) -> List[BenchmarkResultSet]:
+        return self._benchmarks
+
+    @property
+    def args(self) -> List[Dict[str, Any]]:
+        return self._args
+
+    @property
+    def benchmarks_sorted(self) -> List[BenchmarkResultSet]:
+        benchmarks = sorted(self._benchmarks, key=lambda x: x.request_rate)
+
+        return benchmarks
+
+    def add_benchmark(self, benchmark: BenchmarkResultSet):
+        self._benchmarks.append(benchmark)

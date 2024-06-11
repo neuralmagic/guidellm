@@ -1,7 +1,7 @@
 import asyncio
 from abc import ABC, abstractmethod
-from typing import Iterator
-from collections import deque
+from typing import Optional, Union, Iterator
+from transformers import AutoTokenizer, PreTrainedTokenizer
 from loguru import logger
 from guidellm.core.request import BenchmarkRequest
 
@@ -10,16 +10,71 @@ class RequestGenerator(ABC):
     """
     A base class for request generators that generate benchmark requests.
 
-    :param queue_size: The size of the request queue.
-    :type queue_size: int
+    :param tokenizer: The tokenizer instance or the name/config to use for tokenizing prompts.
+    :type tokenizer: Union[str, PreTrainedTokenizer]
+    :param mode: The generation mode, either 'async' or 'sync'.
+    :type mode: str
+    :param async_queue_size: The size of the request queue.
+    :type async_queue_size: int
     """
 
-    def __init__(self, queue_size: int = 10):
-        self.queue_size = queue_size
-        self._queue = deque(maxlen=queue_size)
+    def __init__(
+        self,
+        tokenizer: Optional[Union[str, PreTrainedTokenizer]] = None,
+        mode: str = "async",
+        async_queue_size: int = 50,
+    ):
+        self._async_queue_size = async_queue_size
+        self._mode = mode
+        self._queue = asyncio.Queue(maxsize=async_queue_size)
         self._stop_event = asyncio.Event()
-        self._populating_task = asyncio.create_task(self._populate_queue())
-        logger.info(f"RequestGenerator initialized with queue size: {queue_size}")
+        self._populating_task = None
+
+        if self.mode == "async":
+            self._populating_task = asyncio.create_task(self._populate_queue())
+            logger.info(
+                f"RequestGenerator initialized in async mode with queue size: {async_queue_size}"
+            )
+        else:
+            logger.info("RequestGenerator initialized in sync mode")
+
+        if tokenizer is not None:
+            self._tokenizer = (
+                AutoTokenizer.from_pretrained(tokenizer)
+                if isinstance(tokenizer, str)
+                else tokenizer
+            )
+            logger.info(f"Tokenizer initialized: {self._tokenizer}")
+        else:
+            self._tokenizer = None
+            logger.debug("No tokenizer provided")
+
+    @property
+    def tokenizer(self) -> Optional[PreTrainedTokenizer]:
+        """
+        Get the tokenizer instance.
+
+        :return: The tokenizer instance.
+        """
+        return self._tokenizer
+
+    @property
+    def mode(self) -> str:
+        """
+        Get the generation mode.
+
+        :return: The generation mode.
+        """
+        return self._mode
+
+    @property
+    def async_queue_size(self) -> int:
+        """
+        Get the size of the request queue.
+
+        :return: The size of the request queue.
+        """
+        return self._async_queue_size
 
     def __iter__(self) -> Iterator[BenchmarkRequest]:
         """
@@ -28,14 +83,20 @@ class RequestGenerator(ABC):
         :return: An iterator over benchmark requests.
         :rtype: Iterator[BenchmarkRequest]
         """
-        while not self._stop_event.is_set():
-            if self._queue:
-                yield self._queue.popleft()
-            else:
-                asyncio.run(self._populate_queue())
+        if self.mode == "async":
+            while not self._stop_event.is_set():
+                try:
+                    item = asyncio.run(self._queue.get())
+                    self._queue.task_done()
+                    yield item
+                except asyncio.CancelledError:
+                    break
+        else:
+            while not self._stop_event.is_set():
+                yield self.create_item()
 
     @abstractmethod
-    async def _create_item(self) -> BenchmarkRequest:
+    def create_item(self) -> BenchmarkRequest:
         """
         Abstract method to create a new benchmark request item.
 
@@ -44,22 +105,34 @@ class RequestGenerator(ABC):
         """
         raise NotImplementedError()
 
-    async def stop(self):
+    def start(self):
+        """
+        Start the background task that populates the queue.
+        """
+        if self._populating_task is not None:
+            logger.warning("RequestGenerator is already running")
+            return
+
+        logger.info("Starting RequestGenerator...")
+        self._populating_task = asyncio.create_task(self._populate_queue())
+
+    def stop(self):
         """
         Stop the background task that populates the queue.
         """
         logger.info("Stopping RequestGenerator...")
         self._stop_event.set()
-        await self._populating_task
 
     async def _populate_queue(self):
         """
         Populate the request queue in the background.
         """
         while not self._stop_event.is_set():
-            while len(self._queue) < self.queue_size:
-                item = await self._create_item()
-                self._queue.append(item)
+            if self._queue.qsize() < self._async_queue_size:
+                item = self.create_item()
+                await self._queue.put(item)
                 logger.debug(
-                    f"Item added to queue. Current queue size: {len(self._queue)}")
-            await asyncio.sleep(0.1)
+                    f"Item added to queue. Current queue size: {self._queue.qsize()}"
+                )
+            else:
+                await asyncio.sleep(0.1)

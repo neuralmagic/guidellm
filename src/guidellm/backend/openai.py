@@ -1,6 +1,5 @@
 import openai
 from typing import Iterator, List, Optional, Dict, Any
-from urllib.parse import urlparse
 from transformers import AutoTokenizer
 from loguru import logger
 from guidellm.backend import Backend, BackendTypes, GenerativeResponse
@@ -24,8 +23,10 @@ class OpenAIBackend(Backend):
     :type path: Optional[str]
     :param model: The OpenAI model to use, defaults to the first available model.
     :type model: Optional[str]
-    :param model_args: Additional model arguments for the request.
-    :type model_args: Optional[Dict[str, Any]]
+    :param api_key: The OpenAI API key to use.
+    :type api_key: Optional[str]
+    :param request_args: Optional arguments for the OpenAI request.
+    :type request_args: Dict[str, Any]
     """
 
     def __init__(
@@ -35,21 +36,30 @@ class OpenAIBackend(Backend):
         port: Optional[int] = None,
         path: Optional[str] = None,
         model: Optional[str] = None,
-        **model_args,
+        api_key: Optional[str] = None,
+        **request_args,
     ):
-        if target:
-            parsed_url = urlparse(target)
-            self.host = parsed_url.hostname
-            self.port = parsed_url.port
-            self.path = parsed_url.path
-        else:
-            self.host = host
-            self.port = port
-            self.path = path
+        self.target = target
         self.model = model
-        self.model_args = model_args
-        openai.api_key = model_args.get("api_key", None)
-        logger.info(f"Initialized OpenAIBackend with model: {self.model}")
+        self.request_args = request_args
+
+        if not self.target:
+            if not host:
+                raise ValueError("Host is required if target is not provided.")
+
+            port_incl = f":{port}" if port else ""
+            path_incl = path if path else ""
+            self.target = f"http://{host}{port_incl}{path_incl}"
+
+        openai.api_base = self.target
+        openai.api_key = api_key
+
+        if not model:
+            self.model = self.default_model()
+
+        logger.info(
+            f"Initialized OpenAIBackend with target: {self.target} and model: {self.model}"
+        )
 
     def make_request(self, request: BenchmarkRequest) -> Iterator[GenerativeResponse]:
         """
@@ -61,14 +71,20 @@ class OpenAIBackend(Backend):
         :rtype: Iterator[GenerativeResponse]
         """
         logger.debug(f"Making request to OpenAI backend with prompt: {request.prompt}")
+        num_gen_tokens = request.params.get("generated_tokens", None)
+        request_args = {
+            "n": 1,
+        }
+
+        if num_gen_tokens:
+            request_args["max_tokens"] = num_gen_tokens
+            request_args["stop"] = None
+
+        if self.request_args:
+            request_args.update(self.request_args)
+
         response = openai.Completion.create(
-            engine=self.model or self.default_model(),
-            prompt=request.prompt,
-            max_tokens=request.params.get("max_tokens", 100),
-            n=request.params.get("n", 1),
-            stop=request.params.get("stop", None),
-            stream=True,
-            **self.model_args,
+            engine=self.model, prompt=request.prompt, stream=True, **request_args,
         )
 
         for chunk in response:
@@ -80,8 +96,16 @@ class OpenAIBackend(Backend):
                         type_="final",
                         output=choice["text"],
                         prompt=request.prompt,
-                        prompt_token_count=self._token_count(request.prompt),
-                        output_token_count=self._token_count(choice["text"]),
+                        prompt_token_count=(
+                            request.token_count
+                            if request.token_count
+                            else self._token_count(request.prompt)
+                        ),
+                        output_token_count=(
+                            num_gen_tokens
+                            if num_gen_tokens
+                            else self._token_count(choice["text"])
+                        ),
                     )
                     break
                 else:
@@ -133,14 +157,6 @@ class OpenAIBackend(Backend):
             return None
 
     def _token_count(self, text: str) -> int:
-        """
-        Count the number of tokens in a text.
-
-        :param text: The text to tokenize.
-        :type text: str
-        :return: The number of tokens.
-        :rtype: int
-        """
         token_count = len(text.split())
         logger.debug(f"Token count for text '{text}': {token_count}")
         return token_count
