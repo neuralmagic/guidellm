@@ -1,12 +1,12 @@
 import asyncio
 import time
-from typing import Optional, Iterable, Union
-from guidellm.core import BenchmarkResultSet, BenchmarkError
-from guidellm.request import RequestGenerator
-from guidellm.backend import Backend
-from guidellm.scheduler.load_generator import LoadGenerator, LoadGenerationModes
-from guidellm.scheduler.task import Task
+from typing import Iterable, Optional, Union
 
+from guidellm.backend import Backend
+from guidellm.core import TextGenerationBenchmark, TextGenerationError
+from guidellm.request import RequestGenerator
+from guidellm.scheduler.load_generator import LoadGenerationModes, LoadGenerator
+from guidellm.scheduler.task import Task
 
 __all__ = ["Scheduler"]
 
@@ -39,7 +39,7 @@ class Scheduler:
         self._max_requests = max_requests
         self._max_duration = max_duration
 
-    def run(self) -> BenchmarkResultSet:
+    def run(self) -> TextGenerationBenchmark:
         if self._load_gen_mode == LoadGenerationModes.SYNCHRONOUS:
             result = self._run_sync()
         else:
@@ -48,15 +48,15 @@ class Scheduler:
 
         return result
 
-    def _run_sync(self) -> BenchmarkResultSet:
-        result_set = BenchmarkResultSet(mode=self._load_gen_mode.value, rate=None)
+    def _run_sync(self) -> TextGenerationBenchmark:
+        result_set = TextGenerationBenchmark(mode=self._load_gen_mode.value, rate=None)
         start_time = time.time()
         counter = 0
 
         for task in self._task_iterator():
-            result_set.benchmark_started()
+            result_set.request_started()
             res = task.run_sync()
-            result_set.benchmark_completed(res)
+            result_set.request_completed(res)
             counter += 1
 
             if (self._max_requests is not None and counter >= self._max_requests) or (
@@ -67,8 +67,8 @@ class Scheduler:
 
         return result_set
 
-    async def _run_async(self) -> BenchmarkResultSet:
-        result_set = BenchmarkResultSet(
+    async def _run_async(self) -> TextGenerationBenchmark:
+        result_set = TextGenerationBenchmark(
             mode=self._load_gen_mode.value, rate=self._load_gen_rate
         )
         load_gen = LoadGenerator(self._load_gen_mode, self._load_gen_rate)
@@ -111,15 +111,15 @@ class Scheduler:
 
         return result_set
 
-    async def _run_task_async(self, task: Task, result_set: BenchmarkResultSet):
-        result_set.benchmark_started()
+    async def _run_task_async(self, task: Task, result_set: TextGenerationBenchmark):
+        result_set.request_started()
         res = await task.run_async()
-        result_set.benchmark_completed(res)
+        result_set.request_completed(res)
 
     def _task_iterator(self) -> Iterable[Task]:
         for request in self._request_generator:
             yield Task(
                 func=self._backend.submit,
                 params={"request": request},
-                err_container=BenchmarkError,
+                err_container=TextGenerationError,
             )

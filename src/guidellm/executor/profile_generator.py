@@ -1,13 +1,20 @@
-import numpy
-from typing import Union, Optional
-from enum import Enum
-from dataclasses import dataclass
 from abc import ABC, abstractmethod
-from guidellm.core import BenchmarkReport
+from dataclasses import dataclass
+from enum import Enum
+from typing import Optional, Union
+
+import numpy
+
+from guidellm.core import TextGenerationBenchmarkReport
 from guidellm.scheduler import LoadGenerationModes
 
-
-__all__ = ["ProfileGenerator", "ProfileGenerationModes"]
+__all__ = [
+    "ProfileGenerationModes",
+    "Profile",
+    "ProfileGenerator",
+    "SingleProfileGenerator",
+    "SweepProfileGenerator",
+]
 
 
 class ProfileGenerationModes(Enum):
@@ -48,7 +55,9 @@ class ProfileGenerator(ABC):
         self._mode = ProfileGenerationModes(mode)
 
     @abstractmethod
-    def next_profile(self, current_report: BenchmarkReport) -> Optional[Profile]:
+    def next_profile(
+        self, current_report: TextGenerationBenchmarkReport
+    ) -> Optional[Profile]:
         pass
 
 
@@ -60,7 +69,9 @@ class SingleProfileGenerator(ProfileGenerator):
         self._rate_type = rate_type
         self._generated = False
 
-    def next_profile(self, current_report: BenchmarkReport) -> Optional[Profile]:
+    def next_profile(
+        self, current_report: TextGenerationBenchmarkReport
+    ) -> Optional[Profile]:
         if self._generated:
             return None
 
@@ -92,7 +103,9 @@ class SweepProfileGenerator(ProfileGenerator):
         self._max_found = False
         self._pending_rates = None
 
-    def next_profile(self, current_report: BenchmarkReport) -> Optional[Profile]:
+    def next_profile(
+        self, current_report: TextGenerationBenchmarkReport
+    ) -> Optional[Profile]:
         if not self._sync_run:
             self._sync_run = True
 
@@ -101,7 +114,7 @@ class SweepProfileGenerator(ProfileGenerator):
             )
 
         if not self._max_found:
-            # check if we've found the maximum rate based on the last benchmark
+            # check if we've found the maximum rate based on the last result
             # if not, double the rate; if so, set the flag to fill in missing data
             last_benchmark = current_report.benchmarks[-1]
 

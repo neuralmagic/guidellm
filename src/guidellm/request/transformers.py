@@ -1,11 +1,12 @@
+from typing import Optional, Union
+
 from datasets import load_dataset
 from loguru import logger
-from typing import Optional, Union
 from transformers import PreTrainedTokenizer
-from guidellm.core.request import BenchmarkRequest
-from guidellm.request.base import RequestGenerator
-from guidellm.utils import PREFERRED_DATA_SPLITS, PREFERRED_DATA_COLUMNS
 
+from guidellm.core.request import TextGenerationRequest
+from guidellm.request.base import RequestGenerator
+from guidellm.utils import PREFERRED_DATA_COLUMNS, PREFERRED_DATA_SPLITS
 
 __all__ = ["TransformersDatasetRequestGenerator"]
 
@@ -14,13 +15,15 @@ class TransformersDatasetRequestGenerator(RequestGenerator):
     """
     A request generator implementation for Hugging Face datasets.
 
-    :param dataset: The name of the Hugging Face dataset to use or the path to a local dataset.
+    :param dataset: The name of the Hugging Face dataset to use or the path
+        to a local dataset.
     :type dataset_name: str
     :param split: The split of the dataset to use (e.g., 'train', 'test').
     :type split: str
     :param column: The column/field to use for generating requests.
     :type column: str
-    :param tokenizer: The tokenizer instance or the name/config to use for tokenizing prompts.
+    :param tokenizer: The tokenizer instance or the name/config to use
+        for tokenizing prompts.
     :type tokenizer: Union[str, PreTrainedTokenizer]
     :param mode: The generation mode, either 'async' or 'sync'.
     :type mode: str
@@ -48,7 +51,8 @@ class TransformersDatasetRequestGenerator(RequestGenerator):
 
     def _load_dataset(self):
         """
-        Load the dataset based on the options given either as a dataset name or a local path.
+        Load the dataset based on the options given either as a dataset name or
+        a local path.
         If no split or column is provided, attempt to infer the best options.
 
         :return: The loaded dataset.
@@ -88,17 +92,18 @@ class TransformersDatasetRequestGenerator(RequestGenerator):
 
         dataset = dataset[self._split]
         logger.info(
-            f"Loaded dataset {self._dataset} with split: {self._split} and column: {self._column}"
+            f"Loaded dataset {self._dataset} with split: {self._split} "
+            f"and column: {self._column}"
         )
 
         return dataset
 
-    def create_item(self) -> BenchmarkRequest:
+    def create_item(self) -> TextGenerationRequest:
         """
-        Create a new benchmark request item from the dataset.
+        Create a new result request item from the dataset.
 
-        :return: A new benchmark request.
-        :rtype: BenchmarkRequest
+        :return: A new result request.
+        :rtype: TextGenerationRequest
         """
         try:
             data = next(self._iterator)
@@ -110,7 +115,7 @@ class TransformersDatasetRequestGenerator(RequestGenerator):
         token_count = (
             self._tokenizer(prompt)["input_ids"].shape[0] if self._tokenizer else None
         )
-        request = BenchmarkRequest(prompt=prompt, token_count=token_count)
-        logger.debug(f"Created new BenchmarkRequest: {request}")
+        request = TextGenerationRequest(prompt=prompt, prompt_token_count=token_count)
+        logger.debug(f"Created new TextGenerationRequest: {request}")
 
         return request

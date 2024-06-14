@@ -1,10 +1,10 @@
-from typing import Dict, Union, Optional, Any
-from guidellm.core import BenchmarkReport
-from guidellm.request import RequestGenerator
-from guidellm.backend import Backend
-from guidellm.scheduler.scheduler import Scheduler
-from guidellm.executor.profile_generator import ProfileGenerator, ProfileGenerationModes
+from typing import Any, Dict, Optional, Union
 
+from guidellm.backend import Backend
+from guidellm.core import TextGenerationBenchmarkReport
+from guidellm.executor.profile_generator import ProfileGenerationModes, ProfileGenerator
+from guidellm.request import RequestGenerator
+from guidellm.scheduler.scheduler import Scheduler
 
 __all__ = ["Executor"]
 
@@ -27,8 +27,8 @@ class Executor:
         self.max_requests = max_requests
         self.max_duration = max_duration
 
-    def run(self) -> BenchmarkReport:
-        report = BenchmarkReport()
+    def run(self) -> TextGenerationBenchmarkReport:
+        report = TextGenerationBenchmarkReport()
 
         while True:
             profile = self.profile.next_profile(report)

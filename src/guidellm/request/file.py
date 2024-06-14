@@ -1,9 +1,11 @@
 import csv
 import json
-from typing import Optional, Union, List
-from transformers import PreTrainedTokenizer
+from typing import List, Optional, Union
+
 from loguru import logger
-from guidellm.core.request import BenchmarkRequest
+from transformers import PreTrainedTokenizer
+
+from guidellm.core.request import TextGenerationRequest
 from guidellm.request.base import RequestGenerator
 from guidellm.utils import PREFERRED_DATA_COLUMNS
 
@@ -16,7 +18,8 @@ class FileRequestGenerator(RequestGenerator):
 
     :param file_path: The path to the file containing the data.
     :type file_path: str
-    :param tokenizer: The tokenizer instance or the name/config to use for tokenizing prompts.
+    :param tokenizer: The tokenizer instance or the name/config to use
+        for tokenizing prompts.
     :type tokenizer: Union[str, PreTrainedTokenizer]
     :param mode: The generation mode, either 'async' or 'sync'.
     :type mode: str
@@ -36,12 +39,12 @@ class FileRequestGenerator(RequestGenerator):
         self._data = self._load_file()
         self._iterator = iter(self._data)
 
-    def create_item(self) -> BenchmarkRequest:
+    def create_item(self) -> TextGenerationRequest:
         """
-        Create a new benchmark request item from the data.
+        Create a new result request item from the data.
 
-        :return: A new benchmark request.
-        :rtype: BenchmarkRequest
+        :return: A new result request.
+        :rtype: TextGenerationRequest
         """
         try:
             data = next(self._iterator)
@@ -52,8 +55,8 @@ class FileRequestGenerator(RequestGenerator):
         token_count = (
             self.tokenizer(data)["input_ids"].shape[0] if self.tokenizer else None
         )
-        request = BenchmarkRequest(prompt=data, token_count=token_count)
-        logger.debug(f"Created new BenchmarkRequest: {request}")
+        request = TextGenerationRequest(prompt=data, prompt_token_count=token_count)
+        logger.debug(f"Created new TextGenerationRequest: {request}")
 
         return request
 
@@ -113,7 +116,8 @@ class FileRequestGenerator(RequestGenerator):
 
             if data is None:
                 raise ValueError(
-                    f"Unsupported JSON structure, expected a list or a dictionary with a list. Given: {obj}"
+                    f"Unsupported JSON structure, "
+                    f"expected a list or a dictionary with a list. Given: {obj}"
                 )
 
         return self._extract_prompts(data)

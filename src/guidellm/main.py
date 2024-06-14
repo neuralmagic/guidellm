@@ -1,13 +1,15 @@
-import click
 import json
+
+import click
+
+from guidellm.backend import Backend
+from guidellm.core import TextGenerationBenchmarkReport
 from guidellm.executor import Executor
 from guidellm.request import (
     EmulatedRequestGenerator,
     FileRequestGenerator,
     TransformersDatasetRequestGenerator,
 )
-from guidellm.backend import Backend
-from guidellm.core import BenchmarkReport
 
 
 @click.command()
@@ -51,7 +53,7 @@ from guidellm.core import BenchmarkReport
     "--num-seconds",
     type=int,
     default="120",
-    help="Number of seconds to benchmark each request rate at",
+    help="Number of seconds to result each request rate at",
 )
 @click.option(
     "--num-requests",
@@ -119,12 +121,12 @@ def main(
     print_report(report)
 
 
-def save_report(report: BenchmarkReport, filename: str):
+def save_report(report: TextGenerationBenchmarkReport, filename: str):
     with open(filename, "w") as f:
         json.dump(report.to_dict(), f, indent=4)
 
 
-def print_report(report: BenchmarkReport):
+def print_report(report: TextGenerationBenchmarkReport):
     for benchmark in report.benchmarks:
         print(f"Rate: {benchmark.request_rate}, Results: {benchmark.results}")
 

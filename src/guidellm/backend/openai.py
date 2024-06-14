@@ -1,9 +1,11 @@
+from typing import Any, Iterator, List, Optional
+
 import openai
-from typing import Iterator, List, Optional, Dict, Any
-from transformers import AutoTokenizer
 from loguru import logger
+from transformers import AutoTokenizer
+
 from guidellm.backend import Backend, BackendTypes, GenerativeResponse
-from guidellm.core.request import BenchmarkRequest
+from guidellm.core.request import TextGenerationRequest
 
 __all__ = ["OpenAIBackend"]
 
@@ -11,7 +13,7 @@ __all__ = ["OpenAIBackend"]
 @Backend.register_backend(BackendTypes.OPENAI_SERVER)
 class OpenAIBackend(Backend):
     """
-    An OpenAI backend implementation for the generative AI benchmark.
+    An OpenAI backend implementation for the generative AI result.
 
     :param target: The target URL string for the OpenAI server.
     :type target: str
@@ -58,15 +60,18 @@ class OpenAIBackend(Backend):
             self.model = self.default_model()
 
         logger.info(
-            f"Initialized OpenAIBackend with target: {self.target} and model: {self.model}"
+            f"Initialized OpenAIBackend with target: {self.target} "
+            f"and model: {self.model}"
         )
 
-    def make_request(self, request: BenchmarkRequest) -> Iterator[GenerativeResponse]:
+    def make_request(
+        self, request: TextGenerationRequest
+    ) -> Iterator[GenerativeResponse]:
         """
         Make a request to the OpenAI backend.
 
-        :param request: The benchmark request to submit.
-        :type request: BenchmarkRequest
+        :param request: The result request to submit.
+        :type request: TextGenerationRequest
         :return: An iterator over the generative responses.
         :rtype: Iterator[GenerativeResponse]
         """
@@ -84,7 +89,10 @@ class OpenAIBackend(Backend):
             request_args.update(self.request_args)
 
         response = openai.Completion.create(
-            engine=self.model, prompt=request.prompt, stream=True, **request_args,
+            engine=self.model,
+            prompt=request.prompt,
+            stream=True,
+            **request_args,
         )
 
         for chunk in response:

@@ -1,11 +1,13 @@
+import uuid
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from enum import Enum
 from typing import Iterator, List, Optional, Type, Union
-from dataclasses import dataclass
-import uuid
+
 from loguru import logger
-from guidellm.core.result import BenchmarkResult
-from guidellm.core.request import BenchmarkRequest
+
+from guidellm.core.request import TextGenerationRequest
+from guidellm.core.result import TextGenerationResult
 
 __all__ = ["Backend", "BackendTypes", "GenerativeResponse"]
 
@@ -69,18 +71,18 @@ class Backend(ABC):
             raise ValueError(f"Unsupported backend type: {backend_type}")
         return Backend._registry[backend_type](**kwargs)
 
-    def submit(self, request: BenchmarkRequest) -> BenchmarkResult:
+    def submit(self, request: TextGenerationRequest) -> TextGenerationResult:
         """
-        Submit a benchmark request and populate the BenchmarkResult.
+        Submit a result request and populate the BenchmarkResult.
 
-        :param request: The benchmark request to submit.
-        :type request: BenchmarkRequest
-        :return: The populated benchmark result.
-        :rtype: BenchmarkResult
+        :param request: The result request to submit.
+        :type request: TextGenerationRequest
+        :return: The populated result result.
+        :rtype: TextGenerationResult
         """
         logger.info(f"Submitting request with prompt: {request.prompt}")
         result_id = str(uuid.uuid4())
-        result = BenchmarkResult(result_id)
+        result = TextGenerationResult(result_id)
         result.start(request.prompt)
 
         for response in self.make_request(request):
@@ -98,12 +100,14 @@ class Backend(ABC):
         return result
 
     @abstractmethod
-    def make_request(self, request: BenchmarkRequest) -> Iterator[GenerativeResponse]:
+    def make_request(
+        self, request: TextGenerationRequest
+    ) -> Iterator[GenerativeResponse]:
         """
         Abstract method to make a request to the backend.
 
-        :param request: The benchmark request to submit.
-        :type request: BenchmarkRequest
+        :param request: The result request to submit.
+        :type request: TextGenerationRequest
         :return: An iterator over the generative responses.
         :rtype: Iterator[GenerativeResponse]
         """

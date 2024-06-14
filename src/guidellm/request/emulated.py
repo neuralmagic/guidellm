@@ -1,14 +1,18 @@
 import json
-import requests
-import numpy as np
-from typing import Optional, Union, Dict, List
-from transformers import PreTrainedTokenizer
-from loguru import logger
-import unicodedata
 import re
+import unicodedata
 from dataclasses import dataclass
-from guidellm.core.request import BenchmarkRequest
+from typing import Dict, List, Optional, Union
+
+import numpy as np
+import requests
+from loguru import logger
+from transformers import PreTrainedTokenizer
+
+from guidellm.core.request import TextGenerationRequest
 from guidellm.request.base import RequestGenerator
+
+__all__ = ["EmulatedConfig", "EmulatedRequestGenerator"]
 
 
 @dataclass
@@ -36,7 +40,8 @@ class EmulatedRequestGenerator(RequestGenerator):
     :type config: Union[str, Dict]
     :param random_seed: The random seed to use for generating requests.
     :type random_seed: Optional[int]
-    :param tokenizer: The tokenizer instance or the name/config to use for tokenizing prompts.
+    :param tokenizer: The tokenizer instance or the name/config to use
+        for tokenizing prompts.
     :type tokenizer: Union[str, PreTrainedTokenizer]
     :param mode: The generation mode, either 'async' or 'sync'.
     :type mode: str
@@ -57,17 +62,19 @@ class EmulatedRequestGenerator(RequestGenerator):
         self._random_seed = random_seed
         self._data = self._load_emulated_data()
 
-    def create_item(self) -> BenchmarkRequest:
+    def create_item(self) -> TextGenerationRequest:
         """
-        Create a new benchmark request item from the data.
+        Create a new result request item from the data.
 
-        :return: A new benchmark request.
-        :rtype: BenchmarkRequest
+        :return: A new result request.
+        :rtype: TextGenerationRequest
         """
         prompt, prompt_token_count = self._sample_prompt()
         generated_token_count = self._sample_generated()
 
-        request = BenchmarkRequest(prompt=prompt, token_count=prompt_token_count)
+        request = TextGenerationRequest(
+            prompt=prompt, prompt_token_count=prompt_token_count
+        )
 
         if generated_token_count:
             request.params["generated_tokens"] = generated_token_count
@@ -115,12 +122,12 @@ class EmulatedRequestGenerator(RequestGenerator):
         response = requests.get(url)
         response.raise_for_status()
 
-        start = (
+        content = response.text
+        start = content.index(
             "It is a truth universally acknowledged, that a single man in possession"
         )
-        end = "CHISWICK PRESS:--CHARLES WHITTINGHAM AND CO."
-        content = response.text
-        content = content[content.index(start) : content.index(end)]
+        end = content.index("CHISWICK PRESS:--CHARLES WHITTINGHAM AND CO.")
+        content = content[start:end]
 
         cleaned_content = (
             content.replace("\r\n", " ").replace("\r", " ").replace("\n", " ")

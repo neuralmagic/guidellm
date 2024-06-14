@@ -1,16 +1,21 @@
 import asyncio
 from abc import ABC, abstractmethod
-from typing import Optional, Union, Iterator
-from transformers import AutoTokenizer, PreTrainedTokenizer
+from typing import Iterator, Optional, Union
+
 from loguru import logger
-from guidellm.core.request import BenchmarkRequest
+from transformers import AutoTokenizer, PreTrainedTokenizer
+
+from guidellm.core.request import TextGenerationRequest
+
+__all__ = ["RequestGenerator"]
 
 
 class RequestGenerator(ABC):
     """
-    A base class for request generators that generate benchmark requests.
+    A base class for request generators that generate result requests.
 
-    :param tokenizer: The tokenizer instance or the name/config to use for tokenizing prompts.
+    :param tokenizer: The tokenizer instance or the name/config to use
+        for tokenizing prompts.
     :type tokenizer: Union[str, PreTrainedTokenizer]
     :param mode: The generation mode, either 'async' or 'sync'.
     :type mode: str
@@ -28,15 +33,6 @@ class RequestGenerator(ABC):
         self._mode = mode
         self._queue = asyncio.Queue(maxsize=async_queue_size)
         self._stop_event = asyncio.Event()
-        self._populating_task = None
-
-        if self.mode == "async":
-            self._populating_task = asyncio.create_task(self._populate_queue())
-            logger.info(
-                f"RequestGenerator initialized in async mode with queue size: {async_queue_size}"
-            )
-        else:
-            logger.info("RequestGenerator initialized in sync mode")
 
         if tokenizer is not None:
             self._tokenizer = (
@@ -49,12 +45,46 @@ class RequestGenerator(ABC):
             self._tokenizer = None
             logger.debug("No tokenizer provided")
 
+    def __repr__(self) -> str:
+        """
+        Return a string representation of the RequestGenerator.
+
+        :return: String representation of the RequestGenerator.
+        :rtype: str
+        """
+        return (
+            f"RequestGenerator("
+            f"mode={self._mode}, "
+            f"async_queue_size={self._async_queue_size}, "
+            f"tokenizer={self._tokenizer})"
+        )
+
+    def __iter__(self) -> Iterator[TextGenerationRequest]:
+        """
+        Provide an iterator interface to generate new requests.
+
+        :return: An iterator over result requests.
+        :rtype: Iterator[TextGenerationRequest]
+        """
+        if self.mode == "async":
+            while not self._stop_event.is_set():
+                try:
+                    item = self._queue.get_nowait()
+                    self._queue.task_done()
+                    yield item
+                except asyncio.QueueEmpty:
+                    continue
+        else:
+            while not self._stop_event.is_set():
+                yield self.create_item()
+
     @property
     def tokenizer(self) -> Optional[PreTrainedTokenizer]:
         """
         Get the tokenizer instance.
 
         :return: The tokenizer instance.
+        :rtype: Optional[PreTrainedTokenizer]
         """
         return self._tokenizer
 
@@ -64,6 +94,7 @@ class RequestGenerator(ABC):
         Get the generation mode.
 
         :return: The generation mode.
+        :rtype: str
         """
         return self._mode
 
@@ -73,35 +104,17 @@ class RequestGenerator(ABC):
         Get the size of the request queue.
 
         :return: The size of the request queue.
+        :rtype: int
         """
         return self._async_queue_size
 
-    def __iter__(self) -> Iterator[BenchmarkRequest]:
-        """
-        Provide an iterator interface to generate new requests.
-
-        :return: An iterator over benchmark requests.
-        :rtype: Iterator[BenchmarkRequest]
-        """
-        if self.mode == "async":
-            while not self._stop_event.is_set():
-                try:
-                    item = asyncio.run(self._queue.get())
-                    self._queue.task_done()
-                    yield item
-                except asyncio.CancelledError:
-                    break
-        else:
-            while not self._stop_event.is_set():
-                yield self.create_item()
-
     @abstractmethod
-    def create_item(self) -> BenchmarkRequest:
+    def create_item(self) -> TextGenerationRequest:
         """
-        Abstract method to create a new benchmark request item.
+        Abstract method to create a new result request item.
 
-        :return: A new benchmark request.
-        :rtype: BenchmarkRequest
+        :return: A new result request.
+        :rtype: TextGenerationRequest
         """
         raise NotImplementedError()
 
@@ -109,12 +122,22 @@ class RequestGenerator(ABC):
         """
         Start the background task that populates the queue.
         """
-        if self._populating_task is not None:
-            logger.warning("RequestGenerator is already running")
-            return
+        if self.mode == "async":
+            try:
+                loop = asyncio.get_running_loop()
+                logger.info("Using existing event loop")
+            except RuntimeError:
+                raise RuntimeError("No running event loop found for async mode")
 
-        logger.info("Starting RequestGenerator...")
-        self._populating_task = asyncio.create_task(self._populate_queue())
+            loop.call_soon_threadsafe(
+                lambda: asyncio.create_task(self._populate_queue())
+            )
+            logger.info(
+                f"RequestGenerator started in async mode with queue size: "
+                f"{self._async_queue_size}"
+            )
+        else:
+            logger.info("RequestGenerator started in sync mode")
 
     def stop(self):
         """
@@ -122,6 +145,7 @@ class RequestGenerator(ABC):
         """
         logger.info("Stopping RequestGenerator...")
         self._stop_event.set()
+        logger.info("RequestGenerator stopped")
 
     async def _populate_queue(self):
         """
@@ -136,3 +160,4 @@ class RequestGenerator(ABC):
                 )
             else:
                 await asyncio.sleep(0.1)
+        logger.info("RequestGenerator stopped populating queue")

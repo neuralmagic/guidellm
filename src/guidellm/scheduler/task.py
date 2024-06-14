@@ -1,5 +1,6 @@
 import asyncio
-from typing import Callable, Any, Dict, Optional
+from typing import Any, Callable, Dict, Optional
+
 from loguru import logger
 
 __all__ = ["Task"]
@@ -7,7 +8,8 @@ __all__ = ["Task"]
 
 class Task:
     """
-    A class representing a general unit of work that can be run either asynchronously or synchronously.
+    A class representing a general unit of work that can be run
+    either asynchronously or synchronously.
 
     :param func: The function to be called.
     :type func: Callable
@@ -28,7 +30,8 @@ class Task:
         self._err_container = err_container
         self._cancel_event = asyncio.Event()
         logger.info(
-            f"Task created with function: {self._func.__name__} and params: {self._params}"
+            f"Task created with function: {self._func.__name__} and "
+            f"params: {self._params}"
         )
 
     async def run_async(self) -> Any:
