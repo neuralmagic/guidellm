@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional, Union
+from typing import List, Optional, Union
 
 import numpy
 
@@ -12,13 +12,13 @@ __all__ = [
     "ProfileGenerationModes",
     "Profile",
     "ProfileGenerator",
-    "SingleProfileGenerator",
+    "MultiProfileGenerator",
     "SweepProfileGenerator",
 ]
 
 
 class ProfileGenerationModes(Enum):
-    SINGLE = "single"
+    MULTI = "multi"
     SWEEP = "sweep"
 
 
@@ -61,25 +61,24 @@ class ProfileGenerator(ABC):
         pass
 
 
-@ProfileGenerator.register_generator(ProfileGenerationModes.SINGLE)
-class SingleProfileGenerator(ProfileGenerator):
-    def __init__(self, rate: float, rate_type: str, **kwargs):
-        super().__init__(ProfileGenerationModes.SINGLE)
-        self._rate = rate
+@ProfileGenerator.register_generator(ProfileGenerationModes.MULTI)
+class MultiProfileGenerator(ProfileGenerator):
+    def __init__(self, rate: List[float], rate_type: str, **kwargs):
+        super().__init__(ProfileGenerationModes.MULTI)
+        self._rates = rate
+        self._rate_index = 0
         self._rate_type = rate_type
         self._generated = False
 
     def next_profile(
         self, current_report: TextGenerationBenchmarkReport
     ) -> Optional[Profile]:
-        if self._generated:
+        if self._rate_index >= len(self._rates):
             return None
-
-        self._generated = True
 
         if self._rate_type == "constant":
             return Profile(
-                load_gen_mode=LoadGenerationModes.CONSTANT, load_gen_rate=self._rate
+                load_gen_mode=LoadGenerationModes.CONSTANT, load_gen_rate=self._rates[self._rate_index]
             )
 
         if self._rate_type == "synchronous":
@@ -89,7 +88,7 @@ class SingleProfileGenerator(ProfileGenerator):
 
         if self._rate_type == "poisson":
             return Profile(
-                load_gen_mode=LoadGenerationModes.POISSON, load_gen_rate=self._rate
+                load_gen_mode=LoadGenerationModes.POISSON, load_gen_rate=self._rates[self._rate_index]
             )
 
         raise ValueError(f"Invalid rate type: {self._rate_type}")

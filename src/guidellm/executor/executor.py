@@ -14,7 +14,7 @@ class Executor:
         self,
         request_generator: RequestGenerator,
         backend: Backend,
-        profile_mode: Union[str, ProfileGenerationModes] = "single",
+        profile_mode: Union[str, ProfileGenerationModes] = "multi",
         profile_args: Optional[Dict[str, Any]] = None,
         max_requests: Optional[int] = None,
         max_duration: Optional[float] = None,

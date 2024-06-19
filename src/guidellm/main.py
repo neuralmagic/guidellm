@@ -46,8 +46,9 @@ from guidellm.request import (
 @click.option(
     "--rate",
     type=float,
-    default="1.0",
+    default=[1.0],
     help="Rate to use for constant and poisson rate types",
+    multiple=True,
 )
 @click.option(
     "--num-seconds",
@@ -106,10 +107,11 @@ def main(
         raise ValueError(f"Unknown data type: {data_type}")
 
     # Create executor
+    profile_mode = rate_type if rate_type == "sweep" else "multi"
     executor = Executor(
         request_generator=request_generator,
         backend=backend,
-        profile_mode=rate_type,
+        profile_mode=profile_mode,
         profile_args={"rate_type": rate_type, "rate": rate},
         max_requests=num_requests,
         max_duration=num_seconds,
