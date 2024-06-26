@@ -4,13 +4,13 @@ import openai
 from loguru import logger
 from transformers import AutoTokenizer
 
-from guidellm.backend import Backend, BackendTypes, GenerativeResponse
+from guidellm.backend import Backend, BackendType, GenerativeResponse
 from guidellm.core.request import TextGenerationRequest
 
 __all__ = ["OpenAIBackend"]
 
 
-@Backend.register_backend(BackendTypes.OPENAI_SERVER)
+@Backend.register_backend(BackendType.OPENAI_SERVER)
 class OpenAIBackend(Backend):
     """
     An OpenAI backend implementation for the generative AI result.
