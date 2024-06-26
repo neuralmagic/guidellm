@@ -15,8 +15,8 @@ style:
 	isort src tests
 	flake8 src tests --max-line-length 88
 
-# test:
-#     pytest tests
+test:
+	python -m pytest -s -vvv --cache-clear tests/
 
 build:
 	python setup.py sdist bdist_wheel
