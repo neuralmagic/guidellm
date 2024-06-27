@@ -29,6 +29,7 @@ setup(
     extras_require={
         'dev': [
             'pytest',
+            'pytest-asyncio',
             'sphinx',
             'ruff',
             'mypy',
