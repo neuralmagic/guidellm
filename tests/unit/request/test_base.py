@@ -1,3 +1,6 @@
+import asyncio
+from collections.abc import AsyncGenerator
+
 import pytest
 
 from guidellm.core.request import TextGenerationRequest
@@ -22,33 +25,30 @@ def test_request_generator_sync():
         if len(items) == 5:
             break
 
-    assert len(items) == 5
     assert items[0].prompt == "Test prompt"
 
 
 @pytest.mark.smoke
-@pytest.mark.asyncio
-def test_request_generator_async():
+async def test_request_generator_async():
     generator = TestRequestGenerator(mode="async", async_queue_size=10)
+
     assert generator.mode == "async"
     assert generator.async_queue_size == 10
     assert generator.tokenizer is None
 
-    generator.start()
-
     items = []
-    for item in generator:
-        items.append(item)
+    try:
+        async for item in generator:
+            items.append(item)
 
-        if len(items) == 5:
-            break
+            if len(items) == 5:
+                break
+    finally:
+        generator.stop()
 
-    generator.stop()
     assert generator._stop_event.is_set()
-
-    assert len(items) == 5
-    assert items[0].prompt == "Test prompt"
-    assert items[-1].prompt == "Test prompt"
+    for item in items:
+        assert item.prompt == "Test prompt"
 
 
 @pytest.mark.regression

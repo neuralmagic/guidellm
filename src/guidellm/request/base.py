@@ -1,6 +1,6 @@
 import asyncio
 from abc import ABC, abstractmethod
-from typing import Iterator, Optional, Union
+from typing import AsyncIterator, Generator, Iterator, Optional, Union
 
 from loguru import logger
 from transformers import AutoTokenizer, PreTrainedTokenizer
@@ -25,14 +25,15 @@ class RequestGenerator(ABC):
 
     def __init__(
         self,
+        *_,
         tokenizer: Optional[Union[str, PreTrainedTokenizer]] = None,
         mode: str = "async",
         async_queue_size: int = 50,
     ):
-        self._async_queue_size = async_queue_size
-        self._mode = mode
-        self._queue = asyncio.Queue(maxsize=async_queue_size)
-        self._stop_event = asyncio.Event()
+        self._async_queue_size: int = async_queue_size
+        self._mode: str = mode
+        self._queue: asyncio.Queue = asyncio.Queue(maxsize=async_queue_size)
+        self._stop_event: asyncio.Event = asyncio.Event()
 
         if tokenizer is not None:
             self._tokenizer = (
@@ -59,24 +60,38 @@ class RequestGenerator(ABC):
             f"tokenizer={self._tokenizer})"
         )
 
-    def __iter__(self) -> Iterator[TextGenerationRequest]:
+    def __iter__(self) -> Generator[TextGenerationRequest, None, None]:
         """
         Provide an iterator interface to generate new requests.
-
-        :return: An iterator over result requests.
-        :rtype: Iterator[TextGenerationRequest]
         """
-        if self.mode == "async":
-            while not self._stop_event.is_set():
-                try:
-                    item = self._queue.get_nowait()
-                    self._queue.task_done()
-                    yield item
-                except asyncio.QueueEmpty:
-                    continue
-        else:
-            while not self._stop_event.is_set():
-                yield self.create_item()
+
+        while not self._stop_event.is_set():
+            yield self.create_item()
+
+    def __aiter__(self) -> AsyncIterator["TextGenerationRequest"]:
+        """
+        Provide an async iterator interface to generate new requests.
+        """
+
+        return self
+
+    async def __anext__(self) -> "TextGenerationRequest":
+        """
+        Asynchronously get the next item from the queue or wait if the queue is empty.
+        """
+
+        asyncio.create_task(self._populate_queue())
+
+        while not self._stop_event.is_set():
+            try:
+                item = self._queue.get_nowait()
+                self._queue.task_done()
+                return item
+            except asyncio.QueueEmpty:
+                # Throttle and release the control
+                await asyncio.sleep(0)
+
+        raise StopAsyncIteration
 
     @property
     def tokenizer(self) -> Optional[PreTrainedTokenizer]:
@@ -118,31 +133,13 @@ class RequestGenerator(ABC):
         """
         raise NotImplementedError()
 
-    def start(self):
-        """
-        Start the background task that populates the queue.
-        """
-        if self.mode == "async":
-            try:
-                loop = asyncio.get_running_loop()
-                logger.info("Using existing event loop")
-            except RuntimeError:
-                raise RuntimeError("No running event loop found for async mode")
-
-            loop.call_soon_threadsafe(
-                lambda: asyncio.create_task(self._populate_queue())
-            )
-            logger.info(
-                f"RequestGenerator started in async mode with queue size: "
-                f"{self._async_queue_size}"
-            )
-        else:
-            logger.info("RequestGenerator started in sync mode")
-
     def stop(self):
         """
         Stop the background task that populates the queue.
         """
+
+        # TODO: Consider moving to the __anext__
+
         logger.info("Stopping RequestGenerator...")
         self._stop_event.set()
         logger.info("RequestGenerator stopped")
@@ -151,13 +148,16 @@ class RequestGenerator(ABC):
         """
         Populate the request queue in the background.
         """
+
         while not self._stop_event.is_set():
             if self._queue.qsize() < self._async_queue_size:
                 item = self.create_item()
                 await self._queue.put(item)
+
                 logger.debug(
                     f"Item added to queue. Current queue size: {self._queue.qsize()}"
                 )
             else:
-                await asyncio.sleep(0.1)
+                await asyncio.sleep(0)
+
         logger.info("RequestGenerator stopped populating queue")
