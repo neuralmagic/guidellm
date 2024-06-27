@@ -2,17 +2,17 @@ import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Iterator, List, Optional, Type, Union
+from typing import Iterator, List, Optional, Type
 
 from loguru import logger
 
 from guidellm.core.request import TextGenerationRequest
 from guidellm.core.result import TextGenerationResult
 
-__all__ = ["Backend", "BackendTypes", "GenerativeResponse"]
+__all__ = ["Backend", "BackendType", "GenerativeResponse"]
 
 
-class BackendTypes(Enum):
+class BackendType(str, Enum):
     TEST = "test"
     OPENAI_SERVER = "openai_server"
 
@@ -39,12 +39,12 @@ class Backend(ABC):
     _registry = {}
 
     @staticmethod
-    def register_backend(backend_type: BackendTypes):
+    def register_backend(backend_type: BackendType):
         """
         A decorator to register a backend class in the backend registry.
 
         :param backend_type: The type of backend to register.
-        :type backend_type: BackendTypes
+        :type backend_type: BackendType
         """
 
         def inner_wrapper(wrapped_class: Type["Backend"]):
@@ -54,21 +54,23 @@ class Backend(ABC):
         return inner_wrapper
 
     @staticmethod
-    def create_backend(backend_type: Union[str, BackendTypes], **kwargs) -> "Backend":
+    def create_backend(backend_type: BackendType, **kwargs) -> "Backend":
         """
         Factory method to create a backend based on the backend type.
 
         :param backend_type: The type of backend to create.
-        :type backend_type: BackendTypes
+        :type backend_type: BackendType
         :param kwargs: Additional arguments for backend initialization.
         :type kwargs: dict
         :return: An instance of a subclass of Backend.
         :rtype: Backend
         """
         logger.info(f"Creating backend of type {backend_type}")
-        if backend_type not in Backend._registry:
+
+        if backend_type not in Backend._registry.keys():
             logger.error(f"Unsupported backend type: {backend_type}")
             raise ValueError(f"Unsupported backend type: {backend_type}")
+
         return Backend._registry[backend_type](**kwargs)
 
     def submit(self, request: TextGenerationRequest) -> TextGenerationResult:

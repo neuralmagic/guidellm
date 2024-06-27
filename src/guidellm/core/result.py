@@ -599,3 +599,6 @@ class TextGenerationBenchmarkReport:
         """
         self._benchmarks.append(benchmark)
         logger.debug(f"Added result: {benchmark}")
+
+    def to_dict(self) -> dict:
+        raise NotImplementedError

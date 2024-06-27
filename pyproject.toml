@@ -8,9 +8,32 @@ target-version = ['py38']
 
 [tool.isort]
 profile = "black"
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+line_length = 88
+src_paths = ["."]
 
 [tool.mypy]
-files = "src/guidellm"
+python_version = '3.8'
+files = ['*.py']
+exclude = ["venv", "docs"]
+
+show_error_codes = true
+namespace_packages = false
+check_untyped_defs = true
+
+warn_redundant_casts = true
+warn_unused_ignores = true
+
+# Silint "type import errors" as our 3rd-party libs does not have types
+# Check: https://mypy.readthedocs.io/en/latest/config_file.html#import-discovery
+follow_imports = 'silent'
+
+[[tool.mypy.overrides]]
+module = []
+ignore_missing_imports=true
 
 [tool.ruff]
 exclude = ["build", "dist", "env", ".venv"]
@@ -20,6 +43,11 @@ lint.select = ["E", "F", "W"]
 max-line-length = 88
 
 [tool.pytest.ini_options]
+addopts = '-s -vvv --cache-clear'
+asyncio_mode = 'auto'
+cache_dir = '/tmp'
+python_files = 'tests.py test_*.py'
+python_functions = 'test_* *_test'
 markers = [
     "smoke: quick tests to check basic functionality",
     "sanity: detailed tests to ensure major functions work correctly",
