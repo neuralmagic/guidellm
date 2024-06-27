@@ -1,7 +1,7 @@
 from typing import Any, Iterator, List, Optional
 
-import openai
 from loguru import logger
+from openai import OpenAI
 from transformers import AutoTokenizer
 
 from guidellm.backend import Backend, BackendType, GenerativeResponse
@@ -53,8 +53,7 @@ class OpenAIBackend(Backend):
             path_incl = path if path else ""
             self.target = f"http://{host}{port_incl}{path_incl}"
 
-        openai.api_base = self.target
-        openai.api_key = api_key
+        self._openai_client = OpenAI(api_key=api_key, base_url=self.target)
 
         if not model:
             self.model = self.default_model()
@@ -88,7 +87,7 @@ class OpenAIBackend(Backend):
         if self.request_args:
             request_args.update(self.request_args)
 
-        response = openai.Completion.create(
+        response = self._openai_client.completions.create(
             engine=self.model,
             prompt=request.prompt,
             stream=True,
@@ -129,7 +128,18 @@ class OpenAIBackend(Backend):
         :return: A list of available models.
         :rtype: List[str]
         """
-        models = [model["id"] for model in openai.Engine.list()["data"]]
+
+        # FIX:You tried to access openai.Engine, but this is no longer supported
+        #     in openai>=1.0.0 - see the README at
+        #     https://github.com/openai/openai-python for the API.
+        #     You can run `openai migrate` to automatically upgrade your codebase
+        #     to use the 1.0.0 interface. Alternatively, you can pin your installation
+        #     to the old version, e.g. `pip install openai==0.28`
+        #     A detailed migration guide is available here:
+        #     https://github.com/openai/openai-python/discussions/742
+
+        # in progress
+        models = [model["id"] for model in self._openai_client.models.list()["data"]]
         logger.info(f"Available models: {models}")
         return models
 
