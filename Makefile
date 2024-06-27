@@ -1,28 +1,26 @@
-run:
-	python -m src.guidellm.main
-
 install:
 	pip install -r requirements.txt
 
+
 install-dev:
 	pip install -e .[dev]
+
 
 quality:
 	ruff check src tests
 	isort --check-only src tests
 	flake8 src tests --max-line-length 88
-	mypy src
+
 
 style:
-	ruff format src tests
-	isort src tests
-	flake8 src tests
+	python -m ruff format src tests
+	python -m isort src tests
+	python -m flake8 src tests
 
-# test:
-#     pytest tests
 
 build:
 	python setup.py sdist bdist_wheel
+
 
 clean:
 	rm -rf __pycache__
@@ -35,10 +33,4 @@ clean:
 	rm -rf .pytest_cache
 
 
-fix:
-	python -m black src tests
-	python -m isort src tests
-	python -m ruff format src tests
-
-
-.PHONY: run install install-dev quality style test test-unit test-integration test-e2e test-smoke test-sanity test-regression build clean fix
+.PHONY: install install-dev quality style build clean
