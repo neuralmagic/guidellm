@@ -19,6 +19,7 @@ setup(
     package_dir={'': 'src'},
     include_package_data=True,
     install_requires=[
+        'click',
         'datasets',
         'loguru',
         'numpy',
