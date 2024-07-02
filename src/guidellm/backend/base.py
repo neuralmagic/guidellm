@@ -1,18 +1,26 @@
+import functools
 import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Iterator, List, Optional, Type, Union
+from typing import Generic, Iterator, List, Optional, Type, Union
 
 from loguru import logger
 
 from guidellm.core.request import TextGenerationRequest
 from guidellm.core.result import TextGenerationResult
 
-__all__ = ["Backend", "BackendTypes", "GenerativeResponse"]
+__all__ = ["Backend", "BackendEngine", "GenerativeResponse"]
 
 
-class BackendTypes(Enum):
+class BackendEngine(str, Enum):
+    """
+    Determines the Engine of the LLM Backend.
+    All the implemented backends in the project have the engine.
+
+    NOTE: the `TEST` engine has to be used only for testing purposes.
+    """
+
     TEST = "test"
     OPENAI_SERVER = "openai_server"
 
@@ -33,18 +41,18 @@ class GenerativeResponse:
 
 class Backend(ABC):
     """
-    An abstract base class for generative AI backends.
+    An abstract base class with template methods for generative AI backends.
     """
 
     _registry = {}
 
     @staticmethod
-    def register_backend(backend_type: BackendTypes):
+    def register(backend_type: BackendEngine):
         """
         A decorator to register a backend class in the backend registry.
 
         :param backend_type: The type of backend to register.
-        :type backend_type: BackendTypes
+        :type backend_type: BackendType
         """
 
         def inner_wrapper(wrapped_class: Type["Backend"]):
@@ -54,21 +62,24 @@ class Backend(ABC):
         return inner_wrapper
 
     @staticmethod
-    def create_backend(backend_type: Union[str, BackendTypes], **kwargs) -> "Backend":
+    def create(backend_type: Union[str, BackendEngine], **kwargs) -> "Backend":
         """
         Factory method to create a backend based on the backend type.
 
         :param backend_type: The type of backend to create.
-        :type backend_type: BackendTypes
+        :type backend_type: BackendType
         :param kwargs: Additional arguments for backend initialization.
         :type kwargs: dict
         :return: An instance of a subclass of Backend.
         :rtype: Backend
         """
+
         logger.info(f"Creating backend of type {backend_type}")
+
         if backend_type not in Backend._registry:
             logger.error(f"Unsupported backend type: {backend_type}")
             raise ValueError(f"Unsupported backend type: {backend_type}")
+
         return Backend._registry[backend_type](**kwargs)
 
     def submit(self, request: TextGenerationRequest) -> TextGenerationResult:
@@ -121,8 +132,10 @@ class Backend(ABC):
         :return: A list of available models.
         :rtype: List[str]
         """
-        raise NotImplementedError()
 
+        pass
+
+    @property
     @abstractmethod
     def default_model(self) -> str:
         """
@@ -131,7 +144,8 @@ class Backend(ABC):
         :return: The default model.
         :rtype: str
         """
-        raise NotImplementedError()
+
+        pass
 
     @abstractmethod
     def model_tokenizer(self, model: str) -> Optional[str]:
@@ -143,4 +157,5 @@ class Backend(ABC):
         :return: The tokenizer for the model, or None if it cannot be created.
         :rtype: Optional[str]
         """
-        raise NotImplementedError()
+
+        pass

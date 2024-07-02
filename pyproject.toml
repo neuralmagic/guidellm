@@ -20,6 +20,7 @@ lint.select = ["E", "F", "W"]
 max-line-length = 88
 
 [tool.pytest.ini_options]
+python_classes = "DisableTestClasses"
 markers = [
     "smoke: quick tests to check basic functionality",
     "sanity: detailed tests to ensure major functions work correctly",

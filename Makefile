@@ -15,8 +15,9 @@ style:
 	isort src tests
 	flake8 src tests --max-line-length 88
 
-# test:
-#     pytest tests
+
+test:
+	python -m pytest --cache-clear -vvv -x -s ./tests
 
 build:
 	python setup.py sdist bdist_wheel
@@ -31,4 +32,4 @@ clean:
 	rm -rf .mypy_cache
 	rm -rf .pytest_cache
 
-.PHONY: install install-dev quality style test test-unit test-integration test-e2e test-smoke test-sanity test-regression build clean
+.PHONY: install install-dev quality style test build clean

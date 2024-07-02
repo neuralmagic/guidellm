@@ -3,6 +3,7 @@ import json
 import click
 
 from guidellm.backend import Backend
+from guidellm.backend.base import BackendEngine
 from guidellm.core import TextGenerationBenchmarkReport
 from guidellm.executor import Executor
 from guidellm.request import (
@@ -23,7 +24,19 @@ from guidellm.request import (
 @click.option("--port", type=str, help="Port for benchmarking")
 @click.option("--path", type=str, help="Path for benchmarking")
 @click.option(
-    "--backend", type=str, default="openai_server", help="Backend type for benchmarking"
+    "--backend",
+    type=BackendEngine,
+    default=BackendEngine.OPENAI_SERVER,
+    help="Backend type for benchmarking",
+)
+@click.option(
+    "--internal-callback-url", type=str, default=None, help="Internal callback url"
+)
+@click.option(
+    "--openai-api-key",
+    type=str,
+    default=None,
+    help="OpenAI API Key. Required if `backend=openai_server`",
 )
 @click.option("--model", type=str, default=None, help="Model to use for benchmarking")
 @click.option("--task", type=str, default=None, help="Task to use for benchmarking")
@@ -66,7 +79,9 @@ def main(
     host,
     port,
     path,
+    internal_callback_url,
     backend,
+    openai_api_key,
     model,
     task,
     data,
@@ -78,13 +93,15 @@ def main(
     num_requests,
 ):
     # Create backend
-    Backend.create_backend(
+    Backend.create(
         backend_type=backend,
         target=target,
         host=host,
         port=port,
         path=path,
         model=model,
+        openai_api_key=openai_api_key,
+        internal_callback_url=internal_callback_url,
     )
 
     # Create request generator

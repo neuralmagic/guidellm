@@ -1,12 +1,7 @@
 import pytest
 from transformers import AutoTokenizer, PreTrainedTokenizerBase
-from guidellm.core.request import TextGenerationRequest
-from guidellm.request.base import RequestGenerator
 
-
-class TestRequestGenerator(RequestGenerator):
-    def create_item(self) -> TextGenerationRequest:
-        return TextGenerationRequest(prompt="Test prompt")
+from guidellm.request.test import TestRequestGenerator
 
 
 @pytest.mark.smoke

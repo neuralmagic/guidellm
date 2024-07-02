@@ -1,5 +1,6 @@
-from setuptools import setup, find_packages
 from typing import Tuple
+
+from setuptools import find_packages, setup
 
 
 def _setup_long_description() -> Tuple[str, str]:
@@ -7,40 +8,41 @@ def _setup_long_description() -> Tuple[str, str]:
 
 
 setup(
-    name='guidellm',
-    version='0.1.0',
-    author='Neuralmagic, Inc.',
-    description='Guidance platform for deploying and managing large language models.',
+    name="guidellm",
+    version="0.1.0",
+    author="Neuralmagic, Inc.",
+    description="Guidance platform for deploying and managing large language models.",
     long_description=_setup_long_description()[0],
     long_description_content_type=_setup_long_description()[1],
     license="Apache",
     url="https://github.com/neuralmagic/guidellm",
-    packages=find_packages(where='src'),
-    package_dir={'': 'src'},
+    packages=find_packages(where="src"),
+    package_dir={"": "src"},
     include_package_data=True,
     install_requires=[
-        'datasets',
-        'loguru',
-        'numpy',
-        'openai',
-        'requests',
-        'transformers',
+        "datasets",
+        "loguru",
+        "numpy",
+        "openai",
+        "requests",
+        "transformers",
     ],
     extras_require={
-        'dev': [
-            'pytest',
-            'sphinx',
-            'ruff',
-            'mypy',
-            'black',
-            'isort',
-            'flake8',
-            'pre-commit',
+        "dev": [
+            "flake8",
+            "isort",
+            "mypy",
+            "polyfactory",
+            "pre-commit",
+            "pytest",
+            "pytest-mock",
+            "ruff",
+            "sphinx",
         ],
     },
     entry_points={
-        'console_scripts': [
-            'guidellm=guidellm.main:main',
+        "console_scripts": [
+            "guidellm=guidellm.main:main",
         ],
     },
     python_requires=">=3.8.0",
