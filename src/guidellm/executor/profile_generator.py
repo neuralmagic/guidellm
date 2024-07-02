@@ -12,13 +12,13 @@ __all__ = [
     "ProfileGenerationModes",
     "Profile",
     "ProfileGenerator",
-    "MultiProfileGenerator",
+    "FixedRateProfileGenerator",
     "SweepProfileGenerator",
 ]
 
 
 class ProfileGenerationModes(Enum):
-    MULTI = "multi"
+    FIXED = "fixed_rate"
     SWEEP = "sweep"
 
 
@@ -61,10 +61,10 @@ class ProfileGenerator(ABC):
         pass
 
 
-@ProfileGenerator.register_generator(ProfileGenerationModes.MULTI)
-class MultiProfileGenerator(ProfileGenerator):
+@ProfileGenerator.register_generator(ProfileGenerationModes.FIXED)
+class FixedRateProfileGenerator(ProfileGenerator):
     def __init__(self, rate: List[float], rate_type: str, **kwargs):
-        super().__init__(ProfileGenerationModes.MULTI)
+        super().__init__(ProfileGenerationModes.FIXED)
         self._rates = rate
         self._rate_index = 0
         self._rate_type = rate_type
