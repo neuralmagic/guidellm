@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional, Union
+from typing import List, Optional, Union
 
 import numpy
 
@@ -12,13 +12,17 @@ __all__ = [
     "ProfileGenerationModes",
     "Profile",
     "ProfileGenerator",
-    "SingleProfileGenerator",
+    "FixedRateProfileGenerator",
     "SweepProfileGenerator",
 ]
 
+RateTypeLoadGenModeMap = {
+    "constant": LoadGenerationModes.CONSTANT,
+    "poisson": LoadGenerationModes.POISSON,
+}
 
 class ProfileGenerationModes(Enum):
-    SINGLE = "single"
+    FIXED = "fixed_rate"
     SWEEP = "sweep"
 
 
@@ -61,35 +65,35 @@ class ProfileGenerator(ABC):
         pass
 
 
-@ProfileGenerator.register_generator(ProfileGenerationModes.SINGLE)
-class SingleProfileGenerator(ProfileGenerator):
-    def __init__(self, rate: float, rate_type: str, **kwargs):
-        super().__init__(ProfileGenerationModes.SINGLE)
-        self._rate = rate
+@ProfileGenerator.register_generator(ProfileGenerationModes.FIXED)
+class FixedRateProfileGenerator(ProfileGenerator):
+    def __init__(self, rate: List[float], rate_type: str, **kwargs):
+        super().__init__(ProfileGenerationModes.FIXED)
+        if rate_type == "synchronous" and rate.length > 0:
+            raise ValueError("custom rates are not supported in synchronous mode")
+        self._rates = rate
+        self._rate_index = 0
         self._rate_type = rate_type
         self._generated = False
 
     def next_profile(
         self, current_report: TextGenerationBenchmarkReport
     ) -> Optional[Profile]:
-        if self._generated:
+        if self._rate_index >= len(self._rates):
             return None
-
-        self._generated = True
-
-        if self._rate_type == "constant":
-            return Profile(
-                load_gen_mode=LoadGenerationModes.CONSTANT, load_gen_rate=self._rate
-            )
+        
+        current_rate = self._rates[self._rate_index]
+        self._rate_index += 1
 
         if self._rate_type == "synchronous":
             return Profile(
                 load_gen_mode=LoadGenerationModes.SYNCHRONOUS, load_gen_rate=None
             )
-
-        if self._rate_type == "poisson":
+        
+        if self._rate_type in {"constant", "poisson"}:
+            load_gen_mode = RateTypeLoadGenModeMap[self._rate_type]
             return Profile(
-                load_gen_mode=LoadGenerationModes.POISSON, load_gen_rate=self._rate
+                load_gen_mode=load_gen_mode, load_gen_rate=current_rate
             )
 
         raise ValueError(f"Invalid rate type: {self._rate_type}")

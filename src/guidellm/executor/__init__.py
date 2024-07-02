@@ -3,7 +3,7 @@ from .profile_generator import (
     Profile,
     ProfileGenerationModes,
     ProfileGenerator,
-    SingleProfileGenerator,
+    FixedRateProfileGenerator,
     SweepProfileGenerator,
 )
 
@@ -12,6 +12,6 @@ __all__ = [
     "ProfileGenerationModes",
     "Profile",
     "ProfileGenerator",
-    "SingleProfileGenerator",
+    "FixedRateProfileGenerator",
     "SweepProfileGenerator",
 ]

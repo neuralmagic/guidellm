@@ -25,6 +25,7 @@ setup(
         'openai',
         'requests',
         'transformers',
+        'click'
     ],
     extras_require={
         'dev': [
