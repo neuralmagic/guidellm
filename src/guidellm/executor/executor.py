@@ -14,13 +14,16 @@ class Executor:
         self,
         request_generator: RequestGenerator,
         backend: Backend,
-        profile_mode: Union[str, ProfileGenerationModes] = "fixed_rate",
+        rate_type: str = "sweep",
         profile_args: Optional[Dict[str, Any]] = None,
         max_requests: Optional[int] = None,
         max_duration: Optional[float] = None,
     ):
         self.request_generator = request_generator
         self.backend = backend
+        profile_mode = "sweep"
+        if rate_type in {"synchronous", "constant", "poisson"}:
+            profile_mode = "fixed_rate"
         self.profile = ProfileGenerator.create_generator(
             profile_mode, **(profile_args or {})
         )

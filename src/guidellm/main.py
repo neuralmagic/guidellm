@@ -107,11 +107,10 @@ def main(
         raise ValueError(f"Unknown data type: {data_type}")
 
     # Create executor
-    profile_mode = rate_type if rate_type == "sweep" else "fixed_rate"
     executor = Executor(
         request_generator=request_generator,
         backend=backend,
-        profile_mode=profile_mode,
+        rate_type=rate_type,
         profile_args={"rate_type": rate_type, "rate": rate},
         max_requests=num_requests,
         max_duration=num_seconds,
