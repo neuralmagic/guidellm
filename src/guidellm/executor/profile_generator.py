@@ -75,10 +75,13 @@ class FixedRateProfileGenerator(ProfileGenerator):
     ) -> Optional[Profile]:
         if self._rate_index >= len(self._rates):
             return None
+        
+        current_rate = self._rates[self._rate_index]
+        self._rate_index += 1
 
         if self._rate_type == "constant":
             return Profile(
-                load_gen_mode=LoadGenerationModes.CONSTANT, load_gen_rate=self._rates[self._rate_index]
+                load_gen_mode=LoadGenerationModes.CONSTANT, load_gen_rate=current_rate
             )
 
         if self._rate_type == "synchronous":
@@ -88,7 +91,7 @@ class FixedRateProfileGenerator(ProfileGenerator):
 
         if self._rate_type == "poisson":
             return Profile(
-                load_gen_mode=LoadGenerationModes.POISSON, load_gen_rate=self._rates[self._rate_index]
+                load_gen_mode=LoadGenerationModes.POISSON, load_gen_rate=current_rate
             )
 
         raise ValueError(f"Invalid rate type: {self._rate_type}")
