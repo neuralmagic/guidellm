@@ -69,6 +69,8 @@ class ProfileGenerator(ABC):
 class FixedRateProfileGenerator(ProfileGenerator):
     def __init__(self, rate: List[float], rate_type: str, **kwargs):
         super().__init__(ProfileGenerationModes.FIXED)
+        if rate_type == "synchronous" and rate.length > 0:
+            raise ValueError("custom rates are not supported in synchronous mode")
         self._rates = rate
         self._rate_index = 0
         self._rate_type = rate_type
