@@ -48,8 +48,7 @@ class RequestGenerator(ABC):
             logger.debug("No tokenizer provided")
 
         if self._mode == "async":
-            self._thread = threading.Thread(target=self._populate_queue)
-            self._thread.daemon = True
+            self._thread = threading.Thread(target=self._populate_queue, daemon=True)
             self._thread.start()
             logger.info(
                 "RequestGenerator started in async mode with queue size: {}",
