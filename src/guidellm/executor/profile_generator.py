@@ -16,6 +16,10 @@ __all__ = [
     "SweepProfileGenerator",
 ]
 
+RateTypeLoadGenModeMap = {
+    "constant": LoadGenerationModes.CONSTANT,
+    "poisson": LoadGenerationModes.POISSON,
+}
 
 class ProfileGenerationModes(Enum):
     FIXED = "fixed_rate"
@@ -79,19 +83,15 @@ class FixedRateProfileGenerator(ProfileGenerator):
         current_rate = self._rates[self._rate_index]
         self._rate_index += 1
 
-        if self._rate_type == "constant":
-            return Profile(
-                load_gen_mode=LoadGenerationModes.CONSTANT, load_gen_rate=current_rate
-            )
-
         if self._rate_type == "synchronous":
             return Profile(
                 load_gen_mode=LoadGenerationModes.SYNCHRONOUS, load_gen_rate=None
             )
-
-        if self._rate_type == "poisson":
+        
+        if self._rate_type in {"constant", "poisson"}:
+            load_gen_mode = RateTypeLoadGenModeMap[self._rate_type]
             return Profile(
-                load_gen_mode=LoadGenerationModes.POISSON, load_gen_rate=current_rate
+                load_gen_mode=load_gen_mode, load_gen_rate=current_rate
             )
 
         raise ValueError(f"Invalid rate type: {self._rate_type}")
