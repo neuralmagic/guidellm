@@ -47,9 +47,11 @@ class ProfileGenerator(ABC):
     def create_generator(
         mode: Union[str, ProfileGenerationModes], **kwargs
     ) -> "ProfileGenerator":
-        if isinstance(mode, str):
-            mode = ProfileGenerationModes(mode)
-
+        mode_is_invalid = not isinstance(mode, str) or mode not in [m.value for m in ProfileGenerationModes]
+        if mode_is_invalid:
+            raise ValueError(f"Invalid profile generation mode: {mode}")
+        mode = ProfileGenerationModes(mode)
+        
         if mode not in ProfileGenerator._registry:
             raise ValueError(f"Invalid profile generation mode: {mode}")
 
@@ -69,12 +71,11 @@ class ProfileGenerator(ABC):
 class FixedRateProfileGenerator(ProfileGenerator):
     def __init__(self, rate: List[float], rate_type: str, **kwargs):
         super().__init__(ProfileGenerationModes.FIXED)
-        if rate_type == "synchronous" and rate.length > 0:
+        if rate_type == "synchronous" and len(rate) > 0:
             raise ValueError("custom rates are not supported in synchronous mode")
         self._rates = rate
         self._rate_index = 0
         self._rate_type = rate_type
-        self._generated = False
 
     def next_profile(
         self, current_report: TextGenerationBenchmarkReport
