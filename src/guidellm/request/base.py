@@ -8,6 +8,7 @@ from loguru import logger
 from transformers import AutoTokenizer, PreTrainedTokenizer
 
 from guidellm.core.request import TextGenerationRequest
+from guidellm.utils import STANDARD_SLEEP_INTERVAL
 
 __all__ = ["RequestGenerator"]
 
@@ -146,13 +147,13 @@ class RequestGenerator(ABC):
             try:
                 if self._queue.qsize() < self._async_queue_size:
                     item = self.create_item()
-                    self._queue.put(item, timeout=0.1)
+                    self._queue.put(item, timeout=STANDARD_SLEEP_INTERVAL)
                     logger.debug(
                         "Item added to queue. Current queue size: {}",
                         self._queue.qsize(),
                     )
                 else:
-                    time.sleep(0.1)
+                    time.sleep(STANDARD_SLEEP_INTERVAL)
             except Full:
                 continue
         logger.info("RequestGenerator stopped populating queue")

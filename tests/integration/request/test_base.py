@@ -1,5 +1,6 @@
 import pytest
 from transformers import AutoTokenizer, PreTrainedTokenizerBase
+
 from guidellm.core.request import TextGenerationRequest
 from guidellm.request.base import RequestGenerator
 

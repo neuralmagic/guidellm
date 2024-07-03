@@ -1,3 +1,4 @@
+import time
 from unittest.mock import Mock, patch
 
 import pytest
@@ -79,6 +80,7 @@ def test_request_generator_repr():
 @pytest.mark.regression
 def test_request_generator_create_item_not_implemented():
     with pytest.raises(TypeError):
+
         class IncompleteRequestGenerator(RequestGenerator):
             pass
 
@@ -106,7 +108,7 @@ def test_request_generator_iter_calls_create_item():
         if len(items) == 5:
             break
 
-    assert len(items) == 5
+    assert generator._queue.qsize() == 0
     generator.create_item.assert_called()
 
 
@@ -124,5 +126,7 @@ def test_request_generator_async_iter_calls_create_item():
             break
 
     generator.stop()
-    assert len(items) == 5
+    stop_size = generator._queue.qsize()
+    time.sleep(0.1)
+    assert generator._queue.qsize() == stop_size
     generator.create_item.assert_called()
