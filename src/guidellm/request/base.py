@@ -1,11 +1,14 @@
-import asyncio
+import threading
+import time
 from abc import ABC, abstractmethod
+from queue import Empty, Full, Queue
 from typing import Iterator, Optional, Union
 
 from loguru import logger
 from transformers import AutoTokenizer, PreTrainedTokenizer
 
 from guidellm.core.request import TextGenerationRequest
+from guidellm.utils import STANDARD_SLEEP_INTERVAL
 
 __all__ = ["RequestGenerator"]
 
@@ -31,8 +34,8 @@ class RequestGenerator(ABC):
     ):
         self._async_queue_size = async_queue_size
         self._mode = mode
-        self._queue = asyncio.Queue(maxsize=async_queue_size)
-        self._stop_event = asyncio.Event()
+        self._queue = Queue(maxsize=async_queue_size)
+        self._stop_event = threading.Event()
 
         if tokenizer is not None:
             self._tokenizer = (
@@ -40,10 +43,18 @@ class RequestGenerator(ABC):
                 if isinstance(tokenizer, str)
                 else tokenizer
             )
-            logger.info(f"Tokenizer initialized: {self._tokenizer}")
+            logger.info("Tokenizer initialized: {}", self._tokenizer)
         else:
             self._tokenizer = None
             logger.debug("No tokenizer provided")
+
+        if self._mode == "async":
+            self._thread = threading.Thread(target=self._populate_queue, daemon=True)
+            self._thread.start()
+            logger.info(
+                "RequestGenerator started in async mode with queue size: {}",
+                self._async_queue_size,
+            )
 
     def __repr__(self) -> str:
         """
@@ -72,7 +83,7 @@ class RequestGenerator(ABC):
                     item = self._queue.get_nowait()
                     self._queue.task_done()
                     yield item
-                except asyncio.QueueEmpty:
+                except Empty:
                     continue
         else:
             while not self._stop_event.is_set():
@@ -118,46 +129,31 @@ class RequestGenerator(ABC):
         """
         raise NotImplementedError()
 
-    def start(self):
-        """
-        Start the background task that populates the queue.
-        """
-        if self.mode == "async":
-            try:
-                loop = asyncio.get_running_loop()
-                logger.info("Using existing event loop")
-            except RuntimeError:
-                raise RuntimeError("No running event loop found for async mode")
-
-            loop.call_soon_threadsafe(
-                lambda: asyncio.create_task(self._populate_queue())
-            )
-            logger.info(
-                f"RequestGenerator started in async mode with queue size: "
-                f"{self._async_queue_size}"
-            )
-        else:
-            logger.info("RequestGenerator started in sync mode")
-
     def stop(self):
         """
         Stop the background task that populates the queue.
         """
         logger.info("Stopping RequestGenerator...")
         self._stop_event.set()
+        if self._mode == "async":
+            self._thread.join()
         logger.info("RequestGenerator stopped")
 
-    async def _populate_queue(self):
+    def _populate_queue(self):
         """
         Populate the request queue in the background.
         """
         while not self._stop_event.is_set():
-            if self._queue.qsize() < self._async_queue_size:
-                item = self.create_item()
-                await self._queue.put(item)
-                logger.debug(
-                    f"Item added to queue. Current queue size: {self._queue.qsize()}"
-                )
-            else:
-                await asyncio.sleep(0.1)
+            try:
+                if self._queue.qsize() < self._async_queue_size:
+                    item = self.create_item()
+                    self._queue.put(item, timeout=STANDARD_SLEEP_INTERVAL)
+                    logger.debug(
+                        "Item added to queue. Current queue size: {}",
+                        self._queue.qsize(),
+                    )
+                else:
+                    time.sleep(STANDARD_SLEEP_INTERVAL)
+            except Full:
+                continue
         logger.info("RequestGenerator stopped populating queue")
