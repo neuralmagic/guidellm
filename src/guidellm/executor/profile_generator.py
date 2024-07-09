@@ -69,30 +69,37 @@ class ProfileGenerator(ABC):
 
 @ProfileGenerator.register_generator(ProfileGenerationModes.FIXED)
 class FixedRateProfileGenerator(ProfileGenerator):
-    def __init__(self, rate: List[float], rate_type: str, **kwargs):
+    def __init__(self, rate_type: str, rate: Optional[List[float]] = None, **kwargs):
         super().__init__(ProfileGenerationModes.FIXED)
-        if rate_type == "synchronous" and len(rate) > 0:
+        if rate_type == "synchronous" and rate and len(rate) > 0:
             raise ValueError("custom rates are not supported in synchronous mode")
         self._rates = rate
         self._rate_index = 0
+        self._generated = False
         self._rate_type = rate_type
 
     def next_profile(
         self, current_report: TextGenerationBenchmarkReport
     ) -> Optional[Profile]:
-        if self._rate_index >= len(self._rates):
-            return None
-        
-        current_rate = self._rates[self._rate_index]
-        self._rate_index += 1
-
         if self._rate_type == "synchronous":
+            if self._generated:
+                return None
+        
+            self._generated = True
+
             return Profile(
                 load_gen_mode=LoadGenerationModes.SYNCHRONOUS, load_gen_rate=None
             )
         
         if self._rate_type in {"constant", "poisson"}:
+            if self._rate_index >= len(self._rates):
+                return None
+
+            current_rate = self._rates[self._rate_index]
+            self._rate_index += 1
+        
             load_gen_mode = RateTypeLoadGenModeMap[self._rate_type]
+            
             return Profile(
                 load_gen_mode=load_gen_mode, load_gen_rate=current_rate
             )
