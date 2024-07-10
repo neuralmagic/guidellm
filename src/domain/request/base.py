@@ -1,3 +1,4 @@
+import contextlib
 import threading
 import time
 from abc import ABC, abstractmethod
@@ -46,8 +47,7 @@ class RequestGenerator(ABC):
             logger.debug("No tokenizer provided")
 
         if self._mode == "async":
-            self._thread = threading.Thread(target=self._populate_queue)
-            self._thread.daemon = True
+            self._thread = threading.Thread(target=self._populate_queue, daemon=True)
             self._thread.start()
             logger.info(
                 "RequestGenerator started in async mode with queue size: {}",
@@ -142,7 +142,7 @@ class RequestGenerator(ABC):
         Populate the request queue in the background.
         """
         while not self._stop_event.is_set():
-            try:
+            with contextlib.suppress(Full):
                 if self._queue.qsize() < self._async_queue_size:
                     item = self.create_item()
                     self._queue.put(item, timeout=0.1)
@@ -151,7 +151,7 @@ class RequestGenerator(ABC):
                         self._queue.qsize(),
                     )
                 else:
-                    time.sleep(0.1)
-            except Full:
-                continue
+                    # print("\nSleeping on _populate_queue...")
+                    time.sleep(1)  # TODO: Change me
+
         logger.info("RequestGenerator stopped populating queue")

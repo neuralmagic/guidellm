@@ -1,9 +1,11 @@
+import random
+
 import pytest
 
 from domain.backend.base import BackendEngine
 from domain.core.result import TextGenerationBenchmarkReport
 from domain.executor import Executor, ProfileGenerationMode, SingleProfileGenerator
-from tests.dummy.services import TestRequestGenerator
+from tests import dummy
 
 
 @pytest.mark.parametrize(
@@ -22,7 +24,9 @@ def test_executor_openai_unsupported_generation_modes(
         * Profile generation modes: sync,
     """
 
-    request_genrator = TestRequestGenerator(tokenizer="bert-base-uncased")
+    request_genrator = dummy.services.TestRequestGenerator(
+        tokenizer="bert-base-uncased"
+    )
     profile_generator_args = {"rate_type": profile_generation_mode, "rate": 1.0}
 
     with pytest.raises(ValueError):
@@ -36,12 +40,20 @@ def test_executor_openai_unsupported_generation_modes(
         )
 
 
-def test_executor_openai_single_report_generation(openai_backend_factory):
+def test_executor_openai_single_report_generation(mocker, openai_backend_factory):
     """
     Check OpenAI Single Report Generation.
+
+    1. create dummy data for all the OpenAI responses
+    2. create an `Executor` instance
+    3. run the executor
+    4. check the executor schedule tasks for submiting requests
+    5. validate the output report
     """
 
-    request_genrator = TestRequestGenerator(tokenizer="bert-base-uncased")
+    request_genrator = dummy.services.TestRequestGenerator(
+        tokenizer="bert-base-uncased"
+    )
     profile_generation_mode = ProfileGenerationMode.SINGLE
     profile_generator_args = {"rate_type": profile_generation_mode, "rate": 1.0}
 

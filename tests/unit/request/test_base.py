@@ -7,8 +7,7 @@ from domain.request import RequestGenerator
 from tests.dummy.services import TestRequestGenerator
 
 
-@pytest.mark.smoke
-def test_request_generator_sync_constructor():
+@pytest.mark.smoke def test_request_generator_sync_constructor():
     generator = TestRequestGenerator(mode="sync")
     assert generator.mode == "sync"
     assert generator.async_queue_size == 50  # Default value

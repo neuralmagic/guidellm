@@ -1,5 +1,5 @@
 import random
-from typing import List
+from typing import List, Optional
 
 import pytest
 from loguru import logger
@@ -49,11 +49,11 @@ def openai_backend_factory():
     Call without provided arguments returns default Backend service.
     """
 
-    def inner_wrapper(*_, **kwargs) -> OpenAIBackend:
+    def inner_wrapper(*_, base_url: Optional[str] = None, **kwargs) -> OpenAIBackend:
         static = {"backend_type": BackendEngine.OPENAI_SERVER}
         defaults = {
             "openai_api_key": "required but not used",
-            "internal_callback_url": "http://localhost:8080",
+            "internal_callback_url": base_url or "http://localhost:8080",
         }
 
         defaults.update(kwargs)

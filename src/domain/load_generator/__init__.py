@@ -8,6 +8,13 @@ __all__ = ["LoadGenerationMode", "LoadGenerator"]
 
 
 class LoadGenerationMode(str, Enum):
+    """
+    Available values:
+    * SYNCHRONOUS
+    * CONSTANT
+    * POISSION
+    """
+
     SYNCHRONOUS = "sync"
     CONSTANT = "constant"
     POISSON = "poisson"

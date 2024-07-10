@@ -1,10 +1,9 @@
 import asyncio
+import functools
 import threading
 from typing import Any, Callable, Dict, Optional
 
 from loguru import logger
-
-__all__ = ["Task"]
 
 
 class Task:
@@ -26,10 +25,12 @@ class Task:
         params: Optional[Dict[str, Any]] = None,
         err_container: Optional[Callable] = None,
     ):
-        self._func = func
-        self._params = params or {}
-        self._err_container = err_container
+        self._func: Callable[..., Any] = func
+        self._params: Dict[str, Any] = params or {}
+        self._err_container: Optional[Callable] = err_container
         self._cancel_event = asyncio.Event()
+        self._loop = asyncio.get_running_loop()
+
         logger.info(
             f"Task created with function: {self._func.__name__} and "
             f"params: {self._params}"
@@ -51,7 +52,9 @@ class Task:
             self._thread.start()
 
             result = await asyncio.gather(
-                asyncio.to_thread(self._func, **self._params),
+                self._loop.run_in_executor(
+                    None, functools.partial(self._func, **self._params)
+                ),
                 self._check_cancelled(),
                 return_exceptions=True,
             )

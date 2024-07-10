@@ -1,4 +1,3 @@
-import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
@@ -91,16 +90,17 @@ class Backend(ABC):
         """
 
         logger.info(f"Submitting request with prompt: {request.prompt}")
-        result_id = str(uuid.uuid4())
-        result = TextGenerationResult(result_id)
+        result = TextGenerationResult(request=request)
         result.start(request.prompt)
 
+        breakpoint()  # TODO: remove
         for response in self.make_request(request):
             if response.type_ == "token_iter" and response.add_token:
                 result.output_token(response.add_token)
             elif response.type_ == "final":
                 result.end(
-                    response.output,
+                    # NOTE: clarify if the `or ""` makesa any sense
+                    response.output or "",
                     response.prompt_token_count,
                     response.output_token_count,
                 )
