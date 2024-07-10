@@ -1,7 +1,7 @@
 import pytest
 from transformers import AutoTokenizer, PreTrainedTokenizerBase
 
-from guidellm.request.test import TestRequestGenerator
+from tests.dummy.services import TestRequestGenerator
 
 
 @pytest.mark.smoke

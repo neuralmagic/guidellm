@@ -1,6 +1,6 @@
 import pytest
 
-from guidellm.core import Distribution
+from domain.core import Distribution
 
 
 @pytest.mark.smoke

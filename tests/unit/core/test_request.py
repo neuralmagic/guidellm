@@ -1,6 +1,6 @@
 import pytest
 
-from guidellm.core import TextGenerationRequest
+from domain.core import TextGenerationRequest
 
 
 @pytest.mark.smoke

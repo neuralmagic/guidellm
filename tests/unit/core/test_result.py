@@ -1,6 +1,6 @@
 import pytest
 
-from guidellm.core import (
+from domain.core import (
     TextGenerationBenchmark,
     TextGenerationBenchmarkReport,
     TextGenerationError,

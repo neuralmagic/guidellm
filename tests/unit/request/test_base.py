@@ -2,13 +2,9 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from guidellm.core.request import TextGenerationRequest
-from guidellm.request.base import RequestGenerator
-
-
-class TestRequestGenerator(RequestGenerator):
-    def create_item(self) -> TextGenerationRequest:
-        return TextGenerationRequest(prompt="Test prompt")
+from domain.core import TextGenerationRequest
+from domain.request import RequestGenerator
+from tests.dummy.services import TestRequestGenerator
 
 
 @pytest.mark.smoke
@@ -79,6 +75,7 @@ def test_request_generator_repr():
 @pytest.mark.regression
 def test_request_generator_create_item_not_implemented():
     with pytest.raises(TypeError):
+
         class IncompleteRequestGenerator(RequestGenerator):
             pass
 

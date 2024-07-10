@@ -7,9 +7,9 @@ from typing import Callable, List
 import pytest
 from openai.types import Completion
 
-from guidellm.backend import Backend, BackendEngine, OpenAIBackend
-from guidellm.core import TextGenerationRequest
-from guidellm.request.test import TestRequestGenerator
+from domain.backend import Backend, BackendEngine, OpenAIBackend
+from domain.core import TextGenerationRequest
+from tests.dummy.services import TestRequestGenerator
 
 
 @pytest.mark.sanity
@@ -18,7 +18,7 @@ def test_openai_backend_creation_with_default_model(openai_backend_factory: Call
     Test whether the OpenAI Backend service is created correctly
     with all default parameters.
 
-    Also checks wheather the `default_models` parameter does not abuse the OpenAI API.
+    Also checks whether the `default_models` parameter does not abuse the OpenAI API.
     """
 
     backend_service = openai_backend_factory()

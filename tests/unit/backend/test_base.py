@@ -2,8 +2,8 @@ from typing import Iterator, List, Optional
 
 import pytest
 
-from guidellm.backend import Backend, BackendEngine, GenerativeResponse, OpenAIBackend
-from guidellm.core import TextGenerationRequest
+from domain.backend import Backend, BackendEngine, GenerativeResponse, OpenAIBackend
+from domain.core import TextGenerationRequest
 
 
 @Backend.register(backend_type=BackendEngine.TEST)
@@ -35,8 +35,7 @@ class TestBackend(Backend):
 @pytest.mark.smoke
 def test_backend_registry():
     """
-    Ensure that all registered classes exist in the registry
-    after they
+    Ensure that all registered classes exist in the Backend._registry.
     """
 
     assert Backend._registry == {

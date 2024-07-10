@@ -20,6 +20,8 @@ lint.select = ["E", "F", "W"]
 max-line-length = 88
 
 [tool.pytest.ini_options]
+addopts = '-s -vvv --cache-clear'
+asyncio_mode = 'auto'
 python_classes = "DisableTestClasses"
 markers = [
     "smoke: quick tests to check basic functionality",
