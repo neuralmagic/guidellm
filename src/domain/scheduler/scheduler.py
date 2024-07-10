@@ -72,26 +72,17 @@ class Scheduler:
         )
         load_gen = LoadGenerator(self._load_gen_mode, self._load_gen_rate)
 
-        coroutines = []
+        tasks = []
         start_time = time.time()
         counter = 0
-
         try:
-            for text_generation_request, task_start_time in zip(
-                self._request_generator, load_gen.times()
-            ):
-                coro = Task(
-                    func=self._backend.submit,
-                    params={"request": text_generation_request.prompt},
-                    err_container=TextGenerationError,
-                )
-
+            for task, task_start_time in zip(self._task_iterator(), load_gen.times()):
                 pending_time = task_start_time - time.time()
 
                 if pending_time > 0:
                     await asyncio.sleep(pending_time)
 
-                coroutines.append(self._run_task_async(coro, result_set))
+                tasks.append(self._run_task_async(task, result_set))
                 counter += 1
 
                 if (
@@ -108,13 +99,12 @@ class Scheduler:
                     await asyncio.sleep(pending_duration)
                 raise asyncio.CancelledError()
 
-            await asyncio.gather(*coroutines)
-
+            await asyncio.gather(*tasks)
         except asyncio.CancelledError:
             # Cancel all pending tasks
-            for coro in coroutines:
-                if not coro.done():
-                    coro.cancel()
+            for task in tasks:
+                if not task.done():
+                    task.cancel()
 
         return result_set
 
@@ -122,3 +112,11 @@ class Scheduler:
         result_set.request_started()
         res = await task.run_async()
         result_set.request_completed(res)
+
+    def _task_iterator(self) -> Iterable[Task]:
+        for request in self._request_generator:
+            yield Task(
+                func=self._backend.submit,
+                params={"request": request},
+                err_container=TextGenerationError,
+            )

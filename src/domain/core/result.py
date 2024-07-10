@@ -40,7 +40,6 @@ class TextGenerationResult:
         self._first_token_time: Optional[float] = None
         self._decode_times = Distribution()
 
-        breakpoint()  # TODO: remove
         logger.debug(f"Initialized TextGenerationResult for request: {self._request}")
 
     def __repr__(self) -> str:

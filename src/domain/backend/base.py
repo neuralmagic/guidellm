@@ -93,7 +93,6 @@ class Backend(ABC):
         result = TextGenerationResult(request=request)
         result.start(request.prompt)
 
-        breakpoint()  # TODO: remove
         for response in self.make_request(request):
             if response.type_ == "token_iter" and response.add_token:
                 result.output_token(response.add_token)
