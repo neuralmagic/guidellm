@@ -57,30 +57,22 @@ def test_distribution_repr():
 
 
 @pytest.mark.regression
-def test_distribution_to_json():
+def test_distribution_json():
     data = [1, 2, 3, 4, 5]
     dist = Distribution(data=data)
     json_str = dist.to_json()
     assert '"data":[1,2,3,4,5]' in json_str
 
-
-@pytest.mark.regression
-def test_distribution_from_json():
-    json_str = '{"data": [1, 2, 3, 4, 5]}'
-    dist = Distribution.from_json(json_str)
-    assert dist.data == [1, 2, 3, 4, 5]
+    dist_restored = Distribution.from_json(json_str)
+    assert dist_restored.data == data
 
 
 @pytest.mark.regression
-def test_distribution_to_yaml():
+def test_distribution_yaml():
     data = [1, 2, 3, 4, 5]
     dist = Distribution(data=data)
     yaml_str = dist.to_yaml()
     assert "data:\n- 1\n- 2\n- 3\n- 4\n- 5\n" in yaml_str
 
-
-@pytest.mark.regression
-def test_distribution_from_yaml():
-    yaml_str = "data:\n- 1\n- 2\n- 3\n- 4\n- 5\n"
-    dist = Distribution.from_yaml(yaml_str)
-    assert dist.data == [1, 2, 3, 4, 5]
+    dist_restored = Distribution.from_yaml(yaml_str)
+    assert dist_restored.data == data
