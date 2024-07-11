@@ -1,9 +1,9 @@
-from .base import Backend, BackendTypes, GenerativeResponse
+from .base import Backend, BackendEngine, GenerativeResponse
 from .openai import OpenAIBackend
 
 __all__ = [
     "Backend",
-    "BackendTypes",
+    "BackendEngine",
     "GenerativeResponse",
     "OpenAIBackend",
 ]

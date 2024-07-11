@@ -1,3 +1,4 @@
+import contextlib
 import threading
 import time
 from abc import ABC, abstractmethod
@@ -8,9 +9,6 @@ from loguru import logger
 from transformers import AutoTokenizer, PreTrainedTokenizer
 
 from guidellm.core.request import TextGenerationRequest
-from guidellm.utils import STANDARD_SLEEP_INTERVAL
-
-__all__ = ["RequestGenerator"]
 
 
 class RequestGenerator(ABC):
@@ -127,7 +125,6 @@ class RequestGenerator(ABC):
         :return: A new result request.
         :rtype: TextGenerationRequest
         """
-        raise NotImplementedError()
 
     def stop(self):
         """
@@ -144,16 +141,15 @@ class RequestGenerator(ABC):
         Populate the request queue in the background.
         """
         while not self._stop_event.is_set():
-            try:
+            with contextlib.suppress(Full):
                 if self._queue.qsize() < self._async_queue_size:
                     item = self.create_item()
-                    self._queue.put(item, timeout=STANDARD_SLEEP_INTERVAL)
+                    self._queue.put(item, timeout=0.1)
                     logger.debug(
                         "Item added to queue. Current queue size: {}",
                         self._queue.qsize(),
                     )
                 else:
-                    time.sleep(STANDARD_SLEEP_INTERVAL)
-            except Full:
-                continue
+                    time.sleep(0.1)
+
         logger.info("RequestGenerator stopped populating queue")

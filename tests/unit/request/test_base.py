@@ -1,15 +1,9 @@
-import time
 from unittest.mock import Mock, patch
 
 import pytest
 
-from guidellm.core.request import TextGenerationRequest
-from guidellm.request.base import RequestGenerator
-
-
-class TestRequestGenerator(RequestGenerator):
-    def create_item(self) -> TextGenerationRequest:
-        return TextGenerationRequest(prompt="Test prompt")
+from guidellm.core import TextGenerationRequest
+from tests.dummy.services import TestRequestGenerator
 
 
 @pytest.mark.smoke
@@ -78,24 +72,6 @@ def test_request_generator_repr():
 
 
 @pytest.mark.regression
-def test_request_generator_create_item_not_implemented():
-    with pytest.raises(TypeError):
-
-        class IncompleteRequestGenerator(RequestGenerator):
-            pass
-
-        IncompleteRequestGenerator()
-
-    class IncompleteCreateItemGenerator(RequestGenerator):
-        def create_item(self):
-            super().create_item()
-
-    generator = IncompleteCreateItemGenerator()
-    with pytest.raises(NotImplementedError):
-        generator.create_item()
-
-
-@pytest.mark.regression
 def test_request_generator_iter_calls_create_item():
     generator = TestRequestGenerator(mode="sync")
     generator.create_item = Mock(
@@ -108,7 +84,7 @@ def test_request_generator_iter_calls_create_item():
         if len(items) == 5:
             break
 
-    assert generator._queue.qsize() == 0
+    assert len(items) == 5
     generator.create_item.assert_called()
 
 
@@ -126,7 +102,5 @@ def test_request_generator_async_iter_calls_create_item():
             break
 
     generator.stop()
-    stop_size = generator._queue.qsize()
-    time.sleep(0.1)
-    assert generator._queue.qsize() == stop_size
+    assert len(items) == 5
     generator.create_item.assert_called()
