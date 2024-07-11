@@ -1,16 +1,19 @@
-from typing import Any, Iterator, List, Optional
+import functools
+import os
+from typing import Any, Dict, Iterator, List, Optional
 
-import openai
 from loguru import logger
+from openai import OpenAI, Stream
+from openai.types import Completion
 from transformers import AutoTokenizer
 
-from guidellm.backend import Backend, BackendTypes, GenerativeResponse
-from guidellm.core.request import TextGenerationRequest
+from guidellm.backend import Backend, BackendEngine, GenerativeResponse
+from guidellm.core import TextGenerationRequest
 
 __all__ = ["OpenAIBackend"]
 
 
-@Backend.register_backend(BackendTypes.OPENAI_SERVER)
+@Backend.register(BackendEngine.OPENAI_SERVER)
 class OpenAIBackend(Backend):
     """
     An OpenAI backend implementation for the generative AI result.
@@ -33,34 +36,37 @@ class OpenAIBackend(Backend):
 
     def __init__(
         self,
-        target: Optional[str] = None,
-        host: Optional[str] = None,
-        port: Optional[int] = None,
-        path: Optional[str] = None,
+        openai_api_key: Optional[str] = None,
+        internal_callback_url: Optional[str] = None,
         model: Optional[str] = None,
-        api_key: Optional[str] = None,
-        **request_args,
+        **request_args: Any,
     ):
-        self.target = target
-        self.model = model
+        """
+        Initialize an OpenAI Client
+        """
+
         self.request_args = request_args
 
-        if not self.target:
-            if not host:
-                raise ValueError("Host is required if target is not provided.")
+        if not (_api_key := (openai_api_key or os.getenv("OPENAI_API_KEY", None))):
+            raise ValueError(
+                "`OPENAI_API_KEY` environment variable "
+                "or --openai-api-key CLI parameter "
+                "must be specify for the OpenAI backend"
+            )
 
-            port_incl = f":{port}" if port else ""
-            path_incl = path if path else ""
-            self.target = f"http://{host}{port_incl}{path_incl}"
-
-        openai.api_base = self.target
-        openai.api_key = api_key
-
-        if not model:
-            self.model = self.default_model()
+        if not (
+            _base_url := (internal_callback_url or os.getenv("OPENAI_BASE_URL", None))
+        ):
+            raise ValueError(
+                "`OPENAI_BASE_URL` environment variable "
+                "or --openai-base-url CLI parameter "
+                "must be specify for the OpenAI backend"
+            )
+        self.openai_client = OpenAI(api_key=_api_key, base_url=_base_url)
+        self.model = model or self.default_model
 
         logger.info(
-            f"Initialized OpenAIBackend with target: {self.target} "
+            f"Initialized OpenAIBackend with callback url: {internal_callback_url} "
             f"and model: {self.model}"
         )
 
@@ -75,52 +81,46 @@ class OpenAIBackend(Backend):
         :return: An iterator over the generative responses.
         :rtype: Iterator[GenerativeResponse]
         """
-        logger.debug(f"Making request to OpenAI backend with prompt: {request.prompt}")
-        num_gen_tokens = request.params.get("generated_tokens", None)
-        request_args = {
-            "n": 1,
-        }
 
-        if num_gen_tokens:
-            request_args["max_tokens"] = num_gen_tokens
-            request_args["stop"] = None
+        logger.debug(f"Making request to OpenAI backend with prompt: {request.prompt}")
+
+        # How many completions to generate for each prompt
+        request_args: Dict = {"n": 1}
+
+        if (num_gen_tokens := request.params.get("generated_tokens", None)) is not None:
+            request_args.update(max_tokens=num_gen_tokens, stop=None)
 
         if self.request_args:
             request_args.update(self.request_args)
 
-        response = openai.Completion.create(
-            engine=self.model,
+        response: Stream[Completion] = self.openai_client.completions.create(
+            model=self.model,
             prompt=request.prompt,
             stream=True,
             **request_args,
         )
 
         for chunk in response:
-            if chunk.get("choices"):
-                choice = chunk["choices"][0]
-                if choice.get("finish_reason") == "stop":
-                    logger.debug("Received final response from OpenAI backend")
-                    yield GenerativeResponse(
-                        type_="final",
-                        output=choice["text"],
-                        prompt=request.prompt,
-                        prompt_token_count=(
-                            request.token_count
-                            if request.token_count
-                            else self._token_count(request.prompt)
-                        ),
-                        output_token_count=(
-                            num_gen_tokens
-                            if num_gen_tokens
-                            else self._token_count(choice["text"])
-                        ),
-                    )
-                    break
-                else:
-                    logger.debug("Received token from OpenAI backend")
-                    yield GenerativeResponse(
-                        type_="token_iter", add_token=choice["text"]
-                    )
+            chunk_content: str = getattr(chunk, "content", "")
+
+            if getattr(chunk, "stop", True) is True:
+                logger.debug("Received final response from OpenAI backend")
+
+                yield GenerativeResponse(
+                    type_="final",
+                    prompt=getattr(chunk, "prompt", request.prompt),
+                    prompt_token_count=(
+                        request.prompt_token_count or self._token_count(request.prompt)
+                    ),
+                    output_token_count=(
+                        num_gen_tokens
+                        if num_gen_tokens
+                        else self._token_count(chunk_content)
+                    ),
+                )
+            else:
+                logger.debug("Received token from OpenAI backend")
+                yield GenerativeResponse(type_="token_iter", add_token=chunk_content)
 
     def available_models(self) -> List[str]:
         """
@@ -129,10 +129,16 @@ class OpenAIBackend(Backend):
         :return: A list of available models.
         :rtype: List[str]
         """
-        models = [model["id"] for model in openai.Engine.list()["data"]]
+
+        models: list[str] = [
+            model.id for model in self.openai_client.models.list().data
+        ]
         logger.info(f"Available models: {models}")
+
         return models
 
+    @property
+    @functools.lru_cache(maxsize=1)
     def default_model(self) -> str:
         """
         Get the default model for the backend.
@@ -140,10 +146,11 @@ class OpenAIBackend(Backend):
         :return: The default model.
         :rtype: str
         """
-        models = self.available_models()
-        if models:
+
+        if models := self.available_models():
             logger.info(f"Default model: {models[0]}")
             return models[0]
+
         logger.error("No models available.")
         raise ValueError("No models available.")
 

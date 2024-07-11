@@ -70,7 +70,7 @@ class TextGenerationResult:
             f"end_time={self._end_time})"
         )
 
-    def __eq__(self, other: "TextGenerationResult") -> bool:
+    def __eq__(self, other: object) -> bool:
         """
         Check equality between two TextGenerationResult instances.
 
@@ -79,6 +79,12 @@ class TextGenerationResult:
         :return: True if the instances are equal, False otherwise.
         :rtype: bool
         """
+
+        if not isinstance(other, "TextGenerationResult"):
+            raise NotImplementedError(
+                "Only TextGenerationResult type could be used in that operation"
+            )
+
         return (
             self._request == other._request
             and self._prompt == other._prompt
@@ -198,7 +204,6 @@ class TextGenerationResult:
 
     def end(
         self,
-        output: str,
         prompt_token_count: Optional[int] = None,
         output_token_count: Optional[int] = None,
     ):
@@ -214,21 +219,13 @@ class TextGenerationResult:
             defaults to word count.
         :type output_token_count: Optional[int]
         """
-        self._output = output
-        self._end_time = time()
-        self._output_word_count = len(output.split())
-        self._output_token_count = (
-            output_token_count
-            if output_token_count is not None
-            else self._output_word_count
-        )
-        self._prompt_token_count = (
-            prompt_token_count
-            if prompt_token_count is not None
-            else self._prompt_word_count
-        )
 
-        logger.info(f"Text generation ended with output: '{output}'")
+        self._end_time = time()
+        self._output_word_count = len(self.output.split())
+        self._output_token_count = output_token_count or self._output_word_count
+        self._prompt_token_count = prompt_token_count or self._prompt_word_count
+
+        logger.info(f"Text generation ended with output: '{self.output}'")
 
 
 class TextGenerationError:

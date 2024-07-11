@@ -78,7 +78,7 @@ def main(
     num_requests,
 ):
     # Create backend
-    Backend.create_backend(
+    Backend.create(
         backend_type=backend,
         target=target,
         host=host,
