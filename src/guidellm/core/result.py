@@ -1,4 +1,4 @@
-from time import perf_counter, time
+from time import time
 from typing import Any, Dict, List, Optional, Union
 
 from loguru import logger
@@ -47,7 +47,7 @@ class TextGenerationResult(Serializable):
         self.prompt_word_count = len(prompt.split())
         self.prompt_token_count = len(prompt)  # Token count placeholder
         self.start_time = time()
-        self.last_time = perf_counter()
+        self.last_time = time()
         self.first_token_set = False
 
         logger.info("Text generation started with prompt: '{}'", prompt)
@@ -78,8 +78,7 @@ class TextGenerationResult(Serializable):
         :param token: The decoded token.
         :type token: str
         """
-
-        current_counter = perf_counter()
+        current_counter = time()
 
         if not self._first_token_set:
             self.first_token_time = current_counter - self.last_time
