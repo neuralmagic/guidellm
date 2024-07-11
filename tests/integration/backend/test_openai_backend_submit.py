@@ -57,7 +57,7 @@ def test_openai_submit_request(
         ),
     )
     backend: OpenAIBackend = openai_backend_factory()
-    request = TextGenerationRequest(prompt="Say this is a test")
+    request = TextGenerationRequest(prompt="Generate numbers from 1 to 10")
 
     start_time = time.perf_counter()
     result: TextGenerationResult = backend.submit(request=request)
