@@ -112,9 +112,9 @@ class EmulatedRequestGenerator(RequestGenerator):
             raise ValueError(f"Invalid configuration type: {type(config)}")
 
         # map the config to the EmulatedConfig dataclass
-        config = EmulatedConfig(**config_dict)
+        mapped_config = EmulatedConfig(**config_dict or {})
 
-        return config
+        return mapped_config
 
     def _load_emulated_data(self) -> List[str]:
         url = "https://www.gutenberg.org/files/1342/1342-0.txt"
