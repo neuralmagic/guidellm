@@ -2,7 +2,7 @@ import json
 import re
 import unicodedata
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import requests
@@ -26,7 +26,7 @@ class EmulatedConfig:
     prompt_tokens_min: Optional[int] = None
     prompt_tokens_max: Optional[int] = None
 
-    generated_tokens: int = None
+    generated_tokens: Optional[int] = None
     generated_tokens_variance: Optional[int] = None
     generated_tokens_min: Optional[int] = None
     generated_tokens_max: Optional[int] = None
@@ -151,7 +151,7 @@ class EmulatedRequestGenerator(RequestGenerator):
             len(self.tokenizer.tokenize(text)) if self.tokenizer else len(text.split())
         )
 
-    def _sample_prompt(self) -> (str, int):
+    def _sample_prompt(self) -> Tuple[str, int]:
         prompt_tokens = self._config.prompt_tokens
         prompt_tokens_variance = self._config.prompt_tokens_variance or 0
         prompt_tokens_min = self._config.prompt_tokens_min or 1

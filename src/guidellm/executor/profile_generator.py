@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional, Union
+from typing import Dict, Optional, Type, Union
 
 import numpy
 
@@ -29,7 +29,7 @@ class Profile:
 
 
 class ProfileGenerator(ABC):
-    _registry = {}
+    _registry: Dict[ProfileGenerationModes, "Type[ProfileGenerator]"] = {}
 
     @staticmethod
     def register_generator(mode: ProfileGenerationModes):

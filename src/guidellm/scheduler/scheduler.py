@@ -71,6 +71,8 @@ class Scheduler:
         result_set = TextGenerationBenchmark(
             mode=self._load_gen_mode.value, rate=self._load_gen_rate
         )
+        if (not self._load_gen_rate):
+            raise ValueError("Invalid empty value for self._load_gen_rate")
         load_gen = LoadGenerator(self._load_gen_mode, self._load_gen_rate)
 
         tasks = []

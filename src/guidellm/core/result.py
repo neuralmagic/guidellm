@@ -80,7 +80,7 @@ class TextGenerationResult:
         :rtype: bool
         """
 
-        if not isinstance(other, "TextGenerationResult"):
+        if not isinstance(other, TextGenerationResult):
             raise NotImplementedError(
                 "Only TextGenerationResult type could be used in that operation"
             )
@@ -232,6 +232,7 @@ class TextGenerationResult:
 
     def end(
         self,
+        output: str,
         prompt_token_count: Optional[int] = None,
         output_token_count: Optional[int] = None,
     ):
@@ -253,7 +254,7 @@ class TextGenerationResult:
         self._output_token_count = output_token_count or self._output_word_count
         self._prompt_token_count = prompt_token_count or self._prompt_word_count
 
-        logger.info(f"Text generation ended with output: '{self.output}'")
+        logger.info(f"Text generation ended with output: '{output}'")
 
 
 class TextGenerationError:
@@ -347,6 +348,8 @@ class TextGenerationBenchmark:
         self._results: List[TextGenerationResult] = []
         self._errors: List[TextGenerationError] = []
         self._concurrencies: List[RequestConcurrencyMeasurement] = []
+        self._overloaded = False
+        self._args_rate: Optional[float] = None
 
         logger.debug(
             f"Initialized TextGenerationBenchmark with mode={mode} and rate={rate}"
@@ -401,6 +404,16 @@ class TextGenerationBenchmark:
         return iter(self._results)
 
     @property
+    def overloaded(self) -> bool:
+        """
+        Get the overloaded state of the result.
+
+        :return: The overloaded state.
+        :rtype: bool
+        """
+        return self._overloaded
+
+    @property
     def mode(self) -> str:
         """
         Get the mode of the result.
@@ -409,6 +422,16 @@ class TextGenerationBenchmark:
         :rtype: str
         """
         return self._mode
+
+    @property
+    def args_rate(self) -> Optional[float]:
+        """
+        Get the args rate of the result.
+
+        :return: The args rate.
+        :rtype: Optional[float]
+        """
+        return self._args_rate
 
     @property
     def rate(self) -> Optional[float]:
@@ -631,3 +654,6 @@ class TextGenerationBenchmarkReport:
         """
         self._benchmarks.append(benchmark)
         logger.debug(f"Added result: {benchmark}")
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {}

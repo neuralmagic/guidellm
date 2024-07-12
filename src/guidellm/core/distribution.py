@@ -135,7 +135,7 @@ class Distribution:
             logger.warning("No data points available to calculate percentile.")
             return 0.0
 
-        percentile_value = np.percentile(self._data, percentile)
+        percentile_value = np.percentile(self._data, percentile).item()
         logger.debug(f"Calculated {percentile}th percentile: {percentile_value}")
         return percentile_value
 

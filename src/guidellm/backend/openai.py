@@ -130,7 +130,7 @@ class OpenAIBackend(Backend):
         :rtype: List[str]
         """
 
-        models: list[str] = [
+        models: List[str] = [
             model.id for model in self.openai_client.models.list().data
         ]
         logger.info(f"Available models: {models}")
