@@ -45,6 +45,7 @@ class TextGenerationRequest:
         :return: String representation of the TextGenerationRequest.
         :rtype: str
         """
+
         return (
             f"TextGenerationRequest("
             f"id={self.id}, "
