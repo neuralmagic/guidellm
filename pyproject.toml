@@ -2,22 +2,94 @@
 requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
 
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["*"]
+
+[tool.setuptools.package-data]
+guidellm = ["*"]
+
+
+# ************************************************
+# ********** Project Metadata **********
+# ************************************************
+
+[project]
+name = "guidellm"
+version = "0.1.0"
+description = "Guidance platform for deploying and managing large language models."
+readme = { file = "README.md", content-type = "text/markdown" }
+requires-python = ">=3.8.0,<4.0"
+license = { file = "LICENSE" }
+authors = [ { name = "Neuralmagic, Inc." } ]
+urls = { homepage = "https://github.com/neuralmagic/guidellm" }
+dependencies = [
+    "click",
+    "datasets",
+    "loguru",
+    "numpy",
+    "openai",
+    "requests",
+    "transformers",
+]
+
+[project.optional-dependencies]
+dev = [
+    "black",
+    "isort",
+    "mypy",
+    "pre-commit",
+    "pytest",
+    "ruff",
+    "sphinx",
+    "tox",
+]
+code_quality = [
+    "black",
+    "isort",
+    "mypy",
+    "pytest",
+    "ruff",
+]
+
+
+[project.entry-points.console_scripts]
+guidellm = "guidellm.main:main"
+
+
+# ************************************************
+# ********** Code Quality Tools **********
+# ************************************************
+
 [tool.black]
 line-length = 88
 target-version = ['py38']
 
+
 [tool.isort]
 profile = "black"
 
+
 [tool.mypy]
 files = "src/guidellm"
+python_version = '3.8'
+warn_redundant_casts = true
+warn_unused_ignores = true
+show_error_codes = true
+namespace_packages = true
+exclude = ["venv", ".tox"]
+
+# Silint "type import errors" as our 3rd-party libs does not have types
+# Check: https://mypy.readthedocs.io/en/latest/config_file.html#import-discovery
+follow_imports = 'silent'
+
 
 [tool.ruff]
+line-length = 88
 exclude = ["build", "dist", "env", ".venv"]
 lint.select = ["E", "F", "W"]
 
-[tool.flake8]
-max-line-length = 88
 
 [tool.pytest.ini_options]
 addopts = '-s -vvv --cache-clear'
@@ -27,4 +99,3 @@ markers = [
     "sanity: detailed tests to ensure major functions work correctly",
     "regression: tests to ensure that new changes do not break existing functionality"
 ]
-

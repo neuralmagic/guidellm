@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Iterator, List, Optional, Type, Union
+from typing import Dict, Iterator, List, Optional, Type
 
 from loguru import logger
 
@@ -41,7 +41,7 @@ class Backend(ABC):
     An abstract base class with template methods for generative AI backends.
     """
 
-    _registry = {}
+    _registry: Dict[BackendEngine, "Type[Backend]"] = {}
 
     @classmethod
     def register(cls, backend_type: BackendEngine):
@@ -59,7 +59,7 @@ class Backend(ABC):
         return inner_wrapper
 
     @classmethod
-    def create(cls, backend_type: Union[str, BackendEngine], **kwargs) -> "Backend":
+    def create(cls, backend_type: BackendEngine, **kwargs) -> "Backend":
         """
         Factory method to create a backend based on the backend type.
 
@@ -77,7 +77,7 @@ class Backend(ABC):
             logger.error(f"Unsupported backend type: {backend_type}")
             raise ValueError(f"Unsupported backend type: {backend_type}")
 
-        return cls._registry[backend_type](**kwargs)
+        return Backend._registry[backend_type](**kwargs)
 
     def submit(self, request: TextGenerationRequest) -> TextGenerationResult:
         """
@@ -91,7 +91,10 @@ class Backend(ABC):
 
         logger.info(f"Submitting request with prompt: {request.prompt}")
 
-        result = TextGenerationResult(request=request)
+        # TODO: Doublecheck why do we need the result id
+        # result_id = str(uuid.uuid4())
+
+        result = TextGenerationResult(TextGenerationRequest(prompt=request.prompt))
         result.start(request.prompt)
 
         for response in self.make_request(request):  # GenerativeResponse
@@ -99,6 +102,7 @@ class Backend(ABC):
                 result.output_token(response.add_token)
             elif response.type_ == "final":
                 result.end(
+                    response.output or "",
                     response.prompt_token_count,
                     response.output_token_count,
                 )

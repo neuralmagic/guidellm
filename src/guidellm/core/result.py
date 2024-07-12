@@ -126,23 +126,31 @@ class TextGenerationResult:
         return self._output
 
     @property
-    def start_time(self) -> Optional[float]:
+    def start_time(self) -> float:
         """
         Get the start time of the text generation.
 
         :return: The start time.
-        :rtype: Optional[float]
+        :rtype: float
         """
+
+        self._recording_started()
+        assert self._start_time
+
         return self._start_time
 
     @property
-    def end_time(self) -> Optional[float]:
+    def end_time(self) -> float:
         """
         Get the end time of the text generation.
 
         :return: The end time.
-        :rtype: Optional[float]
+        :rtype: float
         """
+
+        self._recording_started()
+        assert self._end_time
+
         return self._end_time
 
     @property
@@ -181,6 +189,25 @@ class TextGenerationResult:
 
         logger.info(f"Text generation started with prompt: '{prompt}'")
 
+    def _recording_started(self, raise_exception: bool = True) -> bool:
+        """
+        Ensure that the benchmark text generation recording is started.
+
+        We can assume that if the `self.start_time` & `self.end_time` exist
+        then the `start()` has been called.
+        """
+
+        if (self.start_time is not None) and (self.end_time is not None):
+            return True
+        else:
+            if raise_exception is True:
+                raise ValueError(
+                    "Last time is not specified. "
+                    "Did you make the `text_generation_benchmark.start()`?"
+                )
+            else:
+                return False
+
     def output_token(self, token: str):
         """
         Add a token to the output and record the decode time.
@@ -188,14 +215,15 @@ class TextGenerationResult:
         :param token: The decoded token.
         :type token: str
         """
+
         current_counter = perf_counter()
 
         if not self._first_token_set:
-            self._first_token_time = current_counter - self._last_time
+            self._first_token_time = current_counter - self.end_time
             self._first_token_set = True
             logger.debug(f"First token decode time: {self._first_token_time}")
         else:
-            decode_time = current_counter - self._last_time
+            decode_time = current_counter - self.end_time
             self._decode_times.add_data([decode_time])
             logger.debug(f"Token '{token}' decoded in {decode_time} seconds")
 
@@ -344,7 +372,7 @@ class TextGenerationBenchmark:
             f"request_rate={self.request_rate})"
         )
 
-    def __eq__(self, other: "TextGenerationBenchmark") -> bool:
+    def __eq__(self, other: Any) -> bool:
         """
         Check equality between two TextGenerationBenchmark instances.
 
@@ -353,13 +381,16 @@ class TextGenerationBenchmark:
         :return: True if the instances are equal, False otherwise.
         :rtype: bool
         """
-        return (
-            self._mode == other._mode
-            and self._rate == other._rate
-            and self._results == other._results
-            and self._errors == other._errors
-            and self._concurrencies == other._concurrencies
-        )
+        if not isinstance(other, TextGenerationBenchmark):
+            raise TypeError(f"Operations only with {type(self)} are allowed.")
+        else:
+            return (
+                self._mode == other._mode
+                and self._rate == other._rate
+                and self._results == other._results
+                and self._errors == other._errors
+                and self._concurrencies == other._concurrencies
+            )
 
     def __iter__(self):
         """
@@ -447,13 +478,13 @@ class TextGenerationBenchmark:
         :return: The rate of requests per second.
         :rtype: float
         """
+
         if not self._results:
             return 0.0
-
-        start_time = self._results[0].start_time
-        end_time = self._results[-1].end_time
-
-        return self.request_count / (end_time - start_time)
+        else:
+            return self.request_count / (
+                self._results[-1].end_time - self._results[0].start_time
+            )
 
     def request_started(self):
         """
@@ -542,7 +573,7 @@ class TextGenerationBenchmarkReport:
             f"benchmarks_summary=[{', '.join(str(b) for b in self._benchmarks)}])"
         )
 
-    def __eq__(self, other: "TextGenerationBenchmarkReport") -> bool:
+    def __eq__(self, other: Any) -> bool:
         """
         Check equality between two TextGenerationBenchmarkReport instances.
 
@@ -551,6 +582,10 @@ class TextGenerationBenchmarkReport:
         :return: True if the instances are equal, False otherwise.
         :rtype: bool
         """
+
+        if not isinstance(other, TextGenerationBenchmarkReport):
+            raise TypeError(f"Operations only with {type(self)} are allowed.")
+
         return self._benchmarks == other._benchmarks and self._args == other._args
 
     def __iter__(self):
