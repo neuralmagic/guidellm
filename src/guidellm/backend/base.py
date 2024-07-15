@@ -91,9 +91,6 @@ class Backend(ABC):
 
         logger.info(f"Submitting request with prompt: {request.prompt}")
 
-        # TODO: Doublecheck why do we need the result id
-        # result_id = str(uuid.uuid4())
-
         result = TextGenerationResult(TextGenerationRequest(prompt=request.prompt))
         result.start(request.prompt)
 
