@@ -1,4 +1,4 @@
-from typing import List, Union
+from typing import List, Optional, Union
 
 import numpy as np
 from loguru import logger
@@ -16,7 +16,7 @@ class Distribution:
     :type data: List[Union[int, float]], optional
     """
 
-    def __init__(self, data: List[Union[int, float]] = None):
+    def __init__(self, data: Optional[List[Union[int, float]]] = None):
         """
         Initialize the Distribution with optional data.
 
@@ -135,7 +135,7 @@ class Distribution:
             logger.warning("No data points available to calculate percentile.")
             return 0.0
 
-        percentile_value = np.percentile(self._data, percentile)
+        percentile_value = np.percentile(self._data, percentile).item()
         logger.debug(f"Calculated {percentile}th percentile: {percentile_value}")
         return percentile_value
 

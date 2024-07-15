@@ -1,4 +1,5 @@
 import asyncio
+import functools
 from typing import Any, Callable, Dict, Optional
 
 from loguru import logger
@@ -25,10 +26,11 @@ class Task:
         params: Optional[Dict[str, Any]] = None,
         err_container: Optional[Callable] = None,
     ):
-        self._func = func
-        self._params = params or {}
-        self._err_container = err_container
-        self._cancel_event = asyncio.Event()
+        self._func: Callable[..., Any] = func
+        self._params: Dict[str, Any] = params or {}
+        self._err_container: Optional[Callable] = err_container
+        self._cancel_event: asyncio.Event = asyncio.Event()
+
         logger.info(
             f"Task created with function: {self._func.__name__} and "
             f"params: {self._params}"
@@ -43,15 +45,19 @@ class Task:
         """
         logger.info(f"Running task asynchronously with function: {self._func.__name__}")
         try:
+            loop = asyncio.get_running_loop()
+
             result = await asyncio.gather(
-                asyncio.to_thread(self._func, **self._params),
+                loop.run_in_executor(
+                    None, functools.partial(self._func, **self._params)
+                ),
                 self._check_cancelled(),
                 return_exceptions=True,
             )
             if isinstance(result[0], Exception):
                 raise result[0]
 
-            if self.is_cancelled():
+            if self.cancelled is True:
                 raise asyncio.CancelledError("Task was cancelled")
 
             logger.info(f"Task completed with result: {result[0]}")
@@ -92,7 +98,7 @@ class Task:
                 else self._err_container(**self._params, error=err)
             )
 
-    def cancel(self):
+    def cancel(self) -> None:
         """
         Cancel the task.
         """
@@ -105,7 +111,8 @@ class Task:
         """
         await self._cancel_event.wait()
 
-    def is_cancelled(self) -> bool:
+    @property
+    def cancelled(self) -> bool:
         """
         Check if the task is cancelled.
 

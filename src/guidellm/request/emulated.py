@@ -2,7 +2,7 @@ import json
 import re
 import unicodedata
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import requests
@@ -26,7 +26,7 @@ class EmulatedConfig:
     prompt_tokens_min: Optional[int] = None
     prompt_tokens_max: Optional[int] = None
 
-    generated_tokens: int = None
+    generated_tokens: Optional[int] = None
     generated_tokens_variance: Optional[int] = None
     generated_tokens_min: Optional[int] = None
     generated_tokens_max: Optional[int] = None
@@ -112,9 +112,9 @@ class EmulatedRequestGenerator(RequestGenerator):
             raise ValueError(f"Invalid configuration type: {type(config)}")
 
         # map the config to the EmulatedConfig dataclass
-        config = EmulatedConfig(**config_dict)
+        mapped_config = EmulatedConfig(**config_dict or {})
 
-        return config
+        return mapped_config
 
     def _load_emulated_data(self) -> List[str]:
         url = "https://www.gutenberg.org/files/1342/1342-0.txt"
@@ -141,17 +141,17 @@ class EmulatedRequestGenerator(RequestGenerator):
             .replace("! ", "!\n")
             .replace("? ", "?\n")
         )
-        lines = lines.split("\n")
-        lines = [line.strip() for line in lines if line and line.strip()]
+        _lines: List[str] = lines.split("\n")
+        _lines = [line.strip() for line in lines if line and line.strip()]
 
-        return lines
+        return _lines
 
     def _token_count(self, text: str) -> int:
         return (
             len(self.tokenizer.tokenize(text)) if self.tokenizer else len(text.split())
         )
 
-    def _sample_prompt(self) -> (str, int):
+    def _sample_prompt(self) -> Tuple[str, int]:
         prompt_tokens = self._config.prompt_tokens
         prompt_tokens_variance = self._config.prompt_tokens_variance or 0
         prompt_tokens_min = self._config.prompt_tokens_min or 1

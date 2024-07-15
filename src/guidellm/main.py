@@ -10,6 +10,7 @@ from guidellm.request import (
     FileRequestGenerator,
     TransformersDatasetRequestGenerator,
 )
+from guidellm.request.base import RequestGenerator
 
 
 @click.command()
@@ -79,7 +80,7 @@ def main(
     num_requests,
 ):
     # Create backend
-    Backend.create_backend(
+    Backend.create(
         backend_type=backend,
         target=target,
         host=host,
@@ -96,7 +97,9 @@ def main(
         )
 
     if data_type == "emulated":
-        request_generator = EmulatedRequestGenerator(config=data, tokenizer=tokenizer)
+        request_generator: RequestGenerator = EmulatedRequestGenerator(
+            config=data, tokenizer=tokenizer
+        )
     elif data_type == "file":
         request_generator = FileRequestGenerator(file_path=data, tokenizer=tokenizer)
     elif data_type == "transformers":

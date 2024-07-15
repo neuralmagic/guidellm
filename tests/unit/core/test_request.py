@@ -20,7 +20,10 @@ def test_text_generation_request_initialization_with_params():
     generated_token_count = 100
     params = {"temperature": 0.7}
     request = TextGenerationRequest(
-        prompt, prompt_token_count, generated_token_count, params
+        prompt=prompt,
+        prompt_token_count=prompt_token_count,
+        generated_token_count=generated_token_count,
+        params=params,
     )
     assert request.prompt == prompt
     assert request.prompt_token_count == prompt_token_count
@@ -35,7 +38,10 @@ def test_text_generation_request_repr():
     generated_token_count = 100
     params = {"temperature": 0.7}
     request = TextGenerationRequest(
-        prompt, prompt_token_count, generated_token_count, params
+        prompt=prompt,
+        prompt_token_count=prompt_token_count,
+        generated_token_count=generated_token_count,
+        params=params,
     )
     assert repr(request) == (
         f"TextGenerationRequest(id={request.id}, prompt={prompt}, "
