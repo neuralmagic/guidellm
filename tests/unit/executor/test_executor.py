@@ -7,17 +7,17 @@ from src.guidellm.request.base import RequestGenerator
 from src.guidellm.scheduler.load_generator import LoadGenerationModes
 
 def test_executor_creation():
-  mock_request_generator = MagicMock(spec=RequestGenerator)
-  mock_backend = MagicMock(spec=Backend)
-  rate_type = "sweep"
-  profile_args = None
-  max_requests = None,
-  max_duration = None,
-  executor = Executor(mock_request_generator, mock_backend, rate_type, profile_args, max_requests, max_duration);
-  assert executor.request_generator == mock_request_generator
-  assert executor.backend == mock_backend
-  assert executor.max_requests == max_requests
-  assert executor.max_duration == max_duration
+    mock_request_generator = MagicMock(spec=RequestGenerator)
+    mock_backend = MagicMock(spec=Backend)
+    rate_type = "sweep"
+    profile_args = None
+    max_requests = None,
+    max_duration = None,
+    executor = Executor(mock_request_generator, mock_backend, rate_type, profile_args, max_requests, max_duration);
+    assert executor.request_generator == mock_request_generator
+    assert executor.backend == mock_backend
+    assert executor.max_requests == max_requests
+    assert executor.max_duration == max_duration
 
 
 @pytest.fixture
