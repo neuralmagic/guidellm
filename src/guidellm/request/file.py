@@ -85,6 +85,8 @@ class FileRequestGenerator(RequestGenerator):
         with open(self._file_path, "r", encoding="utf-8") as file:
             reader = csv.DictReader(file)
             columns = reader.fieldnames
+            if not columns:
+                raise ValueError("Invalid empty value for columns")
             for row in reader:
                 # convert the row to a dictionary
                 obj = {col: row[col] for col in columns}

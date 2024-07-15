@@ -30,10 +30,10 @@ class RequestGenerator(ABC):
         mode: str = "async",
         async_queue_size: int = 50,
     ):
-        self._async_queue_size = async_queue_size
-        self._mode = mode
-        self._queue = Queue(maxsize=async_queue_size)
-        self._stop_event = threading.Event()
+        self._async_queue_size: int = async_queue_size
+        self._mode: str = mode
+        self._queue: Queue = Queue(maxsize=async_queue_size)
+        self._stop_event: threading.Event = threading.Event()
 
         if tokenizer is not None:
             self._tokenizer = (
