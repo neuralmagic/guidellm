@@ -102,7 +102,6 @@ class Backend(ABC):
                 result.output_token(response.add_token)
             elif response.type_ == "final":
                 result.end(
-                    response.output or "",
                     response.prompt_token_count,
                     response.output_token_count,
                 )

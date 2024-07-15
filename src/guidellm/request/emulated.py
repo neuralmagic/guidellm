@@ -141,10 +141,10 @@ class EmulatedRequestGenerator(RequestGenerator):
             .replace("! ", "!\n")
             .replace("? ", "?\n")
         )
-        lines = lines.split("\n")
-        lines = [line.strip() for line in lines if line and line.strip()]
+        _lines: List[str] = lines.split("\n")
+        _lines = [line.strip() for line in lines if line and line.strip()]
 
-        return lines
+        return _lines
 
     def _token_count(self, text: str) -> int:
         return (

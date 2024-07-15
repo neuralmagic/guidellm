@@ -36,21 +36,19 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "black",
-    "isort",
-    "mypy",
+    "guidellm[code_quality]",
     "pre-commit",
-    "pytest",
-    "ruff",
     "sphinx",
-    "tox",
 ]
 code_quality = [
     "black",
     "isort",
     "mypy",
     "pytest",
+    "pytest-mock",
     "ruff",
+    "tox",
+    "types-requests"
 ]
 
 
@@ -83,6 +81,10 @@ exclude = ["venv", ".tox"]
 # Silint "type import errors" as our 3rd-party libs does not have types
 # Check: https://mypy.readthedocs.io/en/latest/config_file.html#import-discovery
 follow_imports = 'silent'
+
+[[tool.mypy.overrides]]
+module = ["transformers.*", "datasets.*"]
+ignore_missing_imports=true
 
 
 [tool.ruff]

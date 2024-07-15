@@ -96,7 +96,9 @@ def main(
         )
 
     if data_type == "emulated":
-        request_generator: RequestGenerator = EmulatedRequestGenerator(config=data, tokenizer=tokenizer)
+        request_generator: RequestGenerator = EmulatedRequestGenerator(
+            config=data, tokenizer=tokenizer
+        )
     elif data_type == "file":
         request_generator = FileRequestGenerator(file_path=data, tokenizer=tokenizer)
     elif data_type == "transformers":

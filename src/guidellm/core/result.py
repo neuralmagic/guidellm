@@ -148,9 +148,7 @@ class TextGenerationResult:
         :rtype: float
         """
 
-        self._recording_started()
         assert self._end_time
-
         return self._end_time
 
     @property
@@ -173,6 +171,11 @@ class TextGenerationResult:
         """
         return self._decode_times
 
+    @property
+    def last_time(self) -> float:
+        assert self._last_time
+        return self._last_time
+
     def start(self, prompt: str):
         """
         Start the text generation by recording the prompt and start time.
@@ -193,16 +196,16 @@ class TextGenerationResult:
         """
         Ensure that the benchmark text generation recording is started.
 
-        We can assume that if the `self.start_time` & `self.end_time` exist
+        We can assume that if the `self._start_time` exist,
         then the `start()` has been called.
         """
 
-        if (self.start_time is not None) and (self.end_time is not None):
+        if self._start_time is not None:
             return True
         else:
             if raise_exception is True:
                 raise ValueError(
-                    "Last time is not specified. "
+                    "start time is not specified. "
                     "Did you make the `text_generation_benchmark.start()`?"
                 )
             else:
@@ -219,11 +222,11 @@ class TextGenerationResult:
         current_counter = perf_counter()
 
         if not self._first_token_set:
-            self._first_token_time = current_counter - self.end_time
+            self._first_token_time = current_counter - self.last_time
             self._first_token_set = True
             logger.debug(f"First token decode time: {self._first_token_time}")
         else:
-            decode_time = current_counter - self.end_time
+            decode_time = current_counter - self.last_time
             self._decode_times.add_data([decode_time])
             logger.debug(f"Token '{token}' decoded in {decode_time} seconds")
 
@@ -232,7 +235,6 @@ class TextGenerationResult:
 
     def end(
         self,
-        output: str,
         prompt_token_count: Optional[int] = None,
         output_token_count: Optional[int] = None,
     ):
@@ -254,7 +256,7 @@ class TextGenerationResult:
         self._output_token_count = output_token_count or self._output_word_count
         self._prompt_token_count = prompt_token_count or self._prompt_word_count
 
-        logger.info(f"Text generation ended with output: '{output}'")
+        logger.info(f"Text generation ended with output: '{self.output}'")
 
 
 class TextGenerationError:

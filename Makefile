@@ -5,7 +5,7 @@ install:
 
 .PHONY: install.dev
 install.dev:
-	python -m pip install .[dev]
+	python -m pip install -e .[dev]
 
 
 .PHONY: build
@@ -63,3 +63,4 @@ clean:
 	find . -type d -name "__pycache__" -exec rm -r {} +
 	rm -rf .mypy_cache
 	rm -rf .pytest_cache
+	rm -rf .tox

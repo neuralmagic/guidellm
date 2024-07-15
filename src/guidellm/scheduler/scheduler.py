@@ -1,6 +1,6 @@
 import asyncio
 import time
-from typing import Iterable, Optional, Union
+from typing import Iterable, List, Optional, Union
 
 from guidellm.backend import Backend
 from guidellm.core import TextGenerationBenchmark, TextGenerationError
@@ -71,22 +71,23 @@ class Scheduler:
         result_set = TextGenerationBenchmark(
             mode=self._load_gen_mode.value, rate=self._load_gen_rate
         )
-        if (not self._load_gen_rate):
+        if not self._load_gen_rate:
             raise ValueError("Invalid empty value for self._load_gen_rate")
         load_gen = LoadGenerator(self._load_gen_mode, self._load_gen_rate)
 
-        tasks = []
+        tasks: List[asyncio.tasks.Task] = []
         start_time = time.time()
         counter = 0
+
         try:
-            for task, task_start_time in zip(self._task_iterator(), load_gen.times()):
+            for _task, task_start_time in zip(self._task_iterator(), load_gen.times()):
                 pending_time = task_start_time - time.time()
 
                 if pending_time > 0:
                     await asyncio.sleep(pending_time)
 
                 tasks.append(
-                    asyncio.create_task(self._run_task_async(task, result_set))
+                    asyncio.create_task(self._run_task_async(_task, result_set))
                 )
                 counter += 1
 
@@ -106,7 +107,7 @@ class Scheduler:
 
             await asyncio.gather(*tasks)
         except asyncio.CancelledError:
-            # Cancel all pending tasks
+            # Cancel all pending asyncio.Tasks instances
             for task in tasks:
                 if not task.done():
                     task.cancel()
