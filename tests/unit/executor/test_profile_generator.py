@@ -2,9 +2,9 @@ import numpy
 import pytest
 from unittest.mock import MagicMock
 from guidellm.executor import (ProfileGenerator, FixedRateProfileGenerator, SweepProfileGenerator)
-from src.guidellm.core.result import TextGenerationBenchmark, TextGenerationBenchmarkReport
-from src.guidellm.executor import profile_generator
-from src.guidellm.scheduler.load_generator import LoadGenerationModes
+from guidellm.core.result import TextGenerationBenchmark, TextGenerationBenchmarkReport
+from guidellm.executor import profile_generator
+from guidellm.scheduler.load_generator import LoadGenerationModes
 
 def test_invalid_profile_generation_mode_error():
   rate = [1]

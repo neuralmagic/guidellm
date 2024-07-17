@@ -1,10 +1,10 @@
 import pytest
 from unittest.mock import MagicMock, patch
-from src.guidellm.backend.base import Backend
-from src.guidellm.executor.executor import Executor
-from src.guidellm.executor.profile_generator import Profile, ProfileGenerator
-from src.guidellm.request.base import RequestGenerator
-from src.guidellm.scheduler.load_generator import LoadGenerationModes
+from guidellm.backend.base import Backend
+from guidellm.executor.executor import Executor
+from guidellm.executor.profile_generator import Profile, ProfileGenerator
+from guidellm.request.base import RequestGenerator
+from guidellm.scheduler.load_generator import LoadGenerationModes
 
 def test_executor_creation():
     mock_request_generator = MagicMock(spec=RequestGenerator)
@@ -30,7 +30,7 @@ def mock_backend():
 
 @pytest.fixture
 def mock_scheduler():
-    with patch('src.guidellm.executor.executor.Scheduler') as MockScheduler:
+    with patch('guidellm.executor.executor.Scheduler') as MockScheduler:
         yield MockScheduler
 
 def test_executor_run(mock_request_generator, mock_backend, mock_scheduler):
@@ -43,7 +43,7 @@ def test_executor_run(mock_request_generator, mock_backend, mock_scheduler):
     ]
     mock_profile_generator.next_profile.side_effect = profiles
     
-    with patch('src.guidellm.executor.executor.ProfileGenerator.create_generator', return_value=mock_profile_generator):
+    with patch('guidellm.executor.executor.ProfileGenerator.create_generator', return_value=mock_profile_generator):
         executor = Executor(
             request_generator=mock_request_generator,
             backend=mock_backend,
