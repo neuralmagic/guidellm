@@ -16,7 +16,7 @@ class Distribution:
     :type data: List[Union[int, float]], optional
     """
 
-    def __init__(self, data: Optional[List[Union[int, float]]] = None):
+    def __init__(self, data: Optional[Union[List[int], List[float]]] = None):
         """
         Initialize the Distribution with optional data.
 
@@ -227,7 +227,7 @@ class Distribution:
         logger.debug(f"Generated description: {description}")
         return description
 
-    def add_data(self, new_data: List[Union[int, float]]):
+    def add_data(self, new_data: Union[List[int], List[float]]):
         """
         Add new data points to the distribution.
 
@@ -237,7 +237,7 @@ class Distribution:
         self._data.extend(new_data)
         logger.debug(f"Added new data: {new_data}")
 
-    def remove_data(self, remove_data: List[Union[int, float]]):
+    def remove_data(self, remove_data: Union[List[int], List[float]]):
         """
         Remove specified data points from the distribution.
 

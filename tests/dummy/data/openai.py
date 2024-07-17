@@ -37,7 +37,7 @@ def openai_completion_factory(
         }
         payload.update(kwargs)
 
-        yield Completion(**payload)
+        yield Completion(**payload)  # type: ignore
 
 
 def openai_model_factory(n: int = 3) -> Generator[Model, None, None]:

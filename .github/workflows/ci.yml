@@ -20,4 +20,3 @@ jobs:
 
       - name: Run tox
         run: tox
-
