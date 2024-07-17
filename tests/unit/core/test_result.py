@@ -49,6 +49,7 @@ def test_text_generation_result_repr():
 def test_text_generation_result_end():
     request = TextGenerationRequest(prompt="Generate a story")
     result = TextGenerationResult(request)
+    result.start("anything")
     result.end()
     assert result.output == ""
     assert result.end_time is not None

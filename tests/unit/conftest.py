@@ -8,7 +8,9 @@ from tests import dummy
 
 
 @pytest.fixture(autouse=True)
-def openai_completion_create_patch(mocker) -> openai.Stream[openai.types.Completion]:
+def openai_completion_create_patch(
+    mocker,
+) -> openai.Stream[openai.types.Completion]:
     """
     Mock available models function to avoid OpenAI API call.
     """

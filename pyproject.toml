@@ -95,7 +95,6 @@ lint.select = ["E", "F", "W"]
 
 [tool.pytest.ini_options]
 addopts = '-s -vvv --cache-clear'
-asyncio_mode = 'auto'
 markers = [
     "smoke: quick tests to check basic functionality",
     "sanity: detailed tests to ensure major functions work correctly",

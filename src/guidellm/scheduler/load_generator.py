@@ -1,37 +1,49 @@
 import time
 from enum import Enum
-from typing import Iterator
+from typing import Generator
 
 import numpy as np
 
-__all__ = ["LoadGenerationModes", "LoadGenerator"]
+__all__ = ["LoadGenerationMode", "LoadGenerator"]
 
 
-class LoadGenerationModes(Enum):
+class LoadGenerationMode(str, Enum):
+    """
+    Available values:
+        * SYNCHRONOUS
+        * CONSTANT
+        * POISSON
+
+    """
+
     SYNCHRONOUS = "sync"
     CONSTANT = "constant"
     POISSON = "poisson"
 
 
 class LoadGenerator:
-    def __init__(self, mode: LoadGenerationModes, rate: float):
-        if mode == LoadGenerationModes.SYNCHRONOUS:
+    def __init__(self, mode: LoadGenerationMode, rate: float):
+        if mode == LoadGenerationMode.SYNCHRONOUS:
             raise ValueError("Synchronous mode not supported by LoadGenerator")
 
         self._mode = mode
         self._rate = rate
 
-    def times(self) -> Iterator[float]:
-        if self._mode == LoadGenerationModes.SYNCHRONOUS:
+    def times(self) -> Generator[float, None, None]:
+        if self._mode == LoadGenerationMode.SYNCHRONOUS:
             raise ValueError("Synchronous mode not supported by LoadGenerator")
 
-        if self._mode == LoadGenerationModes.CONSTANT:
-            return self._constant_times()
+        elif self._mode == LoadGenerationMode.CONSTANT:
+            yield from self._constant_times()
 
-        if self._mode == LoadGenerationModes.POISSON:
-            return self._poisson_times()
+        elif self._mode == LoadGenerationMode.POISSON:
+            yield from self._poisson_times()
+        else:
+            raise NotImplementedError(
+                f"{self._mode} is not supported Load Generation Mode"
+            )
 
-    def _constant_times(self) -> Iterator[float]:
+    def _constant_times(self) -> Generator[float, None, None]:
         start_time = time.time()
         time_increment = 1.0 / self._rate
         counter = 0
@@ -40,7 +52,7 @@ class LoadGenerator:
             yield start_time + time_increment * counter
             counter += 1
 
-    def _poisson_times(self) -> Iterator[float]:
+    def _poisson_times(self) -> Generator[float, None, None]:
         time_tracker = time.time()
 
         while True:

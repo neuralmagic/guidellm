@@ -1,7 +1,7 @@
 from .executor import Executor
 from .profile_generator import (
     Profile,
-    ProfileGenerationModes,
+    ProfileGenerationMode,
     ProfileGenerator,
     SingleProfileGenerator,
     SweepProfileGenerator,
@@ -9,7 +9,7 @@ from .profile_generator import (
 
 __all__ = [
     "Executor",
-    "ProfileGenerationModes",
+    "ProfileGenerationMode",
     "Profile",
     "ProfileGenerator",
     "SingleProfileGenerator",

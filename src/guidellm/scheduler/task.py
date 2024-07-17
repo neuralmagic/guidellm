@@ -36,40 +36,26 @@ class Task:
             f"params: {self._params}"
         )
 
-    async def run_async(self) -> Any:
+    async def run_async(self, event_loop: asyncio.AbstractEventLoop) -> Any:
         """
         Run the task asynchronously.
 
         :return: The output of the function.
         :rtype: Any
         """
+
         logger.info(f"Running task asynchronously with function: {self._func.__name__}")
+
         try:
-            loop = asyncio.get_running_loop()
-
-            result = await asyncio.gather(
-                loop.run_in_executor(
-                    None, functools.partial(self._func, **self._params)
-                ),
-                self._check_cancelled(),
-                return_exceptions=True,
+            result = await event_loop.run_in_executor(
+                None, functools.partial(self._func, **self._params)
             )
-            if isinstance(result[0], Exception):
-                raise result[0]
+            if isinstance(result, Exception):
+                raise result
 
-            if self.cancelled is True:
-                raise asyncio.CancelledError("Task was cancelled")
+            logger.info(f"Task completed with result: {result}")
 
-            logger.info(f"Task completed with result: {result[0]}")
-
-            return result[0]
-        except asyncio.CancelledError as cancel_err:
-            logger.warning("Task was cancelled")
-            return (
-                cancel_err
-                if not self._err_container
-                else self._err_container(**self._params, error=cancel_err)
-            )
+            return result
         except Exception as err:
             logger.error(f"Task failed with error: {err}")
             return (
@@ -97,26 +83,3 @@ class Task:
                 if not self._err_container
                 else self._err_container(**self._params, error=err)
             )
-
-    def cancel(self) -> None:
-        """
-        Cancel the task.
-        """
-        logger.info("Cancelling task")
-        self._cancel_event.set()
-
-    async def _check_cancelled(self):
-        """
-        Check if the task is cancelled.
-        """
-        await self._cancel_event.wait()
-
-    @property
-    def cancelled(self) -> bool:
-        """
-        Check if the task is cancelled.
-
-        :return: True if the task is cancelled, False otherwise.
-        :rtype: bool
-        """
-        return self._cancel_event.is_set()

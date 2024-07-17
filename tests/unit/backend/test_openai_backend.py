@@ -2,10 +2,9 @@
 This module includes unit tests for the OpenAI Backend Service.
 """
 
-from typing import Callable, List, Optional
+from typing import Callable, Optional
 
 import pytest
-from openai.types import Completion
 
 from guidellm.backend import Backend, BackendEngine, OpenAIBackend
 from guidellm.core import TextGenerationRequest
@@ -63,9 +62,7 @@ def test_model_tokenizer_no_model(openai_backend_factory):
 
 
 @pytest.mark.smoke
-def test_make_request(
-    openai_backend_factory, openai_completion_create_patch: List[Completion]
-):
+def test_make_request(openai_backend_factory, openai_completion_create_patch):
     """
     Test `OpenAIBackend.make_request()` workflow.
 
@@ -78,18 +75,17 @@ def test_make_request(
     backend_service: OpenAIBackend = openai_backend_factory()
     total_generative_responses = 0
 
-    for generative_response, patched_completion in zip(
+    for generative_response, completion_patch in zip(
         backend_service.make_request(request=request),
         openai_completion_create_patch,
     ):
-
         total_generative_responses += 1
-        expected_token: Optional[str] = getattr(patched_completion, "content") or None
+        expected_token: Optional[str] = getattr(completion_patch, "content") or None
 
         assert generative_response.add_token == expected_token
         assert (
             generative_response.type_ == "final"
-            if getattr(patched_completion, "stop") is True
+            if getattr(completion_patch, "stop") is True
             else "token_iter"
         )
         if expected_token is not None:
