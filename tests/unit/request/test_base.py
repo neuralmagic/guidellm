@@ -74,7 +74,7 @@ def test_request_generator_repr():
 @pytest.mark.regression
 def test_request_generator_iter_calls_create_item():
     generator = TestRequestGenerator(mode="sync")
-    generator.create_item = Mock(
+    generator.create_item = Mock(  # type: ignore
         return_value=TextGenerationRequest(prompt="Mock prompt")
     )
 
@@ -91,7 +91,7 @@ def test_request_generator_iter_calls_create_item():
 @pytest.mark.regression
 def test_request_generator_async_iter_calls_create_item():
     generator = TestRequestGenerator(mode="sync")
-    generator.create_item = Mock(
+    generator.create_item = Mock(  # type: ignore
         return_value=TextGenerationRequest(prompt="Mock prompt")
     )
 
