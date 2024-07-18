@@ -25,7 +25,7 @@ def openai_models_list_patch(mocker) -> List[openai.types.Model]:
     Mock available models function to avoid OpenAI API call.
     """
 
-    items: list[openai.types.Model] = [
+    items: List[openai.types.Model] = [
         item for item in dummy.data.openai_model_factory()
     ]
     mocker.patch(

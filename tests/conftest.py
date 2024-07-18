@@ -28,6 +28,6 @@ def openai_backend_factory() -> Callable[..., OpenAIBackend]:
 
         defaults.update(kwargs)
 
-        return Backend.create(**defaults)
+        return Backend.create(**defaults)  # type: ignore
 
     return inner_wrapper

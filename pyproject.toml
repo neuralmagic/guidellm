@@ -36,19 +36,19 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "guidellm[code_quality]",
-    "pre-commit",
-    "sphinx",
-]
-code_quality = [
-    "black",
-    "isort",
-    "mypy",
-    "pytest",
-    "pytest-mock",
-    "ruff",
-    "tox",
-    "types-requests"
+    # general
+    "pre-commit~=3.5.0",
+    "sphinx~=7.1.2",
+
+    # code quality
+    "black~=24.4.2",
+    "isort~=5.13.2",
+    "mypy~=1.10.1",
+    "pytest~=8.2.2",
+    "pytest-mock~=3.14.0",
+    "ruff~=0.5.2",
+    "tox~=4.16.0",
+    "types-requests~=2.32.0"
 ]
 
 
