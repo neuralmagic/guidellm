@@ -11,8 +11,8 @@ class LoadGenerationMode(str, Enum):
     """
     Available values:
         * SYNCHRONOUS
-        * CONSTANT
-        * POISSON
+        * CONSTANT (async)
+        * POISSON (async)
 
     """
 

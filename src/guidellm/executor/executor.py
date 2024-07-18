@@ -1,7 +1,7 @@
 from typing import Any, Dict, Optional
 
 from guidellm.backend import Backend
-from guidellm.core import TextGenerationBenchmarkReport
+from guidellm.core import TextGenerationBenchmark, TextGenerationBenchmarkReport
 from guidellm.request import RequestGenerator
 from guidellm.scheduler import Scheduler
 
@@ -37,18 +37,9 @@ class Executor:
     @property
     def scheduler(self) -> Scheduler:
         if self._scheduler is None:
-            raise ValueError("The scheduler is not defined. Did you run the execution?")
+            raise ValueError("The scheduler is not set. Did you run the execution?")
         else:
             return self._scheduler
-
-    @scheduler.setter
-    def scheduler(self, value: Any):
-        if not isinstance(value, Scheduler):
-            raise TypeError(
-                "Only Scheduler instances could be set as a self._scheduler"
-            )
-        else:
-            self._scheduler = value
 
     def run(self) -> TextGenerationBenchmarkReport:
         report = TextGenerationBenchmarkReport()
@@ -57,7 +48,7 @@ class Executor:
             if not (profile := self.profile_generator.next(report)):
                 break
 
-            self.scheduler = Scheduler(
+            scheduler = Scheduler(
                 request_generator=self.request_generator,
                 backend=self.backend,
                 load_gen_mode=profile.load_gen_mode,
@@ -66,7 +57,7 @@ class Executor:
                 max_duration=self.max_duration,
             )
 
-            benchmark = self.scheduler.run()
+            benchmark: TextGenerationBenchmark = scheduler.run()
             report.add_benchmark(benchmark)
 
         return report

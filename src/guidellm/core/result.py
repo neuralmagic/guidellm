@@ -134,7 +134,7 @@ class TextGenerationResult:
         :rtype: float
         """
 
-        self._recording_started()
+        self.check_recording_started()
         assert self._start_time
 
         return self._start_time
@@ -148,7 +148,7 @@ class TextGenerationResult:
         :rtype: float
         """
 
-        self._recording_started()
+        self.check_recording_started()
         assert self._end_time
         return self._end_time
 
@@ -193,7 +193,7 @@ class TextGenerationResult:
 
         logger.info(f"Text generation started with prompt: '{prompt}'")
 
-    def _recording_started(self, raise_exception: bool = True) -> bool:
+    def check_recording_started(self, raise_exception: bool = True) -> bool:
         """
         Ensure that the benchmark text generation recording is started.
 
@@ -357,8 +357,10 @@ class TextGenerationBenchmark:
         self._results: List[TextGenerationResult] = []
         self._errors: List[TextGenerationError] = []
         self._concurrencies: List[RequestConcurrencyMeasurement] = []
-        self._overloaded = False
         self._args_rate: Optional[float] = None
+
+        # NOTE: This state never changes
+        self._overloaded = False
 
         logger.debug(
             f"Initialized TextGenerationBenchmark with mode={mode} and rate={rate}"
@@ -420,6 +422,7 @@ class TextGenerationBenchmark:
         :return: The overloaded state.
         :rtype: bool
         """
+
         return self._overloaded
 
     @property

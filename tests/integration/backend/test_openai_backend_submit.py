@@ -31,6 +31,7 @@ def openai_server_healthcheck():
         )
 
 
+@pytest.mark.skip("OpenAI compatible service is not deployed yet")
 @pytest.mark.integration
 def test_openai_submit_request(
     mocker, openai_backend_factory: Callable[..., OpenAIBackend]

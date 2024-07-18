@@ -1,3 +1,5 @@
+import time
+
 import pytest
 
 from guidellm.backend import OpenAIBackend
@@ -72,7 +74,6 @@ def test_executor_openai_single_report_generation_constant_mode_infinite(
 
     assert isinstance(executor.backend, OpenAIBackend)
     assert len(report.benchmarks) == 1
-    assert len(report.benchmarks[0].results) == len(executor.scheduler)
     assert len(report.benchmarks[0].errors) == 0
 
 
@@ -111,12 +112,14 @@ def test_executor_openai_single_report_generation_constant_mode_limited(
 
 @pytest.mark.sanity
 def test_executor_openai_single_report_generation_constant_mode_failed(
-    openai_backend_factory,
+    mocker, openai_backend_factory
 ):
     """
     Test max duration immediate tasks iteration break up
     because of the `time.time() - start_time >= self._max_duration`.
     """
+
+    mocker.patch("guidellm.backend.Backend.submit", side_effect=Exception)
 
     request_genrator = dummy.services.TestRequestGenerator(
         tokenizer="bert-base-uncased"
@@ -132,15 +135,15 @@ def test_executor_openai_single_report_generation_constant_mode_failed(
         request_generator=request_genrator,
         profile_mode=profile_generation_mode,
         profile_args=profile_generator_kwargs,
-        max_requests=10,
-        max_duration=0,  # immediately stop the execution
+        max_requests=3,
+        max_duration=None,
     )
 
     report: TextGenerationBenchmarkReport = executor.run()
 
     assert isinstance(executor.backend, OpenAIBackend)
     assert len(report.benchmarks) == 1
-    assert report.benchmarks[0].results == []
+    assert len(report.benchmarks[0].errors) == 3
 
 
 @pytest.mark.sanity
@@ -165,10 +168,11 @@ def test_executor_openai_single_report_generation_constant_mode_cancelled_report
         max_duration=3,
     )
 
+    start_time: float = time.perf_counter()
     report: TextGenerationBenchmarkReport = executor.run()
+    end_time: float = time.perf_counter() - start_time
 
     assert isinstance(executor.backend, OpenAIBackend)
     assert len(report.benchmarks) == 1
-    assert len(report.benchmarks[0].results) + len(report.benchmarks[0].errors) == len(
-        executor.scheduler
-    )
+    assert len(report.benchmarks[0].errors) > 0
+    assert round(end_time) == 3
