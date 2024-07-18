@@ -62,6 +62,9 @@ class Scheduler:
 
     @property
     def load_generator(self) -> LoadGenerator:
+        if self._load_gen_mode == LoadGenerationMode.SYNCHRONOUS:
+            raise ValueError("LoadGenerator can't be used is synchronous mode")
+
         if not self._load_gen_rate:
             raise ValueError("Invalid empty value for self._load_gen_rate")
 
@@ -198,7 +201,7 @@ class Scheduler:
             res = await self._event_loop.run_in_executor(
                 None, functools.partial(self._backend.submit, **backend_submit_payload)
             )
-        except Exception as error:
+        except Exception:
             benchmark.errors.append(
                 TextGenerationError(
                     **backend_submit_payload, error_class=asyncio.CancelledError()
