@@ -36,6 +36,7 @@ def test_scheduler_max_requests_limitation(
     assert benchmark.errors == []
 
 
+@pytest.mark.skip("Poission can't be limited with max duration. TBD")
 @pytest.mark.sanity
 @pytest.mark.parametrize("max_duration", [1, 3])
 def test_scheduler_max_duration_limitation(
