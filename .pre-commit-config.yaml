@@ -28,6 +28,8 @@ repos:
         datasets,
         loguru,
         numpy,
+        pydantic,
+        pyyaml,
         openai,
         requests,
         transformers,
@@ -38,4 +40,5 @@ repos:
         # types
         types-click,
         types-requests,
+        types-PyYAML,
       ]

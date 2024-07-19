@@ -2,6 +2,7 @@ from time import time
 from typing import Any, Dict, List, Optional, Union
 
 from loguru import logger
+from pydantic import Field
 
 from guidellm.core.distribution import Distribution
 from guidellm.core.request import TextGenerationRequest
@@ -22,19 +23,43 @@ class TextGenerationResult(Serializable):
     for generative AI workloads.
     """
 
-    request: TextGenerationRequest
-    prompt: str = ""
-    prompt_word_count: int = 0
-    prompt_token_count: int = 0
-    output: str = ""
-    output_word_count: int = 0
-    output_token_count: int = 0
-    last_time: Optional[float] = None
-    first_token_set: bool = False
-    start_time: Optional[float] = None
-    end_time: Optional[float] = None
-    first_token_time: Optional[float] = None
-    decode_times: Distribution = Distribution()
+    request: TextGenerationRequest = Field(
+        description="The text generation request used to generate the result."
+    )
+    prompt: str = Field(
+        default_factory=str, description="The input prompt for the text generation."
+    )
+    prompt_word_count: int = Field(
+        default=0, description="The number of words in the input prompt."
+    )
+    prompt_token_count: int = Field(
+        default=0, description="The number of tokens in the input prompt."
+    )
+    output: str = Field(
+        default_factory=str, description="The generated output for the text generation."
+    )
+    output_word_count: int = Field(
+        default=0, description="The number of words in the output."
+    )
+    output_token_count: int = Field(
+        default=0, description="The number of tokens in the output."
+    )
+    last_time: float = Field(default=None, description="The last time recorded.")
+    first_token_set: bool = Field(
+        default=False, description="Whether the first token time is set."
+    )
+    start_time: float = Field(
+        default=None, description="The start time of the text generation."
+    )
+    end_time: float = Field(
+        default=None, description="The end time of the text generation."
+    )
+    first_token_time: float = Field(
+        default=None, description="The time taken to decode the first token."
+    )
+    decode_times: Distribution = Field(
+        default_factory=Distribution, description="The distribution of decode times."
+    )
 
     def start(self, prompt: str):
         """
@@ -52,25 +77,6 @@ class TextGenerationResult(Serializable):
 
         logger.info("Text generation started with prompt: '{}'", prompt)
 
-    def _recording_started(self, raise_exception: bool = True) -> bool:
-        """
-        Ensure that the benchmark text generation recording is started.
-
-        We can assume that if the `self._start_time` exist,
-        then the `start()` has been called.
-        """
-
-        if self._start_time is not None:
-            return True
-        else:
-            if raise_exception is True:
-                raise ValueError(
-                    "start time is not specified. "
-                    "Did you make the `text_generation_benchmark.start()`?"
-                )
-            else:
-                return False
-
     def output_token(self, token: str):
         """
         Add a token to the output and record the decode time.
@@ -80,13 +86,13 @@ class TextGenerationResult(Serializable):
         """
         current_counter = time()
 
-        if not self._first_token_set:
+        if not self.first_token_set:
             self.first_token_time = current_counter - self.last_time
             self.first_token_set = True
-            logger.debug(f"First token decode time: {self._first_token_time}")
+            logger.debug(f"First token decode time: {self.first_token_time}")
         else:
             decode_time = current_counter - self.last_time
-            self._decode_times.add_data([decode_time])
+            self.decode_times.add_data([decode_time])
             logger.debug(f"Token '{token}' decoded in {decode_time} seconds")
 
         self.last_time = current_counter
@@ -95,6 +101,7 @@ class TextGenerationResult(Serializable):
 
     def end(
         self,
+        output: Optional[str] = None,
         prompt_token_count: Optional[int] = None,
         output_token_count: Optional[int] = None,
     ):
@@ -111,11 +118,34 @@ class TextGenerationResult(Serializable):
         :type output_token_count: Optional[int]
         """
         self.end_time = time()
+
+        if output:
+            self.output = output
+
         self.output_word_count = len(self.output.split())
-        self.output_token_count = output_token_count or self._output_word_count
-        self.prompt_token_count = prompt_token_count or self._prompt_word_count
+        self.output_token_count = output_token_count or self.output_word_count
+        self.prompt_token_count = prompt_token_count or self.prompt_word_count
 
         logger.info(f"Text generation ended with output: '{self.output}'")
+
+    def _check_recording_started(self, raise_exception: bool = True) -> bool:
+        """
+        Ensure that the benchmark text generation recording is started.
+
+        We can assume that if the `self._start_time` exist,
+        then the `start()` has been called.
+        """
+
+        if self.start_time is not None:
+            return True
+        else:
+            if raise_exception is True:
+                raise ValueError(
+                    "start time is not specified. "
+                    "Did you make the `text_generation_benchmark.start()`?"
+                )
+            else:
+                return False
 
 
 class TextGenerationError(Serializable):
@@ -124,8 +154,12 @@ class TextGenerationError(Serializable):
     for generative AI workloads.
     """
 
-    request: TextGenerationRequest
-    error: str
+    request: TextGenerationRequest = Field(
+        description="The text generation request that resulted in an error."
+    )
+    error: str = Field(
+        description="The error message that occurred during text generation."
+    )
 
     def __init__(self, request: TextGenerationRequest, error: Exception):
         super().__init__(request=request, error=str(error))
@@ -137,10 +171,10 @@ class RequestConcurrencyMeasurement(Serializable):
     A dataclass to represent the concurrency measurement of a request.
     """
 
-    time: float
-    completed: int
-    errored: int
-    processing: int
+    time: float = Field(description="The time of the measurement.")
+    completed: int = Field(description="The number of completed requests.")
+    errored: int = Field(description="The number of errored requests.")
+    processing: int = Field(description="The number of processing requests.")
 
 
 class TextGenerationBenchmark(Serializable):
@@ -150,11 +184,20 @@ class TextGenerationBenchmark(Serializable):
     This is a set of results and errors for a specific mode and rate.
     """
 
-    mode: str
-    rate: Optional[float]
-    results: List[TextGenerationResult] = []
-    errors: List[TextGenerationError] = []
-    concurrencies: List[RequestConcurrencyMeasurement] = []
+    mode: str = Field(description="The generation mode, either 'async' or 'sync'.")
+    rate: float = Field(
+        default=None, description="The requested rate of requests per second."
+    )
+    results: List[TextGenerationResult] = Field(
+        default_factory=list, description="The results of the text generation requests."
+    )
+    errors: List[TextGenerationError] = Field(
+        default_factory=list, description="The errors of the text generation requests."
+    )
+    concurrencies: List[RequestConcurrencyMeasurement] = Field(
+        default_factory=list,
+        description="The concurrency measurements of the requests.",
+    )
 
     def __iter__(self):
         """
@@ -162,7 +205,7 @@ class TextGenerationBenchmark(Serializable):
 
         :return: An iterator over the results.
         """
-        return iter(self._results)
+        return iter(self.results)
 
     @property
     def request_count(self) -> int:
@@ -185,19 +228,44 @@ class TextGenerationBenchmark(Serializable):
         return len(self.errors)
 
     @property
-    def request_rate(self) -> float:
+    def completed_request_rate(self) -> float:
         """
         Get the rate of requests per second in the result.
 
         :return: The rate of requests per second.
         :rtype: float
         """
-        if not self._results:
+        if not self.results:
             return 0.0
         else:
             return self.request_count / (
-                self._results[-1].end_time - self._results[0].start_time
+                self.results[-1].end_time - self.results[0].start_time
             )
+
+    @property
+    def overloaded(self) -> bool:
+        if not self.results or not self.concurrencies:
+            raise ValueError("No results or concurrencies to check for overload.")
+
+        if self.rate is None or len(self.concurrencies) < 2:
+            # if rate was not set, sync mode is assumed,
+            # or we have less than 2 data points,
+            # then we cannot be overloaded by definition
+            return False
+
+        if self.completed_request_rate < 0.60 * self.rate:
+            # if the calculated rate is less than 60% of the requested rate,
+            # safe to assume the system is overloaded
+            return True
+
+        # rate comparisons did not give a clear signal,
+        # let's double check that we aren't overloaded by comparing the
+        # compute throughput for the benchmark with the latency for the requests.
+        # overall this means that a relatively flat or decreasing throughput curve
+        # over time in addition to a growing processing queue is a sign of overload
+
+        # TODO
+        return False
 
     def request_started(self):
         """
@@ -266,8 +334,12 @@ class TextGenerationBenchmarkReport(Serializable):
     This is a collection of benchmarks for different modes and rates.
     """
 
-    benchmarks: List[TextGenerationBenchmark] = []
-    args: List[Dict[str, Any]] = []
+    benchmarks: List[TextGenerationBenchmark] = Field(
+        default_factory=list, description="The benchmarks of text generation requests."
+    )
+    args: List[Dict[str, Any]] = Field(
+        default_factory=list, description="The arguments used for the benchmarks."
+    )
 
     def __iter__(self):
         return iter(self.benchmarks)
@@ -280,7 +352,7 @@ class TextGenerationBenchmarkReport(Serializable):
         :return: The sorted list of benchmarks.
         :rtype: List[TextGenerationBenchmark]
         """
-        benchmarks = sorted(self.benchmarks, key=lambda x: x.request_rate)
+        benchmarks = sorted(self.benchmarks, key=lambda x: x.completed_request_rate)
         return benchmarks
 
     def add_benchmark(self, benchmark: TextGenerationBenchmark):
