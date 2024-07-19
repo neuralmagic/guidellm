@@ -120,9 +120,9 @@ class SweepProfileGenerator(ProfileGenerator):
 
             if not last_benchmark.overloaded:
                 last_rate = (
-                    last_benchmark.args_rate
-                    if last_benchmark.args_rate
-                    else last_benchmark.request_rate
+                    last_benchmark.rate
+                    if last_benchmark.rate
+                    else last_benchmark.completed_request_rate
                 )
                 return Profile(
                     load_gen_mode=LoadGenerationModes.CONSTANT,
@@ -133,14 +133,14 @@ class SweepProfileGenerator(ProfileGenerator):
                 first_benchmark = current_report.benchmarks[0]
 
                 min_rate = (
-                    first_benchmark.args_rate
-                    if first_benchmark.args_rate
-                    else first_benchmark.request_rate
+                    first_benchmark.rate
+                    if first_benchmark.rate
+                    else first_benchmark.completed_request_rate
                 )
                 max_rate = (
-                    last_benchmark.args_rate
-                    if last_benchmark.args_rate
-                    else last_benchmark.request_rate
+                    last_benchmark.rate
+                    if last_benchmark.rate
+                    else last_benchmark.completed_request_rate
                 )
 
                 self._pending_rates = list(numpy.linspace(min_rate, max_rate, 10))

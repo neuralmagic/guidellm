@@ -1,5 +1,3 @@
-import json
-
 import click
 
 from guidellm.backend import Backend
@@ -125,13 +123,13 @@ def main(
 
 
 def save_report(report: TextGenerationBenchmarkReport, filename: str):
-    with open(filename, "w") as f:
-        json.dump(report.to_dict(), f, indent=4)
+    with open(filename, "w") as file:
+        file.write(report.to_json())
 
 
 def print_report(report: TextGenerationBenchmarkReport):
     for benchmark in report.benchmarks:
-        print(f"Rate: {benchmark.request_rate}, Results: {benchmark.results}")
+        print(f"Rate: {benchmark.completed_request_rate}, Results: {benchmark.results}")
 
 
 if __name__ == "__main__":

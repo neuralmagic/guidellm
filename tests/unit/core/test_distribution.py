@@ -46,7 +46,15 @@ def test_distribution_remove_data():
 def test_distribution_str():
     data = [1, 2, 3, 4, 5]
     dist = Distribution(data=data)
-    assert str(dist) == "Distribution(mean=3.00, median=3.00, min=1, max=5, count=5)"
+    assert str(dist) == (
+        "Distribution({'mean': 3.0, 'median': 3.0, "
+        "'variance': 2.0, 'std_deviation': 1.4142135623730951, "
+        "'percentile_indices': "
+        "[10, 20, 30, 40, 50, 60, 70, 80, 90, 95, 99], "
+        "'percentile_values': "
+        "[1.4, 1.8, 2.2, 2.6, 3.0, 3.4, 3.8, 4.2, 4.6, 4.8, 4.96], "
+        "'min': 1, 'max': 5, 'range': 4})"
+    )
 
 
 @pytest.mark.regression

@@ -1,7 +1,8 @@
-from typing import List, Optional, Union
+from typing import List, Sequence
 
 import numpy as np
 from loguru import logger
+from pydantic import Field
 
 from guidellm.core.serializable import Serializable
 
@@ -14,24 +15,12 @@ class Distribution(Serializable):
     statistical analyses.
     """
 
-    def __init__(self, **data):
-        super().__init__(**data)
-        logger.debug(f"Initialized Distribution with data: {self.data}")
+    data: Sequence[float] = Field(
+        default_factory=list, description="The data points of the distribution."
+    )
 
-    def __str__(self) -> str:
-        """
-        Return a string representation of the Distribution.
-        """
-        return (
-            f"Distribution(mean={self.mean:.2f}, median={self.median:.2f}, "
-            f"min={self.min}, max={self.max}, count={len(self.data)})"
-        )
-
-    def __repr__(self) -> str:
-        """
-        Return an unambiguous string representation of the Distribution for debugging.
-        """
-        return f"Distribution(data={self.data})"
+    def __str__(self):
+        return f"Distribution({self.describe()})"
 
     @property
     def mean(self) -> float:
@@ -99,7 +88,7 @@ class Distribution(Serializable):
             logger.warning("No data points available to calculate percentile.")
             return 0.0
 
-        percentile_value = np.percentile(self._data, percentile).item()
+        percentile_value = np.percentile(self.data, percentile).item()
         logger.debug(f"Calculated {percentile}th percentile: {percentile_value}")
         return percentile_value
 
@@ -180,15 +169,15 @@ class Distribution(Serializable):
         logger.debug(f"Generated description: {description}")
         return description
 
-    def add_data(self, new_data: Union[List[int], List[float]]):
+    def add_data(self, new_data: Sequence[float]):
         """
         Add new data points to the distribution.
         :param new_data: A list of new numerical data points to add.
         """
-        self.data.extend(new_data)
+        self.data = list(self.data) + list(new_data)
         logger.debug(f"Added new data: {new_data}")
 
-    def remove_data(self, remove_data: Union[List[int], List[float]]):
+    def remove_data(self, remove_data: Sequence[float]):
         """
         Remove specified data points from the distribution.
         :param remove_data: A list of numerical data points to remove.

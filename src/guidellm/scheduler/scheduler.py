@@ -49,7 +49,7 @@ class Scheduler:
         return result
 
     def _run_sync(self) -> TextGenerationBenchmark:
-        result_set = TextGenerationBenchmark(mode=self._load_gen_mode.value, rate=None)
+        result_set = TextGenerationBenchmark(mode=self._load_gen_mode.value)
         start_time = time.time()
         counter = 0
 
@@ -68,6 +68,9 @@ class Scheduler:
         return result_set
 
     async def _run_async(self) -> TextGenerationBenchmark:
+        if self._load_gen_rate is None:
+            raise ValueError("Rate must be specified for asynchronous load generation")
+
         result_set = TextGenerationBenchmark(
             mode=self._load_gen_mode.value, rate=self._load_gen_rate
         )

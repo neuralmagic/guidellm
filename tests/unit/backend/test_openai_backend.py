@@ -82,7 +82,6 @@ def test_make_request(
         backend_service.make_request(request=request),
         openai_completion_create_patch,
     ):
-
         total_generative_responses += 1
         expected_token: Optional[str] = getattr(patched_completion, "content") or None
 

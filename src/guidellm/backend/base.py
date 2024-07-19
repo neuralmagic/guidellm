@@ -91,7 +91,9 @@ class Backend(ABC):
 
         logger.info(f"Submitting request with prompt: {request.prompt}")
 
-        result = TextGenerationResult(TextGenerationRequest(prompt=request.prompt))
+        result = TextGenerationResult(
+            request=TextGenerationRequest(prompt=request.prompt)
+        )
         result.start(request.prompt)
 
         for response in self.make_request(request):  # GenerativeResponse
@@ -99,8 +101,8 @@ class Backend(ABC):
                 result.output_token(response.add_token)
             elif response.type_ == "final":
                 result.end(
-                    response.prompt_token_count,
-                    response.output_token_count,
+                    prompt_token_count=response.prompt_token_count,
+                    output_token_count=response.output_token_count,
                 )
 
         logger.info(f"Request completed with output: {result.output}")
