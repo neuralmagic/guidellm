@@ -45,10 +45,11 @@ code_quality = [
     "isort",
     "mypy",
     "pytest",
+    "pytest-cov",
     "pytest-mock",
     "ruff",
     "tox",
-    "types-requests"
+    "types-requests",
 ]
 
 
@@ -94,7 +95,7 @@ lint.select = ["E", "F", "W"]
 
 
 [tool.pytest.ini_options]
-addopts = '-s -vvv --cache-clear'
+addopts = '-s -vvv --cache-clear --cov-report=term-missing --cov --cov-fail-under=75'
 markers = [
     "smoke: quick tests to check basic functionality",
     "sanity: detailed tests to ensure major functions work correctly",

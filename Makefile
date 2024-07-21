@@ -36,7 +36,7 @@ quality:
 
 .PHONY: test
 test:
-	python -m pytest -s -vvv --cache-clear tests
+	python -m pytesttests
 
 
 .PHONY: test.unit
