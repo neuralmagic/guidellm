@@ -134,7 +134,7 @@ class TextGenerationResult:
         :rtype: float
         """
 
-        self._recording_started()
+        self.check_recording_started()
         assert self._start_time
 
         return self._start_time
@@ -148,6 +148,7 @@ class TextGenerationResult:
         :rtype: float
         """
 
+        self.check_recording_started()
         assert self._end_time
         return self._end_time
 
@@ -192,7 +193,7 @@ class TextGenerationResult:
 
         logger.info(f"Text generation started with prompt: '{prompt}'")
 
-    def _recording_started(self, raise_exception: bool = True) -> bool:
+    def check_recording_started(self, raise_exception: bool = True) -> bool:
         """
         Ensure that the benchmark text generation recording is started.
 
@@ -205,7 +206,7 @@ class TextGenerationResult:
         else:
             if raise_exception is True:
                 raise ValueError(
-                    "start time is not specified. "
+                    "Start time is not specified. "
                     "Did you make the `text_generation_benchmark.start()`?"
                 )
             else:
@@ -270,7 +271,11 @@ class TextGenerationError:
     :type error: Exception
     """
 
-    def __init__(self, request: TextGenerationRequest, error: Exception):
+    def __init__(
+        self,
+        request: TextGenerationRequest,
+        error_class: BaseException,
+    ):
         """
         Initialize the TextGenerationError with a unique identifier.
 
@@ -279,10 +284,10 @@ class TextGenerationError:
         :param error: The exception that occurred during the text generation.
         :type error: Exception
         """
-        self._request = request
-        self._error = error
+        self._request: TextGenerationRequest = request
+        self._error_class: BaseException = error_class
 
-        logger.error(f"Error occurred for request: {self._request}: {error}")
+        logger.error(f"Error occurred for request: {self._request}: {error_class}")
 
     def __repr__(self) -> str:
         """
@@ -291,7 +296,9 @@ class TextGenerationError:
         :return: String representation of the TextGenerationError.
         :rtype: str
         """
-        return f"TextGenerationError(request={self._request}, error={self._error})"
+        return (
+            f"TextGenerationError(request={self._request}, error={self._error_class})"
+        )
 
     @property
     def request(self) -> TextGenerationRequest:
@@ -304,14 +311,14 @@ class TextGenerationError:
         return self._request
 
     @property
-    def error(self) -> Exception:
+    def error(self) -> BaseException:
         """
         Get the exception that occurred during the text generation.
 
         :return: The exception.
         :rtype: Exception
         """
-        return self._error
+        return self._error_class
 
 
 @dataclass
@@ -350,8 +357,10 @@ class TextGenerationBenchmark:
         self._results: List[TextGenerationResult] = []
         self._errors: List[TextGenerationError] = []
         self._concurrencies: List[RequestConcurrencyMeasurement] = []
-        self._overloaded = False
         self._args_rate: Optional[float] = None
+
+        # NOTE: This state never changes
+        self._overloaded = False
 
         logger.debug(
             f"Initialized TextGenerationBenchmark with mode={mode} and rate={rate}"
@@ -413,6 +422,7 @@ class TextGenerationBenchmark:
         :return: The overloaded state.
         :rtype: bool
         """
+
         return self._overloaded
 
     @property
