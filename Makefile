@@ -8,6 +8,7 @@ install.dev:
 	python -m pip install -e .[dev]
 
 
+
 .PHONY: build
 build:
 	python setup.py sdist bdist_wheel
