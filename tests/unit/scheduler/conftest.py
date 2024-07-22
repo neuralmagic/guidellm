@@ -7,7 +7,9 @@ from guidellm.core import TextGenerationRequest, TextGenerationResult
 def backend_submit_patch(mocker):
     patch = mocker.patch(
         "guidellm.backend.base.Backend.submit",
-        return_value=TextGenerationResult(TextGenerationRequest(prompt="Test prompt")),
+        return_value=TextGenerationResult(
+            request=TextGenerationRequest(prompt="Test prompt")
+        ),
     )
     patch.__name__ = "Backend.submit fallbackBackend.submit fallback"
 

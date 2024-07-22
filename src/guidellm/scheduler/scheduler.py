@@ -1,7 +1,7 @@
 import asyncio
 import functools
 import time
-from typing import Callable, Dict, Generator, Iterable, List, Optional, Tuple
+from typing import Callable, Generator, Iterable, List, Optional, Tuple
 
 from loguru import logger
 
@@ -11,6 +11,7 @@ from guidellm.core import (
     TextGenerationError,
     TextGenerationResult,
 )
+from guidellm.core.request import TextGenerationRequest
 from guidellm.request import RequestGenerator
 
 from .load_generator import LoadGenerationMode, LoadGenerator
@@ -72,7 +73,7 @@ class Scheduler:
 
     def _cancel_running_tasks(
         self,
-        tasks: Iterable[Tuple[asyncio.Task, Dict]],
+        tasks: Iterable[Tuple[TextGenerationRequest, asyncio.Task]],
         benchmark: TextGenerationBenchmark,
     ) -> None:
         """
@@ -83,13 +84,12 @@ class Scheduler:
             the asyncio.Task and the signature context of that task.
         """
 
-        for task, context in tasks:
+        for request, task in tasks:
             if not task.done():
                 logger.debug(f"Cancelling running task {task}")
                 task.cancel()
                 benchmark.errors.append(
-                    # TODO: Extract the data from the Coroutine parameters
-                    TextGenerationError(**context, error_class=asyncio.CancelledError())
+                    TextGenerationError(request=request, error=asyncio.CancelledError())
                 )
 
     def _run_sync(self) -> TextGenerationBenchmark:
@@ -130,14 +130,14 @@ class Scheduler:
             mode=self._load_gen_mode.value, rate=self._load_gen_rate
         )
         requests_counter: int = 0
-        tasks: List[Tuple[asyncio.Task, Dict]] = []
+        tasks: List[Tuple[TextGenerationRequest, asyncio.Task]] = []
         start_time: float = time.time()
 
-        for _task, task_start_time in zip(
+        for _task_package, task_start_time in zip(
             self._async_tasks(benchmark), self.load_generator.times()
         ):
-            task, task_context = _task
-            tasks.append((task, task_context))
+            request, task = _task_package
+            tasks.append((request, task))
             requests_counter += 1
 
             if (
@@ -156,12 +156,12 @@ class Scheduler:
                 await asyncio.sleep(pending_time)
 
         if self._max_duration is None:
-            await asyncio.gather(*(t for t, _ in tasks))
+            await asyncio.gather(*(t for _, t in tasks))
         else:
             try:
                 # Set the timeout if the max duration is specified
                 await asyncio.wait_for(
-                    asyncio.gather(*(t for t, _ in tasks), return_exceptions=True),
+                    asyncio.gather(*(t for _, t in tasks), return_exceptions=True),
                     self._max_duration,
                 )
             except TimeoutError:
@@ -179,33 +179,30 @@ class Scheduler:
 
     def _async_tasks(
         self, benchmark: TextGenerationBenchmark
-    ) -> Generator[Tuple[asyncio.Task, Dict], None, None]:
+    ) -> Generator[Tuple[TextGenerationRequest, asyncio.Task], None, None]:
         """
         Iterate through `Backend.submit()` async tasks.
         """
 
         for request in self._request_generator:
-            submit_payload = {"request": request}
             task: asyncio.Task = asyncio.create_task(
-                self._run_task_async(benchmark=benchmark, **submit_payload),
+                self._run_task_async(benchmark=benchmark, request=request),
                 name=f"Backend.submit({request.prompt})",
             )
 
-            yield task, submit_payload
+            yield request, task
 
     async def _run_task_async(
-        self, benchmark: TextGenerationBenchmark, **backend_submit_payload
+        self, benchmark: TextGenerationBenchmark, request: TextGenerationRequest
     ):
         benchmark.request_started()
         try:
             res = await self._event_loop.run_in_executor(
-                None, functools.partial(self._backend.submit, **backend_submit_payload)
+                None, functools.partial(self._backend.submit, request=request)
             )
         except Exception:
             benchmark.errors.append(
-                TextGenerationError(
-                    **backend_submit_payload, error_class=asyncio.CancelledError()
-                )
+                TextGenerationError(request=request, error=asyncio.CancelledError())
             )
         else:
             benchmark.request_completed(res)

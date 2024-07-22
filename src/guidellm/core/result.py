@@ -44,17 +44,19 @@ class TextGenerationResult(Serializable):
     output_token_count: int = Field(
         default=0, description="The number of tokens in the output."
     )
-    last_time: float = Field(default=None, description="The last time recorded.")
+    last_time: Optional[float] = Field(
+        default=None, description="The last time recorded."
+    )
     first_token_set: bool = Field(
         default=False, description="Whether the first token time is set."
     )
-    start_time: float = Field(
+    start_time: Optional[float] = Field(
         default=None, description="The start time of the text generation."
     )
-    end_time: float = Field(
+    end_time: Optional[float] = Field(
         default=None, description="The end time of the text generation."
     )
-    first_token_time: float = Field(
+    first_token_time: Optional[float] = Field(
         default=None, description="The time taken to decode the first token."
     )
     decode_times: Distribution = Field(
@@ -85,6 +87,9 @@ class TextGenerationResult(Serializable):
         :type token: str
         """
         current_counter = time()
+
+        if not self.last_time:
+            raise ValueError("Last time is not specified to get the output token.")
 
         if not self.first_token_set:
             self.first_token_time = current_counter - self.last_time
@@ -157,11 +162,11 @@ class TextGenerationError(Serializable):
     request: TextGenerationRequest = Field(
         description="The text generation request that resulted in an error."
     )
-    error: str = Field(
-        description="The error message that occurred during text generation."
+    error: BaseException = Field(
+        description="The error that occurred during text generation."
     )
 
-    def __init__(self, request: TextGenerationRequest, error: Exception):
+    def __init__(self, request: TextGenerationRequest, error: BaseException):
         super().__init__(request=request, error=str(error))
         logger.error("Text generation error occurred: {}", error)
 
@@ -185,7 +190,7 @@ class TextGenerationBenchmark(Serializable):
     """
 
     mode: str = Field(description="The generation mode, either 'async' or 'sync'.")
-    rate: float = Field(
+    rate: Optional[float] = Field(
         default=None, description="The requested rate of requests per second."
     )
     results: List[TextGenerationResult] = Field(
@@ -238,6 +243,9 @@ class TextGenerationBenchmark(Serializable):
         if not self.results:
             return 0.0
         else:
+            if not self.results[0].start_time or not self.results[-1].end_time:
+                raise ValueError("Start time and End time are not defined")
+
             return self.request_count / (
                 self.results[-1].end_time - self.results[0].start_time
             )
