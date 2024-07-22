@@ -22,7 +22,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -e '.[code_quality]'
+          pip install -e '.[dev]'
 
       - name: Run tests
         run: python -m pytest tests/unit
