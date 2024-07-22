@@ -16,6 +16,10 @@ class Serializable(BaseModel):
         use_enum_values=True,
         validate_assignment=True,
         from_attributes=True,
+        arbitrary_types_allowed=True,
+        json_encoders={
+            BaseException: lambda value: str(value),
+        },
     )
 
     def __init__(self, /, **data: Any) -> None:

@@ -166,9 +166,8 @@ class TextGenerationError(Serializable):
         description="The error that occurred during text generation."
     )
 
-    def __init__(self, request: TextGenerationRequest, error: BaseException):
-        super().__init__(request=request, error=str(error))
-        logger.error("Text generation error occurred: {}", error)
+    def model_post_init(self, _: Any):
+        logger.error(f"Text generation error occurred: {str(self.error)}")
 
 
 class RequestConcurrencyMeasurement(Serializable):
@@ -272,7 +271,6 @@ class TextGenerationBenchmark(Serializable):
         # overall this means that a relatively flat or decreasing throughput curve
         # over time in addition to a growing processing queue is a sign of overload
 
-        # TODO
         return False
 
     def request_started(self):

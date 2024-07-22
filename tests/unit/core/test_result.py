@@ -98,7 +98,7 @@ def test_text_generation_error_initialization():
     error = Exception("Test error")
     result = TextGenerationError(request=request, error=error)
     assert result.request == request
-    assert result.error == str(error)
+    assert str(result.error) == str(error)
 
 
 @pytest.mark.regression
@@ -111,7 +111,7 @@ def test_text_generation_error_json():
 
     result_restored = TextGenerationError.from_json(json_str)
     assert result.request == result_restored.request
-    assert result_restored.error == str(error)
+    assert str(result_restored.error) == str(error)
 
     json_str_restored = result_restored.to_json()
     assert json_str == json_str_restored
@@ -127,7 +127,7 @@ def test_text_generation_error_yaml():
 
     result_restored = TextGenerationError.from_yaml(yaml_str)
     assert result.request == result_restored.request
-    assert result_restored.error == str(error)
+    assert str(result_restored.error) == str(error)
 
     yaml_str_restored = result_restored.to_yaml()
     assert yaml_str == yaml_str_restored
