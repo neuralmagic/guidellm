@@ -44,8 +44,9 @@ dev = [
     "black~=24.4.2",
     "isort~=5.13.2",
     "mypy~=1.10.1",
-    "pytest~=8.2.2",
+    "pytest-cov~=5.0.0",
     "pytest-mock~=3.14.0",
+    "pytest~=8.2.2",
     "ruff~=0.5.2",
     "tox~=4.16.0",
     "types-requests~=2.32.0"
@@ -94,7 +95,7 @@ lint.select = ["E", "F", "W"]
 
 
 [tool.pytest.ini_options]
-addopts = '-s -vvv --cache-clear'
+addopts = '-s -vvv --cache-clear --cov-report=term-missing --cov --cov-fail-under=75'
 markers = [
     "smoke: quick tests to check basic functionality",
     "sanity: detailed tests to ensure major functions work correctly",
