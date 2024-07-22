@@ -11,7 +11,7 @@ install.dev:
 
 .PHONY: build
 build:
-	python setup.py sdist bdist_wheel
+	python -m build
 
 .PHONY: style
 style:
