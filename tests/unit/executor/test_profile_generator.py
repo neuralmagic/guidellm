@@ -144,7 +144,7 @@ def test_pending_rates():
     benchmarks = [mock_benchmark, mock_overloaded_benchmark]
     mock_report.benchmarks = benchmarks
     profile = test_profile_generator.next(mock_report)
-    assert profile is not None
     for expected_rate in numpy.linspace(2.0, 8.0, 10):
         profile = test_profile_generator.next(mock_report)
+        assert profile is not None
         assert profile.load_gen_rate == expected_rate
