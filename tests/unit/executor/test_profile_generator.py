@@ -1,4 +1,3 @@
-from profile import Profile
 from unittest.mock import MagicMock
 
 import numpy
