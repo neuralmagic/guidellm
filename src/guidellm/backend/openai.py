@@ -1,6 +1,6 @@
 import functools
 import os
-from typing import Any, Dict, Iterator, List, Optional
+from typing import Any, Dict, Generator, List, Optional
 
 from loguru import logger
 from openai import OpenAI, Stream
@@ -72,7 +72,7 @@ class OpenAIBackend(Backend):
 
     def make_request(
         self, request: TextGenerationRequest
-    ) -> Iterator[GenerativeResponse]:
+    ) -> Generator[GenerativeResponse, None, None]:
         """
         Make a request to the OpenAI backend.
 

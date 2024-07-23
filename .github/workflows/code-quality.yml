@@ -1,0 +1,39 @@
+name: Code Quality Check
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  code-quality-check:
+    name: Code quality check
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e '.[dev]'
+
+      - name: Run tests
+        run: python -m pytest tests/unit
+
+      - name: Run linter
+        run: python -m ruff check src tests
+
+      - name: Check formatting
+        run: |
+          python -m black --check src tests
+          python -m isort --check src tests
+
+      - name: Check types
+        run: python -m mypy --check-untyped-defs src tests
