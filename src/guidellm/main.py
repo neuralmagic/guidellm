@@ -2,7 +2,11 @@ import click
 
 from guidellm.backend import Backend
 from guidellm.core import TextGenerationBenchmarkReport
-from guidellm.executor import Executor, rate_type_to_load_gen_mode, rate_type_to_profile_mode
+from guidellm.executor import (
+    Executor,
+    rate_type_to_load_gen_mode,
+    rate_type_to_profile_mode,
+)
 from guidellm.request import (
     EmulatedRequestGenerator,
     FileRequestGenerator,
@@ -107,10 +111,10 @@ def main(
         )
     else:
         raise ValueError(f"Unknown data type: {data_type}")
-    
+
     profile_mode = rate_type_to_profile_mode(rate_type)
     load_gen_mode = rate_type_to_load_gen_mode.get(rate_type, None)
-    
+
     # Create executor
     executor = Executor(
         request_generator=request_generator,

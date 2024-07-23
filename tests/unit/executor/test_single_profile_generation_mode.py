@@ -25,7 +25,7 @@ def test_executor_single_profile_generator_benchmark_report(
         tokenizer="bert-base-uncased"
     )
     rates = [1.0]
-    if (load_gen_mode == LoadGenerationMode.SYNCHRONOUS):
+    if load_gen_mode == LoadGenerationMode.SYNCHRONOUS:
         rates = None
     profile_generator_kwargs = {"load_gen_mode": load_gen_mode, "rates": rates}
 

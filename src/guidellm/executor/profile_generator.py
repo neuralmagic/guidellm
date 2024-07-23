@@ -19,7 +19,7 @@ __all__ = [
 rate_type_to_load_gen_mode = {
     "synchronous": LoadGenerationMode.SYNCHRONOUS,
     "constant": LoadGenerationMode.CONSTANT,
-    "poisson": LoadGenerationMode.POISSON
+    "poisson": LoadGenerationMode.POISSON,
 }
 
 
@@ -27,12 +27,14 @@ class ProfileGenerationMode(Enum):
     FIXED_RATE = "fixed_rate"
     SWEEP = "sweep"
 
+
 rate_type_to_profile_mode = {
     "synchronous": ProfileGenerationMode.FIXED_RATE,
     "constant": ProfileGenerationMode.FIXED_RATE,
     "poisson": ProfileGenerationMode.FIXED_RATE,
     "sweep": ProfileGenerationMode.SWEEP,
 }
+
 
 @dataclass
 class Profile:
@@ -69,7 +71,12 @@ class ProfileGenerator(ABC):
 
 @ProfileGenerator.register(ProfileGenerationMode.FIXED_RATE)
 class FixedRateProfileGenerator(ProfileGenerator):
-    def __init__(self, load_gen_mode: Optional[LoadGenerationMode], rates: Optional[List[float]] = None, **kwargs):
+    def __init__(
+        self,
+        load_gen_mode: Optional[LoadGenerationMode],
+        rates: Optional[List[float]] = None,
+        **kwargs,
+    ):
         super().__init__(ProfileGenerationMode.FIXED_RATE)
         if load_gen_mode == "synchronous" and rates and len(rates) > 0:
             raise ValueError("custom rates are not supported in synchronous mode")
@@ -78,9 +85,7 @@ class FixedRateProfileGenerator(ProfileGenerator):
         self._generated: bool = False
         self._rate_index: int = 0
 
-    def next(
-        self, current_report: TextGenerationBenchmarkReport
-    ) -> Optional[Profile]:
+    def next(self, current_report: TextGenerationBenchmarkReport) -> Optional[Profile]:
         if self._load_gen_mode.name == LoadGenerationMode.SYNCHRONOUS.name:
             if self._generated:
                 return None
@@ -88,7 +93,10 @@ class FixedRateProfileGenerator(ProfileGenerator):
             return Profile(
                 load_gen_mode=LoadGenerationMode.SYNCHRONOUS, load_gen_rate=None
             )
-        elif self._load_gen_mode.name in {LoadGenerationMode.CONSTANT.name, LoadGenerationMode.POISSON.name}:
+        elif self._load_gen_mode.name in {
+            LoadGenerationMode.CONSTANT.name,
+            LoadGenerationMode.POISSON.name,
+        }:
             if self._rate_index >= len(self._rates):
                 return None
             current_rate = self._rates[self._rate_index]

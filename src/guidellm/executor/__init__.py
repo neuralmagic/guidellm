@@ -1,12 +1,12 @@
 from .executor import Executor
 from .profile_generator import (
-    rate_type_to_load_gen_mode,
-    rate_type_to_profile_mode,
+    FixedRateProfileGenerator,
     Profile,
     ProfileGenerationMode,
     ProfileGenerator,
-    FixedRateProfileGenerator,
     SweepProfileGenerator,
+    rate_type_to_load_gen_mode,
+    rate_type_to_profile_mode,
 )
 
 __all__ = [
