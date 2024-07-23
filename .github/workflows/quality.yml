@@ -11,13 +11,36 @@ on:
 jobs:
   quality-check:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python:
+          - "3.12"
+          - "3.8"
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.8'
+          python-version: ${{ matrix.python }}
       - name: Install dependencies
         run: pip install tox
       - name: Run quality checks
         run: tox -e quality
+
+  type-check:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python:
+          - "3.12"
+          - "3.8"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install dependencies
+        run: pip install tox
+      - name: Run type checks
+        run: tox -e types
