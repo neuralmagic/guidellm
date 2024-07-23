@@ -16,6 +16,12 @@ __all__ = [
     "SweepProfileGenerator",
 ]
 
+rate_type_to_load_gen_mode = {
+    "synchronous": LoadGenerationMode.SYNCHRONOUS,
+    "constant": LoadGenerationMode.CONSTANT,
+    "poisson": LoadGenerationMode.POISSON
+}
+
 class ProfileGenerationMode(Enum):
     FIXED_RATE = "fixed_rate"
     SWEEP = "sweep"
@@ -54,37 +60,37 @@ class ProfileGenerator(ABC):
         pass
 
 
-@ProfileGenerator.register_generator(ProfileGenerationMode.FIXED_RATE)
+@ProfileGenerator.register(ProfileGenerationMode.FIXED_RATE)
 class FixedRateProfileGenerator(ProfileGenerator):
-    def __init__(self, rate_type: LoadGenerationMode, rates: Optional[List[float]] = None, **kwargs):
+    def __init__(self, load_gen_mode: Optional[LoadGenerationMode], rates: Optional[List[float]] = None, **kwargs):
         super().__init__(ProfileGenerationMode.FIXED_RATE)
-        if rate_type == "synchronous" and rates and len(rates) > 0:
+        if load_gen_mode == "synchronous" and rates and len(rates) > 0:
             raise ValueError("custom rates are not supported in synchronous mode")
         self._rates: Optional[List[float]] = rates
-        self._rate_type: LoadGenerationMode = rate_type
+        self._load_gen_mode: LoadGenerationMode = load_gen_mode
         self._generated: bool = False
         self._rate_index: int = 0
 
     def next(
         self, current_report: TextGenerationBenchmarkReport
     ) -> Optional[Profile]:
-        if self._rate_type.name == LoadGenerationMode.SYNCHRONOUS.name:
+        if self._load_gen_mode.name == LoadGenerationMode.SYNCHRONOUS.name:
             if self._generated:
                 return None
             self._generated = True
             return Profile(
                 load_gen_mode=LoadGenerationMode.SYNCHRONOUS, load_gen_rate=None
             )
-        elif self._rate_type.name in {LoadGenerationMode.CONSTANT.name, LoadGenerationMode.POISSON.name}:
+        elif self._load_gen_mode.name in {LoadGenerationMode.CONSTANT.name, LoadGenerationMode.POISSON.name}:
             if self._rate_index >= len(self._rates):
                 return None
             current_rate = self._rates[self._rate_index]
             self._rate_index += 1
             return Profile(
-                load_gen_mode=self.rate_type, load_gen_rate=current_rate
+                load_gen_mode=self._load_gen_mode, load_gen_rate=current_rate
             )
 
-        raise ValueError(f"Invalid rate type: {self._rate_type}")
+        raise ValueError(f"Invalid rate type: {self._load_gen_mode}")
 
 
 @ProfileGenerator.register(ProfileGenerationMode.SWEEP)

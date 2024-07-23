@@ -99,12 +99,3 @@ ignore_missing_imports=true
 line-length = 88
 exclude = ["build", "dist", "env", ".venv"]
 lint.select = ["E", "F", "W"]
-
-
-[tool.pytest.ini_options]
-addopts = '-s -vvv --cache-clear --cov-report=term-missing --cov --cov-fail-under=75'
-markers = [
-    "smoke: quick tests to check basic functionality",
-    "sanity: detailed tests to ensure major functions work correctly",
-    "regression: tests to ensure that new changes do not break existing functionality"
-]

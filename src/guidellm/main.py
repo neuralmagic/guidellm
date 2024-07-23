@@ -2,13 +2,14 @@ import click
 
 from guidellm.backend import Backend
 from guidellm.core import TextGenerationBenchmarkReport
-from guidellm.executor import Executor
+from guidellm.executor import Executor, rate_type_to_load_gen_mode
 from guidellm.request import (
     EmulatedRequestGenerator,
     FileRequestGenerator,
     TransformersDatasetRequestGenerator,
 )
 from guidellm.request.base import RequestGenerator
+from guidellm.scheduler.load_generator import LoadGenerationMode
 
 
 @click.command()
@@ -106,13 +107,14 @@ def main(
         )
     else:
         raise ValueError(f"Unknown data type: {data_type}")
-
+    
+    load_gen_mode = rate_type_to_load_gen_mode.get(rate_type, None)
     # Create executor
     executor = Executor(
         request_generator=request_generator,
         backend=backend,
         rate_type=rate_type,
-        profile_args={"rate_type": rate_type, "rate": rate},
+        profile_args={"load_gen_mode": load_gen_mode, "rates": rate},
         max_requests=num_requests,
         max_duration=num_seconds,
     )

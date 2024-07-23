@@ -16,7 +16,7 @@ class LoadGenerationMode(str, Enum):
 
     """
 
-    SYNCHRONOUS = "sync"
+    SYNCHRONOUS = "synchronous"
     CONSTANT = "constant"
     POISSON = "poisson"
 
