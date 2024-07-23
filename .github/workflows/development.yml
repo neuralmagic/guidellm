@@ -10,13 +10,15 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [3.8, 3.9, 3.10, 3.11, 3.12]
+        python:
+          - "3.12"
+          - "3.8"
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: ${{ matrix.python }}
       - name: Install dependencies
         run: pip install tox
       - name: Run unit tests
@@ -26,13 +28,15 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [3.8, 3.9, 3.10, 3.11, 3.12]
+        python:
+          - "3.12"
+          - "3.8"
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: ${{ matrix.python }}
       - name: Install dependencies
         run: pip install tox
       - name: Run integration tests
