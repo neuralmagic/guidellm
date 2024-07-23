@@ -1,3 +1,5 @@
+from typing import List, Optional
+
 import pytest
 
 from guidellm.core import TextGenerationBenchmark, TextGenerationBenchmarkReport
@@ -24,7 +26,7 @@ def test_executor_single_profile_generator_benchmark_report(
     request_genrator = dummy.services.TestRequestGenerator(
         tokenizer="bert-base-uncased"
     )
-    rates = [1.0]
+    rates: Optional[List[float]] = [1.0]
     if load_gen_mode == LoadGenerationMode.SYNCHRONOUS:
         rates = None
     profile_generator_kwargs = {"load_gen_mode": load_gen_mode, "rates": rates}

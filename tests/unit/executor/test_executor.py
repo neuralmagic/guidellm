@@ -14,8 +14,8 @@ def test_executor_creation():
     mock_backend = MagicMock(spec=Backend)
     profile_mode = ProfileGenerationMode.SWEEP
     profile_args = None
-    max_requests = (None,)
-    max_duration = (None,)
+    max_requests = None
+    max_duration = None
     executor = Executor(
         mock_backend,
         mock_request_generator,

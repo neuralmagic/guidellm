@@ -13,7 +13,6 @@ from guidellm.request import (
     TransformersDatasetRequestGenerator,
 )
 from guidellm.request.base import RequestGenerator
-from guidellm.scheduler.load_generator import LoadGenerationMode
 
 
 @click.command()
@@ -112,9 +111,10 @@ def main(
     else:
         raise ValueError(f"Unknown data type: {data_type}")
 
-    profile_mode = rate_type_to_profile_mode(rate_type)
+    profile_mode = rate_type_to_profile_mode.get(rate_type)
     load_gen_mode = rate_type_to_load_gen_mode.get(rate_type, None)
-
+    if not profile_mode or not load_gen_mode:
+        raise ValueError("Invalid rate type")
     # Create executor
     executor = Executor(
         request_generator=request_generator,

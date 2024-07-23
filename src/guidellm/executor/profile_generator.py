@@ -78,32 +78,33 @@ class FixedRateProfileGenerator(ProfileGenerator):
         **kwargs,
     ):
         super().__init__(ProfileGenerationMode.FIXED_RATE)
-        if load_gen_mode == "synchronous" and rates and len(rates) > 0:
+        if load_gen_mode == LoadGenerationMode.SYNCHRONOUS and rates and len(rates) > 0:
             raise ValueError("custom rates are not supported in synchronous mode")
         self._rates: Optional[List[float]] = rates
-        self._load_gen_mode: LoadGenerationMode = load_gen_mode
+        self._load_gen_mode = load_gen_mode
         self._generated: bool = False
         self._rate_index: int = 0
 
     def next(self, current_report: TextGenerationBenchmarkReport) -> Optional[Profile]:
-        if self._load_gen_mode.name == LoadGenerationMode.SYNCHRONOUS.name:
+        if self._load_gen_mode == LoadGenerationMode.SYNCHRONOUS:
             if self._generated:
                 return None
             self._generated = True
             return Profile(
                 load_gen_mode=LoadGenerationMode.SYNCHRONOUS, load_gen_rate=None
             )
-        elif self._load_gen_mode.name in {
-            LoadGenerationMode.CONSTANT.name,
-            LoadGenerationMode.POISSON.name,
+        elif self._load_gen_mode in {
+            LoadGenerationMode.CONSTANT,
+            LoadGenerationMode.POISSON,
         }:
-            if self._rate_index >= len(self._rates):
-                return None
-            current_rate = self._rates[self._rate_index]
-            self._rate_index += 1
-            return Profile(
-                load_gen_mode=self._load_gen_mode, load_gen_rate=current_rate
-            )
+            if self._rates:
+                if self._rate_index >= len(self._rates):
+                    return None
+                current_rate = self._rates[self._rate_index]
+                self._rate_index += 1
+                return Profile(
+                    load_gen_mode=self._load_gen_mode, load_gen_rate=current_rate
+                )
 
         raise ValueError(f"Invalid rate type: {self._load_gen_mode}")
 
