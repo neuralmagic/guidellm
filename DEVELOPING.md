@@ -1,34 +1,209 @@
-# Developing GuideLLM
+# Developer Documentation
 
-GuideLLM is developed and tested using Python 3.8-3.11.
-To develop GuideLLM, you will also need the development dependencies and to follow the styling guidelines.
+## Introduction
 
-Here are some details to get started.
+Welcome to the developer documentation for `guidellm`, a guidance platform for evaluating large language model deployments.
+This document aims to provide developers with all the necessary information to contribute to the project effectively.
 
-## Basic Commands
+## Getting Started
 
-**Development Installation**
+### Prerequisites
 
-```bash
-git clone https://github.com/neuralmagic/guidellm.git
-cd guidellm
-python3 -m pip install -e "./[dev]"
+Before you begin, ensure you have the following installed:
+- Python 3.8 or higher
+- `pip` (Python package installer)
+- `git` (version control system)
+
+### Installation
+
+1. Clone the repository:
+    ```bash
+    git clone https://github.com/neuralmagic/guidellm.git
+    cd guidellm
+    ```
+
+2. Install the required dependencies:
+    ```bash
+    pip install -e .[dev]
+    ```
+
+## Project Structure
+
+The project follows a standard Python project structure:
+```plaintext
+guidellm/
+├── src/
+│ └── guidellm/
+├── tests/
+│ ├── unit/
+│ ├── integration/
+│ └── e2e/
+├── pyproject.toml
+├── tox.ini
+└── README.md
 ```
 
-This will clone the GuideLLM repo, install it, and install the development dependencies.
+- **src/guidellm/**: Main source code for the project.
+- **tests/**: Test cases categorized into unit, integration, and end-to-end tests.
 
-After this, install pre-commit hooks to ensure code quality and style checks are run before committing changes.
+## Development Environment Setup
 
+To set up your development environment, follow these steps:
+
+1. Install pre-commit hooks:
+    ```bash
+    pre-commit install
+    ```
+
+2. Ensure all dependencies are installed:
+    ```bash
+    pip install -e .[dev]
+    ```
+
+## Code Quality and Style Guidelines
+
+We use several tools to maintain code quality and consistency:
+
+### Ruff
+
+Ruff is used for linting and formatting checks.
+
+- Configuration is in `pyproject.toml`.
+- To run Ruff:
+    ```bash
+    ruff check src tests
+    ```
+
+### Isort
+
+Isort is used for sorting imports.
+
+- Configuration is in `pyproject.toml`.
+- To sort imports:
+    ```bash
+    isort src tests
+    ```
+
+### Flake8
+
+Flake8 is used for linting.
+
+- Configuration is in `tox.ini`.
+- To run Flake8:
+    ```bash
+    flake8 src tests --max-line-length 88
+    ```
+
+### MyPy
+
+MyPy is used for type checking.
+
+- Configuration is in `pyproject.toml`.
+- To run MyPy:
+    ```bash
+    mypy src/guidellm
+    ```
+
+## Testing
+
+We use `pytest` for running tests.
+
+### Running All Tests
+
+To run all tests:
 ```bash
-pre-commit install
+tox
 ```
 
-**Code Styling and Formatting checks**
+Additionally, all tests are marked with smoke, sanity, or regression tags for better organization.
+To run tests with a specific tag, use the `-m` flag:
 
 ```bash
-make style
-make quality
+tox -- -m "smoke or sanity"
 ```
 
-This will run automatic code styling using `black` and `isort` and test that the
-repository's code matches its standards.
+### Running Unit Tests
+
+The unit tests are located in the `tests/unit` directory.
+To run the unit tests, use the following command:
+
+```bash
+tox -e test-unit
+```
+
+### Running Integration Tests
+
+The integration tests are located in the `tests/integration` directory.
+To run the integration tests, use the following command:
+
+```bash
+tox -e test-integration
+```
+
+### Running End-to-End Tests
+
+The end-to-end tests are located in the `tests/e2e` directory.
+To run the end-to-end tests, use the following command:
+
+```bash
+tox -e test-e2e
+```
+
+## Formatting, Linting, and Type Checking
+### Running Quality Checks (Linting)
+
+To run quality checks (ruff, isort, flake8, mypy), use the following command:
+
+```bash
+tox -e quality
+```
+
+### Running Auto Formatting and Validation
+
+To run formatting checks and fixes (ruff, isort, flake8) for automatic formatting, use the following command:
+
+```bash
+tox -e style
+```
+
+### Type Checking
+
+To run type checks (MyPy), use the following command:
+
+```bash
+tox -e types
+```
+
+## Building the Project
+
+To build the project, use the following command:
+
+```bash
+tox -e build
+```
+
+## Cleaning Up
+
+To clean up build, dist, and cache files, use the following command:
+
+```bash
+tox -e clean
+```
+
+## Continuous Integration/Continuous Deployment (CI/CD)
+
+Our CI/CD pipeline is configured using GitHub Actions.
+The configuration files are located in the .github/workflows/ directory.
+You can run the CI/CD pipeline locally using act or similar tools.
+
+## Contributing
+
+Please refer to the CONTRIBUTING.md file for guidelines on how to contribute to the project.
+
+## Maintaining
+
+Please refer to the MAINTAINERS file for maintenance guidelines and contact information.
+
+## Contact and Support
+
+If you need help or have any questions, please open an issue on GitHub or contact us at support@neuralmagic.com.
