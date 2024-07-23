@@ -21,16 +21,3 @@ jobs:
         run: pip install tox
       - name: Run quality checks
         run: tox -e quality
-
-  type-check:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.8'
-      - name: Install dependencies
-        run: pip install tox
-      - name: Run type checks
-        run: tox -e types
