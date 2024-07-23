@@ -89,7 +89,9 @@ class Scheduler:
                 logger.debug(f"Cancelling running task {task}")
                 task.cancel()
                 benchmark.errors.append(
-                    TextGenerationError(request=request, error=asyncio.CancelledError())
+                    TextGenerationError(
+                        request=request, message=str(asyncio.CancelledError())
+                    )
                 )
 
     def _run_sync(self) -> TextGenerationBenchmark:
@@ -202,7 +204,9 @@ class Scheduler:
             )
         except Exception:
             benchmark.errors.append(
-                TextGenerationError(request=request, error=asyncio.CancelledError())
+                TextGenerationError(
+                    request=request, message=str(asyncio.CancelledError())
+                )
             )
         else:
             benchmark.request_completed(res)

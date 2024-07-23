@@ -162,12 +162,12 @@ class TextGenerationError(Serializable):
     request: TextGenerationRequest = Field(
         description="The text generation request that resulted in an error."
     )
-    error: BaseException = Field(
-        description="The error that occurred during text generation."
+    message: str = Field(
+        description="The error message that occurred during text generation."
     )
 
     def model_post_init(self, _: Any):
-        logger.error(f"Text generation error occurred: {str(self.error)}")
+        logger.error(f"Text generation error occurred: {self.message}")
 
 
 class RequestConcurrencyMeasurement(Serializable):
@@ -317,7 +317,7 @@ class TextGenerationBenchmark(Serializable):
                 )
             )
             logger.warning(
-                "Text generation request resulted in error: {}", result.error
+                f"Text generation request resulted in error: {result.message}"
             )
         else:
             self.results.append(result)

@@ -96,22 +96,23 @@ def test_text_generation_result_yaml():
 def test_text_generation_error_initialization():
     request = TextGenerationRequest(prompt="Generate a story")
     error = Exception("Test error")
-    result = TextGenerationError(request=request, error=error)
+    result = TextGenerationError(request=request, message=str(error))
     assert result.request == request
-    assert str(result.error) == str(error)
+    assert str(result.message) == str(error)
 
 
 @pytest.mark.regression
 def test_text_generation_error_json():
     request = TextGenerationRequest(prompt="Generate a story")
     error = Exception("Test error")
-    result = TextGenerationError(request=request, error=error)
+    result = TextGenerationError(request=request, message=str(error))
     json_str = result.to_json()
-    assert '"error":"Test error"' in json_str
 
     result_restored = TextGenerationError.from_json(json_str)
+
+    assert result.message == "Test error"
     assert result.request == result_restored.request
-    assert str(result_restored.error) == str(error)
+    assert str(result_restored.message) == str(error)
 
     json_str_restored = result_restored.to_json()
     assert json_str == json_str_restored
@@ -121,13 +122,14 @@ def test_text_generation_error_json():
 def test_text_generation_error_yaml():
     request = TextGenerationRequest(prompt="Generate a story")
     error = Exception("Test error")
-    result = TextGenerationError(request=request, error=error)
+    result = TextGenerationError(request=request, message=str(error))
     yaml_str = result.to_yaml()
-    assert "error: Test error" in yaml_str
 
     result_restored = TextGenerationError.from_yaml(yaml_str)
+
+    assert result.message == "Test error"
     assert result.request == result_restored.request
-    assert str(result_restored.error) == str(error)
+    assert str(result_restored.message) == str(error)
 
     yaml_str_restored = result_restored.to_yaml()
     assert yaml_str == yaml_str_restored
@@ -165,7 +167,7 @@ def test_text_generation_benchmark_completed_with_error():
     benchmark = TextGenerationBenchmark(mode="test", rate=1.0)
     benchmark.request_started()
     request = TextGenerationRequest(prompt="Generate a story")
-    error = TextGenerationError(request=request, error=Exception("Test error"))
+    error = TextGenerationError(request=request, message=str(Exception("Test error")))
     benchmark.request_completed(error)
     assert benchmark.request_count == 0
     assert benchmark.error_count == 1
