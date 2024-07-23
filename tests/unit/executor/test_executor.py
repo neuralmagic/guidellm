@@ -3,17 +3,18 @@ from unittest.mock import MagicMock, patch
 from guidellm.backend.base import Backend
 from guidellm.executor import Executor
 from guidellm.executor import Profile, ProfileGenerator
+from guidellm.executor.profile_generator import ProfileGenerationMode
 from guidellm.request.base import RequestGenerator
 from guidellm.scheduler import LoadGenerationMode
 
 def test_executor_creation():
     mock_request_generator = MagicMock(spec=RequestGenerator)
     mock_backend = MagicMock(spec=Backend)
-    rate_type = "sweep"
+    profile_mode = ProfileGenerationMode.SWEEP
     profile_args = None
     max_requests = None,
     max_duration = None,
-    executor = Executor(mock_backend, mock_request_generator, rate_type, profile_args, max_requests, max_duration);
+    executor = Executor(mock_backend, mock_request_generator, profile_mode, profile_args, max_requests, max_duration);
     assert executor.request_generator == mock_request_generator
     assert executor.backend == mock_backend
     assert executor.max_requests == max_requests
@@ -47,8 +48,8 @@ def test_executor_run(mock_request_generator, mock_backend, mock_scheduler):
         executor = Executor(
             request_generator=mock_request_generator,
             backend=mock_backend,
-            rate_type="constant",
-            profile_args={"rate_type": "constant", "rate": [1.0, 2.0]},
+            profile_mode=ProfileGenerationMode.FIXED_RATE,
+            profile_args={"load_gen_mode": LoadGenerationMode.CONSTANT, "rates": [1.0, 2.0]},
             max_requests=10,
             max_duration=100
         )

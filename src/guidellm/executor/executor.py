@@ -20,20 +20,13 @@ class Executor:
         self,
         backend: Backend,
         request_generator: RequestGenerator,
-        rate_type: str = "sweep",
+        profile_mode: ProfileGenerationMode = ProfileGenerationMode.SWEEP,
         profile_args: Optional[Dict[str, Any]] = None,
         max_requests: Optional[int] = None,
         max_duration: Optional[float] = None,
     ):
         self.request_generator = request_generator
         self.backend = backend
-        profile_mode = "sweep"
-        if rate_type in {"synchronous", "constant", "poisson"}:
-            profile_mode = ProfileGenerationMode.FIXED_RATE
-        elif rate_type == "sweep":
-            profile_mode = ProfileGenerationMode.SWEEP
-        else:
-            raise ValueError("invalid rate type provided")
         self.profile_generator: ProfileGenerator = ProfileGenerator.create(
             profile_mode, **(profile_args or {})
         )

@@ -65,7 +65,7 @@ def test_rate_doubles():
   mock_report = MagicMock(spec=TextGenerationBenchmarkReport)
   mock_benchmark = MagicMock(spec=TextGenerationBenchmark)
   mock_benchmark.overloaded = False
-  mock_benchmark.args_rate = 2.0
+  mock_benchmark.rate = 2.0
   mock_benchmark.request_rate = 2.0
   benchmarks = [
         mock_benchmark
@@ -81,11 +81,11 @@ def test_max_found():
   mock_report = MagicMock(spec=TextGenerationBenchmarkReport)
   mock_benchmark = MagicMock(spec=TextGenerationBenchmark)
   mock_benchmark.overloaded = False
-  mock_benchmark.args_rate = 2.0
+  mock_benchmark.rate = 2.0
   mock_benchmark.request_rate = 2.0
   mock_overloaded_benchmark = MagicMock(spec=TextGenerationBenchmark)
   mock_overloaded_benchmark.overloaded = True
-  mock_overloaded_benchmark.args_rate = 4.0
+  mock_overloaded_benchmark.rate = 4.0
   mock_overloaded_benchmark.request_rate = 4.0
   benchmarks = [
         mock_benchmark,
@@ -104,11 +104,11 @@ def test_pending_rates():
   mock_report = MagicMock(spec=TextGenerationBenchmarkReport)
   mock_benchmark = MagicMock(spec=TextGenerationBenchmark)
   mock_benchmark.overloaded = False
-  mock_benchmark.args_rate = 2.0
+  mock_benchmark.rate = 2.0
   mock_benchmark.request_rate = 2.0
   mock_overloaded_benchmark = MagicMock(spec=TextGenerationBenchmark)
   mock_overloaded_benchmark.overloaded = True
-  mock_overloaded_benchmark.args_rate = 8.0
+  mock_overloaded_benchmark.rate = 8.0
   mock_overloaded_benchmark.request_rate = 8.0
   benchmarks = [
         mock_benchmark,

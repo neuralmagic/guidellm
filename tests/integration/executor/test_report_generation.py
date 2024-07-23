@@ -18,8 +18,7 @@ def test_executor_openai_single_report_generation_sync_mode(
     )
     profile_generation_mode = ProfileGenerationMode.FIXED_RATE
     profile_generator_kwargs = {
-        "rate_type": LoadGenerationMode.SYNCHRONOUS,
-        "rate": [1.0],
+        "load_gen_mode": LoadGenerationMode.SYNCHRONOUS,
     }
 
     executor = Executor(
@@ -57,8 +56,8 @@ def test_executor_openai_single_report_generation_constant_mode_infinite(
     )
     profile_generation_mode = ProfileGenerationMode.FIXED_RATE
     profile_generator_kwargs = {
-        "rate_type": LoadGenerationMode.CONSTANT,
-        "rate": [1.0],
+        "load_gen_mode": LoadGenerationMode.CONSTANT,
+        "rates": [1.0],
     }
 
     executor = Executor(
@@ -90,8 +89,8 @@ def test_executor_openai_single_report_generation_constant_mode_limited(
     )
     profile_generation_mode = ProfileGenerationMode.FIXED_RATE
     profile_generator_kwargs = {
-        "rate_type": LoadGenerationMode.CONSTANT,
-        "rate": [1.0],
+        "load_gen_mode": LoadGenerationMode.CONSTANT,
+        "rates": [1.0],
     }
 
     executor = Executor(
@@ -126,8 +125,8 @@ def test_executor_openai_single_report_generation_constant_mode_failed(
     )
     profile_generation_mode = ProfileGenerationMode.FIXED_RATE
     profile_generator_kwargs = {
-        "rate_type": LoadGenerationMode.CONSTANT,
-        "rate": [1.0],
+        "load_gen_mode": LoadGenerationMode.CONSTANT,
+        "rates": [1.0],
     }
 
     executor = Executor(
@@ -155,8 +154,8 @@ def test_executor_openai_single_report_generation_constant_mode_cancelled_report
     )
     profile_generation_mode = ProfileGenerationMode.FIXED_RATE
     profile_generator_kwargs = {
-        "rate_type": LoadGenerationMode.CONSTANT,
-        "rate": [1.0],
+        "load_gen_mode": LoadGenerationMode.CONSTANT,
+        "rates": [1.0],
     }
 
     executor = Executor(

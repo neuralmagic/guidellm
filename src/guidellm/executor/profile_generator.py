@@ -22,10 +22,17 @@ rate_type_to_load_gen_mode = {
     "poisson": LoadGenerationMode.POISSON
 }
 
+
 class ProfileGenerationMode(Enum):
     FIXED_RATE = "fixed_rate"
     SWEEP = "sweep"
 
+rate_type_to_profile_mode = {
+    "synchronous": ProfileGenerationMode.FIXED_RATE,
+    "constant": ProfileGenerationMode.FIXED_RATE,
+    "poisson": ProfileGenerationMode.FIXED_RATE,
+    "sweep": ProfileGenerationMode.SWEEP,
+}
 
 @dataclass
 class Profile:
