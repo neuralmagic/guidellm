@@ -36,6 +36,9 @@ def test_text_generation_result_output_token():
     result.start(prompt)
     token = "the"
     result.output_token(token)
+
+    assert result.last_time
+    assert result.start_time
     assert result.output == f"{token} "
     assert result.last_time is not None and result.last_time > result.start_time
 
@@ -46,7 +49,10 @@ def test_text_generation_result_end():
     result = TextGenerationResult(request=request)
     result.start("Once upon a time")
     result.end("The end")
+
     assert result.output == "The end"
+    assert result.last_time
+    assert result.start_time
     assert result.end_time is not None and result.end_time > result.start_time
 
 
