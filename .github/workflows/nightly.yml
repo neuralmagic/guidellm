@@ -24,7 +24,7 @@ jobs:
       - name: Install dependencies
         run: pip install tox
       - name: Run unit tests
-        run: tox -e test-unit
+        run: tox -e test-unit -- --cov-report=term-missing --cov --cov-fail-under=75
 
   integration-tests:
     runs-on: ubuntu-latest

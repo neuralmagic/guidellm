@@ -101,7 +101,7 @@ lint.select = ["E", "F", "W"]
 
 
 [tool.pytest.ini_options]
-addopts = '-s -vvv --cache-clear --cov-report=term-missing --cov --cov-fail-under=75'
+addopts = '-s -vvv --cache-clear'
 markers = [
     "smoke: quick tests to check basic functionality",
     "sanity: detailed tests to ensure major functions work correctly",
