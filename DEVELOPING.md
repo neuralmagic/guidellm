@@ -10,6 +10,7 @@ This document aims to provide developers with all the necessary information to c
 ### Prerequisites
 
 Before you begin, ensure you have the following installed:
+
 - Python 3.8 or higher
 - `pip` (Python package installer)
 - `git` (version control system)
@@ -17,19 +18,21 @@ Before you begin, ensure you have the following installed:
 ### Installation
 
 1. Clone the repository:
-    ```bash
-    git clone https://github.com/neuralmagic/guidellm.git
-    cd guidellm
-    ```
+
+   ```bash
+   git clone https://github.com/neuralmagic/guidellm.git
+   cd guidellm
+   ```
 
 2. Install the required dependencies:
-    ```bash
-    pip install -e .[dev]
-    ```
+   ```bash
+   pip install -e .[dev]
+   ```
 
 ## Project Structure
 
 The project follows a standard Python project structure:
+
 ```plaintext
 guidellm/
 ├── src/
@@ -51,14 +54,15 @@ guidellm/
 To set up your development environment, follow these steps:
 
 1. Install pre-commit hooks:
-    ```bash
-    pre-commit install
-    ```
+
+   ```bash
+   pre-commit install
+   ```
 
 2. Ensure all dependencies are installed:
-    ```bash
-    pip install -e .[dev]
-    ```
+   ```bash
+   pip install -e .[dev]
+   ```
 
 ## Code Quality and Style Guidelines
 
@@ -70,9 +74,9 @@ Ruff is used for linting and formatting checks.
 
 - Configuration is in `pyproject.toml`.
 - To run Ruff:
-    ```bash
-    ruff check src tests
-    ```
+  ```bash
+  ruff check src tests
+  ```
 
 ### Isort
 
@@ -80,9 +84,9 @@ Isort is used for sorting imports.
 
 - Configuration is in `pyproject.toml`.
 - To sort imports:
-    ```bash
-    isort src tests
-    ```
+  ```bash
+  isort src tests
+  ```
 
 ### Flake8
 
@@ -90,9 +94,9 @@ Flake8 is used for linting.
 
 - Configuration is in `tox.ini`.
 - To run Flake8:
-    ```bash
-    flake8 src tests --max-line-length 88
-    ```
+  ```bash
+  flake8 src tests --max-line-length 88
+  ```
 
 ### MyPy
 
@@ -100,9 +104,9 @@ MyPy is used for type checking.
 
 - Configuration is in `pyproject.toml`.
 - To run MyPy:
-    ```bash
-    mypy src/guidellm
-    ```
+  ```bash
+  mypy src/guidellm
+  ```
 
 ## Testing
 
@@ -111,6 +115,7 @@ We use `pytest` for running tests.
 ### Running All Tests
 
 To run all tests:
+
 ```bash
 tox
 ```
@@ -150,6 +155,7 @@ tox -e test-e2e
 ```
 
 ## Formatting, Linting, and Type Checking
+
 ### Running Quality Checks (Linting)
 
 To run quality checks (ruff, isort, flake8, mypy), use the following command:
@@ -207,7 +213,7 @@ Please refer to the MAINTAINERS file for maintenance guidelines and contact info
 ## Contact and Support
 
 If you need help or have any questions, please open an issue on GitHub or contact us at support@neuralmagic.com.
-=======
+
 This will run automatic code styling using `black` and `isort` and test that the
 repository's code matches its standards.
 
@@ -239,4 +245,3 @@ settings = Settings()
 ```
 
 With that configuration set you can load parameters to `LoggingSettings()` by using environment variables. Just run `export GUIDELLM__LOGGING__DISABLED=true` or `export GUIDELLM__LOGGING__NESTED=another_value` respectfully. The nesting delimiter is `__`
->>>>>>> d8244f6 (📝 Project `configuration management` is documented)
