@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, Optional, Type, Union
+from typing import Dict, List, Optional, Type, Union
 
 import numpy
 
@@ -12,14 +12,28 @@ __all__ = [
     "ProfileGenerationMode",
     "Profile",
     "ProfileGenerator",
-    "SingleProfileGenerator",
+    "FixedRateProfileGenerator",
     "SweepProfileGenerator",
 ]
 
+rate_type_to_load_gen_mode = {
+    "synchronous": LoadGenerationMode.SYNCHRONOUS,
+    "constant": LoadGenerationMode.CONSTANT,
+    "poisson": LoadGenerationMode.POISSON,
+}
+
 
 class ProfileGenerationMode(Enum):
-    SINGLE = "single"
+    FIXED_RATE = "fixed_rate"
     SWEEP = "sweep"
+
+
+rate_type_to_profile_mode = {
+    "synchronous": ProfileGenerationMode.FIXED_RATE,
+    "constant": ProfileGenerationMode.FIXED_RATE,
+    "poisson": ProfileGenerationMode.FIXED_RATE,
+    "sweep": ProfileGenerationMode.SWEEP,
+}
 
 
 @dataclass
@@ -55,34 +69,44 @@ class ProfileGenerator(ABC):
         pass
 
 
-@ProfileGenerator.register(ProfileGenerationMode.SINGLE)
-class SingleProfileGenerator(ProfileGenerator):
-    def __init__(self, rate: float, rate_type: LoadGenerationMode):
-        super().__init__(ProfileGenerationMode.SINGLE)
-        self._rate: float = rate
-        self._rate_type: LoadGenerationMode = rate_type
+@ProfileGenerator.register(ProfileGenerationMode.FIXED_RATE)
+class FixedRateProfileGenerator(ProfileGenerator):
+    def __init__(
+        self,
+        load_gen_mode: Optional[LoadGenerationMode],
+        rates: Optional[List[float]] = None,
+        **kwargs,
+    ):
+        super().__init__(ProfileGenerationMode.FIXED_RATE)
+        if load_gen_mode == LoadGenerationMode.SYNCHRONOUS and rates and len(rates) > 0:
+            raise ValueError("custom rates are not supported in synchronous mode")
+        self._rates: Optional[List[float]] = rates
+        self._load_gen_mode = load_gen_mode
         self._generated: bool = False
+        self._rate_index: int = 0
 
     def next(self, current_report: TextGenerationBenchmarkReport) -> Optional[Profile]:
-        if self._generated:
-            return None
-
-        self._generated = True
-
-        if self._rate_type == LoadGenerationMode.CONSTANT:
-            return Profile(
-                load_gen_mode=LoadGenerationMode.CONSTANT, load_gen_rate=self._rate
-            )
-        elif self._rate_type == LoadGenerationMode.SYNCHRONOUS:
+        if self._load_gen_mode == LoadGenerationMode.SYNCHRONOUS:
+            if self._generated:
+                return None
+            self._generated = True
             return Profile(
                 load_gen_mode=LoadGenerationMode.SYNCHRONOUS, load_gen_rate=None
             )
-        elif self._rate_type == LoadGenerationMode.POISSON:
-            return Profile(
-                load_gen_mode=LoadGenerationMode.POISSON, load_gen_rate=self._rate
-            )
+        elif self._load_gen_mode in {
+            LoadGenerationMode.CONSTANT,
+            LoadGenerationMode.POISSON,
+        }:
+            if self._rates:
+                if self._rate_index >= len(self._rates):
+                    return None
+                current_rate = self._rates[self._rate_index]
+                self._rate_index += 1
+                return Profile(
+                    load_gen_mode=self._load_gen_mode, load_gen_rate=current_rate
+                )
 
-        raise ValueError(f"Invalid rate type: {self._rate_type}")
+        raise ValueError(f"Invalid rate type: {self._load_gen_mode}")
 
 
 @ProfileGenerator.register(ProfileGenerationMode.SWEEP)

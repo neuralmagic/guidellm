@@ -20,7 +20,7 @@ class Executor:
         self,
         backend: Backend,
         request_generator: RequestGenerator,
-        profile_mode: ProfileGenerationMode = ProfileGenerationMode.SINGLE,
+        profile_mode: ProfileGenerationMode = ProfileGenerationMode.SWEEP,
         profile_args: Optional[Dict[str, Any]] = None,
         max_requests: Optional[int] = None,
         max_duration: Optional[float] = None,

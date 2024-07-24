@@ -1,3 +1,5 @@
+from typing import List, Optional
+
 import pytest
 
 from guidellm.core import TextGenerationBenchmark, TextGenerationBenchmarkReport
@@ -24,12 +26,15 @@ def test_executor_single_profile_generator_benchmark_report(
     request_genrator = dummy.services.TestRequestGenerator(
         tokenizer="bert-base-uncased"
     )
-    profile_generator_kwargs = {"rate_type": load_gen_mode, "rate": 1.0}
+    rates: Optional[List[float]] = [1.0]
+    if load_gen_mode == LoadGenerationMode.SYNCHRONOUS:
+        rates = None
+    profile_generator_kwargs = {"load_gen_mode": load_gen_mode, "rates": rates}
 
     executor = Executor(
         backend=openai_backend_factory(),
         request_generator=request_genrator,
-        profile_mode=ProfileGenerationMode.SINGLE,
+        profile_mode=ProfileGenerationMode.FIXED_RATE,
         profile_args=profile_generator_kwargs,
         max_requests=1,
         max_duration=None,
