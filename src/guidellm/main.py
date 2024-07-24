@@ -23,15 +23,20 @@ from guidellm.request.base import RequestGenerator
     default="localhost:8000/completions",
     help="Target for benchmarking",
 )
-@click.option("--host", type=str, help="Host for benchmarking")
-@click.option("--port", type=str, help="Port for benchmarking")
-@click.option("--path", type=str, help="Path for benchmarking")
+@click.option("--host", type=str, default=None, help="Host for benchmarking")
+@click.option("--port", type=str, default=None, help="Port for benchmarking")
+@click.option("--path", type=str, default=None, help="Path for benchmarking")
 @click.option(
-    "--backend", type=str, default="openai_server", help="Backend type for benchmarking"
+    "--backend",
+    type=click.Choice(["test", "openai_server"]),
+    default="openai_server",
+    help="Backend type for benchmarking",
 )
 @click.option("--model", type=str, default=None, help="Model to use for benchmarking")
 @click.option("--task", type=str, default=None, help="Task to use for benchmarking")
-@click.option("--data", type=str, help="Data file or alias for benchmarking")
+@click.option(
+    "--data", type=str, default=None, help="Data file or alias for benchmarking"
+)
 @click.option(
     "--data-type",
     type=click.Choice(["emulated", "file", "transformers"]),
@@ -44,7 +49,7 @@ from guidellm.request.base import RequestGenerator
 @click.option(
     "--rate-type",
     type=click.Choice(["sweep", "synchronous", "constant", "poisson"]),
-    default="sweep",
+    default="synchronous",
     help="Type of rate generation for benchmarking",
 )
 @click.option(
@@ -57,7 +62,7 @@ from guidellm.request.base import RequestGenerator
 @click.option(
     "--num-seconds",
     type=int,
-    default="120",
+    default=120,
     help="Number of seconds to result each request rate at",
 )
 @click.option(
@@ -89,6 +94,7 @@ def main(
     num_requests,
     output_path,
 ):
+
     # Create backend
     Backend.create(
         backend_type=backend,

@@ -1,7 +1,8 @@
 import pytest
+from loguru import logger
 
 from config import LoggingSettings
-from guidellm import configure_logger, logger
+from guidellm.logger import configure_logger
 
 
 @pytest.fixture(autouse=True)
