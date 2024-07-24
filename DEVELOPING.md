@@ -231,7 +231,7 @@ The project is fully configurable with environment variables. With that configur
 ## Contact and Support
 
 If you need help or have any questions, please open an issue on GitHub or contact us at support@neuralmagic.com.
-=======
+
 This will run automatic code styling using `black` and `isort` and test that the
 repository's code matches its standards.
 
@@ -263,4 +263,3 @@ settings = Settings()
 ```
 
 With that configuration set you can load parameters to `LoggingSettings()` by using environment variables. Just run `export GUIDELLM__LOGGING__DISABLED=true` or `export GUIDELLM__LOGGING__NESTED=another_value` respectfully. The nesting delimiter is `__`
->>>>>>> d8244f6 (📝 Project `configuration management` is documented)
