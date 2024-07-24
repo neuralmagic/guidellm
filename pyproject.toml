@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools >= 61.0", "wheel", "build"]
+requires = ["setuptools >= 61.0", "wheel", "build", "loguru"]
 build-backend = "setuptools.build_meta"
 
 
@@ -17,7 +17,7 @@ guidellm = ["*"]
 
 [project]
 name = "guidellm"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Guidance platform for deploying and managing large language models."
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.8.0,<4.0"
@@ -54,13 +54,18 @@ dev = [
 
     # type-checking
     "types-click~=7.1.8",
-    "types-requests~=2.32.0",
     "types-PyYAML~=6.0.1",
+    "types-requests~=2.32.0",
+    "types-toml",
 ]
 
 
 [project.entry-points.console_scripts]
 guidellm = "guidellm.main:main"
+
+
+[tool.setuptools.dynamic]
+version = {attr = "guidellm.__version__"}
 
 
 # ************************************************
@@ -85,7 +90,7 @@ show_error_codes = true
 namespace_packages = true
 exclude = ["venv", ".tox"]
 
-# Silint "type import errors" as our 3rd-party libs does not have types
+# Silence "type import errors" as our 3rd-party libs does not have types
 # Check: https://mypy.readthedocs.io/en/latest/config_file.html#import-discovery
 follow_imports = 'silent'
 
