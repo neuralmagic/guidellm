@@ -71,12 +71,13 @@ def test_configure_logger_console_and_file(capsys, tmp_path):
 
 
 def test_environment_variable_override(monkeypatch, capsys, tmp_path):
-    # Test environment variables override settings
-    monkeypatch.setenv("GUIDELLM_LOG_LEVEL", "ERROR")
-    monkeypatch.setenv("GUIDELLM_LOG_FILE", str(tmp_path / "env_test.log"))
-    monkeypatch.setenv("GUIDELLM_LOG_FILE_LEVEL", "DEBUG")
-
-    configure_logger(config=LoggingSettings())
+    configure_logger(
+        config=LoggingSettings(
+            console_log_level="ERROR",
+            log_file=str(tmp_path / "env_test.log"),
+            log_file_level="DEBUG",
+        )
+    )
     logger.info("Info message")
     logger.error("Error message")
     logger.debug("Debug message")
@@ -93,11 +94,8 @@ def test_environment_variable_override(monkeypatch, capsys, tmp_path):
     assert log_contents.count('"message": "Debug message"') == 1
 
 
-def test_environment_variable_disable_logging(monkeypatch, capsys):
-    # Test environment variable to disable logging
-    monkeypatch.setenv("GUIDELLM_LOG_DISABLED", "true")
-
-    configure_logger(config=LoggingSettings())
+def test_logging_disabled(capsys):
+    configure_logger(config=LoggingSettings(disabled=True))
     logger.info("Info message")
     logger.error("Error message")
 
