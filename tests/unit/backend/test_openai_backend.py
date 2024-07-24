@@ -6,7 +6,7 @@ from typing import Callable, Optional
 
 import pytest
 
-from guidellm.backend import Backend, BackendEngine, OpenAIBackend
+from guidellm.backend import OpenAIBackend
 from guidellm.core import TextGenerationRequest
 from tests.dummy.services import TestRequestGenerator
 
