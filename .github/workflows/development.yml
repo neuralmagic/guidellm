@@ -1,0 +1,43 @@
+name: Development
+
+on:
+  pull_request:
+    branches:
+      - '**'
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python:
+          - "3.12"
+          - "3.8"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install dependencies
+        run: pip install tox
+      - name: Run unit tests
+        run: tox -e test-unit -- -m "smoke or sanity"
+
+  integration-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python:
+          - "3.12"
+          - "3.8"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install dependencies
+        run: pip install tox
+      - name: Run integration tests
+        run: tox -e test-integration -- -m smoke
