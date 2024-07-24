@@ -1,29 +1,55 @@
-import toml
 from loguru import logger
-
-import guidellm
-
-
-def construct_project_name():
-    project_names = {
-        "release": "guidellm",
-        "nightly": "guidellm_nightly",
-        "dev": "guidellm_dev",
-    }
-    return project_names.get(guidellm.build_type, "guidellm")
+import toml
+import os
+from datetime import datetime
+import re
 
 
-def update_pyproject_toml(project_name):
+def get_build_type():
+    return os.getenv("GUIDELLM_BUILD_TYPE", "dev")
+
+
+def get_build_number():
+    return os.getenv("GUIDELLM_BUILD_NUMBER", "0")
+
+
+def construct_project_name_and_version(build_type, build_number, current_version):
+    if not re.match(r"^\d+\.\d+\.\d+$", current_version):
+        raise ValueError(
+            f"Version '{current_version}' does not match the "
+            f"semantic versioning pattern '#.#.#'"
+        )
+
+    if build_type == "dev":
+        project_name = "guidellm_dev"
+        version = f"{current_version}.dev{build_number}"
+    elif build_type == "nightly":
+        project_name = "guidellm_nightly"
+        date_str = datetime.now().strftime("%Y%m%d")
+        version = f"{current_version}.{date_str}"
+    elif build_type == "release":
+        project_name = "guidellm"
+        version = current_version
+    else:
+        raise ValueError(f"Unknown build type: {build_type}")
+
+    return project_name, version
+
+
+def update_pyproject_toml(project_name, version):
     try:
         with open("pyproject.toml", "r") as file:
             data = toml.load(file)
 
         data["project"]["name"] = project_name
+        data["project"]["version"] = version
 
         with open("pyproject.toml", "w") as file:
             toml.dump(data, file)
 
-        logger.info(f"Updated project name to: {project_name}")
+        logger.info(
+            f"Updated project name to: {project_name} and version to: {version}"
+        )
     except (FileNotFoundError, toml.TomlDecodeError) as e:
         logger.error(f"Error reading or writing pyproject.toml: {e}")
         raise
@@ -31,8 +57,19 @@ def update_pyproject_toml(project_name):
 
 def main():
     try:
-        project_name = construct_project_name()
-        update_pyproject_toml(project_name)
+        build_type = get_build_type()
+        build_number = get_build_number()
+
+        with open("pyproject.toml", "r") as file:
+            pyproject_data = toml.load(file)
+
+        current_version = pyproject_data["project"]["version"]
+        project_name, version = construct_project_name_and_version(
+            build_type, build_number, current_version
+        )
+
+        if build_type != "release":
+            update_pyproject_toml(project_name, version)
     except Exception as e:
         logger.error(f"An error occurred: {e}")
 

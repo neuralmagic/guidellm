@@ -17,7 +17,7 @@ guidellm = ["*"]
 
 [project]
 name = "guidellm"
-dynamic = ["version"]
+version = "0.1.0"
 description = "Guidance platform for deploying and managing large language models."
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.8.0,<4.0"
@@ -62,10 +62,6 @@ dev = [
 
 [project.entry-points.console_scripts]
 guidellm = "guidellm.main:main"
-
-
-[tool.setuptools.dynamic]
-version = {attr = "guidellm.__version__"}
 
 
 # ************************************************
