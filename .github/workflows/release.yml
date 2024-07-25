@@ -68,3 +68,47 @@ jobs:
         run: pip install tox
       - name: Run e2e tests
         run: tox -e test-e2e -- --cov-report=term-missing --cov --cov-fail-under=75
+
+  publish-release-candidate:
+    name: Publish Release Candidate
+    needs: [unit-tests, integration-tests, e2e-tests]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.8"
+      - name: Install pypa/build and pypa/twine
+        run: python3 -m pip install build twine --user
+      - name: Build a binary wheel & Inject build props
+        run: python3 -m tox -e build
+      - name: Publish to Internal PyPI
+        env:
+          GUIDELLM_BUILD_TYPE: dev
+          GUIDELLM_BUILD_NUMBER: ${{ github.event.pull_request.number }}
+          TWINE_USERNAME: ${{ secrets.INTERNAL_PYPI_USERNAME }}
+          TWINE_PASSWORD: ${{ secrets.INTERNAL_PYPI_PASSWORD }}
+        run: python -m twine upload --repository-url ${{ secrets.INTERNAL_PYPI_REPOSITORY_URL }} dist/*
+
+  publish-final-release:
+    name: Publish Final Release
+    if: github.ref == 'refs/tags/v*'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.8"
+      - name: Install pypa/build and pypa/twine
+        run: python3 -m pip install build twine --user
+      - name: Build a binary wheel & Inject build props
+        run: python3 -m tox build
+      - name: Publish to Public PyPI
+        env:
+          GUIDELLM_BUILD_TYPE: release
+          GUIDELLM_BUILD_NUMBER: ${{ github.event.pull_request.number }}
+          TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
+          TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+        run: python -m twine upload dist/*
