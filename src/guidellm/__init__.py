@@ -5,4 +5,8 @@ evaluating and benchmarking large language models (LLMs).
 
 from .logger import LoggerConfig, configure_logger, logger
 
-__all__ = ["logger", "configure_logger", "LoggerConfig"]
+__all__ = [
+    "logger",
+    "configure_logger",
+    "LoggerConfig",
+]

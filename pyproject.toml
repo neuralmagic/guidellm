@@ -54,8 +54,9 @@ dev = [
 
     # type-checking
     "types-click~=7.1.8",
-    "types-requests~=2.32.0",
     "types-PyYAML~=6.0.1",
+    "types-requests~=2.32.0",
+    "types-toml",
 ]
 
 
@@ -85,7 +86,7 @@ show_error_codes = true
 namespace_packages = true
 exclude = ["venv", ".tox"]
 
-# Silint "type import errors" as our 3rd-party libs does not have types
+# Silence "type import errors" as our 3rd-party libs does not have types
 # Check: https://mypy.readthedocs.io/en/latest/config_file.html#import-discovery
 follow_imports = 'silent'
 
