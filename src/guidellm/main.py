@@ -7,7 +7,6 @@ from guidellm.executor import (
     rate_type_to_load_gen_mode,
     rate_type_to_profile_mode,
 )
-from guidellm.logger import configure_logger
 from guidellm.request import (
     EmulatedRequestGenerator,
     FileRequestGenerator,
@@ -143,9 +142,4 @@ def print_report(report: TextGenerationBenchmarkReport):
 
 
 if __name__ == "__main__":
-    # invoke logger setup on import with default values
-    # enabling console logging with INFO and disabling file logging
-    configure_logger()
-
-    # entrypoint
     main()

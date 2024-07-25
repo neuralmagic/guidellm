@@ -216,28 +216,7 @@ The project configuartion is powered by _[`🔗 pydantic-settings`](https://docs
 
 The project configuration entry point is represented by lazy-loaded `settigns` singleton object ( `src/config/__init__` )
 
-The project is fully configurable with environment variables. All the default values and
-
-```py
-class NestedIntoLogging(BaseModel):
-    nested: str = "default value"
-
-class LoggingSettings(BaseModel):
-    # ...
-    disabled: bool = False
-
-
-class Settings(BaseSettings):
-    """The entrypoint to settings."""
-
-    # ...
-    logging: LoggingSettings = LoggingSettings()
-
-
-settings = Settings()
-```
-
-With that configuration set you can load parameters to `LoggingSettings()` by using environment variables. Just run `export GUIDELLM__LOGGING__DISABLED=true` or `export GUIDELLM__LOGGING__NESTED=another_value` respectfully. The nesting delimiter is `__`
+The project is fully configurable with environment variables. With that configuration set you can load parameters to `LoggingSettings()` by using environment variables. Just run `export GUIDELLM__LOGGING__DISABLED=true` or `export GUIDELLM__LOGGING__NESTED=another_value` respectfully. The nesting delimiter is `__`.
 
 ## Contact and Support
 

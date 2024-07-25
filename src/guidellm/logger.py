@@ -77,3 +77,8 @@ def configure_logger(config: LoggingSettings = settings.logging):
         log_file_level = config.log_file_level or "INFO"
         # log as json to the file for easier parsing
         logger.add(log_file, level=log_file_level.upper(), serialize=True)
+
+
+# invoke logger setup on import with default values
+# enabling console logging with INFO and disabling file logging
+configure_logger()
