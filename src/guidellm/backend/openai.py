@@ -1,5 +1,4 @@
 import functools
-import os
 from typing import Any, Dict, Generator, List, Optional
 
 from loguru import logger
@@ -7,6 +6,7 @@ from openai import OpenAI, Stream
 from openai.types import Completion
 from transformers import AutoTokenizer
 
+from config import settings
 from guidellm.backend import Backend, BackendEngine, GenerativeResponse
 from guidellm.core import TextGenerationRequest
 
@@ -47,18 +47,16 @@ class OpenAIBackend(Backend):
 
         self.request_args = request_args
 
-        if not (_api_key := (openai_api_key or os.getenv("OPENAI_API_KEY", None))):
+        if not (_api_key := (openai_api_key or settings.openai.api_key)):
             raise ValueError(
-                "`OPENAI_API_KEY` environment variable "
+                "`GUIDELLM__OPENAI__API_KEY` environment variable "
                 "or --openai-api-key CLI parameter "
                 "must be specify for the OpenAI backend"
             )
 
-        if not (
-            _base_url := (internal_callback_url or os.getenv("OPENAI_BASE_URL", None))
-        ):
+        if not (_base_url := (internal_callback_url or settings.openai.base_url)):
             raise ValueError(
-                "`OPENAI_BASE_URL` environment variable "
+                "`GUIDELLM__OPENAI__BASE_URL` environment variable "
                 "or --openai-base-url CLI parameter "
                 "must be specify for the OpenAI backend"
             )
