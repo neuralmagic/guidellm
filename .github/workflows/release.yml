@@ -80,7 +80,7 @@ jobs:
         with:
           python-version: "3.8"
       - name: Install pypa/build and pypa/twine
-        run: python3 -m pip install build twine --user
+        run: python3 -m pip install tox build twine --user
       - name: Build a binary wheel & Inject build props
         run: python3 -m tox -e build
       - name: Publish to Internal PyPI
@@ -102,7 +102,7 @@ jobs:
         with:
           python-version: "3.8"
       - name: Install pypa/build and pypa/twine
-        run: python3 -m pip install build twine --user
+        run: python3 -m pip install tox build twine --user
       - name: Build a binary wheel & Inject build props
         run: python3 -m tox build
       - name: Publish to Public PyPI

@@ -38,7 +38,7 @@ jobs:
       - name: Install dependencies
         run: pip install tox
       - name: Run integration tests
-        run: tox -e test-integration -- -m smoke
+        run: python -m tox -e test-integration -- -m smoke
 
   publish-dev:
     needs: [unit-tests, integration-tests]
@@ -50,7 +50,7 @@ jobs:
         with:
           python-version: "3.8"
       - name: Install pypa/build and pypa/twine
-        run: python3 -m pip install build twine --user
+        run: python3 -m pip install tox build twine --user
       - name: Build a binary wheel & Inject build props
         run: python3 -m tox -e build
       - name: Publish to Internal PyPI
