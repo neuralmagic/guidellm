@@ -1,9 +1,9 @@
-import os
 from typing import Callable, Optional
 
 import pytest
 from loguru import logger
 
+from config import settings
 from guidellm.backend import Backend, BackendEngine, OpenAIBackend
 
 
@@ -22,8 +22,7 @@ def openai_backend_factory() -> Callable[..., OpenAIBackend]:
         defaults = {
             "backend_type": BackendEngine.OPENAI_SERVER,
             "openai_api_key": "required but not used",
-            "internal_callback_url": base_url
-            or os.getenv("OPENAI_BASE_URL", "http://localhost:8080"),
+            "internal_callback_url": base_url or settings.openai.base_url,
         }
 
         defaults.update(kwargs)

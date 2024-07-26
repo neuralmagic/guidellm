@@ -1,4 +1,3 @@
-import os
 import time
 from typing import Callable
 
@@ -7,6 +6,7 @@ import requests
 from openai.pagination import SyncPage
 from openai.types import Model
 
+from config import settings
 from guidellm.backend import OpenAIBackend
 from guidellm.core import TextGenerationRequest, TextGenerationResult
 
@@ -17,9 +17,10 @@ def openai_server_healthcheck():
     Check if the openai server is running
     """
 
-    if not (openai_server := os.getenv("OPENAI_BASE_URL", None)):
+    if not (openai_server := settings.openai.base_url):
         raise ValueError(
-            "Integration backend tests can't be run without OPENAI_BASE_URL specified"
+            "Integration backend tests can't be run without "
+            "GUIDELLM__OPENAI__BASE_URL specified"
         )
 
     try:

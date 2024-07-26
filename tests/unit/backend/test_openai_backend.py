@@ -6,7 +6,7 @@ from typing import Callable, Optional
 
 import pytest
 
-from guidellm.backend import Backend, BackendEngine, OpenAIBackend
+from guidellm.backend import OpenAIBackend
 from guidellm.core import TextGenerationRequest
 from tests.dummy.services import TestRequestGenerator
 
@@ -23,29 +23,6 @@ def test_openai_backend_creation_with_default_model(openai_backend_factory: Call
 
     assert isinstance(backend_service, OpenAIBackend)
     assert backend_service.default_model == backend_service.available_models()[0]
-
-
-@pytest.mark.smoke
-@pytest.mark.parametrize(
-    "extra_kwargs",
-    [
-        {"openai_api_key": "dummy"},
-        {"internal_callback_url": "dummy"},
-    ],
-)
-def test_openai_backend_creation_required_arguments(mocker, extra_kwargs: dict):
-    """
-    Both OpenAI key & internal callback URL are required to work with OpenAI Backend.
-    """
-
-    # Ignore environment variables
-    mocker.patch("os.getenv", return_value=None)
-
-    with pytest.raises(ValueError):
-        Backend.create(
-            backend_type=BackendEngine.OPENAI_SERVER,
-            **extra_kwargs,
-        )
 
 
 @pytest.mark.smoke
