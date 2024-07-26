@@ -1,7 +1,7 @@
 import click
 
 from guidellm.backend import Backend
-from guidellm.core import TextGenerationBenchmarkReport
+from guidellm.core import GuidanceReport
 from guidellm.executor import (
     Executor,
     rate_type_to_load_gen_mode,
@@ -65,6 +65,12 @@ from guidellm.request.base import RequestGenerator
     default=None,
     help="Number of requests to send for each rate",
 )
+@click.option(
+    "--save-path",
+    type=str,
+    default="benchmark_report.json",
+    help="Path to save benchmark report to",
+)
 def main(
     target,
     host,
@@ -80,6 +86,7 @@ def main(
     rate,
     num_seconds,
     num_requests,
+    save_path,
 ):
     # Create backend
     Backend.create(
@@ -127,18 +134,12 @@ def main(
     report = executor.run()
 
     # Save or print results
-    save_report(report, "benchmark_report.json")
-    print_report(report)
+    guidance_report = GuidanceReport()
+    guidance_report.benchmarks.append(report)
+    guidance_report.save_file(save_path)
 
-
-def save_report(report: TextGenerationBenchmarkReport, filename: str):
-    with open(filename, "w") as file:
-        file.write(report.to_json())
-
-
-def print_report(report: TextGenerationBenchmarkReport):
-    for benchmark in report.benchmarks:
-        print(f"Rate: {benchmark.completed_request_rate}, Results: {benchmark.results}")
+    print("Guidance Report Complete:")
+    print(guidance_report)
 
 
 if __name__ == "__main__":
