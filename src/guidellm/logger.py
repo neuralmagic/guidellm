@@ -64,13 +64,12 @@ def configure_logger(config: LoggingSettings = settings.logging):
     if config.clear_loggers:
         logger.remove()
 
-    if config.console_log_level:
-        # log as a human readable string with the time, function, level, and message
-        logger.add(
-            sys.stdout,
-            level=config.console_log_level.upper(),
-            format="{time} | {function} | {level} - {message}",
-        )
+    # log as a human readable string with the time, function, level, and message
+    logger.add(
+        sys.stdout,
+        level=config.console_log_level.upper(),
+        format="{time} | {function} | {level} - {message}",
+    )
 
     if config.log_file or config.log_file_level:
         log_file = config.log_file or "guidellm.log"

@@ -9,7 +9,7 @@ __all__ = ["settings"]
 class LoggingSettings(BaseModel):
     disabled: bool = False
     clear_loggers: bool = True
-    console_log_level: Optional[str] = "INFO"
+    console_log_level: str = "INFO"
     log_file: Optional[str] = None
     log_file_level: Optional[str] = None
 
