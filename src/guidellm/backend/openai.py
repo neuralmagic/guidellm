@@ -124,6 +124,8 @@ class OpenAIBackend(Backend):
                     ),
                 )
             else:
+                # FIX: This task work for infinite
+                print(f"🟢 generative Response adding token: [{chunk_content}]")
                 logger.debug("Received token from OpenAI backend")
                 yield GenerativeResponse(type_="token_iter", add_token=chunk_content)
 

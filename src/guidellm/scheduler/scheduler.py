@@ -144,8 +144,6 @@ class Scheduler:
             tasks.append((request, task))
             requests_counter += 1
 
-            print("Task started")
-
             if (
                 self._max_duration is not None
                 and time.time() - start_time >= self._max_duration
@@ -206,7 +204,7 @@ class Scheduler:
             res = await self._event_loop.run_in_executor(
                 None, functools.partial(self._backend.submit, request=request)
             )
-        except Exception:
+        except Exception as error:
             benchmark.errors.append(
                 TextGenerationError(
                     request=request, message=str(asyncio.CancelledError())
