@@ -45,6 +45,11 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    # TODO: add to the DEVELOPING.md after
+    # https://github.com/neuralmagic/guidellm/pull/17
+    # is merged
+    debug: bool = False
+
     logging: LoggingSettings = LoggingSettings()
     openai: OpenAISettings = OpenAISettings()
 

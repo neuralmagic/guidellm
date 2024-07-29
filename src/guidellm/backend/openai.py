@@ -1,6 +1,7 @@
 import functools
 from typing import Any, Dict, Generator, List, Optional
 
+import openai
 from loguru import logger
 from openai import OpenAI, Stream
 from openai.types import Completion
@@ -128,12 +129,19 @@ class OpenAIBackend(Backend):
         :rtype: List[str]
         """
 
-        models: List[str] = [
-            model.id for model in self.openai_client.models.list().data
-        ]
-        logger.info(f"Available models: {models}")
-
-        return models
+        try:
+            models: List[str] = [
+                model.id for model in self.openai_client.models.list().data
+            ]
+            logger.info(f"Available models: {models}")
+        except openai.NotFoundError as error:
+            logger.error(error)
+            if settings.debug is True:
+                return ["gpt-4o"]
+            else:
+                raise error
+        else:
+            return models
 
     @property
     @functools.lru_cache(maxsize=1)
