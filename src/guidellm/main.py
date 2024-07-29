@@ -66,7 +66,7 @@ from guidellm.request.base import RequestGenerator
     help="Number of requests to send for each rate",
 )
 @click.option(
-    "--save-path",
+    "--output-path",
     type=str,
     default="benchmark_report.json",
     help="Path to save benchmark report to",
@@ -86,7 +86,7 @@ def main(
     rate,
     num_seconds,
     num_requests,
-    save_path,
+    output_path,
 ):
     # Create backend
     Backend.create(
@@ -136,7 +136,7 @@ def main(
     # Save or print results
     guidance_report = GuidanceReport()
     guidance_report.benchmarks.append(report)
-    guidance_report.save_file(save_path)
+    guidance_report.save_file(output_path)
 
     print("Guidance Report Complete:")
     print(guidance_report)
