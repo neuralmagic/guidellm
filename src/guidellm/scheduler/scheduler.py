@@ -43,7 +43,7 @@ class Scheduler:
 
         if load_gen_mode != LoadGenerationMode.SYNCHRONOUS and load_gen_rate is None:
             raise ValueError(
-                "Rate must be specified for non-synchronous load generation modes"
+                "Rate must be specified for non-synchronous load generation modes",
             )
 
         self._request_generator = request_generator
@@ -90,18 +90,18 @@ class Scheduler:
                 task.cancel()
                 benchmark.errors.append(
                     TextGenerationError(
-                        request=request, message=str(asyncio.CancelledError())
-                    )
+                        request=request,
+                        message=str(asyncio.CancelledError()),
+                    ),
                 )
 
     def _run_sync(self) -> TextGenerationBenchmark:
         benchmark = TextGenerationBenchmark(mode=self._load_gen_mode.value, rate=None)
         start_time = time.time()
-        requests_counter = 0
 
         logger.debug("Running scheduler in sync mode")
 
-        for callback in self._sync_tasks():
+        for requests_counter, callback in enumerate(self._sync_tasks()):
             if (
                 self._max_requests is not None
                 and requests_counter >= self._max_requests
@@ -114,8 +114,6 @@ class Scheduler:
             benchmark.request_started()
             res = callback()
             benchmark.request_completed(res)
-
-            requests_counter += 1
 
         return benchmark
 
@@ -131,18 +129,20 @@ class Scheduler:
         """
 
         benchmark: TextGenerationBenchmark = TextGenerationBenchmark(
-            mode=self._load_gen_mode.value, rate=self._load_gen_rate
+            mode=self._load_gen_mode.value,
+            rate=self._load_gen_rate,
         )
-        requests_counter: int = 0
         tasks: List[Tuple[TextGenerationRequest, asyncio.Task]] = []
         start_time: float = time.time()
 
-        for _task_package, task_start_time in zip(
-            self._async_tasks(benchmark), self.load_generator.times()
+        for requests_counter, (_task_package, task_start_time) in enumerate(
+            zip(
+                self._async_tasks(benchmark),
+                self.load_generator.times(),
+            )
         ):
             request, task = _task_package
             tasks.append((request, task))
-            requests_counter += 1
 
             if (
                 self._max_duration is not None
@@ -150,7 +150,8 @@ class Scheduler:
             ):
                 self._cancel_running_tasks(tasks=tasks, benchmark=benchmark)
                 break
-            elif (
+
+            if (
                 self._max_requests is not None
                 and requests_counter >= self._max_requests
             ):
@@ -182,7 +183,8 @@ class Scheduler:
             yield functools.partial(self._backend.submit, request=request)
 
     def _async_tasks(
-        self, benchmark: TextGenerationBenchmark
+        self,
+        benchmark: TextGenerationBenchmark,
     ) -> Generator[Tuple[TextGenerationRequest, asyncio.Task], None, None]:
         """
         Iterate through `Backend.submit()` async tasks.
@@ -197,19 +199,22 @@ class Scheduler:
             yield request, task
 
     async def _run_task_async(
-        self, benchmark: TextGenerationBenchmark, request: TextGenerationRequest
+        self,
+        benchmark: TextGenerationBenchmark,
+        request: TextGenerationRequest,
     ):
         benchmark.request_started()
         try:
             res = await self._event_loop.run_in_executor(
-                None, functools.partial(self._backend.submit, request=request)
+                None,
+                functools.partial(self._backend.submit, request=request),
             )
-        except Exception as error:
-            logger.error(error)
+        except asyncio.CancelledError as err:
             benchmark.errors.append(
                 TextGenerationError(
-                    request=request, message=str(asyncio.CancelledError())
-                )
+                    request=request,
+                    message=str(err),
+                ),
             )
         else:
             benchmark.request_completed(res)

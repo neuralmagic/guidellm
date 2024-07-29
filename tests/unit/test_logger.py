@@ -1,6 +1,7 @@
-import pytest
 from loguru import logger
+from pathlib import Path
 
+import pytest
 from config import LoggingSettings
 from guidellm.logger import configure_logger
 
@@ -11,6 +12,8 @@ def reset_logger():
     logger.remove()
     yield
     logger.remove()
+
+    return logger
 
 
 def test_default_logger_settings(capsys):
@@ -45,7 +48,7 @@ def test_configure_logger_file_settings(tmp_path):
     logger.info("Info message")
     logger.debug("Debug message")
 
-    with open(log_file, "r") as f:
+    with Path(log_file).open() as f:
         log_contents = f.read()
     assert log_contents.count('"message": "Info message"') == 1
     assert log_contents.count('"message": "Debug message"') == 1
@@ -55,7 +58,9 @@ def test_configure_logger_console_and_file(capsys, tmp_path):
     # Test configuring the logger to change both console and file settings
     log_file = tmp_path / "test.log"
     config = LoggingSettings(
-        console_log_level="ERROR", log_file=str(log_file), log_file_level="INFO"
+        console_log_level="ERROR",
+        log_file=str(log_file),
+        log_file_level="INFO",
     )
     configure_logger(config=config)
     logger.info("Info message")
@@ -65,7 +70,7 @@ def test_configure_logger_console_and_file(capsys, tmp_path):
     assert "Info message" not in captured.out
     assert captured.out.count("Error message") == 1
 
-    with open(log_file, "r") as f:
+    with Path(log_file).open() as f:
         log_contents = f.read()
     assert log_contents.count('"message": "Info message"') == 1
     assert log_contents.count('"message": "Error message"') == 1
@@ -77,7 +82,7 @@ def test_environment_variable_override(monkeypatch, capsys, tmp_path):
             console_log_level="ERROR",
             log_file=str(tmp_path / "env_test.log"),
             log_file_level="DEBUG",
-        )
+        ),
     )
     logger.info("Info message")
     logger.error("Error message")
@@ -88,7 +93,7 @@ def test_environment_variable_override(monkeypatch, capsys, tmp_path):
     assert captured.out.count("Error message") == 1
     assert "Debug message" not in captured.out
 
-    with open(tmp_path / "env_test.log", "r") as f:
+    with Path(tmp_path / "env_test.log").open() as f:
         log_contents = f.read()
     assert log_contents.count('"message": "Error message"') == 1
     assert log_contents.count('"message": "Info message"') == 1

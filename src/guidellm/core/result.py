@@ -24,43 +24,55 @@ class TextGenerationResult(Serializable):
     """
 
     request: TextGenerationRequest = Field(
-        description="The text generation request used to generate the result."
+        description="The text generation request used to generate the result.",
     )
     prompt: str = Field(
-        default_factory=str, description="The input prompt for the text generation."
+        default_factory=str,
+        description="The input prompt for the text generation.",
     )
     prompt_word_count: int = Field(
-        default=0, description="The number of words in the input prompt."
+        default=0,
+        description="The number of words in the input prompt.",
     )
     prompt_token_count: int = Field(
-        default=0, description="The number of tokens in the input prompt."
+        default=0,
+        description="The number of tokens in the input prompt.",
     )
     output: str = Field(
-        default_factory=str, description="The generated output for the text generation."
+        default_factory=str,
+        description="The generated output for the text generation.",
     )
     output_word_count: int = Field(
-        default=0, description="The number of words in the output."
+        default=0,
+        description="The number of words in the output.",
     )
     output_token_count: int = Field(
-        default=0, description="The number of tokens in the output."
+        default=0,
+        description="The number of tokens in the output.",
     )
     last_time: Optional[float] = Field(
-        default=None, description="The last time recorded."
+        default=None,
+        description="The last time recorded.",
     )
     first_token_set: bool = Field(
-        default=False, description="Whether the first token time is set."
+        default=False,
+        description="Whether the first token time is set.",
     )
     start_time: Optional[float] = Field(
-        default=None, description="The start time of the text generation."
+        default=None,
+        description="The start time of the text generation.",
     )
     end_time: Optional[float] = Field(
-        default=None, description="The end time of the text generation."
+        default=None,
+        description="The end time of the text generation.",
     )
     first_token_time: Optional[float] = Field(
-        default=None, description="The time taken to decode the first token."
+        default=None,
+        description="The time taken to decode the first token.",
     )
     decode_times: Distribution = Field(
-        default_factory=Distribution, description="The distribution of decode times."
+        default_factory=Distribution,
+        description="The distribution of decode times.",
     )
 
     def start(self, prompt: str):
@@ -133,7 +145,10 @@ class TextGenerationResult(Serializable):
 
         logger.info(f"Text generation ended with output: '{self.output}'")
 
-    def _check_recording_started(self, raise_exception: bool = True) -> bool:
+    def _check_recording_started(
+        self,
+        raise_exception: bool = True,  # noqa: FBT001, FBT002
+    ) -> bool:
         """
         Ensure that the benchmark text generation recording is started.
 
@@ -143,14 +158,14 @@ class TextGenerationResult(Serializable):
 
         if self.start_time is not None:
             return True
-        else:
-            if raise_exception is True:
-                raise ValueError(
-                    "start time is not specified. "
-                    "Did you make the `text_generation_benchmark.start()`?"
-                )
-            else:
-                return False
+
+        if raise_exception is True:
+            raise ValueError(
+                "start time is not specified. "
+                "Did you make the `text_generation_benchmark.start()`?",
+            )
+
+        return False
 
 
 class TextGenerationError(Serializable):
@@ -160,10 +175,10 @@ class TextGenerationError(Serializable):
     """
 
     request: TextGenerationRequest = Field(
-        description="The text generation request that resulted in an error."
+        description="The text generation request that resulted in an error.",
     )
     message: str = Field(
-        description="The error message that occurred during text generation."
+        description="The error message that occurred during text generation.",
     )
 
     def model_post_init(self, _: Any):
@@ -190,13 +205,16 @@ class TextGenerationBenchmark(Serializable):
 
     mode: str = Field(description="The generation mode, either 'async' or 'sync'.")
     rate: Optional[float] = Field(
-        default=None, description="The requested rate of requests per second."
+        default=None,
+        description="The requested rate of requests per second.",
     )
     results: List[TextGenerationResult] = Field(
-        default_factory=list, description="The results of the text generation requests."
+        default_factory=list,
+        description="The results of the text generation requests.",
     )
     errors: List[TextGenerationError] = Field(
-        default_factory=list, description="The errors of the text generation requests."
+        default_factory=list,
+        description="The errors of the text generation requests.",
     )
     concurrencies: List[RequestConcurrencyMeasurement] = Field(
         default_factory=list,
@@ -241,37 +259,28 @@ class TextGenerationBenchmark(Serializable):
         """
         if not self.results:
             return 0.0
-        else:
-            if not self.results[0].start_time or not self.results[-1].end_time:
-                raise ValueError("Start time and End time are not defined")
 
-            return self.request_count / (
-                self.results[-1].end_time - self.results[0].start_time
-            )
+        if not self.results[0].start_time or not self.results[-1].end_time:
+            raise ValueError("Start time and End time are not defined")
+
+        return self.request_count / (
+            self.results[-1].end_time - self.results[0].start_time
+        )
 
     @property
     def overloaded(self) -> bool:
         if not self.results or not self.concurrencies:
             raise ValueError("No results or concurrencies to check for overload.")
 
-        if self.rate is None or len(self.concurrencies) < 2:
+        if self.rate is None or len(self.concurrencies) < 2:  # noqa: PLR2004
             # if rate was not set, sync mode is assumed,
             # or we have less than 2 data points,
             # then we cannot be overloaded by definition
             return False
 
-        if self.completed_request_rate < 0.60 * self.rate:
-            # if the calculated rate is less than 60% of the requested rate,
-            # safe to assume the system is overloaded
-            return True
-
-        # rate comparisons did not give a clear signal,
-        # let's double check that we aren't overloaded by comparing the
-        # compute throughput for the benchmark with the latency for the requests.
-        # overall this means that a relatively flat or decreasing throughput curve
-        # over time in addition to a growing processing queue is a sign of overload
-
-        return False
+        # if the calculated rate is less than 60% of the requested rate,
+        # safe to assume the system is overloaded
+        return self.completed_request_rate < 0.60 * self.rate
 
     def request_started(self):
         """
@@ -280,8 +289,11 @@ class TextGenerationBenchmark(Serializable):
         if not self.concurrencies:
             self.concurrencies.append(
                 RequestConcurrencyMeasurement(
-                    time=time(), completed=0, errored=0, processing=1
-                )
+                    time=time(),
+                    completed=0,
+                    errored=0,
+                    processing=1,
+                ),
             )
         else:
             last = self.concurrencies[-1]
@@ -291,13 +303,14 @@ class TextGenerationBenchmark(Serializable):
                     completed=last.completed,
                     errored=last.errored,
                     processing=last.processing + 1,
-                )
+                ),
             )
 
         logger.info("Text generation request started")
 
     def request_completed(
-        self, result: Union[TextGenerationResult, TextGenerationError]
+        self,
+        result: Union[TextGenerationResult, TextGenerationError],
     ):
         """
         Record the completion of a text generation request.
@@ -314,10 +327,10 @@ class TextGenerationBenchmark(Serializable):
                     completed=last.completed,
                     errored=last.errored + 1,
                     processing=last.processing - 1,
-                )
+                ),
             )
             logger.warning(
-                f"Text generation request resulted in error: {result.message}"
+                f"Text generation request resulted in error: {result.message}",
             )
         else:
             self.results.append(result)
@@ -328,7 +341,7 @@ class TextGenerationBenchmark(Serializable):
                     completed=last.completed + 1,
                     errored=last.errored,
                     processing=last.processing - 1,
-                )
+                ),
             )
             logger.info("Text generation request completed successfully: {}", result)
 
@@ -341,10 +354,12 @@ class TextGenerationBenchmarkReport(Serializable):
     """
 
     benchmarks: List[TextGenerationBenchmark] = Field(
-        default_factory=list, description="The benchmarks of text generation requests."
+        default_factory=list,
+        description="The benchmarks of text generation requests.",
     )
     args: List[Dict[str, Any]] = Field(
-        default_factory=list, description="The arguments used for the benchmarks."
+        default_factory=list,
+        description="The arguments used for the benchmarks.",
     )
 
     def __iter__(self):
@@ -358,8 +373,7 @@ class TextGenerationBenchmarkReport(Serializable):
         :return: The sorted list of benchmarks.
         :rtype: List[TextGenerationBenchmark]
         """
-        benchmarks = sorted(self.benchmarks, key=lambda x: x.completed_request_rate)
-        return benchmarks
+        return sorted(self.benchmarks, key=lambda x: x.completed_request_rate)
 
     def add_benchmark(self, benchmark: TextGenerationBenchmark):
         """

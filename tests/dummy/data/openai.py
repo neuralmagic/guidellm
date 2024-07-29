@@ -14,12 +14,13 @@ from openai.types import Completion, Model
 def words(n: int = 1) -> Generator[str, None, None]:
     for _ in range(n):
         yield "".join(
-            (random.choice(string.ascii_letters) for _ in range(random.randint(3, 10)))
+            random.choice(string.ascii_letters) for _ in range(random.randint(3, 10))
         )
 
 
 def openai_completion_factory(
-    n: int = 3, **kwargs
+    n: int = 3,
+    **kwargs,
 ) -> Generator[Completion, None, None]:
     """
     The factory that yields the openai Completion instance.
@@ -29,7 +30,7 @@ def openai_completion_factory(
         payload = {
             "id": str(uuid.uuid4()),
             "choices": [],
-            "stop": False if i < n else True,
+            "stop": not i < n,
             "content": " ".join(words(random.randint(3, 10))) if i < n else "",
             "object": "text_completion",
             "model": "mock-model",

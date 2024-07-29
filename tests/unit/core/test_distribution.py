@@ -1,16 +1,15 @@
 import pytest
-
 from guidellm.core import Distribution
 
 
-@pytest.mark.smoke
+@pytest.mark.smoke()
 def test_distribution_initialization():
     data = [1, 2, 3, 4, 5]
     dist = Distribution(data=data)
     assert dist.data == data
 
 
-@pytest.mark.smoke
+@pytest.mark.smoke()
 def test_distribution_statistics():
     data = [1, 2, 3, 4, 5]
     dist = Distribution(data=data)
@@ -23,7 +22,7 @@ def test_distribution_statistics():
     assert dist.range == 4
 
 
-@pytest.mark.sanity
+@pytest.mark.sanity()
 def test_distribution_add_data():
     data = [1, 2, 3, 4, 5]
     dist = Distribution(data=data)
@@ -33,7 +32,7 @@ def test_distribution_add_data():
     assert dist.data == data + new_data
 
 
-@pytest.mark.sanity
+@pytest.mark.sanity()
 def test_distribution_remove_data():
     data = [1, 2, 3, 4, 5]
     dist = Distribution(data=data)
@@ -43,7 +42,7 @@ def test_distribution_remove_data():
 
 
 @pytest.mark.skip("fix me")
-@pytest.mark.regression
+@pytest.mark.regression()
 def test_distribution_str():
     data = [1, 2, 3, 4, 5]
     dist = Distribution(data=data)
@@ -59,7 +58,7 @@ def test_distribution_str():
 
 
 @pytest.mark.skip("fix me")
-@pytest.mark.regression
+@pytest.mark.regression()
 def test_distribution_repr():
     data = [1, 2, 3, 4, 5]
     dist = Distribution(data=data)
@@ -67,7 +66,7 @@ def test_distribution_repr():
 
 
 @pytest.mark.skip("fix me")
-@pytest.mark.regression
+@pytest.mark.regression()
 def test_distribution_json():
     data = [1, 2, 3, 4, 5]
     dist = Distribution(data=data)
@@ -79,7 +78,7 @@ def test_distribution_json():
 
 
 @pytest.mark.skip("fix me")
-@pytest.mark.regression
+@pytest.mark.regression()
 def test_distribution_yaml():
     data = [1, 2, 3, 4, 5]
     dist = Distribution(data=data)

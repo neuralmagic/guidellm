@@ -1,17 +1,16 @@
 from typing import Callable, Optional
 
 import pytest
-from loguru import logger
-
 from config import settings
 from guidellm.backend import Backend, BackendEngine, OpenAIBackend
+from loguru import logger
 
 
 def pytest_configure() -> None:
     logger.disable("guidellm")
 
 
-@pytest.fixture
+@pytest.fixture()
 def openai_backend_factory() -> Callable[..., OpenAIBackend]:
     """
     OpenAI Backend factory method.

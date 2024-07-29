@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Dict, List, Optional, Type, Union
 
-import numpy
+import numpy as np
 
 from guidellm.core import TextGenerationBenchmarkReport
 from guidellm.scheduler import LoadGenerationMode
@@ -66,7 +66,6 @@ class ProfileGenerator(ABC):
     @abstractmethod
     def next(self, current_report: TextGenerationBenchmarkReport) -> Optional[Profile]:
         """ """
-        pass
 
 
 @ProfileGenerator.register(ProfileGenerationMode.FIXED_RATE)
@@ -75,7 +74,7 @@ class FixedRateProfileGenerator(ProfileGenerator):
         self,
         load_gen_mode: Optional[LoadGenerationMode],
         rates: Optional[List[float]] = None,
-        **kwargs,
+        **kwargs,  # noqa: RET505, ARG002
     ):
         super().__init__(ProfileGenerationMode.FIXED_RATE)
         if load_gen_mode == LoadGenerationMode.SYNCHRONOUS and rates and len(rates) > 0:
@@ -86,33 +85,43 @@ class FixedRateProfileGenerator(ProfileGenerator):
         self._generated: bool = False
         self._rate_index: int = 0
 
-    def next(self, current_report: TextGenerationBenchmarkReport) -> Optional[Profile]:
+    def next(self, _: TextGenerationBenchmarkReport) -> Optional[Profile]:
         if self._load_gen_mode == LoadGenerationMode.SYNCHRONOUS:
             if self._generated:
                 return None
             self._generated = True
             return Profile(
-                load_gen_mode=LoadGenerationMode.SYNCHRONOUS, load_gen_rate=None
+                load_gen_mode=LoadGenerationMode.SYNCHRONOUS,
+                load_gen_rate=None,
             )
-        elif self._load_gen_mode in {
+
+        if self._load_gen_mode in {
             LoadGenerationMode.CONSTANT,
             LoadGenerationMode.POISSON,
         }:
-            if self._rates:
-                if self._rate_index >= len(self._rates):
-                    return None
-                current_rate = self._rates[self._rate_index]
-                self._rate_index += 1
-                return Profile(
-                    load_gen_mode=self._load_gen_mode, load_gen_rate=current_rate
+            if not self._rates:
+                raise ValueError(
+                    "rates must be provided for constant and poisson modes"
                 )
+
+            if self._rate_index >= len(self._rates):
+                return None
+            current_rate = self._rates[self._rate_index]
+            self._rate_index += 1
+            return Profile(
+                load_gen_mode=self._load_gen_mode,
+                load_gen_rate=current_rate,
+            )
 
         raise ValueError(f"Invalid rate type: {self._load_gen_mode}")
 
 
 @ProfileGenerator.register(ProfileGenerationMode.SWEEP)
 class SweepProfileGenerator(ProfileGenerator):
-    def __init__(self, **kwargs):
+    def __init__(
+        self,
+        **kwargs,  # noqa: RET505, ARG002
+    ):
         super().__init__(ProfileGenerationMode.SWEEP)
         self._sync_run = False
         self._max_found = False
@@ -123,7 +132,8 @@ class SweepProfileGenerator(ProfileGenerator):
             self._sync_run = True
 
             return Profile(
-                load_gen_mode=LoadGenerationMode.SYNCHRONOUS, load_gen_rate=None
+                load_gen_mode=LoadGenerationMode.SYNCHRONOUS,
+                load_gen_rate=None,
             )
 
         if not self._max_found:
@@ -141,27 +151,28 @@ class SweepProfileGenerator(ProfileGenerator):
                     load_gen_mode=LoadGenerationMode.CONSTANT,
                     load_gen_rate=last_rate * 2,
                 )
-            else:
-                self._max_found = True
-                first_benchmark = current_report.benchmarks[0]
 
-                min_rate = (
-                    first_benchmark.rate
-                    if first_benchmark.rate
-                    else first_benchmark.completed_request_rate
-                )
-                max_rate = (
-                    last_benchmark.rate
-                    if last_benchmark.rate
-                    else last_benchmark.completed_request_rate
-                )
+            self._max_found = True
+            first_benchmark = current_report.benchmarks[0]
 
-                self._pending_rates = list(numpy.linspace(min_rate, max_rate, 10))
+            min_rate = (
+                first_benchmark.rate
+                if first_benchmark.rate
+                else first_benchmark.completed_request_rate
+            )
+            max_rate = (
+                last_benchmark.rate
+                if last_benchmark.rate
+                else last_benchmark.completed_request_rate
+            )
+
+            self._pending_rates = list(np.linspace(min_rate, max_rate, 10))
 
         if self._pending_rates:
             rate = self._pending_rates.pop(0)
             return Profile(
-                load_gen_mode=LoadGenerationMode.CONSTANT, load_gen_rate=rate
+                load_gen_mode=LoadGenerationMode.CONSTANT,
+                load_gen_rate=rate,
             )
 
         return None

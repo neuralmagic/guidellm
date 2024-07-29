@@ -15,7 +15,6 @@ class LoggingSettings(BaseModel):
 
 
 class OpenAISettings(BaseModel):
-
     # OpenAI API key.
     api_key: str = "invalid"
 

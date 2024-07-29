@@ -1,3 +1,4 @@
+import functools
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
@@ -79,6 +80,16 @@ class Backend(ABC):
 
         return Backend._registry[backend_type](**kwargs)
 
+    @property
+    def default_model(self) -> str:
+        """
+        Get the default model for the backend.
+
+        :return: The default model.
+        :rtype: str
+        """
+        return _cachable_default_model(self)
+
     def submit(self, request: TextGenerationRequest) -> TextGenerationResult:
         """
         Submit a result request and populate the BenchmarkResult.
@@ -92,7 +103,7 @@ class Backend(ABC):
         logger.info(f"Submitting request with prompt: {request.prompt}")
 
         result = TextGenerationResult(
-            request=TextGenerationRequest(prompt=request.prompt)
+            request=TextGenerationRequest(prompt=request.prompt),
         )
         result.start(request.prompt)
 
@@ -111,7 +122,8 @@ class Backend(ABC):
 
     @abstractmethod
     def make_request(
-        self, request: TextGenerationRequest
+        self,
+        request: TextGenerationRequest,
     ) -> Iterator[GenerativeResponse]:
         """
         Abstract method to make a request to the backend.
@@ -121,8 +133,7 @@ class Backend(ABC):
         :return: An iterator over the generative responses.
         :rtype: Iterator[GenerativeResponse]
         """
-
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def available_models(self) -> List[str]:
@@ -132,20 +143,7 @@ class Backend(ABC):
         :return: A list of available models.
         :rtype: List[str]
         """
-
-        pass
-
-    @property
-    @abstractmethod
-    def default_model(self) -> str:
-        """
-        Abstract method to get the default model for the backend.
-
-        :return: The default model.
-        :rtype: str
-        """
-
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def model_tokenizer(self, model: str) -> Optional[str]:
@@ -157,5 +155,14 @@ class Backend(ABC):
         :return: The tokenizer for the model, or None if it cannot be created.
         :rtype: Optional[str]
         """
+        raise NotImplementedError
 
-        pass
+
+@functools.lru_cache(maxsize=1)
+def _cachable_default_model(backend: Backend) -> str:
+    if models := backend.available_models():
+        logger.debug(f"Default model: {models[0]}")
+        return models[0]
+
+    logger.error("No models available.")
+    raise ValueError("No models available.")

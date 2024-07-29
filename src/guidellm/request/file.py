@@ -1,5 +1,6 @@
 import csv
 import json
+from pathlib import Path
 from typing import List, Optional, Union
 
 from loguru import logger
@@ -75,14 +76,12 @@ class FileRequestGenerator(RequestGenerator):
         return [line.strip() for line in data if line and line.strip()]
 
     def _load_text_file(self) -> List[str]:
-        with open(self._file_path, "r", encoding="utf-8") as file:
-            data = file.readlines()
-
-        return data
+        with Path(self._file_path).open(encoding="utf-8") as file:
+            return file.readlines()
 
     def _load_csv_file(self) -> List[str]:
         data = []
-        with open(self._file_path, "r", encoding="utf-8") as file:
+        with Path(self._file_path).open(encoding="utf-8") as file:
             reader = csv.DictReader(file)
             columns = reader.fieldnames
             if not columns:
@@ -96,7 +95,7 @@ class FileRequestGenerator(RequestGenerator):
 
     def _load_jsonl_file(self) -> List[str]:
         data = []
-        with open(self._file_path, "r", encoding="utf-8") as file:
+        with Path(self._file_path).open(encoding="utf-8") as file:
             for line in file:
                 obj = json.loads(line)
                 data.append(obj)
@@ -104,14 +103,14 @@ class FileRequestGenerator(RequestGenerator):
         return self._extract_prompts(data)
 
     def _load_json_file(self) -> List[str]:
-        with open(self._file_path, "r", encoding="utf-8") as file:
+        with Path(self._file_path).open(encoding="utf-8") as file:
             obj = json.load(file)
             data = None
 
             if isinstance(obj, list):
                 data = obj
             elif isinstance(obj, dict):
-                for key, value in obj.items():
+                for value in obj.values():
                     if isinstance(value, list):
                         data = value
                         break
@@ -119,7 +118,7 @@ class FileRequestGenerator(RequestGenerator):
             if data is None:
                 raise ValueError(
                     f"Unsupported JSON structure, "
-                    f"expected a list or a dictionary with a list. Given: {obj}"
+                    f"expected a list or a dictionary with a list. Given: {obj}",
                 )
 
         return self._extract_prompts(data)

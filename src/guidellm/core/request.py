@@ -17,10 +17,12 @@ class TextGenerationRequest(Serializable):
     )
     prompt: str = Field(description="The input prompt for the text generation.")
     prompt_token_count: Optional[int] = Field(
-        default=None, description="The number of tokens in the input prompt."
+        default=None,
+        description="The number of tokens in the input prompt.",
     )
     generate_token_count: Optional[int] = Field(
-        default=None, description="The number of tokens to generate."
+        default=None,
+        description="The number of tokens to generate.",
     )
     params: Dict[str, Any] = Field(
         default_factory=dict,

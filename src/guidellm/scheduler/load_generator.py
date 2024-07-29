@@ -40,7 +40,7 @@ class LoadGenerator:
             yield from self._poisson_times()
         else:
             raise NotImplementedError(
-                f"{self._mode} is not supported Load Generation Mode"
+                f"{self._mode} is not supported Load Generation Mode",
             )
 
     def _constant_times(self) -> Generator[float, None, None]:
@@ -54,7 +54,8 @@ class LoadGenerator:
 
     def _poisson_times(self) -> Generator[float, None, None]:
         time_tracker = time.time()
+        rng = np.random.default_rng()
 
         while True:
             yield time_tracker
-            time_tracker += np.random.poisson(1.0 / self._rate)
+            time_tracker += rng.poisson(1.0 / self._rate)

@@ -1,14 +1,16 @@
-from typing import Any, Dict, Generator, List, Optional
-
 import openai
-from loguru import logger
-from openai import OpenAI, Stream
-from openai.types import Completion
-from transformers import AutoTokenizer
+from typing import TYPE_CHECKING, Any, Dict, Generator, List, Optional
 
 from config import settings
+from loguru import logger
+from openai import OpenAI, Stream
+from transformers import AutoTokenizer
+
 from guidellm.backend import Backend, BackendEngine, GenerativeResponse
 from guidellm.core import TextGenerationRequest
+
+if TYPE_CHECKING:
+    from openai.types import Completion
 
 __all__ = ["OpenAIBackend"]
 
@@ -53,7 +55,7 @@ class OpenAIBackend(Backend):
             raise ValueError(
                 "`GUIDELLM__OPENAI__API_KEY` environment variable "
                 "or --openai-api-key CLI parameter "
-                "must be specify for the OpenAI backend"
+                "must be specify for the OpenAI backend",
             )
 
         if target is not None:
@@ -65,16 +67,17 @@ class OpenAIBackend(Backend):
         else:
             raise ValueError(
                 "`GUIDELLM__OPENAI__BASE_URL` environment variable "
-                "or --target CLI parameter must be specify for the OpenAI backend."
+                "or --target CLI parameter must be specified for the OpenAI backend."
             )
 
         self.openai_client = OpenAI(api_key=_api_key, base_url=base_url)
         self.model = model or self.default_model
 
-        logger.info(f"OpenAI {self.model} Backend listening on {target}")
+        logger.info("OpenAI {} Backend listening on {}", self.model, target)
 
     def make_request(
-        self, request: TextGenerationRequest
+        self,
+        request: TextGenerationRequest,
     ) -> Generator[GenerativeResponse, None, None]:
         """
         Make a request to the OpenAI backend.
@@ -143,22 +146,6 @@ class OpenAIBackend(Backend):
             logger.info(f"Available models: {models}")
             return models
 
-    @property
-    def default_model(self) -> str:
-        """
-        Get the default model for the backend.
-
-        :return: The default model.
-        :rtype: str
-        """
-
-        if models := self.available_models():
-            logger.info(f"Default model: {models[0]}")
-            return models[0]
-
-        logger.error("No models available.")
-        raise ValueError("No models available.")
-
     def model_tokenizer(self, model: str) -> Optional[Any]:
         """
         Get the tokenizer for a model.
@@ -172,8 +159,8 @@ class OpenAIBackend(Backend):
             tokenizer = AutoTokenizer.from_pretrained(model)
             logger.info(f"Tokenizer created for model: {model}")
             return tokenizer
-        except Exception as e:
-            logger.warning(f"Could not create tokenizer for model {model}: {e}")
+        except Exception as err:  # noqa: BLE001
+            logger.warning(f"Could not create tokenizer for model {model}: {err}")
             return None
 
     def _token_count(self, text: str) -> int:

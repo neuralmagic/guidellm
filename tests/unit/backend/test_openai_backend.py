@@ -5,13 +5,13 @@ This module includes unit tests for the OpenAI Backend Service.
 from typing import Callable, Optional
 
 import pytest
-
 from guidellm.backend import OpenAIBackend
 from guidellm.core import TextGenerationRequest
+
 from tests.dummy.services import TestRequestGenerator
 
 
-@pytest.mark.smoke
+@pytest.mark.smoke()
 def test_openai_backend_creation_with_default_model(openai_backend_factory: Callable):
     """
     Test whether the OpenAI Backend service is created correctly
@@ -25,20 +25,20 @@ def test_openai_backend_creation_with_default_model(openai_backend_factory: Call
     assert backend_service.default_model == backend_service.available_models()[0]
 
 
-@pytest.mark.smoke
+@pytest.mark.smoke()
 def test_model_tokenizer(openai_backend_factory):
     backend_service = openai_backend_factory()
     assert backend_service.model_tokenizer("bert-base-uncased")
 
 
-@pytest.mark.smoke
+@pytest.mark.smoke()
 def test_model_tokenizer_no_model(openai_backend_factory):
     backend_service = openai_backend_factory()
     tokenizer = backend_service.model_tokenizer("invalid")
     assert tokenizer is None
 
 
-@pytest.mark.smoke
+@pytest.mark.smoke()
 def test_make_request(openai_backend_factory, openai_completion_create_patch):
     """
     Test `OpenAIBackend.make_request()` workflow.
@@ -57,12 +57,12 @@ def test_make_request(openai_backend_factory, openai_completion_create_patch):
         openai_completion_create_patch,
     ):
         total_generative_responses += 1
-        expected_token: Optional[str] = getattr(completion_patch, "content") or None
+        expected_token: Optional[str] = completion_patch.content or None
 
         assert generative_response.add_token == expected_token
         assert (
             generative_response.type_ == "final"
-            if getattr(completion_patch, "stop") is True
+            if completion_patch.stop is True
             else "token_iter"
         )
         if expected_token is not None:
