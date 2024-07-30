@@ -8,7 +8,7 @@ from .result import (
     TextGenerationError,
     TextGenerationResult,
 )
-from .serializable import Serializable, SerializableFileType
+from .serializable import Serializable, SerializableFileExtensions
 
 __all__ = [
     "Distribution",
@@ -19,6 +19,6 @@ __all__ = [
     "TextGenerationBenchmarkReport",
     "RequestConcurrencyMeasurement",
     "Serializable",
-    "SerializableFileType",
+    "SerializableFileExtensions",
     "GuidanceReport",
 ]

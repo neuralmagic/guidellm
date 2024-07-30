@@ -93,7 +93,12 @@ class OpenAIBackend(Backend):
         request_args: Dict = {"n": 1}
 
         if (num_gen_tokens := request.params.get("generated_tokens", None)) is not None:
-            request_args.update(max_tokens=num_gen_tokens, stop=None)
+            request_args.update(
+                {
+                    "max_tokens": num_gen_tokens,
+                    "stop": None,
+                }
+            )
 
         if self.request_args:
             request_args.update(self.request_args)
@@ -124,8 +129,6 @@ class OpenAIBackend(Backend):
                     ),
                 )
             else:
-                # FIX: This task work for infinite
-                print(f"🟢 generative Response adding token: [{chunk_content}]")
                 logger.debug("Received token from OpenAI backend")
                 yield GenerativeResponse(type_="token_iter", add_token=chunk_content)
 

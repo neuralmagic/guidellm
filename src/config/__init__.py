@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Optional
 
 from pydantic import BaseModel
@@ -45,6 +46,8 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    root_dir: Path
+
     # TODO: add to the DEVELOPING.md after
     # https://github.com/neuralmagic/guidellm/pull/17
     # is merged
@@ -54,4 +57,7 @@ class Settings(BaseSettings):
     openai: OpenAISettings = OpenAISettings()
 
 
-settings = Settings()
+settings = Settings(
+    # NOTE: hardcoded since should not be changed in a runtime
+    root_dir=Path(__file__).parent.parent.parent,
+)

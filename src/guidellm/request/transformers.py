@@ -124,7 +124,11 @@ class TransformersDatasetRequestGenerator(RequestGenerator):
         token_count = (
             self._tokenizer(prompt)["input_ids"].shape[0] if self._tokenizer else None
         )
-        request = TextGenerationRequest(prompt=prompt, prompt_token_count=token_count)
+        request = TextGenerationRequest(
+            prompt=prompt,
+            prompt_token_count=token_count,
+            params={"generated_tokens": 10},  # TODO: remove
+        )
         logger.debug(f"Created new TextGenerationRequest: {request}")
 
         return request

@@ -1,6 +1,5 @@
 import os
 
-
 __all__ = [
     "is_file_name",
     "is_directory_name",

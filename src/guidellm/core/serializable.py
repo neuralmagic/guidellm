@@ -1,18 +1,19 @@
-from typing import Any, Optional
-
+import functools
 import os
+from enum import Enum
+from typing import Any, List, Union
+
 import yaml
 from loguru import logger
 from pydantic import BaseModel, ConfigDict
-from enum import Enum
 
+from config import settings
 from guidellm.utils import is_file_name
 
+__all__ = ["Serializable", "SerializableFileExtensions"]
 
-__all__ = ["Serializable", "SerializableFileType"]
 
-
-class SerializableFileType(Enum):
+class SerializableFileExtensions(str, Enum):
     """
     Enum class for file types supported by Serializable.
     """
@@ -41,6 +42,16 @@ class Serializable(BaseModel):
             self.__class__.__name__,
             data,
         )
+
+    @staticmethod
+    @functools.lru_cache(maxsize=1)
+    def available_file_extensions() -> List[str]:
+        """
+        Returns string representation of available filetypes that
+        are supported by the Serializable class.
+        """
+
+        return [item.value for item in SerializableFileExtensions]
 
     def to_yaml(self) -> str:
         """
@@ -90,7 +101,13 @@ class Serializable(BaseModel):
 
         return obj
 
-    def save_file(self, path: str, type_: Optional[SerializableFileType] = None) -> str:
+    def save_file(
+        self,
+        path: str,
+        extension: Union[
+            SerializableFileExtensions, str
+        ] = SerializableFileExtensions.YAML,
+    ) -> str:
         """
         Save the model to a file in either YAML or JSON format.
 
@@ -103,44 +120,34 @@ class Serializable(BaseModel):
             it will save in YAML format.
         :return: The path to the saved file.
         """
-        logger.debug("Saving to file... {} with format: {}", path, type_)
 
-        if not is_file_name(path):
-            file_name = f"{self.__class__.__name__.lower()}"
-            if type_:
-                file_name += f".{type_.value.lower()}"
-            else:
-                file_name += ".yaml"
-                type_ = SerializableFileType.YAML
-            path = os.path.join(path, file_name)
-
-        if not type_:
-            extension = path.split(".")[-1].upper()
-
-            if extension not in SerializableFileType.__members__:
-                raise ValueError(
-                    f"Unsupported file extension: {extension}. "
-                    f"Expected one of {', '.join(SerializableFileType.__members__)}) "
-                    f"for {path}"
-                )
-
-            type_ = SerializableFileType[extension]
-
-        if type_.name not in SerializableFileType.__members__:
+        if extension not in SerializableFileExtensions:
             raise ValueError(
-                f"Unsupported file format: {type_} "
-                f"(expected 'yaml' or 'json') for {path}"
+                f"Unsupported file extension: .{extension} "
+                f"(expected: [{self.available_file_extensions()}]) for {path}"
             )
 
-        os.makedirs(os.path.dirname(path), exist_ok=True)
+        logger.debug("Saving to file... {} with format: {}", path, extension)
+
+        if not is_file_name(path):
+            file_name = f"{self.__class__.__name__.lower()}.{extension}"
+            path = os.path.join(settings.root_dir, file_name)
+        else:
+            extension = path.split(".")[-1].lower()
+
+            if extension not in self.available_file_extensions():
+                raise ValueError(
+                    f"Unsupported file extension: .{str(extension)}. "
+                    f"Expected one of {', '.join(self.available_file_extensions())})."
+                )
 
         with open(path, "w") as file:
-            if type_ == SerializableFileType.YAML:
+            if extension == SerializableFileExtensions.YAML:
                 file.write(self.to_yaml())
-            elif type_ == SerializableFileType.JSON:
+            elif extension == SerializableFileExtensions.JSON:
                 file.write(self.to_json())
             else:
-                raise ValueError(f"Unsupported file format: {type_}")
+                raise ValueError(f"Unsupported file format: {extension}")
 
         logger.info("Successfully saved {} to {}", self.__class__.__name__, path)
 
@@ -163,21 +170,21 @@ class Serializable(BaseModel):
 
         extension = path.split(".")[-1].upper()
 
-        if extension not in SerializableFileType.__members__:
+        if extension not in cls.available_file_extensions():
             raise ValueError(
                 f"Unsupported file extension: {extension}. "
-                f"Expected one of {', '.join(SerializableFileType.__members__)}) "
+                f"Expected one of {cls.available_file_extensions()}) "
                 f"for {path}"
             )
 
-        type_ = SerializableFileType[extension]
+        type_ = SerializableFileExtensions[extension]
 
         with open(path, "r") as file:
             data = file.read()
 
-            if type_ == SerializableFileType.YAML:
+            if type_ == SerializableFileExtensions.YAML:
                 obj = cls.from_yaml(data)
-            elif type_ == SerializableFileType.JSON:
+            elif type_ == SerializableFileExtensions.JSON:
                 obj = cls.from_json(data)
             else:
                 raise ValueError(f"Unsupported file format: {type_}")

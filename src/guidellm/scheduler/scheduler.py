@@ -205,6 +205,7 @@ class Scheduler:
                 None, functools.partial(self._backend.submit, request=request)
             )
         except Exception as error:
+            logger.error(error)
             benchmark.errors.append(
                 TextGenerationError(
                     request=request, message=str(asyncio.CancelledError())
