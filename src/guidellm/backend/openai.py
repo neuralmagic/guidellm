@@ -38,9 +38,12 @@ class OpenAIBackend(Backend):
     def __init__(
         self,
         openai_api_key: Optional[str] = None,
-        internal_callback_url: Optional[str] = None,
+        target: Optional[str] = None,
+        host: Optional[str] = None,
+        port: Optional[int] = None,
+        path: str = "/completions",
         model: Optional[str] = None,
-        **request_args: Any,
+        **request_args,
     ):
         """
         Initialize an OpenAI Client
@@ -55,19 +58,22 @@ class OpenAIBackend(Backend):
                 "must be specify for the OpenAI backend"
             )
 
-        if not (_base_url := (internal_callback_url or settings.openai.base_url)):
+        if target is not None:
+            _base_url = target
+        elif host and port:
+            _base_url = f"{host}:{port}"
+        elif settings.openai.base_url is not None:
+            _base_url = settings.openai.base_url
+        else:
             raise ValueError(
                 "`GUIDELLM__OPENAI__BASE_URL` environment variable "
-                "or --openai-base-url CLI parameter "
-                "must be specify for the OpenAI backend"
+                "or --target CLI parameter must be specify for the OpenAI backend."
             )
+
         self.openai_client = OpenAI(api_key=_api_key, base_url=_base_url)
         self.model = model or self.default_model
 
-        logger.info(
-            f"Initialized OpenAIBackend with callback url: {internal_callback_url} "
-            f"and model: {self.model}"
-        )
+        logger.info(f"OpenAI {self.model} Backend listening on {target}")
 
     def make_request(
         self, request: TextGenerationRequest

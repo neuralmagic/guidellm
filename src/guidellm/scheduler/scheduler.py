@@ -99,6 +99,8 @@ class Scheduler:
         start_time = time.time()
         requests_counter = 0
 
+        logger.debug("Running scheduler in sync mode")
+
         for callback in self._sync_tasks():
             if (
                 self._max_requests is not None
@@ -142,6 +144,8 @@ class Scheduler:
             tasks.append((request, task))
             requests_counter += 1
 
+            print("Task started")
+
             if (
                 self._max_duration is not None
                 and time.time() - start_time >= self._max_duration
@@ -166,7 +170,7 @@ class Scheduler:
                     asyncio.gather(*(t for _, t in tasks), return_exceptions=True),
                     self._max_duration,
                 )
-            except TimeoutError:
+            except asyncio.TimeoutError:
                 self._cancel_running_tasks(tasks=tasks, benchmark=benchmark)
 
         return benchmark
