@@ -2,8 +2,8 @@ from typing import List
 
 from pydantic import Field
 
-from guidellm.core.serializable import Serializable
 from guidellm.core.result import TextGenerationBenchmarkReport
+from guidellm.core.serializable import Serializable
 
 __all__ = [
     "GuidanceReport",

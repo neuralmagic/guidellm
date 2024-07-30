@@ -127,7 +127,6 @@ class TransformersDatasetRequestGenerator(RequestGenerator):
         request = TextGenerationRequest(
             prompt=prompt,
             prompt_token_count=token_count,
-            params={"generated_tokens": 10},  # TODO: remove
         )
         logger.debug(f"Created new TextGenerationRequest: {request}")
 

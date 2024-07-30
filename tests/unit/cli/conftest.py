@@ -22,7 +22,7 @@ def default_main_kwargs() -> Dict[str, Any]:
     """
 
     return {
-        "target": "localhost:8000/completions",
+        "target": "http://localhost:8000",
         "host": None,
         "port": None,
         "path": None,
@@ -33,7 +33,8 @@ def default_main_kwargs() -> Dict[str, Any]:
         "data_type": "transformers",
         "tokenizer": None,
         "rate_type": "synchronous",
-        "rate": (1.0,),
-        "num_seconds": 120,
-        "num_requests": None,
+        "rate": (),
+        "max_seconds": 120,
+        "max_requests": None,
+        "output_path": "benchmark_report.json",
     }

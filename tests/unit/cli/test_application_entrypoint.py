@@ -43,10 +43,10 @@ def test_main_cli_overrided(
             ),
         ),
         (
-            ["--num-requests", "str instead of int"],
+            ["--max-requests", "str instead of int"],
             (
                 b"Usage: main [OPTIONS]\nTry 'main --help' for help.\n\n"
-                b"Error: Invalid value for '--num-requests': "
+                b"Error: Invalid value for '--max-requests': "
                 b"'str instead of int' is not a valid integer.\n"
             ),
         ),

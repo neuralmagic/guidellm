@@ -146,9 +146,6 @@ class RequestGenerator(ABC):
                 if self._queue.qsize() < self._async_queue_size:
                     item = self.create_item()
                     self._queue.put(item, timeout=0.1)
-                    # print(
-                    #     f"[TMP_LOG>] Item is added to the queue. Current size: {self._queue.qsize()}"
-                    # )  # TODO: remove
                     logger.debug(
                         "Item added to queue. Current queue size: {}",
                         self._queue.qsize(),
