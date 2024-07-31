@@ -22,7 +22,7 @@ limitations under the License.
 </p>
 
 <h3 align="center">
-Simulate and visualize LLM inference serving workloads
+Benchmark and visualize LLM inference serving workloads
 </h3>
 
 
@@ -64,7 +64,7 @@ Simulate and visualize LLM inference serving workloads
 Diagram HERE
 
 
-**GuideLLM is a tool designed to optimize the deployment of large language models (LLMs).** By evaluating model performance and cost under various workload configurations, it helps users determine the optimal hardware resources needed to meet service level objectives (SLOs). This ensures efficient and cost-effective LLM inference serving without compromising user experience.
+**GuideLLM is a tool designed to optimize the deployment of large language models (LLMs) through benchmarking simulated workloads on an inference server.** By evaluating model performance and cost under various workload configurations,it helps users determine the optimal hardware resources needed to meet service level objectives (SLOs). This ensures efficient and cost-effective LLM inference serving without compromising user experience.
 
 GuideLLM can help you:
 
