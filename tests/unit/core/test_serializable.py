@@ -118,7 +118,7 @@ def test_serializable_load_file_invalid_extension():
         invalid_file_path = os.path.join(temp_dir, "example.txt")
         with open(invalid_file_path, "w") as file:
             file.write("invalid content")
-        with pytest.raises(ValueError, match="Unsupported file extension: TXT"):
+        with pytest.raises(ValueError, match="Unsupported file extension: txt"):
             ExampleModel.load_file(invalid_file_path)
 
 

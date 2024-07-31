@@ -168,7 +168,7 @@ class Serializable(BaseModel):
         elif not os.path.isfile(path):
             raise ValueError(f"Path is not a file: {path}")
 
-        extension = path.split(".")[-1].upper()
+        extension = path.split(".")[-1].lower()
 
         if extension not in cls.available_file_extensions():
             raise ValueError(
@@ -177,16 +177,14 @@ class Serializable(BaseModel):
                 f"for {path}"
             )
 
-        type_ = SerializableFileExtensions[extension]
-
         with open(path, "r") as file:
             data = file.read()
 
-            if type_ == SerializableFileExtensions.YAML:
+            if extension == SerializableFileExtensions.YAML:
                 obj = cls.from_yaml(data)
-            elif type_ == SerializableFileExtensions.JSON:
+            elif extension == SerializableFileExtensions.JSON:
                 obj = cls.from_json(data)
             else:
-                raise ValueError(f"Unsupported file format: {type_}")
+                raise ValueError(f"Unsupported file format: {extension}")
 
         return obj
