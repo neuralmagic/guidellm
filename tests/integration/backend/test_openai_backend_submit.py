@@ -3,7 +3,8 @@ from typing import Callable
 
 import pytest
 import requests
-from config import settings
+
+from guidellm.config import settings
 from guidellm.backend import OpenAIBackend
 from guidellm.core import TextGenerationRequest, TextGenerationResult
 from openai.pagination import SyncPage
