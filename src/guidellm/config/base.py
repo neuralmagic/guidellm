@@ -1,9 +1,8 @@
-from typing import Optional
 from enum import Enum
+from typing import Optional
 
 from pydantic import BaseModel, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
 
 __all__ = [
     "settings",
@@ -59,6 +58,8 @@ class OpenAISettings(BaseModel):
     # NOTE: The default value is default address of llama.cpp web server
     base_url: str = "http://localhost:8080"
 
+    max_gen_tokens: int = 4096
+
 
 class ReportGenerationSettings(BaseModel):
     source: str = ""
@@ -83,29 +84,21 @@ class Settings(BaseSettings):
         env_nested_delimiter="__",
         extra="ignore",
         validate_default=True,
+        env_file=".env",
     )
 
     env: Environment = Environment.PROD
+    request_timeout: int = 30
+
     logging: LoggingSettings = LoggingSettings()
     openai: OpenAISettings = OpenAISettings()
     report_generation: ReportGenerationSettings = ReportGenerationSettings()
 
-    @model_validator(mode="before")
+    @model_validator(mode="after")
+    @classmethod
     def set_default_source(cls, values):
-        env = values.get("env", Environment.PROD)  # type: Environment
-
-        if not values.get("report_generation"):
-            values["report_generation"] = ReportGenerationSettings()
-
-        if isinstance(values["report_generation"], dict) and not values[
-            "report_generation"
-        ].get("source"):
-            values["report_generation"]["source"] = ENV_REPORT_MAPPING.get(env)
-        elif (
-            isinstance(values["report_generation"], ReportGenerationSettings)
-            and not values["report_generation"].source
-        ):
-            values["report_generation"].source = ENV_REPORT_MAPPING[env]
+        if not values.report_generation.source:
+            values.report_generation.source = ENV_REPORT_MAPPING.get(values.env)
 
         return values
 

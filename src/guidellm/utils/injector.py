@@ -1,20 +1,19 @@
-from pydantic import BaseModel
-import requests
-import os
 from pathlib import Path
+from typing import Union
 
-from guidellm.utils.constants import (
-    REPORT_HTML_PLACEHOLDER,
-    REPORT_HTML_MATCH,
-    STANDARD_REQUEST_TIMEOUT,
-)
+import requests
+from pydantic import BaseModel
+
 from guidellm.config import settings
-
+from guidellm.utils.constants import (
+    REPORT_HTML_MATCH,
+    REPORT_HTML_PLACEHOLDER,
+)
 
 __all__ = ["create_report", "inject_data", "load_html_file"]
 
 
-def create_report(model: BaseModel, output_path: str) -> str:
+def create_report(model: BaseModel, output_path: Union[str, Path]) -> Path:
     """
     Creates a report from the model and saves it to the output path.
 
@@ -27,18 +26,20 @@ def create_report(model: BaseModel, output_path: str) -> str:
     :return: the path to the saved report
     :rtype: str
     """
+    if not isinstance(output_path, Path):
+        output_path = Path(output_path)
+
     html_content = load_html_file(settings.report_generation.source)
     report_content = inject_data(
         model, html_content, REPORT_HTML_MATCH, REPORT_HTML_PLACEHOLDER
     )
 
-    if os.path.isdir(output_path):
-        output_path = os.path.join(output_path, "report.html")
+    if not output_path.suffix:
+        # assume directory, save as report.html
+        output_path = output_path / "report.html"
 
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-
-    with Path(output_path).open("w") as file:
-        file.write(report_content)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(report_content)
 
     return output_path
 
@@ -80,13 +81,14 @@ def load_html_file(path_or_url: str) -> str:
     :rtype: str
     """
     if path_or_url.startswith("http"):
-        response = requests.get(path_or_url, timeout=STANDARD_REQUEST_TIMEOUT)
+        response = requests.get(path_or_url, timeout=settings.request_timeout)
         response.raise_for_status()
 
         return response.text
 
-    if not os.path.exists(path_or_url):
+    path = Path(path_or_url)
+
+    if not path.exists():
         raise FileNotFoundError(f"File not found: {path_or_url}")
 
-    with Path(path_or_url).open("r") as file:
-        return file.read()
+    return path.read_text()

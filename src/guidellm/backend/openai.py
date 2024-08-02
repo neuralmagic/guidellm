@@ -6,8 +6,8 @@ from openai import OpenAI, Stream
 from openai.types import Completion
 from transformers import AutoTokenizer
 
-from guidellm.config import settings
 from guidellm.backend import Backend, BackendEngine, GenerativeResponse
+from guidellm.config import settings
 from guidellm.core import TextGenerationRequest
 
 __all__ = ["OpenAIBackend"]

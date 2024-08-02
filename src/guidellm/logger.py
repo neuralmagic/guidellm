@@ -41,7 +41,6 @@ from loguru import logger
 from guidellm.config import settings
 from guidellm.config.base import LoggingSettings
 
-
 __all__ = ["configure_logger", "logger"]
 
 

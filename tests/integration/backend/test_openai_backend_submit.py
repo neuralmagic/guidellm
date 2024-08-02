@@ -3,9 +3,8 @@ from typing import Callable
 
 import pytest
 import requests
-
-from guidellm.config import settings
 from guidellm.backend import OpenAIBackend
+from guidellm.config import settings
 from guidellm.core import TextGenerationRequest, TextGenerationResult
 from openai.pagination import SyncPage
 from openai.types import Model
@@ -33,7 +32,7 @@ def _openai_server_healthcheck():
 
 
 @pytest.mark.skip("OpenAI compatible service is not deployed yet")
-@pytest.mark.integration()
+@pytest.mark.sanity()
 def test_openai_submit_request(
     mocker,
     openai_backend_factory: Callable[..., OpenAIBackend],

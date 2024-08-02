@@ -1,9 +1,8 @@
 from typing import Callable, Optional
 
 import pytest
-
-from guidellm.config import settings
 from guidellm.backend import Backend, BackendEngine, OpenAIBackend
+from guidellm.config import settings
 from loguru import logger
 
 

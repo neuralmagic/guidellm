@@ -1,15 +1,14 @@
 import pytest
-
 from guidellm.config.base import (
-    Settings,
     Environment,
     LoggingSettings,
     OpenAISettings,
     ReportGenerationSettings,
+    Settings,
 )
 
 
-@pytest.mark.unit
+@pytest.mark.smoke()
 def test_default_settings():
     settings = Settings()
     assert settings.env == Environment.PROD
@@ -21,13 +20,18 @@ def test_default_settings():
     )
 
 
-@pytest.mark.unit
-def test_settings_from_env_variables(monkeypatch):
-    monkeypatch.setenv("GUIDELLM__env", "dev")
-    monkeypatch.setenv("GUIDELLM__logging__disabled", "true")
-    monkeypatch.setenv("GUIDELLM__OPENAI__API_KEY", "test_key")
-    monkeypatch.setenv("GUIDELLM__OPENAI__BASE_URL", "http://test.url")
-    monkeypatch.setenv("GUIDELLM__REPORT_GENERATION__SOURCE", "http://custom.url")
+@pytest.mark.smoke()
+def test_settings_from_env_variables(mocker):
+    mocker.patch.dict(
+        "os.environ",
+        {
+            "GUIDELLM__env": "dev",
+            "GUIDELLM__logging__disabled": "true",
+            "GUIDELLM__OPENAI__API_KEY": "test_key",
+            "GUIDELLM__OPENAI__BASE_URL": "http://test.url",
+            "GUIDELLM__REPORT_GENERATION__SOURCE": "http://custom.url",
+        },
+    )
 
     settings = Settings()
     assert settings.env == Environment.DEV
@@ -37,7 +41,7 @@ def test_settings_from_env_variables(monkeypatch):
     assert settings.report_generation.source == "http://custom.url"
 
 
-@pytest.mark.unit
+@pytest.mark.smoke()
 def test_report_generation_default_source():
     settings = Settings(env=Environment.LOCAL)
     assert settings.report_generation.source == "tests/dummy/report.html"
@@ -61,7 +65,7 @@ def test_report_generation_default_source():
     )
 
 
-@pytest.mark.sanity
+@pytest.mark.sanity()
 def test_logging_settings():
     logging_settings = LoggingSettings(
         disabled=True,
@@ -75,14 +79,14 @@ def test_logging_settings():
     assert logging_settings.log_file_level == "ERROR"
 
 
-@pytest.mark.sanity
+@pytest.mark.sanity()
 def test_openai_settings():
     openai_settings = OpenAISettings(api_key="test_api_key", base_url="http://test.api")
     assert openai_settings.api_key == "test_api_key"
     assert openai_settings.base_url == "http://test.api"
 
 
-@pytest.mark.sanity
+@pytest.mark.sanity()
 def test_report_generation_settings():
     report_settings = ReportGenerationSettings(source="http://custom.report")
     assert report_settings.source == "http://custom.report"
