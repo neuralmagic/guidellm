@@ -228,12 +228,7 @@ The project is fully configurable with environment variables. With that configur
 | `GUIDELLM__OPENAI__BASE_URL`   | `http://localhost:8080` | The address to the **OpenAI-compatible** server.<br><br>OpenAI live base url is `https://api.openai.com/v1`                                             |
 | `GUIDELLM__OPENAI__API_KEY`    | `invalid`               | Corresponds to the **OpenAI-compatible** server API key.<br><br>If you look for the live key - check [this link](https://platform.openai.com/api-keys). |
 
-## Contact and Support
-
-If you need help or have any questions, please open an issue on GitHub or contact us at support@neuralmagic.com.
-
-This will run automatic code styling using `black` and `isort` and test that the
-repository's code matches its standards.
+<br>
 
 ## Project configuration
 
@@ -263,3 +258,7 @@ settings = Settings()
 ```
 
 With that configuration set you can load parameters to `LoggingSettings()` by using environment variables. Just run `export GUIDELLM__LOGGING__DISABLED=true` or `export GUIDELLM__LOGGING__NESTED=another_value` respectfully. The nesting delimiter is `__`
+
+## Contact and Support
+
+If you need help or have any questions, please open an issue on GitHub or contact us at support@neuralmagic.com.
