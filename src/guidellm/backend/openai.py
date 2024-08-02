@@ -1,6 +1,6 @@
-import openai
 from typing import Any, Dict, Generator, List, Optional
 
+import openai
 from config import settings
 from loguru import logger
 from openai import OpenAI, Stream

@@ -5,17 +5,17 @@ import pytest
 from click.testing import CliRunner
 
 
-@pytest.fixture
+@pytest.fixture()
 def cli_runner():
     return CliRunner()
 
 
-@pytest.fixture
+@pytest.fixture()
 def patch_main(mocker) -> MagicMock:
     return mocker.patch("guidellm.main.main.callback")
 
 
-@pytest.fixture
+@pytest.fixture()
 def default_main_kwargs() -> Dict[str, Any]:
     """
     All the defaults come from the `guidellm.main` function.

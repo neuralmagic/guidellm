@@ -93,7 +93,6 @@ def main(
     max_requests,
     output_path,
 ):
-
     # Create backend
     _backend = Backend.create(
         backend_type=backend,
