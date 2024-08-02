@@ -23,6 +23,9 @@ class OpenAISettings(BaseModel):
     # NOTE: The default value is default address of llama.cpp http server
     base_url: str = "http://localhost:8080"
 
+    # The max value of generated tokens
+    max_gen_tokens: int = 4096
+
 
 class Settings(BaseSettings):
     """

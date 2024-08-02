@@ -25,7 +25,6 @@ def default_main_kwargs() -> Dict[str, Any]:
         "target": "http://localhost:8000",
         "host": None,
         "port": None,
-        "path": None,
         "backend": "openai_server",
         "model": None,
         "task": None,

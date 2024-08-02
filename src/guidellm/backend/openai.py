@@ -90,13 +90,11 @@ class OpenAIBackend(Backend):
         # How many completions to generate for each prompt
         request_args: Dict = {"n": 1}
 
-        if (num_gen_tokens := request.params.get("generated_tokens", None)) is not None:
-            request_args.update(
-                {
-                    "max_tokens": num_gen_tokens,
-                    "stop": None,
-                }
-            )
+        num_gen_tokens: int = (
+            request.params.get("generated_tokens", None)
+            or settings.openai.max_gen_tokens
+        )
+        request_args.update({"max_tokens": num_gen_tokens, "stop": None})
 
         if self.request_args:
             request_args.update(self.request_args)
@@ -120,11 +118,7 @@ class OpenAIBackend(Backend):
                     prompt_token_count=(
                         request.prompt_token_count or self._token_count(request.prompt)
                     ),
-                    output_token_count=(
-                        num_gen_tokens
-                        if num_gen_tokens
-                        else self._token_count(chunk_content)
-                    ),
+                    output_token_count=(self._token_count(chunk_content)),
                 )
             else:
                 logger.debug("Received token from OpenAI backend")
@@ -143,7 +137,7 @@ class OpenAIBackend(Backend):
                 model.id for model in self.openai_client.models.list().data
             ]
         except openai.NotFoundError as error:
-            logger.error(f"No available models for OpenAI Backend")
+            logger.error("No available models for OpenAI Backend")
             raise error
         else:
             logger.info(f"Available models: {models}")
