@@ -10,6 +10,7 @@ import requests
 from loguru import logger
 from transformers import PreTrainedTokenizer
 
+from guidellm.config import settings
 from guidellm.core.request import TextGenerationRequest
 from guidellm.request.base import RequestGenerator
 
@@ -117,7 +118,7 @@ class EmulatedRequestGenerator(RequestGenerator):
     def _load_emulated_data(self) -> List[str]:
         url = "https://www.gutenberg.org/files/1342/1342-0.txt"
         logger.info(f"Downloading text corpus from {url}")
-        response = requests.get(url, timeout=30)
+        response = requests.get(url, timeout=settings.request_timeout)
         response.raise_for_status()
 
         content = response.text

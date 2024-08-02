@@ -1,9 +1,8 @@
 from pathlib import Path
 
 import pytest
-from config import LoggingSettings
-from guidellm.logger import configure_logger
-from loguru import logger
+from guidellm import configure_logger, logger
+from guidellm.config.base import LoggingSettings
 
 
 @pytest.fixture(autouse=True)

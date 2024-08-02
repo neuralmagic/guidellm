@@ -1,13 +1,13 @@
 from typing import Any, Dict, Generator, List, Optional
 
 import openai
-from config import settings
 from loguru import logger
 from openai import OpenAI, Stream
 from openai.types import Completion
 from transformers import AutoTokenizer
 
 from guidellm.backend import Backend, BackendEngine, GenerativeResponse
+from guidellm.config import settings
 from guidellm.core import TextGenerationRequest
 
 __all__ = ["OpenAIBackend"]

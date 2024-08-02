@@ -29,6 +29,7 @@ repos:
 
         # dev dependencies
         pytest,
+        pydantic_settings,
 
         # types
         types-click,
