@@ -153,7 +153,7 @@ class Scheduler:
 
             if (
                 self._max_requests is not None
-                and requests_counter >= self._max_requests
+                and requests_counter >= self._max_requests - 1
             ):
                 break
 
