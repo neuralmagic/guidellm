@@ -138,6 +138,8 @@ class TextGenerationResult(Serializable):
 
         if output:
             self.output = output
+        elif self.output:
+            self.output = self.output.strip()
 
         self.output_word_count = len(self.output.split())
         self.output_token_count = output_token_count or self.output_word_count
@@ -269,18 +271,20 @@ class TextGenerationBenchmark(Serializable):
 
     @property
     def overloaded(self) -> bool:
-        if not self.results or not self.concurrencies:
-            raise ValueError("No results or concurrencies to check for overload.")
-
-        if self.rate is None or len(self.concurrencies) < 2:  # noqa: PLR2004
+        if (
+            self.rate is None
+            or not self.results
+            or not self.concurrencies
+            or len(self.concurrencies) < 2
+        ):
             # if rate was not set, sync mode is assumed,
             # or we have less than 2 data points,
             # then we cannot be overloaded by definition
             return False
 
-        # if the calculated rate is less than 60% of the requested rate,
+        # if the calculated rate is less than 75% of the requested rate,
         # safe to assume the system is overloaded
-        return self.completed_request_rate < 0.60 * self.rate
+        return self.completed_request_rate < 0.75 * self.rate
 
     def request_started(self):
         """

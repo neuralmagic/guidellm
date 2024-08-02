@@ -103,7 +103,7 @@ class Backend(ABC):
         logger.info(f"Submitting request with prompt: {request.prompt}")
 
         result = TextGenerationResult(
-            request=TextGenerationRequest(prompt=request.prompt),
+            request=request,
         )
         result.start(request.prompt)
 

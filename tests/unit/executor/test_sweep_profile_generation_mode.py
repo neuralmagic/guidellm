@@ -6,7 +6,6 @@ from guidellm.scheduler import LoadGenerationMode
 from tests import dummy
 
 
-@pytest.mark.skip("SweepProfileGenerator never break.")
 @pytest.mark.parametrize(
     "load_gen_mode",
     [

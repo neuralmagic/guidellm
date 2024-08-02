@@ -5,10 +5,31 @@ This module includes unit tests for the OpenAI Backend Service.
 from typing import Callable, Optional
 
 import pytest
-from guidellm.backend import OpenAIBackend
+
+from guidellm.backend import OpenAIBackend, Backend, BackendEngine
 from guidellm.core import TextGenerationRequest
 
 from tests.dummy.services import TestRequestGenerator
+
+
+@pytest.mark.smoke()
+def test_openai_registry():
+    assert BackendEngine.OPENAI_SERVER in Backend._registry
+
+
+@pytest.mark.smoke()
+def test_openai_backend_creation():
+    backend = Backend.create(
+        BackendEngine.OPENAI_SERVER,
+        openai_api_key="test_key",
+        internal_callback_url="http://test.url",
+        model="test_model",
+        arg="request",
+    )
+    assert backend is not None
+    assert isinstance(backend, OpenAIBackend)
+    assert backend.model == "test_model"
+    assert backend.request_args == {"arg": "request"}
 
 
 @pytest.mark.smoke()
