@@ -1,8 +1,7 @@
-import os
 import tempfile
+from pathlib import Path
 
 import pytest
-
 from guidellm.core import (
     Distribution,
     GuidanceReport,
@@ -14,7 +13,7 @@ from guidellm.core import (
 )
 
 
-@pytest.fixture
+@pytest.fixture()
 def sample_benchmark_report() -> TextGenerationBenchmarkReport:
     sample_request = TextGenerationRequest(prompt="sample prompt")
     sample_distribution = Distribution()
@@ -50,29 +49,29 @@ def compare_guidance_reports(report1: GuidanceReport, report2: GuidanceReport) -
     return report1 == report2
 
 
-@pytest.mark.smoke
+@pytest.mark.smoke()
 def test_guidance_report_initialization():
     report = GuidanceReport()
     assert report.benchmarks == []
 
 
-@pytest.mark.smoke
+@pytest.mark.smoke()
 def test_guidance_report_initialization_with_params(sample_benchmark_report):
     report = GuidanceReport(benchmarks=[sample_benchmark_report])
     assert report.benchmarks == [sample_benchmark_report]
 
 
-@pytest.mark.smoke
+@pytest.mark.smoke()
 def test_guidance_report_file(sample_benchmark_report):
     report = GuidanceReport(benchmarks=[sample_benchmark_report])
     with tempfile.TemporaryDirectory() as temp_dir:
-        file_path = os.path.join(temp_dir, "report.yaml")
+        file_path = Path(temp_dir) / "report.yaml"
         report.save_file(file_path)
         loaded_report = GuidanceReport.load_file(file_path)
         assert compare_guidance_reports(report, loaded_report)
 
 
-@pytest.mark.regression
+@pytest.mark.regression()
 def test_guidance_report_json(sample_benchmark_report):
     report = GuidanceReport(benchmarks=[sample_benchmark_report])
     json_str = report.to_json()
@@ -80,7 +79,7 @@ def test_guidance_report_json(sample_benchmark_report):
     assert compare_guidance_reports(report, loaded_report)
 
 
-@pytest.mark.regression
+@pytest.mark.regression()
 def test_guidance_report_yaml(sample_benchmark_report):
     report = GuidanceReport(benchmarks=[sample_benchmark_report])
     yaml_str = report.to_yaml()

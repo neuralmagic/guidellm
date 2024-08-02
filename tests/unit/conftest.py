@@ -15,7 +15,7 @@ def openai_completion_create_patch(
     Mock available models function to avoid OpenAI API call.
     """
 
-    items = [item for item in dummy.data.openai_completion_factory()]
+    items = list(dummy.data.openai_completion_factory())
     mocker.patch("openai.resources.completions.Completions.create", return_value=items)
 
     return cast(openai.Stream[openai.types.Completion], items)
@@ -27,9 +27,7 @@ def openai_models_list_patch(mocker) -> List[openai.types.Model]:
     Mock available models function to avoid OpenAI API call.
     """
 
-    items: List[openai.types.Model] = [
-        item for item in dummy.data.openai_model_factory()
-    ]
+    items: List[openai.types.Model] = list(dummy.data.openai_model_factory())
     mocker.patch(
         "openai.resources.models.Models.list",
         return_value=SyncPage(object="list", data=items),

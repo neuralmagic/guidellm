@@ -3,7 +3,6 @@ from unittest.mock import MagicMock
 
 import pytest
 from click.testing import CliRunner
-
 from guidellm.main import main
 
 
@@ -32,7 +31,7 @@ def test_main_cli_overrided(
 
 
 @pytest.mark.parametrize(
-    "args,expected_stdout",
+    ("args", "expected_stdout"),
     [
         (
             ["--backend", "invalid", "--rate-type", "sweep"],

@@ -28,7 +28,8 @@ class Executor:
         self.request_generator = request_generator
         self.backend = backend
         self.profile_generator: ProfileGenerator = ProfileGenerator.create(
-            profile_mode, **(profile_args or {})
+            profile_mode,
+            **(profile_args or {}),
         )
         self.max_requests: Optional[int] = max_requests
         self.max_duration: Optional[float] = max_duration
@@ -38,8 +39,8 @@ class Executor:
     def scheduler(self) -> Scheduler:
         if self._scheduler is None:
             raise ValueError("The scheduler is not set. Did you run the execution?")
-        else:
-            return self._scheduler
+
+        return self._scheduler
 
     def run(self) -> TextGenerationBenchmarkReport:
         report = TextGenerationBenchmarkReport()

@@ -1,10 +1,10 @@
 from typing import List, Optional
 
 import pytest
-
 from guidellm.core import TextGenerationBenchmark, TextGenerationBenchmarkReport
 from guidellm.executor import Executor, ProfileGenerationMode
 from guidellm.scheduler import LoadGenerationMode
+
 from tests import dummy
 
 
@@ -17,14 +17,16 @@ from tests import dummy
     ],
 )
 def test_executor_single_profile_generator_benchmark_report(
-    mocker, openai_backend_factory, load_gen_mode
+    mocker,
+    openai_backend_factory,
+    load_gen_mode,
 ):
     scheduler_run_patch = mocker.patch(
         "guidellm.scheduler.scheduler.Scheduler.run",
         return_value=TextGenerationBenchmark(mode="test", rate=1.0),
     )
     request_genrator = dummy.services.TestRequestGenerator(
-        tokenizer="bert-base-uncased"
+        tokenizer="bert-base-uncased",
     )
     rates: Optional[List[float]] = [1.0]
     if load_gen_mode == LoadGenerationMode.SYNCHRONOUS:

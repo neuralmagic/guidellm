@@ -20,10 +20,10 @@ repos:
         datasets,
         loguru,
         numpy,
+        openai,
         pydantic,
         pydantic_settings,
         pyyaml,
-        openai,
         requests,
         transformers,
 

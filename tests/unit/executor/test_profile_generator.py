@@ -1,8 +1,7 @@
 from unittest.mock import MagicMock
 
-import numpy
+import numpy as np
 import pytest
-
 from guidellm.core import TextGenerationBenchmark, TextGenerationBenchmarkReport
 from guidellm.executor import (
     FixedRateProfileGenerator,
@@ -20,7 +19,8 @@ def test_fixed_rate_profile_generator_creation():
     load_gen_mode = LoadGenerationMode.CONSTANT
     test_profile_generator = ProfileGenerator.create(
         ProfileGenerationMode.FIXED_RATE,
-        **({"rates": rates, "load_gen_mode": load_gen_mode}),
+        rates=rates,
+        load_gen_mode=load_gen_mode,
     )
     assert isinstance(test_profile_generator, FixedRateProfileGenerator)
     assert test_profile_generator._rates == rates
@@ -32,11 +32,13 @@ def test_synchronous_mode_rate_list_error():
     rates = [1.0]
     load_gen_mode = LoadGenerationMode.SYNCHRONOUS
     with pytest.raises(
-        ValueError, match="custom rates are not supported in synchronous mode"
+        ValueError,
+        match="custom rates are not supported in synchronous mode",
     ):
         ProfileGenerator.create(
             ProfileGenerationMode.FIXED_RATE,
-            **({"rates": rates, "load_gen_mode": load_gen_mode}),
+            rates=rates,
+            load_gen_mode=load_gen_mode,
         )
 
 
@@ -45,7 +47,8 @@ def test_next_with_multiple_rates():
     load_gen_mode = LoadGenerationMode.CONSTANT
     test_profile_generator = ProfileGenerator.create(
         ProfileGenerationMode.FIXED_RATE,
-        **({"rates": rates, "load_gen_mode": load_gen_mode}),
+        rates=rates,
+        load_gen_mode=load_gen_mode,
     )
     mock_report = MagicMock(spec=TextGenerationBenchmarkReport)
     for rate in rates:
@@ -59,7 +62,8 @@ def test_next_with_multiple_rates():
 def test_next_with_sync_mode():
     load_gen_mode = LoadGenerationMode.SYNCHRONOUS
     test_profile_generator = ProfileGenerator.create(
-        ProfileGenerationMode.FIXED_RATE, **({"load_gen_mode": load_gen_mode})
+        ProfileGenerationMode.FIXED_RATE,
+        load_gen_mode=load_gen_mode,
     )
     mock_report = MagicMock(spec=TextGenerationBenchmarkReport)
     current_profile = test_profile_generator.next(mock_report)
@@ -74,7 +78,7 @@ def test_next_with_sync_mode():
 
 def test_sweep_profile_generator_creation():
     test_profile_generator = ProfileGenerator.create(
-        ProfileGenerationMode.SWEEP, **({})
+        ProfileGenerationMode.SWEEP,
     )
     assert isinstance(test_profile_generator, SweepProfileGenerator)
     assert not test_profile_generator._sync_run
@@ -144,7 +148,7 @@ def test_pending_rates():
     benchmarks = [mock_benchmark, mock_overloaded_benchmark]
     mock_report.benchmarks = benchmarks
     profile = test_profile_generator.next(mock_report)
-    for expected_rate in numpy.linspace(2.0, 8.0, 10):
+    for expected_rate in np.linspace(2.0, 8.0, 10):
         profile = test_profile_generator.next(mock_report)
         assert profile is not None
         assert profile.load_gen_rate == expected_rate

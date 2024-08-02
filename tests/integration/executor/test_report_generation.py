@@ -1,20 +1,21 @@
 import time
 
 import pytest
-
 from guidellm.backend import OpenAIBackend
 from guidellm.core import TextGenerationBenchmarkReport
 from guidellm.executor import Executor, ProfileGenerationMode
 from guidellm.scheduler import LoadGenerationMode
+
 from tests import dummy
 
 
-@pytest.mark.sanity
+@pytest.mark.sanity()
 def test_executor_openai_single_report_generation_sync_mode(
-    openai_backend_factory, openai_completion_create_patch
+    openai_backend_factory,
+    openai_completion_create_patch,
 ):
     request_genrator = dummy.services.TestRequestGenerator(
-        tokenizer="bert-base-uncased"
+        tokenizer="bert-base-uncased",
     )
     profile_generation_mode = ProfileGenerationMode.FIXED_RATE
     profile_generator_kwargs = {
@@ -40,7 +41,7 @@ def test_executor_openai_single_report_generation_sync_mode(
     )
 
 
-@pytest.mark.sanity
+@pytest.mark.sanity()
 def test_executor_openai_single_report_generation_constant_mode_infinite(
     openai_backend_factory,
 ):
@@ -52,7 +53,7 @@ def test_executor_openai_single_report_generation_constant_mode_infinite(
     """
 
     request_genrator = dummy.services.TestRequestGenerator(
-        tokenizer="bert-base-uncased"
+        tokenizer="bert-base-uncased",
     )
     profile_generation_mode = ProfileGenerationMode.FIXED_RATE
     profile_generator_kwargs = {
@@ -76,7 +77,7 @@ def test_executor_openai_single_report_generation_constant_mode_infinite(
     assert len(report.benchmarks[0].errors) == 0
 
 
-@pytest.mark.sanity
+@pytest.mark.sanity()
 def test_executor_openai_single_report_generation_constant_mode_limited(
     openai_backend_factory,
 ):
@@ -85,7 +86,7 @@ def test_executor_openai_single_report_generation_constant_mode_limited(
     """
 
     request_genrator = dummy.services.TestRequestGenerator(
-        tokenizer="bert-base-uncased"
+        tokenizer="bert-base-uncased",
     )
     profile_generation_mode = ProfileGenerationMode.FIXED_RATE
     profile_generator_kwargs = {
@@ -109,9 +110,10 @@ def test_executor_openai_single_report_generation_constant_mode_limited(
     assert len(report.benchmarks[0].results) == 2
 
 
-@pytest.mark.sanity
+@pytest.mark.sanity()
 def test_executor_openai_single_report_generation_constant_mode_failed(
-    mocker, openai_backend_factory
+    mocker,
+    openai_backend_factory,
 ):
     """
     Test max duration immediate tasks iteration break up
@@ -121,7 +123,7 @@ def test_executor_openai_single_report_generation_constant_mode_failed(
     mocker.patch("guidellm.backend.Backend.submit", side_effect=Exception)
 
     request_genrator = dummy.services.TestRequestGenerator(
-        tokenizer="bert-base-uncased"
+        tokenizer="bert-base-uncased",
     )
     profile_generation_mode = ProfileGenerationMode.FIXED_RATE
     profile_generator_kwargs = {
@@ -145,12 +147,12 @@ def test_executor_openai_single_report_generation_constant_mode_failed(
     assert len(report.benchmarks[0].errors) == 3
 
 
-@pytest.mark.sanity
+@pytest.mark.sanity()
 def test_executor_openai_single_report_generation_constant_mode_cancelled_reports(
     openai_backend_factory,
 ):
     request_genrator = dummy.services.TestRequestGenerator(
-        tokenizer="bert-base-uncased"
+        tokenizer="bert-base-uncased",
     )
     profile_generation_mode = ProfileGenerationMode.FIXED_RATE
     profile_generator_kwargs = {

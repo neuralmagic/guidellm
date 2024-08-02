@@ -1,9 +1,8 @@
 import pytest
-
 from guidellm.core import TextGenerationRequest
 
 
-@pytest.mark.smoke
+@pytest.mark.smoke()
 def test_text_generation_request_initialization():
     prompt = "Generate a story"
     request = TextGenerationRequest(prompt=prompt)
@@ -13,7 +12,7 @@ def test_text_generation_request_initialization():
     assert request.params == {}
 
 
-@pytest.mark.sanity
+@pytest.mark.sanity()
 def test_text_generation_request_initialization_with_params():
     prompt = "Generate a story"
     prompt_token_count = 50
@@ -31,7 +30,7 @@ def test_text_generation_request_initialization_with_params():
     assert request.params == params
 
 
-@pytest.mark.regression
+@pytest.mark.regression()
 def test_request_json():
     prompt = "Generate text"
     prompt_token_count = 10
@@ -55,7 +54,7 @@ def test_request_json():
     assert request_restored.params == params
 
 
-@pytest.mark.regression
+@pytest.mark.regression()
 def test_request_yaml():
     prompt = "Generate text"
     prompt_token_count = 15

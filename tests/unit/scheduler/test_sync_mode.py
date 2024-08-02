@@ -2,14 +2,14 @@ import time
 from typing import Callable
 
 import pytest
-
 from guidellm.backend import OpenAIBackend
 from guidellm.core import TextGenerationBenchmark
 from guidellm.scheduler import LoadGenerationMode, Scheduler
+
 from tests import dummy
 
 
-@pytest.mark.sanity
+@pytest.mark.sanity()
 @pytest.mark.parametrize("max_requests", [1, 5])
 def test_scheduler_max_requests_limitation(
     openai_backend_factory: Callable[..., OpenAIBackend],
@@ -17,7 +17,7 @@ def test_scheduler_max_requests_limitation(
     max_requests: int,
 ):
     request_genrator = dummy.services.TestRequestGenerator(
-        tokenizer="bert-base-uncased"
+        tokenizer="bert-base-uncased",
     )
 
     scheduler = Scheduler(
@@ -36,13 +36,14 @@ def test_scheduler_max_requests_limitation(
     assert benchmark.errors == []
 
 
-@pytest.mark.sanity
+@pytest.mark.sanity()
 @pytest.mark.parametrize("max_duration", [1, 3])
 def test_scheduler_max_duration_limitation(
-    openai_backend_factory: Callable[..., OpenAIBackend], max_duration: int
+    openai_backend_factory: Callable[..., OpenAIBackend],
+    max_duration: int,
 ):
     request_genrator = dummy.services.TestRequestGenerator(
-        tokenizer="bert-base-uncased"
+        tokenizer="bert-base-uncased",
     )
 
     scheduler = Scheduler(

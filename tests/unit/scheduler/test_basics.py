@@ -1,14 +1,14 @@
 from typing import Callable
 
 import pytest
-
 from guidellm.backend import OpenAIBackend
 from guidellm.scheduler import LoadGenerationMode, Scheduler
+
 from tests import dummy
 
 
 @pytest.mark.parametrize(
-    "load_gen_mode,max_requests,max_duration,load_gen_rate",
+    ("load_gen_mode", "max_requests", "max_duration", "load_gen_rate"),
     [
         # Sync load generation mode payload
         (LoadGenerationMode.SYNCHRONOUS, None, None, None),

@@ -1,5 +1,4 @@
 import pytest
-
 from guidellm.core import (
     TextGenerationBenchmark,
     TextGenerationBenchmarkReport,
@@ -9,7 +8,7 @@ from guidellm.core import (
 )
 
 
-@pytest.mark.smoke
+@pytest.mark.smoke()
 def test_text_generation_result_initialization():
     request = TextGenerationRequest(prompt="Generate a story")
     result = TextGenerationResult(request=request)
@@ -18,7 +17,7 @@ def test_text_generation_result_initialization():
     assert result.output == ""
 
 
-@pytest.mark.sanity
+@pytest.mark.sanity()
 def test_text_generation_result_start():
     request = TextGenerationRequest(prompt="Generate a story")
     result = TextGenerationResult(request=request)
@@ -28,7 +27,7 @@ def test_text_generation_result_start():
     assert result.start_time is not None
 
 
-@pytest.mark.sanity
+@pytest.mark.sanity()
 def test_text_generation_result_output_token():
     request = TextGenerationRequest(prompt="Generate a story")
     result = TextGenerationResult(request=request)
@@ -40,10 +39,11 @@ def test_text_generation_result_output_token():
     assert result.last_time
     assert result.start_time
     assert result.output == f"{token} "
-    assert result.last_time is not None and result.last_time > result.start_time
+    assert result.last_time is not None
+    assert result.last_time > result.start_time
 
 
-@pytest.mark.sanity
+@pytest.mark.sanity()
 def test_text_generation_result_end():
     request = TextGenerationRequest(prompt="Generate a story")
     result = TextGenerationResult(request=request)
@@ -53,10 +53,11 @@ def test_text_generation_result_end():
     assert result.output == "The end"
     assert result.last_time
     assert result.start_time
-    assert result.end_time is not None and result.end_time > result.start_time
+    assert result.end_time is not None
+    assert result.end_time > result.start_time
 
 
-@pytest.mark.regression
+@pytest.mark.regression()
 def test_text_generation_result_json():
     request = TextGenerationRequest(prompt="Generate a story")
     result = TextGenerationResult(request=request)
@@ -77,7 +78,7 @@ def test_text_generation_result_json():
     assert json_str == json_str_restored
 
 
-@pytest.mark.regression
+@pytest.mark.regression()
 def test_text_generation_result_yaml():
     request = TextGenerationRequest(prompt="Generate a story")
     result = TextGenerationResult(request=request)
@@ -98,7 +99,7 @@ def test_text_generation_result_yaml():
     assert yaml_str == yaml_str_restored
 
 
-@pytest.mark.smoke
+@pytest.mark.smoke()
 def test_text_generation_error_initialization():
     request = TextGenerationRequest(prompt="Generate a story")
     error = Exception("Test error")
@@ -107,7 +108,7 @@ def test_text_generation_error_initialization():
     assert str(result.message) == str(error)
 
 
-@pytest.mark.regression
+@pytest.mark.regression()
 def test_text_generation_error_json():
     request = TextGenerationRequest(prompt="Generate a story")
     error = Exception("Test error")
@@ -124,7 +125,7 @@ def test_text_generation_error_json():
     assert json_str == json_str_restored
 
 
-@pytest.mark.regression
+@pytest.mark.regression()
 def test_text_generation_error_yaml():
     request = TextGenerationRequest(prompt="Generate a story")
     error = Exception("Test error")
@@ -141,7 +142,7 @@ def test_text_generation_error_yaml():
     assert yaml_str == yaml_str_restored
 
 
-@pytest.mark.smoke
+@pytest.mark.smoke()
 def test_text_generation_benchmark_initialization():
     benchmark = TextGenerationBenchmark(mode="test", rate=1.0)
     assert benchmark.mode == "test"
@@ -150,14 +151,14 @@ def test_text_generation_benchmark_initialization():
     assert benchmark.error_count == 0
 
 
-@pytest.mark.sanity
+@pytest.mark.sanity()
 def test_text_generation_benchmark_started():
     benchmark = TextGenerationBenchmark(mode="test", rate=1.0)
     benchmark.request_started()
     assert len(benchmark.concurrencies) == 1
 
 
-@pytest.mark.regression
+@pytest.mark.regression()
 def test_text_generation_benchmark_completed_with_result():
     benchmark = TextGenerationBenchmark(mode="test", rate=1.0)
     benchmark.request_started()
@@ -168,7 +169,7 @@ def test_text_generation_benchmark_completed_with_result():
     assert benchmark.error_count == 0
 
 
-@pytest.mark.regression
+@pytest.mark.regression()
 def test_text_generation_benchmark_completed_with_error():
     benchmark = TextGenerationBenchmark(mode="test", rate=1.0)
     benchmark.request_started()
@@ -179,7 +180,7 @@ def test_text_generation_benchmark_completed_with_error():
     assert benchmark.error_count == 1
 
 
-@pytest.mark.regression
+@pytest.mark.regression()
 def test_text_generation_benchmark_json():
     benchmark = TextGenerationBenchmark(mode="test", rate=1.0)
     benchmark.request_started()
@@ -200,7 +201,7 @@ def test_text_generation_benchmark_json():
     assert json_str == json_str_restored
 
 
-@pytest.mark.regression
+@pytest.mark.regression()
 def test_text_generation_benchmark_yaml():
     benchmark = TextGenerationBenchmark(mode="test", rate=1.0)
     benchmark.request_started()
@@ -221,14 +222,14 @@ def test_text_generation_benchmark_yaml():
     assert yaml_str == yaml_str_restored
 
 
-@pytest.mark.smoke
+@pytest.mark.smoke()
 def test_text_generation_benchmark_report_initialization():
     report = TextGenerationBenchmarkReport()
     assert len(report.benchmarks) == 0
     assert len(report.args) == 0
 
 
-@pytest.mark.sanity
+@pytest.mark.sanity()
 def test_text_generation_benchmark_report_add_benchmark():
     report = TextGenerationBenchmarkReport()
     benchmark = TextGenerationBenchmark(mode="test", rate=1.0)
@@ -236,7 +237,7 @@ def test_text_generation_benchmark_report_add_benchmark():
     assert len(report.benchmarks) == 1
 
 
-@pytest.mark.regression
+@pytest.mark.regression()
 def test_text_generation_benchmark_report_json():
     report = TextGenerationBenchmarkReport()
     benchmark = TextGenerationBenchmark(mode="test", rate=1.0)
@@ -253,7 +254,7 @@ def test_text_generation_benchmark_report_json():
     assert json_str == json_str_restored
 
 
-@pytest.mark.regression
+@pytest.mark.regression()
 def test_text_generation_benchmark_report_yaml():
     report = TextGenerationBenchmarkReport()
     benchmark = TextGenerationBenchmark(mode="test", rate=1.0)

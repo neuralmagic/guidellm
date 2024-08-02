@@ -36,9 +36,8 @@ Usage:
 
 import sys
 
-from loguru import logger
-
 from config import LoggingSettings, settings
+from loguru import logger
 
 __all__ = ["configure_logger", "logger"]
 

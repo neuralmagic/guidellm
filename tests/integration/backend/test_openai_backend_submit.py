@@ -3,16 +3,15 @@ from typing import Callable
 
 import pytest
 import requests
-from openai.pagination import SyncPage
-from openai.types import Model
-
 from config import settings
 from guidellm.backend import OpenAIBackend
 from guidellm.core import TextGenerationRequest, TextGenerationResult
+from openai.pagination import SyncPage
+from openai.types import Model
 
 
 @pytest.fixture(scope="session", autouse=True)
-def openai_server_healthcheck():
+def _openai_server_healthcheck():
     """
     Check if the openai server is running
     """
@@ -20,22 +19,23 @@ def openai_server_healthcheck():
     if not (openai_server := settings.openai.base_url):
         raise ValueError(
             "Integration backend tests can't be run without "
-            "GUIDELLM__OPENAI__BASE_URL specified"
+            "GUIDELLM__OPENAI__BASE_URL specified",
         )
 
     try:
-        requests.get(openai_server)
+        requests.get(openai_server, timeout=10)
     except requests.ConnectionError:
         raise SystemExit(
             "Integration backend tests can't be run without "
-            f"OpenAI compatible server running. Please check the {openai_server}"
-        )
+            f"OpenAI compatible server running. Please check the {openai_server}",
+        ) from None
 
 
 @pytest.mark.skip("OpenAI compatible service is not deployed yet")
-@pytest.mark.integration
+@pytest.mark.integration()
 def test_openai_submit_request(
-    mocker, openai_backend_factory: Callable[..., OpenAIBackend]
+    mocker,
+    openai_backend_factory: Callable[..., OpenAIBackend],
 ):
     """
     Check the OpenAI making request and checking the results.
@@ -54,7 +54,7 @@ def test_openai_submit_request(
                     created=1719814049,
                     object="model",
                     owned_by="guidellm",
-                )
+                ),
             ],
         ),
     )

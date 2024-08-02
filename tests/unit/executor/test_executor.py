@@ -1,7 +1,6 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 from guidellm.backend.base import Backend
 from guidellm.executor import Executor, Profile, ProfileGenerator
 from guidellm.executor.profile_generator import ProfileGenerationMode
@@ -30,17 +29,17 @@ def test_executor_creation():
     assert executor.max_duration == max_duration
 
 
-@pytest.fixture
+@pytest.fixture()
 def mock_request_generator():
     return MagicMock(spec=RequestGenerator)
 
 
-@pytest.fixture
+@pytest.fixture()
 def mock_backend():
     return MagicMock(spec=Backend)
 
 
-@pytest.fixture
+@pytest.fixture()
 def mock_scheduler():
     with patch("guidellm.executor.executor.Scheduler") as MockScheduler:
         yield MockScheduler

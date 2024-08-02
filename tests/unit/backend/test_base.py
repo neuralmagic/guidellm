@@ -1,7 +1,6 @@
 from typing import Iterator, List, Optional
 
 import pytest
-
 from guidellm.backend import Backend, BackendEngine, GenerativeResponse, OpenAIBackend
 from guidellm.core import TextGenerationRequest
 
@@ -17,7 +16,8 @@ class TestBackend(Backend):
         self.model: str = model
 
     def make_request(
-        self, request: TextGenerationRequest
+        self,
+        request: TextGenerationRequest,
     ) -> Iterator[GenerativeResponse]:
         raise NotImplementedError
 
@@ -32,7 +32,7 @@ class TestBackend(Backend):
         raise NotImplementedError
 
 
-@pytest.mark.smoke
+@pytest.mark.smoke()
 def test_backend_registry():
     """
     Ensure that all registered classes exist in the Backend._registry.

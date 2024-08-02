@@ -99,7 +99,80 @@ ignore_missing_imports=true
 [tool.ruff]
 line-length = 88
 exclude = ["build", "dist", "env", ".venv"]
-lint.select = ["E", "F", "W"]
+lint.ignore = [
+    "PLR0913",
+    "TCH001",
+    "COM812",
+    "ISC001",
+    "TCH002",
+]
+lint.select = [
+    # Rules reference: https://docs.astral.sh/ruff/rules/
+
+    # Code Style / Formatting
+    "E", # pycodestyle: checks adherence to PEP 8 conventions including spacing, indentation, and line length
+    "W", # pycodestyle: checks adherence to PEP 8 conventions including spacing, indentation, and line length
+    "A", # flake8-builtins: prevents shadowing of Python built-in names
+    "C", # Convention: ensures code adheres to specific style and formatting conventions
+    "COM", # flake8-commas: enforces the correct use of trailing commas
+    "ERA", # eradicate: detects commented-out code that should be removed
+    "I", # isort: ensures imports are sorted in a consistent manner
+    "ICN", # flake8-import-conventions: enforces import conventions for better readability
+    "N", # pep8-naming: enforces PEP 8 naming conventions for classes, functions, and variables
+    "NPY", # NumPy: enforces best practices for using the NumPy library
+    "PD", # pandas-vet: enforces best practices for using the pandas library
+    "PT", # flake8-pytest-style: enforces best practices and style conventions for pytest tests
+    "PTH", # flake8-use-pathlib: encourages the use of pathlib over os.path for file system operations
+    "Q", # flake8-quotes: enforces consistent use of single or double quotes
+    "TCH", # flake8-type-checking: enforces type checking practices and standards
+    "TID", # flake8-tidy-imports: enforces tidy and well-organized imports
+
+    # Code Structure / Complexity
+    "C4", # flake8-comprehensions: improves readability and performance of list, set, and dict comprehensions
+    "C90", # mccabe: checks for overly complex code using cyclomatic complexity
+    "FBT", # flake8-boolean-trap: prevents the use of boolean traps in function arguments and calls
+    "ISC", # flake8-implicit-str-concat: prevents implicit string concatenation
+    "PIE", # flake8-pie: identifies and corrects common code inefficiencies and mistakes
+    "R", # Refactor: suggests improvements to code structure and readability
+    "SIM", # flake8-simplify: simplifies complex expressions and improves code readability
+
+    # Code Security / Bug Prevention
+    "ARG", # flake8-unused-arguments: detects unused function and method arguments
+    "ASYNC", # flake8-async: identifies incorrect or inefficient usage patterns in asynchronous code
+    "B", # flake8-bugbear: detects common programming mistakes and potential bugs
+    "BLE", # flake8-blind-except: prevents blind exceptions that catch all exceptions without handling
+    "E", # Error: detects and reports errors in the code
+    "F", # Pyflakes: detects unused imports, shadowed imports, undefined variables, and various formatting errors in string operations
+    "INP", # flake8-no-pep420: prevents implicit namespace packages by requiring __init__.py
+    "PGH", # pygrep-hooks: detects deprecated and dangerous code patterns
+    "PL", # Pylint: comprehensive source code analyzer for enforcing coding standards and detecting errors
+    "RSE", # flake8-raise: ensures exceptions are raised correctly
+    "S", # flake8-bandit: detects security issues and vulnerabilities in the code
+    "SLF", # flake8-self: prevents incorrect usage of the self argument in class methods
+    "T10", # flake8-debugger: detects the presence of debugging tools such as pdb
+    "T20", # flake8-print: detects print statements left in the code
+    "UP", # pyupgrade: automatically upgrades syntax for newer versions of Python
+    "W", # Warning: provides warnings about potential issues in the code
+    "YTT", # flake8-2020: identifies code that will break with future Python releases
+
+    # Code Documentation
+    "FIX", # flake8-fixme: detects FIXMEs and other temporary comments that should be resolved
+]
+
+[tool.ruff.lint.extend-per-file-ignores]
+"tests/**/*.py" = [
+    "S101", # asserts allowed in tests
+    "ARG", # Unused function args allowed in tests
+    "FBT", # Booleans as positional arguments in tests, e.g. via @pytest.mark.parametrize()
+    "PLR2004", # Magic value used in comparison
+    "TCH002", # No import only type checking in tests
+    "SLF001", # enable private member access in tests
+    "S105", # allow hardcoded passwords in tests
+    "S311", # allow standard pseudo-random generators in tests
+    "PT011", # allow generic exceptions in tests
+    "N806", # allow uppercase variable names in tests
+    "PGH003", # allow general ignores in tests
+]
 
 
 [tool.pytest.ini_options]

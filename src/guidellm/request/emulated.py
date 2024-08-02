@@ -2,6 +2,7 @@ import json
 import re
 import unicodedata
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
@@ -59,8 +60,8 @@ class EmulatedRequestGenerator(RequestGenerator):
     ):
         super().__init__(tokenizer, mode, async_queue_size)
         self._config = self._load_config(config)
-        self._random_seed = random_seed
         self._data = self._load_emulated_data()
+        self._rng = np.random.default_rng(random_seed)
 
     def create_item(self) -> TextGenerationRequest:
         """
@@ -73,7 +74,8 @@ class EmulatedRequestGenerator(RequestGenerator):
         generated_token_count = self._sample_generated()
 
         request = TextGenerationRequest(
-            prompt=prompt, prompt_token_count=prompt_token_count
+            prompt=prompt,
+            prompt_token_count=prompt_token_count,
         )
 
         if generated_token_count:
@@ -83,43 +85,39 @@ class EmulatedRequestGenerator(RequestGenerator):
 
     def _load_config(self, config: Union[str, Dict]) -> EmulatedConfig:
         # load the config file from a dict, string (json or csv), or file path
-        config_dict = None
         if isinstance(config, dict):
             config_dict = config
-            logger.info(f"Loaded configuration from dict: {config}")
-        elif isinstance(config, str):
-            config = config.strip()
+            logger.info("Loaded configuration from dict: {}", config)
+        elif isinstance(config, str) and config.endswith(".json"):
+            with Path(config).open(encoding="utf-8") as file:
+                config_dict = json.load(file)
 
-            # check if the string is a file path, json, or csv
-            if config.endswith(".json"):
-                with open(config, "r", encoding="utf-8") as file:
-                    config_dict = json.load(file)
-
-                logger.info(f"Loaded configuration from file: {config}")
-            elif config.index("{") > -1:
-                config_dict = json.loads(config)
-                logger.info(f"Loaded configuration from json string: {config}")
-            elif config.index(",") > -1:
-                # format: key1=value1,key2=value2
-                items = config.split(",")
-                config_dict = {
-                    key: val for key, val in [item.split("=") for item in items]
-                }
-                logger.info(f"Loaded configuration from csv string: {config}")
-            else:
-                raise ValueError(f"Invalid configuration string: {config}")
+            logger.info("Loaded configuration from file: {}", config)
+        elif isinstance(config, str) and (config.index("{") > -1):
+            config_dict = json.loads(config.strip())
+            logger.info("Loaded configuration from string: {}", config)
+        elif isinstance(config, str) and (config.index(",") > -1):
+            items = config.split(",")
+            config_dict = {}
+            for item in items:
+                key_value = item.split("=")
+                if len(key_value) != 2:  # noqa: PLR2004
+                    raise ValueError(f"Unexpected format for item: {item}")
+                key, value = key_value
+                config_dict[key] = value
+            logger.info("Loaded configuration from csv string: {}", config)
         else:
-            raise ValueError(f"Invalid configuration type: {type(config)}")
+            raise ValueError(
+                f"Invalid configuration given for EmulatedRequestGenerator: {config}"
+            )
 
         # map the config to the EmulatedConfig dataclass
-        mapped_config = EmulatedConfig(**config_dict or {})
-
-        return mapped_config
+        return EmulatedConfig(**config_dict or {})
 
     def _load_emulated_data(self) -> List[str]:
         url = "https://www.gutenberg.org/files/1342/1342-0.txt"
         logger.info(f"Downloading text corpus from {url}")
-        response = requests.get(url)
+        response = requests.get(url, timeout=30)
         response.raise_for_status()
 
         content = response.text
@@ -136,15 +134,14 @@ class EmulatedRequestGenerator(RequestGenerator):
         cleaned_content = re.sub(r"\s+", " ", cleaned_content).strip()
 
         # break lines according to punctuation
-        lines = (
+        lines_text = (
             cleaned_content.replace(". ", ".\n")
             .replace("! ", "!\n")
             .replace("? ", "?\n")
         )
-        _lines: List[str] = lines.split("\n")
-        _lines = [line.strip() for line in lines if line and line.strip()]
+        lines: List[str] = lines_text.split("\n")
 
-        return _lines
+        return [line.strip() for line in lines if line.strip()]
 
     def _token_count(self, text: str) -> int:
         return (
@@ -152,47 +149,29 @@ class EmulatedRequestGenerator(RequestGenerator):
         )
 
     def _sample_prompt(self) -> Tuple[str, int]:
-        prompt_tokens = self._config.prompt_tokens
-        prompt_tokens_variance = self._config.prompt_tokens_variance or 0
-        prompt_tokens_min = self._config.prompt_tokens_min or 1
-        prompt_tokens_max = (
-            self._config.prompt_tokens_max or prompt_tokens + 5 * prompt_tokens_variance
-            if prompt_tokens_variance
-            else 10000
+        prompt_token_count = self._sample_tokens(
+            self._config.prompt_tokens,
+            self._config.prompt_tokens_variance,
+            self._config.prompt_tokens_min,
+            self._config.prompt_tokens_max,
         )
-        prompt_tokens_min = max(1, prompt_tokens_min)
-        prompt_tokens_max = max(prompt_tokens_min, prompt_tokens_max)
 
-        # Sample a token count for the prompt
-        prompt_token_count = max(
-            min(
-                prompt_tokens
-                + np.random.randint(
-                    -prompt_tokens_variance, prompt_tokens_variance + 1
-                ),
-                prompt_tokens_max,
-            ),
-            prompt_tokens_min,
-        )
-        random_line_index = np.random.randint(0, len(self._data))
-
-        # Create a sample prompt above the desired token count
-        prompt = self._data[random_line_index]
+        prompt = self._data[self._rng.integers(0, len(self._data))]
 
         while self._token_count(prompt) < prompt_token_count:
-            prompt += " " + self._data[np.random.randint(0, len(self._data))]
+            prompt += " " + self._data[self._rng.integers(0, len(self._data))]
 
-        # Binary search to find the closest token count to the desired token count
+        # truncate the prompt to the desired token count
+        words = prompt.split()
         left = 0
-        right = len(prompt)
+        right = len(words)
         while left < right:
             mid = (left + right) // 2
-            if self._token_count(prompt[:mid]) < prompt_token_count:
+            if self._token_count(" ".join(words[:mid])) < prompt_token_count:
                 left = mid + 1
             else:
                 right = mid
-
-        prompt = prompt[:left]
+        prompt = " ".join(words[:left])
 
         return prompt, prompt_token_count
 
@@ -200,28 +179,30 @@ class EmulatedRequestGenerator(RequestGenerator):
         if not self._config.generated_tokens:
             return None
 
-        generated_tokens = self._config.generated_tokens
-        generated_tokens_variance = self._config.generated_tokens_variance or 0
-        generated_tokens_min = self._config.generated_tokens_min or 1
-        generated_tokens_max = (
-            self._config.generated_tokens_max
-            or generated_tokens + 5 * generated_tokens_variance
-            if generated_tokens_variance
-            else 10000
+        return self._sample_tokens(
+            self._config.generated_tokens,
+            self._config.generated_tokens_variance,
+            self._config.generated_tokens_min,
+            self._config.generated_tokens_max,
         )
-        generated_tokens_min = max(1, generated_tokens_min)
-        generated_tokens_max = max(generated_tokens_min, generated_tokens_max)
 
-        # Sample a token count for the generated text
-        generated_token_count = max(
+    def _sample_tokens(
+        self,
+        base: int,
+        variance: Optional[int],
+        min_tokens: Optional[int],
+        max_tokens: Optional[int],
+    ) -> int:
+        variance = variance or 0
+        min_tokens = max(1, min_tokens or 1)
+        max_tokens = max(
+            min_tokens, max_tokens or base + 5 * variance if variance else 10000
+        )
+
+        return max(
             min(
-                generated_tokens
-                + np.random.randint(
-                    -generated_tokens_variance, generated_tokens_variance + 1
-                ),
-                generated_tokens_max,
+                base + self._rng.integers(-variance, variance + 1),
+                max_tokens,
             ),
-            generated_tokens_min,
+            min_tokens,
         )
-
-        return generated_token_count

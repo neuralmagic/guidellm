@@ -93,7 +93,6 @@ def main(
     max_requests,
     output_path,
 ):
-
     # Create backend
     _backend = Backend.create(
         backend_type=backend,
@@ -105,7 +104,6 @@ def main(
 
     # Create request generator
     if not data and task:
-        # TODO: Implement task-based request generation
         raise NotImplementedError(
             "Task-based request generation is not yet implemented"
         )
@@ -147,8 +145,8 @@ def main(
     guidance_report.benchmarks.append(report)
     guidance_report.save_file(output_path)
 
-    print("Guidance Report Complete:")
-    print(guidance_report)
+    print("Guidance Report Complete:")  # noqa: T201
+    print(guidance_report)  # noqa: T201
 
 
 if __name__ == "__main__":

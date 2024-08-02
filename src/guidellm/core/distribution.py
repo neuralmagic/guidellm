@@ -16,7 +16,8 @@ class Distribution(Serializable):
     """
 
     data: Sequence[float] = Field(
-        default_factory=list, description="The data points of the distribution."
+        default_factory=list,
+        description="The data points of the distribution.",
     )
 
     def __str__(self):
@@ -160,7 +161,7 @@ class Distribution(Serializable):
             "std_deviation": self.std_deviation,
             "percentile_indices": [10, 20, 30, 40, 50, 60, 70, 80, 90, 95, 99],
             "percentile_values": self.percentiles(
-                [10, 20, 30, 40, 50, 60, 70, 80, 90, 95, 99]
+                [10, 20, 30, 40, 50, 60, 70, 80, 90, 95, 99],
             ),
             "min": self.min,
             "max": self.max,
