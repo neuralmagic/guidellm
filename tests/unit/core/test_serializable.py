@@ -126,8 +126,7 @@ def test_serializable_load_file_invalid_extension():
 def test_serializable_file_no_type_provided():
     example = ExampleModel(name="John Doe", age=30)
     with tempfile.TemporaryDirectory() as temp_dir:
-        file_path = os.path.join(temp_dir, "example")
-        saved_path = example.save_file(file_path)
+        saved_path = example.save_file(temp_dir)
         assert os.path.exists(saved_path)
         assert saved_path.endswith(".yaml")
         loaded_example = ExampleModel.load_file(saved_path)

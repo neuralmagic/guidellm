@@ -26,7 +26,6 @@ from guidellm.request.base import RequestGenerator
 )
 @click.option("--host", type=str, default=None, help="Host for benchmarking")
 @click.option("--port", type=str, default=None, help="Port for benchmarking")
-@click.option("--path", type=str, default=None, help="Path for benchmarking")
 @click.option(
     "--backend",
     type=click.Choice(["test", "openai_server"]),
@@ -82,7 +81,6 @@ def main(
     target,
     host,
     port,
-    path,
     backend,
     model,
     task,
@@ -102,7 +100,6 @@ def main(
         target=target,
         host=host,
         port=port,
-        path=path,
         model=model,
     )
 

@@ -1,4 +1,3 @@
-import functools
 from typing import Any, Dict, Generator, List, Optional
 
 import openai
@@ -41,7 +40,6 @@ class OpenAIBackend(Backend):
         target: Optional[str] = None,
         host: Optional[str] = None,
         port: Optional[int] = None,
-        path: str = "/completions",
         model: Optional[str] = None,
         **request_args,
     ):
@@ -59,18 +57,18 @@ class OpenAIBackend(Backend):
             )
 
         if target is not None:
-            _base_url = target
+            base_url = target
         elif host and port:
-            _base_url = f"{host}:{port}"
+            base_url = f"{host}:{port}"
         elif settings.openai.base_url is not None:
-            _base_url = settings.openai.base_url
+            base_url = settings.openai.base_url
         else:
             raise ValueError(
                 "`GUIDELLM__OPENAI__BASE_URL` environment variable "
                 "or --target CLI parameter must be specify for the OpenAI backend."
             )
 
-        self.openai_client = OpenAI(api_key=_api_key, base_url=_base_url)
+        self.openai_client = OpenAI(api_key=_api_key, base_url=base_url)
         self.model = model or self.default_model
 
         logger.info(f"OpenAI {self.model} Backend listening on {target}")
@@ -144,18 +142,14 @@ class OpenAIBackend(Backend):
             models: List[str] = [
                 model.id for model in self.openai_client.models.list().data
             ]
-            logger.info(f"Available models: {models}")
         except openai.NotFoundError as error:
-            logger.error(error)
-            if settings.debug is True:
-                return ["gpt-4o"]
-            else:
-                raise error
+            logger.error(f"No available models for OpenAI Backend")
+            raise error
         else:
+            logger.info(f"Available models: {models}")
             return models
 
     @property
-    @functools.lru_cache(maxsize=1)
     def default_model(self) -> str:
         """
         Get the default model for the backend.

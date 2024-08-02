@@ -1,4 +1,3 @@
-from pathlib import Path
 from typing import Optional
 
 from pydantic import BaseModel
@@ -21,7 +20,7 @@ class OpenAISettings(BaseModel):
     api_key: str = "invalid"
 
     # OpenAI-compatible server URL
-    # NOTE: The default value is default address of llama.cpp web server
+    # NOTE: The default value is default address of llama.cpp http server
     base_url: str = "http://localhost:8080"
 
 
@@ -40,24 +39,14 @@ class Settings(BaseSettings):
     """
 
     model_config = SettingsConfigDict(
-        env_prefix="GUIDELLM",
+        env_prefix="GUIDELLM__",
         env_nested_delimiter="__",
         env_file=".env",
         extra="ignore",
     )
 
-    root_dir: Path
-
-    # TODO: add to the DEVELOPING.md after
-    # https://github.com/neuralmagic/guidellm/pull/17
-    # is merged
-    debug: bool = False
-
     logging: LoggingSettings = LoggingSettings()
     openai: OpenAISettings = OpenAISettings()
 
 
-settings = Settings(
-    # NOTE: hardcoded since should not be changed in a runtime
-    root_dir=Path(__file__).parent.parent.parent,
-)
+settings = Settings()

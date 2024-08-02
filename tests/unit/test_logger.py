@@ -14,7 +14,7 @@ def reset_logger():
 
 
 def test_default_logger_settings(capsys):
-    configure_logger()
+    configure_logger(config=LoggingSettings())
 
     # Default settings should log to console with INFO level and no file logging
     logger.info("Info message")

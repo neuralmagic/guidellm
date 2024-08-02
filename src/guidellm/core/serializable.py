@@ -7,8 +7,7 @@ import yaml
 from loguru import logger
 from pydantic import BaseModel, ConfigDict
 
-from config import settings
-from guidellm.utils import is_file_name
+from guidellm.utils import is_directory_name, is_file_name
 
 __all__ = ["Serializable", "SerializableFileExtensions"]
 
@@ -121,25 +120,18 @@ class Serializable(BaseModel):
         :return: The path to the saved file.
         """
 
-        if extension not in SerializableFileExtensions:
-            raise ValueError(
-                f"Unsupported file extension: .{extension} "
-                f"(expected: [{self.available_file_extensions()}]) for {path}"
-            )
-
-        logger.debug("Saving to file... {} with format: {}", path, extension)
-
-        if not is_file_name(path):
-            file_name = f"{self.__class__.__name__.lower()}.{extension}"
-            path = os.path.join(settings.root_dir, file_name)
-        else:
+        if is_file_name(path):
             extension = path.split(".")[-1].lower()
-
             if extension not in self.available_file_extensions():
                 raise ValueError(
                     f"Unsupported file extension: .{str(extension)}. "
                     f"Expected one of {', '.join(self.available_file_extensions())})."
                 )
+        elif is_directory_name(path):
+            file_name = f"{self.__class__.__name__.lower()}.{extension}"
+            path = os.path.join(path, file_name)
+        else:
+            raise ValueError("Output path must be a either directory or file path")
 
         with open(path, "w") as file:
             if extension == SerializableFileExtensions.YAML:
