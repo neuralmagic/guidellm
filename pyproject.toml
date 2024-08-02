@@ -31,6 +31,7 @@ dependencies = [
     "numpy",
     "openai",
     "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
     "pyyaml>=6.0.0",
     "requests",
     "transformers",

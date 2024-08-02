@@ -1,4 +1,5 @@
 from .distribution import Distribution
+from .report import GuidanceReport
 from .request import TextGenerationRequest
 from .result import (
     RequestConcurrencyMeasurement,
@@ -7,6 +8,7 @@ from .result import (
     TextGenerationError,
     TextGenerationResult,
 )
+from .serializable import Serializable, SerializableFileType
 
 __all__ = [
     "Distribution",
@@ -16,4 +18,7 @@ __all__ = [
     "TextGenerationBenchmark",
     "TextGenerationBenchmarkReport",
     "RequestConcurrencyMeasurement",
+    "Serializable",
+    "SerializableFileType",
+    "GuidanceReport",
 ]
