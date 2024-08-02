@@ -16,7 +16,7 @@ __all__ = [
     "SweepProfileGenerator",
 ]
 
-rate_type_to_load_gen_mode = {
+RATE_TYPE_TO_LOAD_GEN_MODE_MAPPER = {
     "synchronous": LoadGenerationMode.SYNCHRONOUS,
     "constant": LoadGenerationMode.CONSTANT,
     "poisson": LoadGenerationMode.POISSON,
@@ -28,7 +28,7 @@ class ProfileGenerationMode(Enum):
     SWEEP = "sweep"
 
 
-rate_type_to_profile_mode = {
+RATE_TYPE_TO_PROFILE_MODE_MAPPER = {
     "synchronous": ProfileGenerationMode.FIXED_RATE,
     "constant": ProfileGenerationMode.FIXED_RATE,
     "poisson": ProfileGenerationMode.FIXED_RATE,
@@ -80,6 +80,7 @@ class FixedRateProfileGenerator(ProfileGenerator):
         super().__init__(ProfileGenerationMode.FIXED_RATE)
         if load_gen_mode == LoadGenerationMode.SYNCHRONOUS and rates and len(rates) > 0:
             raise ValueError("custom rates are not supported in synchronous mode")
+
         self._rates: Optional[List[float]] = rates
         self._load_gen_mode = load_gen_mode
         self._generated: bool = False

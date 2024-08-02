@@ -1,12 +1,14 @@
 import click
+from loguru import logger
 
 from guidellm.backend import Backend
 from guidellm.core import GuidanceReport
 from guidellm.executor import (
+    RATE_TYPE_TO_LOAD_GEN_MODE_MAPPER,
+    RATE_TYPE_TO_PROFILE_MODE_MAPPER,
     Executor,
-    rate_type_to_load_gen_mode,
-    rate_type_to_profile_mode,
 )
+from guidellm.logger import configure_logger
 from guidellm.request import (
     EmulatedRequestGenerator,
     FileRequestGenerator,
@@ -19,18 +21,22 @@ from guidellm.request.base import RequestGenerator
 @click.option(
     "--target",
     type=str,
-    default="localhost:8000/completions",
+    default="http://localhost:8000",
     help="Target for benchmarking",
 )
-@click.option("--host", type=str, help="Host for benchmarking")
-@click.option("--port", type=str, help="Port for benchmarking")
-@click.option("--path", type=str, help="Path for benchmarking")
+@click.option("--host", type=str, default=None, help="Host for benchmarking")
+@click.option("--port", type=str, default=None, help="Port for benchmarking")
 @click.option(
-    "--backend", type=str, default="openai_server", help="Backend type for benchmarking"
+    "--backend",
+    type=click.Choice(["test", "openai_server"]),
+    default="openai_server",
+    help="Backend type for benchmarking",
 )
 @click.option("--model", type=str, default=None, help="Model to use for benchmarking")
 @click.option("--task", type=str, default=None, help="Task to use for benchmarking")
-@click.option("--data", type=str, help="Data file or alias for benchmarking")
+@click.option(
+    "--data", type=str, default=None, help="Data file or alias for benchmarking"
+)
 @click.option(
     "--data-type",
     type=click.Choice(["emulated", "file", "transformers"]),
@@ -43,24 +49,24 @@ from guidellm.request.base import RequestGenerator
 @click.option(
     "--rate-type",
     type=click.Choice(["sweep", "synchronous", "constant", "poisson"]),
-    default="sweep",
+    default="synchronous",
     help="Type of rate generation for benchmarking",
 )
 @click.option(
     "--rate",
     type=float,
-    default=[1.0],
+    default=None,
     help="Rate to use for constant and poisson rate types",
     multiple=True,
 )
 @click.option(
-    "--num-seconds",
+    "--max-seconds",
     type=int,
-    default="120",
+    default=120,
     help="Number of seconds to result each request rate at",
 )
 @click.option(
-    "--num-requests",
+    "--max-requests",
     type=int,
     default=None,
     help="Number of requests to send for each rate",
@@ -75,7 +81,6 @@ def main(
     target,
     host,
     port,
-    path,
     backend,
     model,
     task,
@@ -84,17 +89,17 @@ def main(
     tokenizer,
     rate_type,
     rate,
-    num_seconds,
-    num_requests,
+    max_seconds,
+    max_requests,
     output_path,
 ):
+
     # Create backend
-    Backend.create(
+    _backend = Backend.create(
         backend_type=backend,
         target=target,
         host=host,
         port=port,
-        path=path,
         model=model,
     )
 
@@ -118,19 +123,23 @@ def main(
     else:
         raise ValueError(f"Unknown data type: {data_type}")
 
-    profile_mode = rate_type_to_profile_mode.get(rate_type)
-    load_gen_mode = rate_type_to_load_gen_mode.get(rate_type, None)
+    profile_mode = RATE_TYPE_TO_PROFILE_MODE_MAPPER.get(rate_type)
+    load_gen_mode = RATE_TYPE_TO_LOAD_GEN_MODE_MAPPER.get(rate_type)
+
     if not profile_mode or not load_gen_mode:
         raise ValueError("Invalid rate type")
+
     # Create executor
     executor = Executor(
         request_generator=request_generator,
-        backend=backend,
+        backend=_backend,
         profile_mode=profile_mode,
         profile_args={"load_gen_mode": load_gen_mode, "rates": rate},
-        max_requests=num_requests,
-        max_duration=num_seconds,
+        max_requests=max_requests,
+        max_duration=max_seconds,
     )
+
+    logger.debug("Running the executor")
     report = executor.run()
 
     # Save or print results
@@ -143,4 +152,9 @@ def main(
 
 
 if __name__ == "__main__":
+    # invoke logger setup on import with default values
+    # enabling console logging with INFO and disabling file logging
+    configure_logger()
+
+    # entrypoint
     main()

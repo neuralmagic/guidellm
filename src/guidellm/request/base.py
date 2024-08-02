@@ -140,6 +140,7 @@ class RequestGenerator(ABC):
         """
         Populate the request queue in the background.
         """
+
         while not self._stop_event.is_set():
             with contextlib.suppress(Full):
                 if self._queue.qsize() < self._async_queue_size:

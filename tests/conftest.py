@@ -22,7 +22,7 @@ def openai_backend_factory() -> Callable[..., OpenAIBackend]:
         defaults = {
             "backend_type": BackendEngine.OPENAI_SERVER,
             "openai_api_key": "required but not used",
-            "internal_callback_url": base_url or settings.openai.base_url,
+            "target": base_url or settings.openai.base_url,
         }
 
         defaults.update(kwargs)

@@ -1,7 +1,9 @@
 import os
 import tempfile
+
 import pytest
-from guidellm.core.serializable import Serializable, SerializableFileType
+
+from guidellm.core.serializable import Serializable
 
 
 class ExampleModel(Serializable):
@@ -46,7 +48,7 @@ def test_serializable_file_json():
     example = ExampleModel(name="John Doe", age=30)
     with tempfile.TemporaryDirectory() as temp_dir:
         file_path = os.path.join(temp_dir, "example.json")
-        saved_path = example.save_file(file_path, SerializableFileType.JSON)
+        saved_path = example.save_file(file_path, "json")
         assert os.path.exists(saved_path)
         loaded_example = ExampleModel.load_file(saved_path)
         assert loaded_example.name == "John Doe"
@@ -58,7 +60,7 @@ def test_serializable_file_yaml():
     example = ExampleModel(name="John Doe", age=30)
     with tempfile.TemporaryDirectory() as temp_dir:
         file_path = os.path.join(temp_dir, "example.yaml")
-        saved_path = example.save_file(file_path, SerializableFileType.YAML)
+        saved_path = example.save_file(file_path, "yaml")
         assert os.path.exists(saved_path)
         loaded_example = ExampleModel.load_file(saved_path)
         assert loaded_example.name == "John Doe"
@@ -81,7 +83,7 @@ def test_serializable_file_without_extension():
 def test_serializable_file_with_directory_json():
     example = ExampleModel(name="John Doe", age=30)
     with tempfile.TemporaryDirectory() as temp_dir:
-        saved_path = example.save_file(temp_dir, SerializableFileType.JSON)
+        saved_path = example.save_file(temp_dir, "json")
         assert os.path.exists(saved_path)
         assert saved_path.endswith(".json")
         loaded_example = ExampleModel.load_file(saved_path)
@@ -93,7 +95,7 @@ def test_serializable_file_with_directory_json():
 def test_serializable_file_with_directory_yaml():
     example = ExampleModel(name="John Doe", age=30)
     with tempfile.TemporaryDirectory() as temp_dir:
-        saved_path = example.save_file(temp_dir, SerializableFileType.YAML)
+        saved_path = example.save_file(temp_dir, "yaml")
         assert os.path.exists(saved_path)
         assert saved_path.endswith(".yaml")
         loaded_example = ExampleModel.load_file(saved_path)
@@ -116,7 +118,7 @@ def test_serializable_load_file_invalid_extension():
         invalid_file_path = os.path.join(temp_dir, "example.txt")
         with open(invalid_file_path, "w") as file:
             file.write("invalid content")
-        with pytest.raises(ValueError, match="Unsupported file extension: TXT"):
+        with pytest.raises(ValueError, match="Unsupported file extension: txt"):
             ExampleModel.load_file(invalid_file_path)
 
 
@@ -124,8 +126,7 @@ def test_serializable_load_file_invalid_extension():
 def test_serializable_file_no_type_provided():
     example = ExampleModel(name="John Doe", age=30)
     with tempfile.TemporaryDirectory() as temp_dir:
-        file_path = os.path.join(temp_dir, "example")
-        saved_path = example.save_file(file_path)
+        saved_path = example.save_file(temp_dir)
         assert os.path.exists(saved_path)
         assert saved_path.endswith(".yaml")
         loaded_example = ExampleModel.load_file(saved_path)
@@ -137,7 +138,7 @@ def test_serializable_file_no_type_provided():
 def test_serializable_file_infer_extension():
     example = ExampleModel(name="John Doe", age=30)
     with tempfile.TemporaryDirectory() as temp_dir:
-        inferred_path = example.save_file(temp_dir, SerializableFileType.JSON)
+        inferred_path = example.save_file(temp_dir, "json")
         assert os.path.exists(inferred_path)
         assert inferred_path.endswith(".json")
         loaded_example = ExampleModel.load_file(inferred_path)

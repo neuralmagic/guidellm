@@ -1,24 +1,18 @@
-from typing import Any, Optional
-
 import os
+from typing import Any, Literal, Tuple, Union
+
 import yaml
 from loguru import logger
 from pydantic import BaseModel, ConfigDict
-from enum import Enum
 
-from guidellm.utils import is_file_name
+from guidellm.utils import is_directory_name, is_file_name
 
-
-__all__ = ["Serializable", "SerializableFileType"]
+__all__ = ["Serializable", "_Extension"]
 
 
-class SerializableFileType(Enum):
-    """
-    Enum class for file types supported by Serializable.
-    """
+_Extension = Union[Literal["yaml"], Literal["json"]]
 
-    YAML = "yaml"
-    JSON = "json"
+AVAILABLE_FILE_EXTENSIONS: Tuple[_Extension, ...] = ("yaml", "json")
 
 
 class Serializable(BaseModel):
@@ -90,7 +84,7 @@ class Serializable(BaseModel):
 
         return obj
 
-    def save_file(self, path: str, type_: Optional[SerializableFileType] = None) -> str:
+    def save_file(self, path: str, extension: _Extension = "yaml") -> str:
         """
         Save the model to a file in either YAML or JSON format.
 
@@ -103,44 +97,28 @@ class Serializable(BaseModel):
             it will save in YAML format.
         :return: The path to the saved file.
         """
-        logger.debug("Saving to file... {} with format: {}", path, type_)
 
-        if not is_file_name(path):
-            file_name = f"{self.__class__.__name__.lower()}"
-            if type_:
-                file_name += f".{type_.value.lower()}"
-            else:
-                file_name += ".yaml"
-                type_ = SerializableFileType.YAML
-            path = os.path.join(path, file_name)
-
-        if not type_:
-            extension = path.split(".")[-1].upper()
-
-            if extension not in SerializableFileType.__members__:
+        if is_file_name(path):
+            requested_extension = path.split(".")[-1].lower()
+            if requested_extension not in AVAILABLE_FILE_EXTENSIONS:
                 raise ValueError(
-                    f"Unsupported file extension: {extension}. "
-                    f"Expected one of {', '.join(SerializableFileType.__members__)}) "
-                    f"for {path}"
+                    f"Unsupported file extension: .{extension}. "
+                    f"Expected one of {', '.join(AVAILABLE_FILE_EXTENSIONS)})."
                 )
 
-            type_ = SerializableFileType[extension]
-
-        if type_.name not in SerializableFileType.__members__:
-            raise ValueError(
-                f"Unsupported file format: {type_} "
-                f"(expected 'yaml' or 'json') for {path}"
-            )
-
-        os.makedirs(os.path.dirname(path), exist_ok=True)
+        elif is_directory_name(path):
+            file_name = f"{self.__class__.__name__.lower()}.{extension}"
+            path = os.path.join(path, file_name)
+        else:
+            raise ValueError("Output path must be a either directory or file path")
 
         with open(path, "w") as file:
-            if type_ == SerializableFileType.YAML:
+            if extension == "yaml":
                 file.write(self.to_yaml())
-            elif type_ == SerializableFileType.JSON:
+            elif extension == "json":
                 file.write(self.to_json())
             else:
-                raise ValueError(f"Unsupported file format: {type_}")
+                raise ValueError(f"Unsupported file format: {extension}")
 
         logger.info("Successfully saved {} to {}", self.__class__.__name__, path)
 
@@ -161,25 +139,23 @@ class Serializable(BaseModel):
         elif not os.path.isfile(path):
             raise ValueError(f"Path is not a file: {path}")
 
-        extension = path.split(".")[-1].upper()
+        extension = path.split(".")[-1].lower()
 
-        if extension not in SerializableFileType.__members__:
+        if extension not in AVAILABLE_FILE_EXTENSIONS:
             raise ValueError(
                 f"Unsupported file extension: {extension}. "
-                f"Expected one of {', '.join(SerializableFileType.__members__)}) "
+                f"Expected one of {AVAILABLE_FILE_EXTENSIONS}) "
                 f"for {path}"
             )
-
-        type_ = SerializableFileType[extension]
 
         with open(path, "r") as file:
             data = file.read()
 
-            if type_ == SerializableFileType.YAML:
+            if extension == "yaml":
                 obj = cls.from_yaml(data)
-            elif type_ == SerializableFileType.JSON:
+            elif extension == "json":
                 obj = cls.from_json(data)
             else:
-                raise ValueError(f"Unsupported file format: {type_}")
+                raise ValueError(f"Unsupported file format: {extension}")
 
         return obj

@@ -1,6 +1,6 @@
-import functools
 from typing import Any, Dict, Generator, List, Optional
 
+import openai
 from loguru import logger
 from openai import OpenAI, Stream
 from openai.types import Completion
@@ -37,9 +37,11 @@ class OpenAIBackend(Backend):
     def __init__(
         self,
         openai_api_key: Optional[str] = None,
-        internal_callback_url: Optional[str] = None,
+        target: Optional[str] = None,
+        host: Optional[str] = None,
+        port: Optional[int] = None,
         model: Optional[str] = None,
-        **request_args: Any,
+        **request_args,
     ):
         """
         Initialize an OpenAI Client
@@ -54,19 +56,22 @@ class OpenAIBackend(Backend):
                 "must be specify for the OpenAI backend"
             )
 
-        if not (_base_url := (internal_callback_url or settings.openai.base_url)):
+        if target is not None:
+            base_url = target
+        elif host and port:
+            base_url = f"{host}:{port}"
+        elif settings.openai.base_url is not None:
+            base_url = settings.openai.base_url
+        else:
             raise ValueError(
                 "`GUIDELLM__OPENAI__BASE_URL` environment variable "
-                "or --openai-base-url CLI parameter "
-                "must be specify for the OpenAI backend"
+                "or --target CLI parameter must be specify for the OpenAI backend."
             )
-        self.openai_client = OpenAI(api_key=_api_key, base_url=_base_url)
+
+        self.openai_client = OpenAI(api_key=_api_key, base_url=base_url)
         self.model = model or self.default_model
 
-        logger.info(
-            f"Initialized OpenAIBackend with callback url: {internal_callback_url} "
-            f"and model: {self.model}"
-        )
+        logger.info(f"OpenAI {self.model} Backend listening on {target}")
 
     def make_request(
         self, request: TextGenerationRequest
@@ -85,8 +90,11 @@ class OpenAIBackend(Backend):
         # How many completions to generate for each prompt
         request_args: Dict = {"n": 1}
 
-        if (num_gen_tokens := request.params.get("generated_tokens", None)) is not None:
-            request_args.update(max_tokens=num_gen_tokens, stop=None)
+        num_gen_tokens: int = (
+            request.params.get("generated_tokens", None)
+            or settings.openai.max_gen_tokens
+        )
+        request_args.update({"max_tokens": num_gen_tokens, "stop": None})
 
         if self.request_args:
             request_args.update(self.request_args)
@@ -110,11 +118,7 @@ class OpenAIBackend(Backend):
                     prompt_token_count=(
                         request.prompt_token_count or self._token_count(request.prompt)
                     ),
-                    output_token_count=(
-                        num_gen_tokens
-                        if num_gen_tokens
-                        else self._token_count(chunk_content)
-                    ),
+                    output_token_count=(self._token_count(chunk_content)),
                 )
             else:
                 logger.debug("Received token from OpenAI backend")
@@ -128,15 +132,18 @@ class OpenAIBackend(Backend):
         :rtype: List[str]
         """
 
-        models: List[str] = [
-            model.id for model in self.openai_client.models.list().data
-        ]
-        logger.info(f"Available models: {models}")
-
-        return models
+        try:
+            models: List[str] = [
+                model.id for model in self.openai_client.models.list().data
+            ]
+        except openai.NotFoundError as error:
+            logger.error("No available models for OpenAI Backend")
+            raise error
+        else:
+            logger.info(f"Available models: {models}")
+            return models
 
     @property
-    @functools.lru_cache(maxsize=1)
     def default_model(self) -> str:
         """
         Get the default model for the backend.

@@ -41,13 +41,16 @@ class TransformersDatasetRequestGenerator(RequestGenerator):
         async_queue_size: int = 50,
         **kwargs,
     ):
-        super().__init__(tokenizer, mode, async_queue_size)
         self._dataset = dataset
         self._split = split
         self._column = column
         self._kwargs = kwargs
         self._hf_dataset = self._load_dataset()
         self._iterator = iter(self._hf_dataset)
+
+        # NOTE: Must be after all the parameters since the queue population
+        #       function requires attributes above
+        super().__init__(tokenizer, mode, async_queue_size)
 
     def _load_dataset(self):
         """
@@ -106,16 +109,25 @@ class TransformersDatasetRequestGenerator(RequestGenerator):
         :rtype: TextGenerationRequest
         """
         try:
-            data = next(self._iterator)
-        except StopIteration:
+            getattr(self, "_hf_dataset")
+        except AttributeError:
+            self._hf_dataset = self._load_dataset()
+
+        try:
+            getattr(self, "_iterator")
+        except (StopIteration, AttributeError):
             self._iterator = iter(self._hf_dataset)
-            data = next(self._iterator)
+
+        data = next(self._iterator)
 
         prompt = data[self._column] if self._column in data else str(data)
         token_count = (
             self._tokenizer(prompt)["input_ids"].shape[0] if self._tokenizer else None
         )
-        request = TextGenerationRequest(prompt=prompt, prompt_token_count=token_count)
+        request = TextGenerationRequest(
+            prompt=prompt,
+            prompt_token_count=token_count,
+        )
         logger.debug(f"Created new TextGenerationRequest: {request}")
 
         return request

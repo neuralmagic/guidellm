@@ -1,8 +1,9 @@
-from loguru import logger
-import toml
 import os
-from datetime import datetime
 import re
+from datetime import datetime
+
+import toml
+from loguru import logger
 
 
 def get_build_type():

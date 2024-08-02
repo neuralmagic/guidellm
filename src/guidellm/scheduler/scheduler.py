@@ -99,6 +99,8 @@ class Scheduler:
         start_time = time.time()
         requests_counter = 0
 
+        logger.debug("Running scheduler in sync mode")
+
         for callback in self._sync_tasks():
             if (
                 self._max_requests is not None
@@ -166,7 +168,7 @@ class Scheduler:
                     asyncio.gather(*(t for _, t in tasks), return_exceptions=True),
                     self._max_duration,
                 )
-            except TimeoutError:
+            except asyncio.TimeoutError:
                 self._cancel_running_tasks(tasks=tasks, benchmark=benchmark)
 
         return benchmark
@@ -202,7 +204,8 @@ class Scheduler:
             res = await self._event_loop.run_in_executor(
                 None, functools.partial(self._backend.submit, request=request)
             )
-        except Exception:
+        except Exception as error:
+            logger.error(error)
             benchmark.errors.append(
                 TextGenerationError(
                     request=request, message=str(asyncio.CancelledError())

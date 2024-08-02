@@ -20,8 +20,11 @@ class OpenAISettings(BaseModel):
     api_key: str = "invalid"
 
     # OpenAI-compatible server URL
-    # NOTE: The default value is default address of llama.cpp web server
+    # NOTE: The default value is default address of llama.cpp http server
     base_url: str = "http://localhost:8080"
+
+    # The max value of generated tokens
+    max_gen_tokens: int = 4096
 
 
 class Settings(BaseSettings):
@@ -39,7 +42,7 @@ class Settings(BaseSettings):
     """
 
     model_config = SettingsConfigDict(
-        env_prefix="GUIDELLM",
+        env_prefix="GUIDELLM__",
         env_nested_delimiter="__",
         env_file=".env",
         extra="ignore",
