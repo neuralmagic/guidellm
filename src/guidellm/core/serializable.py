@@ -125,7 +125,7 @@ class Serializable(BaseModel):
         return path
 
     @classmethod
-    def load_file(cls, path: str) -> "Serializable":
+    def load_file(cls, path: str):
         """
         Load a model from a file in either YAML or JSON format.
 
