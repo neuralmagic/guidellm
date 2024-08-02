@@ -21,6 +21,7 @@ repos:
         loguru,
         numpy,
         pydantic,
+        pydantic_settings,
         pyyaml,
         openai,
         requests,
