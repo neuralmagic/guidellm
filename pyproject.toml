@@ -104,6 +104,7 @@ lint.ignore = [
     "TCH001",
     "COM812",
     "ISC001",
+    "TCH002",
 ]
 lint.select = [
     # Rules reference: https://docs.astral.sh/ruff/rules/

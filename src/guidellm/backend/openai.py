@@ -1,16 +1,14 @@
 import openai
-from typing import TYPE_CHECKING, Any, Dict, Generator, List, Optional
+from typing import Any, Dict, Generator, List, Optional
 
 from config import settings
 from loguru import logger
 from openai import OpenAI, Stream
+from openai.types import Completion
 from transformers import AutoTokenizer
 
 from guidellm.backend import Backend, BackendEngine, GenerativeResponse
 from guidellm.core import TextGenerationRequest
-
-if TYPE_CHECKING:
-    from openai.types import Completion
 
 __all__ = ["OpenAIBackend"]
 
