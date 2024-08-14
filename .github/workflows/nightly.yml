@@ -2,7 +2,7 @@ name: Nightly
 
 on:
   schedule:
-    - cron: '0 0 * * *'  # Runs at midnight every night
+    - cron: "0 0 * * *"
 
 jobs:
   unit-tests:
@@ -67,3 +67,36 @@ jobs:
         run: pip install tox
       - name: Run e2e tests
         run: tox -e test-e2e -- -m smoke
+
+  publish-nightly:
+    needs: [unit-tests, integration-tests, e2e-tests]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.8"
+      - name: Install pypa/build and pypa/twine
+        run: python3 -m pip install build twine --user
+      - name: Build a binary wheel & Inject build props
+        run: python3 -m tox -e build
+      - name: Publish to Internal PyPI
+        env:
+          GUIDELLM_BUILD_TYPE: nightly
+          GUIDELLM_BUILD_NUMBER: ${{ github.event.pull_request.number }}
+          TWINE_USERNAME: ${{ secrets.INTERNAL_PYPI_USERNAME }}
+          TWINE_PASSWORD: ${{ secrets.INTERNAL_PYPI_PASSWORD }}
+        run: python -m twine upload --repository-url ${{ secrets.INTERNAL_PYPI_REPOSITORY_URL }} dist/*
+
+      - name: Publish to Public PyPI
+        if: success()
+        env:
+        env:
+          GUIDELLM_BUILD_TYPE: nightly
+          GUIDELLM_BUILD_NUMBER: ${{ github.event.pull_request.number }}
+          TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
+          TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+        run: |
+          DATE=$(date +%Y%m%d)
+          python -m twine upload dist/*

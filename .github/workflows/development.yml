@@ -3,7 +3,7 @@ name: Development
 on:
   pull_request:
     branches:
-      - '**'
+      - "**"
 
 jobs:
   unit-tests:
@@ -28,9 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python:
-          - "3.12"
-          - "3.8"
+        python: ["3.12", "3.8"]
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python
@@ -41,3 +39,24 @@ jobs:
         run: pip install tox
       - name: Run integration tests
         run: tox -e test-integration -- -m smoke
+
+  publish-dev:
+    needs: [unit-tests, integration-tests]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.8"
+      - name: Install pypa/build and pypa/twine
+        run: python3 -m pip install build twine --user
+      - name: Build a binary wheel & Inject build props
+        run: python3 -m tox -e build
+      - name: Publish to Internal PyPI
+        env:
+          GUIDELLM_BUILD_TYPE: dev
+          GUIDELLM_BUILD_NUMBER: ${{ github.event.pull_request.number }}
+          TWINE_USERNAME: ${{ secrets.INTERNAL_PYPI_USERNAME }}
+          TWINE_PASSWORD: ${{ secrets.INTERNAL_PYPI_PASSWORD }}
+        run: python -m twine upload --repository-url ${{ secrets.INTERNAL_PYPI_REPOSITORY_URL }} dist/*
