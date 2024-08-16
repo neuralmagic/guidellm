@@ -82,7 +82,8 @@ jobs:
         with:
           python-version: "3.8"
       - name: Build and Publish Final Release
-        uses: neuralmagic/nm-actions/actions/publisher@main
+        uses: neuralmagic/nm-actions/actions/publish_pypi@main
         with:
-          publish_pypi_internal: true
           publish_pypi: true
+          publish_pypi_internal: true
+          build_type: "release"
