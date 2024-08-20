@@ -37,6 +37,12 @@ jobs:
           - "3.9"
           - "3.8"
     steps:
+      - name: Setup llama.cpp web server
+        uses: neuralmagic/nm-actions/actions/llama-cpp@main
+        with:
+          port: 8080
+          model: "aminkhalafi/Phi-3-mini-4k-instruct-Q4_K_M-GGUF"
+          context-size: 2048
       - uses: actions/checkout@v4
       - name: Set up Python
         uses: actions/setup-python@v5
