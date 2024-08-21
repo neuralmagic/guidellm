@@ -4,9 +4,9 @@ from .file import FileRequestGenerator
 from .transformers import TransformersDatasetRequestGenerator
 
 __all__ = [
-    "RequestGenerator",
     "EmulatedConfig",
     "EmulatedRequestGenerator",
     "FileRequestGenerator",
+    "RequestGenerator",
     "TransformersDatasetRequestGenerator",
 ]

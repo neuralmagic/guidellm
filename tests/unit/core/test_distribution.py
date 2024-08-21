@@ -1,4 +1,5 @@
 import pytest
+
 from guidellm.core import Distribution
 
 
@@ -20,6 +21,22 @@ def test_distribution_statistics():
     assert dist.min == 1
     assert dist.max == 5
     assert dist.range == 4
+    assert dist.percentile(50) == 3.0
+    assert dist.percentiles([25, 50, 75]) == pytest.approx([2.0, 3.0, 4.0])
+
+
+@pytest.mark.smoke()
+def test_distribution_no_data():
+    dist = Distribution(data=[])
+    assert dist.mean == 0.0
+    assert dist.median == 0.0
+    assert dist.variance == 0.0
+    assert dist.std_deviation == 0.0
+    assert dist.min == 0.0
+    assert dist.max == 0.0
+    assert dist.range == 0.0
+    assert dist.percentile(50) == 0.0
+    assert dist.percentiles([25, 50, 75]) == [0.0, 0.0, 0.0]
 
 
 @pytest.mark.sanity()

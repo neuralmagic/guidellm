@@ -1,98 +1,177 @@
-from typing import Iterator, List, Optional
-import time
-
 import pytest
 
-from guidellm.backend import Backend, BackendEngine, GenerativeResponse
-from guidellm.core import TextGenerationRequest
-
-
-TEST_TOKENS = ["test_token_1", "test_token_2", "test_token_3"]
-TEST_TOKEN_GEN_TIME = 0.1
-
-
-@Backend.register(backend_type=BackendEngine.TEST)
-class TestBackend(Backend):
-    """
-    The test implementation of a LLM Backend.
-    """
-
-    def __init__(self, target: str, model: str):
-        self.target: str = target
-        self.model: str = model
-
-    def make_request(
-        self,
-        request: TextGenerationRequest,
-    ) -> Iterator[GenerativeResponse]:
-        for token in TEST_TOKENS:
-            time.sleep(TEST_TOKEN_GEN_TIME)
-            yield GenerativeResponse(
-                type_="token_iter",
-                add_token=token,
-            )
-
-        yield GenerativeResponse(
-            type_="final",
-            prompt=request.prompt,
-            output=" ".join(TEST_TOKENS),
-            prompt_token_count=request.prompt_token_count,
-        )
-
-    def available_models(self) -> List[str]:
-        raise NotImplementedError
-
-    @property
-    def default_model(self) -> str:
-        raise NotImplementedError
-
-    def model_tokenizer(self, model: str) -> Optional[str]:
-        raise NotImplementedError
+from guidellm.backend import Backend, GenerativeResponse
+from guidellm.core import TextGenerationRequest, TextGenerationResult
 
 
 @pytest.mark.smoke()
 def test_backend_registry():
-    """
-    Ensure that all registered classes exist in the Backend._registry.
-    """
+    class MockBackend(Backend):
+        async def make_request(self, request):
+            yield GenerativeResponse(type_="final", output="Test")
 
-    assert BackendEngine.TEST in Backend._registry
+        def available_models(self):
+            return ["mock-model"]
+
+    backend_type = "test"
+    Backend.register(backend_type)(MockBackend)  # type: ignore
+    assert Backend._registry[backend_type] is MockBackend  # type: ignore
+
+    backend_instance = Backend.create(backend_type)  # type: ignore
+    assert isinstance(backend_instance, MockBackend)
+
+    with pytest.raises(ValueError):
+        Backend.create("invalid_type")  # type: ignore
 
 
-@pytest.mark.smoke
-def test_backend_creation():
-    backend = Backend.create(
-        BackendEngine.TEST, target="test_target", model="test_model"
-    )
-    assert backend is not None
-    assert isinstance(backend, TestBackend)
-    assert backend.target == "test_target"
-    assert backend.model == "test_model"
+@pytest.mark.smoke()
+def test_generative_response_creation():
+    response = GenerativeResponse(type_="final", output="Test Output")
+    assert response.type_ == "final"
+    assert response.output == "Test Output"
+    assert response.add_token is None
+    assert response.prompt is None
+
+    response = GenerativeResponse(type_="token_iter", add_token="token")
+    assert response.type_ == "token_iter"
+    assert response.add_token == "token"
+    assert response.output is None
 
 
-@pytest.mark.smoke
-def test_backend_submit():
-    backend = Backend.create(
-        BackendEngine.TEST, target="test_target", model="test_model"
-    )
-    request = TextGenerationRequest(prompt="test_prompt")
+@pytest.mark.smoke()
+@pytest.mark.asyncio()
+async def test_backend_make_request():
+    class MockBackend(Backend):
+        async def make_request(self, request):
+            yield GenerativeResponse(
+                type_="token_iter",
+                add_token="Token",
+                prompt="Hello, world!",
+                prompt_token_count=5,
+            )
+            yield GenerativeResponse(
+                type_="final",
+                output="This is a final response.",
+                prompt="Hello, world!",
+                prompt_token_count=5,
+                output_token_count=10,
+            )
 
-    result = backend.submit(request)
-    assert result.request == request
-    assert result.prompt == request.prompt
-    assert result.prompt_word_count == 1
-    assert result.prompt_token_count == 1
-    assert result.output == " ".join(TEST_TOKENS)
-    assert result.output_word_count == len(TEST_TOKENS)
-    assert result.output_token_count == len(TEST_TOKENS)
-    assert result.last_time is not None
-    assert result.first_token_set
-    assert result.start_time is not None
-    assert result.end_time is not None
-    assert result.end_time > result.start_time
-    assert result.end_time - result.start_time >= len(TEST_TOKENS) * TEST_TOKEN_GEN_TIME
-    assert result.first_token_time is not None
-    assert result.first_token_time < result.end_time - result.start_time
-    assert result.decode_times is not None
-    assert result.decode_times.mean >= 0
-    assert result.decode_times.mean < TEST_TOKEN_GEN_TIME * 1.1  # 10% tolerance
+        def available_models(self):
+            return ["mock-model"]
+
+    backend = MockBackend()
+    index = 0
+
+    async for response in backend.make_request(TextGenerationRequest(prompt="Test")):
+        if index == 0:
+            assert response.type_ == "token_iter"
+            assert response.add_token == "Token"
+            assert response.prompt == "Hello, world!"
+            assert response.prompt_token_count == 5
+        else:
+            assert response.type_ == "final"
+            assert response.output == "This is a final response."
+            assert response.prompt == "Hello, world!"
+            assert response.prompt_token_count == 5
+            assert response.output_token_count == 10
+        index += 1
+
+
+@pytest.mark.smoke()
+@pytest.mark.asyncio()
+async def test_backend_submit_final():
+    class MockBackend(Backend):
+        async def make_request(self, request):
+            yield GenerativeResponse(type_="final", output="Test")
+
+        def available_models(self):
+            return ["mock-model"]
+
+    backend = MockBackend()
+    result = await backend.submit(TextGenerationRequest(prompt="Test"))
+    assert isinstance(result, TextGenerationResult)
+    assert result.output == "Test"
+
+
+@pytest.mark.smoke()
+@pytest.mark.asyncio()
+async def test_backend_submit_multi():
+    class MockBackend(Backend):
+        async def make_request(self, request):
+            yield GenerativeResponse(type_="token_iter", add_token="Token")
+            yield GenerativeResponse(type_="token_iter", add_token=" ")
+            yield GenerativeResponse(type_="token_iter", add_token="Test")
+            yield GenerativeResponse(type_="final")
+
+        def available_models(self):
+            return ["mock-model"]
+
+    backend = MockBackend()
+    result = await backend.submit(TextGenerationRequest(prompt="Test"))
+    assert isinstance(result, TextGenerationResult)
+    assert result.output == "Token Test"
+
+
+@pytest.mark.regression()
+@pytest.mark.asyncio()
+async def test_backend_submit_no_response():
+    class MockBackend(Backend):
+        async def make_request(self, request):
+            if False:  # simulate no yield
+                yield
+
+        def available_models(self):
+            return ["mock-model"]
+
+    backend = MockBackend()
+
+    with pytest.raises(ValueError):
+        await backend.submit(TextGenerationRequest(prompt="Test"))
+
+
+@pytest.mark.smoke()
+@pytest.mark.asyncio()
+async def test_backend_submit_multi_final():
+    class MockBackend(Backend):
+        async def make_request(self, request):
+            yield GenerativeResponse(type_="token_iter", add_token="Token")
+            yield GenerativeResponse(type_="token_iter", add_token=" ")
+            yield GenerativeResponse(type_="token_iter", add_token="Test")
+            yield GenerativeResponse(type_="final")
+            yield GenerativeResponse(type_="final")
+
+        def available_models(self):
+            return ["mock-model"]
+
+    backend = MockBackend()
+
+    with pytest.raises(ValueError):
+        await backend.submit(TextGenerationRequest(prompt="Test"))
+
+
+@pytest.mark.smoke()
+def test_backend_models():
+    class MockBackend(Backend):
+        def available_models(self):
+            return ["mock-model", "mock-model-2"]
+
+        async def make_request(self, request):
+            yield GenerativeResponse(type_="final", output="")
+
+    backend = MockBackend()
+    assert backend.available_models() == ["mock-model", "mock-model-2"]
+    assert backend.default_model == "mock-model"
+
+
+@pytest.mark.regression()
+def test_backend_abstract_methods():
+    with pytest.raises(TypeError):
+        Backend()  # type: ignore
+
+    class IncompleteBackend(Backend):
+        async def make_request(self, request):
+            yield GenerativeResponse(type_="final", output="Test")
+
+    with pytest.raises(TypeError):
+        IncompleteBackend()  # type: ignore

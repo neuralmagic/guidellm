@@ -23,6 +23,9 @@ class Distribution(Serializable):
     def __str__(self):
         return f"Distribution({self.describe()})"
 
+    def __len__(self):
+        return len(self.data)
+
     @property
     def mean(self) -> float:
         """

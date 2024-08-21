@@ -1,154 +1,194 @@
-from unittest.mock import MagicMock
+from typing import get_args
+from unittest.mock import create_autospec
 
-import numpy as np
 import pytest
-from guidellm.core import TextGenerationBenchmark, TextGenerationBenchmarkReport
-from guidellm.executor import (
-    FixedRateProfileGenerator,
-    ProfileGenerationMode,
-    ProfileGenerator,
-    SweepProfileGenerator,
+
+from guidellm import settings
+from guidellm.core import (
+    TextGenerationBenchmark,
+    TextGenerationBenchmarkReport,
 )
-from guidellm.scheduler import LoadGenerationMode
-
-# Fixed Rate Profile Generator
+from guidellm.executor import Profile, ProfileGenerationMode, ProfileGenerator
 
 
-def test_fixed_rate_profile_generator_creation():
-    rates = [1.0]
-    load_gen_mode = LoadGenerationMode.CONSTANT
-    test_profile_generator = ProfileGenerator.create(
-        ProfileGenerationMode.FIXED_RATE,
-        rates=rates,
-        load_gen_mode=load_gen_mode,
-    )
-    assert isinstance(test_profile_generator, FixedRateProfileGenerator)
-    assert test_profile_generator._rates == rates
-    assert test_profile_generator._load_gen_mode == load_gen_mode
-    assert test_profile_generator._rate_index == 0
+@pytest.mark.smoke()
+def test_profile_generator_mode():
+    assert set(get_args(ProfileGenerationMode)) == {
+        "sweep",
+        "synchronous",
+        "throughput",
+        "constant",
+        "poisson",
+    }
 
 
-def test_synchronous_mode_rate_list_error():
-    rates = [1.0]
-    load_gen_mode = LoadGenerationMode.SYNCHRONOUS
-    with pytest.raises(
-        ValueError,
-        match="custom rates are not supported in synchronous mode",
-    ):
-        ProfileGenerator.create(
-            ProfileGenerationMode.FIXED_RATE,
-            rates=rates,
-            load_gen_mode=load_gen_mode,
-        )
+@pytest.mark.smoke()
+def test_profile_instantiation():
+    profile = Profile(load_gen_mode="constant", load_gen_rate=10)
+    assert profile.load_gen_mode == "constant"
+    assert profile.load_gen_rate == 10
 
 
-def test_next_with_multiple_rates():
-    rates = [1.0, 2.0]
-    load_gen_mode = LoadGenerationMode.CONSTANT
-    test_profile_generator = ProfileGenerator.create(
-        ProfileGenerationMode.FIXED_RATE,
-        rates=rates,
-        load_gen_mode=load_gen_mode,
-    )
-    mock_report = MagicMock(spec=TextGenerationBenchmarkReport)
-    for rate in rates:
-        current_profile = test_profile_generator.next(mock_report)
-        assert current_profile is not None
-        assert current_profile.load_gen_rate == rate
-        assert current_profile.load_gen_mode == LoadGenerationMode.CONSTANT
-    assert test_profile_generator.next(mock_report) is None
+@pytest.mark.smoke()
+@pytest.mark.parametrize(
+    ("mode", "rate"),
+    [
+        ("sweep", None),
+        ("synchronous", None),
+        ("throughput", None),
+        ("constant", 10),
+        ("constant", [10, 20, 30]),
+        ("poisson", 10),
+        ("poisson", [10, 20, 30]),
+    ],
+)
+def test_profile_generator_instantiation(mode, rate):
+    generator = ProfileGenerator(mode=mode, rate=rate)
+    assert generator.mode == mode
+
+    if rate is None:
+        assert generator.rates is None
+    elif isinstance(rate, list):
+        assert generator.rates == rate
+    else:
+        assert generator.rates == [rate]
+
+    if mode == "sweep":
+        assert len(generator) == settings.num_sweep_profiles
+    elif mode in ("throughput", "synchronous"):
+        assert len(generator) == 1
+    else:
+        assert len(generator) == len(rate) if isinstance(rate, list) else 1
+
+    assert generator.generated_count == 0
 
 
-def test_next_with_sync_mode():
-    load_gen_mode = LoadGenerationMode.SYNCHRONOUS
-    test_profile_generator = ProfileGenerator.create(
-        ProfileGenerationMode.FIXED_RATE,
-        load_gen_mode=load_gen_mode,
-    )
-    mock_report = MagicMock(spec=TextGenerationBenchmarkReport)
-    current_profile = test_profile_generator.next(mock_report)
-    assert current_profile is not None
-    assert current_profile.load_gen_rate is None
-    assert current_profile.load_gen_mode == LoadGenerationMode.SYNCHRONOUS
-    assert test_profile_generator.next(mock_report) is None
+@pytest.mark.sanity()
+@pytest.mark.parametrize(
+    ("mode", "rate"),
+    [
+        # invalid modes
+        ("invalid_mode", None),
+        # rates supplied for non-applicable modes
+        ("sweep", 10),
+        ("sweep", [10, 20, 30]),
+        ("synchronous", 10),
+        ("synchronous", [10, 20, 30]),
+        ("throughput", 10),
+        ("throughput", [10, 20, 30]),
+        # invalid rates supplied for applicable modes
+        ("constant", None),
+        ("constant", -1),
+        ("constant", 0),
+        ("poisson", None),
+        ("poisson", -1),
+        ("poisson", 0),
+    ],
+)
+def test_profile_generator_invalid_instantiation(mode, rate):
+    with pytest.raises(ValueError):
+        ProfileGenerator(mode=mode, rate=rate)
 
 
-# Sweep Profile Generator
+@pytest.mark.sanity()
+def test_profile_generator_next_sweep():
+    generator = ProfileGenerator(mode="sweep")
+    current_report = TextGenerationBenchmarkReport()
+
+    for index in range(settings.num_sweep_profiles):
+        profile: Profile = generator.next(current_report)  # type: ignore
+
+        if index == 0:
+            assert profile.load_gen_mode == "synchronous"
+            assert profile.load_gen_rate is None
+            mock_benchmark = create_autospec(TextGenerationBenchmark, instance=True)
+            mock_benchmark.completed_request_rate = 1
+            current_report.add_benchmark(mock_benchmark)
+        elif index == 1:
+            assert profile.load_gen_mode == "throughput"
+            assert profile.load_gen_rate is None
+            mock_benchmark = create_autospec(TextGenerationBenchmark, instance=True)
+            mock_benchmark.completed_request_rate = 10
+            current_report.add_benchmark(mock_benchmark)
+        else:
+            assert profile.load_gen_mode == "constant"
+            assert profile.load_gen_rate == index
+
+        assert generator.generated_count == index + 1
+
+    for _ in range(3):
+        assert generator.next(current_report) is None
 
 
-def test_sweep_profile_generator_creation():
-    test_profile_generator = ProfileGenerator.create(
-        ProfileGenerationMode.SWEEP,
-    )
-    assert isinstance(test_profile_generator, SweepProfileGenerator)
-    assert not test_profile_generator._sync_run
-    assert not test_profile_generator._max_found
-    assert test_profile_generator._pending_rates is None
-    assert test_profile_generator._pending_rates is None
+@pytest.mark.sanity()
+def test_profile_generator_next_synchronous():
+    generator = ProfileGenerator(mode="synchronous")
+    current_report = TextGenerationBenchmarkReport()
 
-
-def test_first_profile_is_synchronous():
-    test_profile_generator = ProfileGenerator.create(ProfileGenerationMode.SWEEP)
-    mock_report = MagicMock(spec=TextGenerationBenchmarkReport)
-    profile = test_profile_generator.next(mock_report)
-    assert profile is not None
+    profile: Profile = generator.next(current_report)  # type: ignore
+    assert profile.load_gen_mode == "synchronous"
     assert profile.load_gen_rate is None
-    assert profile.load_gen_mode == LoadGenerationMode.SYNCHRONOUS
+    assert generator.generated_count == 1
+
+    for _ in range(3):
+        assert generator.next(current_report) is None
 
 
-def test_rate_doubles():
-    test_profile_generator = ProfileGenerator.create(ProfileGenerationMode.SWEEP)
-    mock_report = MagicMock(spec=TextGenerationBenchmarkReport)
-    mock_benchmark = MagicMock(spec=TextGenerationBenchmark)
-    mock_benchmark.overloaded = False
-    mock_benchmark.rate = 2.0
-    mock_benchmark.request_rate = 2.0
-    benchmarks = [mock_benchmark]
-    mock_report.benchmarks = benchmarks
-    test_profile_generator.next(mock_report)
+@pytest.mark.sanity()
+def test_profile_generator_next_throughput():
+    generator = ProfileGenerator(mode="throughput")
+    current_report = TextGenerationBenchmarkReport()
 
-    profile = test_profile_generator.next(mock_report)
-    assert profile is not None
-    assert profile.load_gen_rate == 4.0
+    profile: Profile = generator.next(current_report)  # type: ignore
+    assert profile.load_gen_mode == "throughput"
+    assert profile.load_gen_rate is None
+    assert generator.generated_count == 1
+
+    for _ in range(3):
+        assert generator.next(current_report) is None
 
 
-def test_max_found():
-    test_profile_generator = ProfileGenerator.create(ProfileGenerationMode.SWEEP)
-    mock_report = MagicMock(spec=TextGenerationBenchmarkReport)
-    mock_benchmark = MagicMock(spec=TextGenerationBenchmark)
-    mock_benchmark.overloaded = False
-    mock_benchmark.rate = 2.0
-    mock_benchmark.request_rate = 2.0
-    mock_overloaded_benchmark = MagicMock(spec=TextGenerationBenchmark)
-    mock_overloaded_benchmark.overloaded = True
-    mock_overloaded_benchmark.rate = 4.0
-    mock_overloaded_benchmark.request_rate = 4.0
-    benchmarks = [mock_benchmark, mock_overloaded_benchmark]
-    mock_report.benchmarks = benchmarks
+@pytest.mark.sanity()
+@pytest.mark.parametrize(
+    "rate",
+    [
+        10,
+        [10, 20, 30],
+    ],
+)
+def test_profile_generator_next_constant(rate):
+    generator = ProfileGenerator(mode="constant", rate=rate)
+    test_rates = rate if isinstance(rate, list) else [rate]
+    current_report = TextGenerationBenchmarkReport()
 
-    test_profile_generator.next(mock_report)
-    profile = test_profile_generator.next(mock_report)
-    assert profile is not None
+    for index, test_rate in enumerate(test_rates):
+        profile: Profile = generator.next(current_report)  # type: ignore
+        assert profile.load_gen_mode == "constant"
+        assert profile.load_gen_rate == test_rate
+        assert generator.generated_count == index + 1
 
-    # if benchmark wasn't overloaded, rates would have doubled to 8
-    assert profile.load_gen_rate == 2.0
+    for _ in range(3):
+        assert generator.next(current_report) is None
 
 
-def test_pending_rates():
-    test_profile_generator = ProfileGenerator.create(ProfileGenerationMode.SWEEP)
-    mock_report = MagicMock(spec=TextGenerationBenchmarkReport)
-    mock_benchmark = MagicMock(spec=TextGenerationBenchmark)
-    mock_benchmark.overloaded = False
-    mock_benchmark.rate = 2.0
-    mock_benchmark.request_rate = 2.0
-    mock_overloaded_benchmark = MagicMock(spec=TextGenerationBenchmark)
-    mock_overloaded_benchmark.overloaded = True
-    mock_overloaded_benchmark.rate = 8.0
-    mock_overloaded_benchmark.request_rate = 8.0
-    benchmarks = [mock_benchmark, mock_overloaded_benchmark]
-    mock_report.benchmarks = benchmarks
-    profile = test_profile_generator.next(mock_report)
-    for expected_rate in np.linspace(2.0, 8.0, 10):
-        profile = test_profile_generator.next(mock_report)
-        assert profile is not None
-        assert profile.load_gen_rate == expected_rate
+@pytest.mark.sanity()
+@pytest.mark.parametrize(
+    "rate",
+    [
+        10,
+        [10, 20, 30],
+    ],
+)
+def test_profile_generator_next_poisson(rate):
+    generator = ProfileGenerator(mode="poisson", rate=rate)
+    test_rates = rate if isinstance(rate, list) else [rate]
+    current_report = TextGenerationBenchmarkReport()
+
+    for index, test_rate in enumerate(test_rates):
+        profile: Profile = generator.next(current_report)  # type: ignore
+        assert profile.load_gen_mode == "poisson"
+        assert profile.load_gen_rate == test_rate
+        assert generator.generated_count == index + 1
+
+    for _ in range(3):
+        assert generator.next(current_report) is None

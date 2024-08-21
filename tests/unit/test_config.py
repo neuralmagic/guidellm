@@ -1,5 +1,6 @@
 import pytest
-from guidellm.config.base import (
+
+from guidellm.config import (
     Environment,
     LoggingSettings,
     OpenAISettings,
