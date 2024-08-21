@@ -27,6 +27,7 @@ urls = { homepage = "https://github.com/neuralmagic/guidellm" }
 dependencies = [
     "click",
     "datasets",
+    "ftfy>=6.0.0",
     "loguru",
     "numpy",
     "openai",
