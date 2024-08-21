@@ -1,7 +1,7 @@
 from unittest.mock import patch
 
 import pytest
-from datasets import (
+from datasets import (  # type: ignore
     Dataset,
     DatasetDict,
     IterableDataset,

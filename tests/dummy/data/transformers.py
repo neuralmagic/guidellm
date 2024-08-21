@@ -1,6 +1,11 @@
 from typing import Iterable
 
-from datasets import Dataset, DatasetDict, IterableDataset, IterableDatasetDict
+from datasets import (  # type: ignore
+    Dataset,
+    DatasetDict,
+    IterableDataset,
+    IterableDatasetDict,
+)
 
 
 def create_sample_dataset(

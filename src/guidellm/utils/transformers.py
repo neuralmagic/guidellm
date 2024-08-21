@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import List, Optional, Union
 
-from datasets import (
+from datasets import (  # type: ignore  # noqa: PGH003
     Dataset,
     DatasetDict,
     IterableDataset,
