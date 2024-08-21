@@ -27,7 +27,6 @@ urls = { homepage = "https://github.com/neuralmagic/guidellm" }
 dependencies = [
     "click",
     "datasets",
-    "ftfy>=6.0.0",
     "loguru",
     "numpy",
     "openai",
@@ -87,7 +86,7 @@ profile = "black"
 files = ["src/guidellm", "tests"]
 python_version = '3.8'
 warn_redundant_casts = true
-warn_unused_ignores = true
+warn_unused_ignores = false
 show_error_codes = true
 namespace_packages = true
 exclude = ["venv", ".tox"]
@@ -95,10 +94,6 @@ exclude = ["venv", ".tox"]
 # Silence "type import errors" as our 3rd-party libs does not have types
 # Check: https://mypy.readthedocs.io/en/latest/config_file.html#import-discovery
 follow_imports = 'silent'
-
-[[tool.mypy.overrides]]
-module = ["transformers.*", "datasets.*"]
-ignore_missing_imports=true
 
 
 [tool.ruff]

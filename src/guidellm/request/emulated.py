@@ -6,7 +6,7 @@ from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
 from loguru import logger
-from transformers import PreTrainedTokenizer
+from transformers import PreTrainedTokenizer  # type: ignore  # noqa: PGH003
 
 from guidellm.config import settings
 from guidellm.core.request import TextGenerationRequest

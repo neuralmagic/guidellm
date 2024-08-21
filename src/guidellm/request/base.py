@@ -6,7 +6,10 @@ from queue import Empty, Full, Queue
 from typing import Iterator, Literal, Optional, Union
 
 from loguru import logger
-from transformers import AutoTokenizer, PreTrainedTokenizer
+from transformers import (  # type: ignore  # noqa: PGH003
+    AutoTokenizer,
+    PreTrainedTokenizer,
+)
 
 from guidellm.config import settings
 from guidellm.core.request import TextGenerationRequest

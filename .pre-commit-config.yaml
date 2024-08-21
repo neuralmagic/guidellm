@@ -18,7 +18,6 @@ repos:
         # main dependencies
         click,
         datasets,
-        ftfy,
         loguru,
         numpy,
         openai,

@@ -5,7 +5,7 @@ from typing import Tuple, Union
 
 import numpy as np
 import pytest
-from transformers import PreTrainedTokenizer
+from transformers import PreTrainedTokenizer  # type: ignore
 
 from guidellm.core.request import TextGenerationRequest
 from guidellm.request.emulated import (

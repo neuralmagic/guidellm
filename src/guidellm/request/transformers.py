@@ -1,14 +1,14 @@
 from pathlib import Path
 from typing import Optional, Union
 
-from datasets import (
+from datasets import (  # type: ignore  # noqa: PGH003
     Dataset,
     DatasetDict,
     IterableDataset,
     IterableDatasetDict,
 )
 from loguru import logger
-from transformers import PreTrainedTokenizer
+from transformers import PreTrainedTokenizer  # type: ignore  # noqa: PGH003
 
 from guidellm.core.request import TextGenerationRequest
 from guidellm.request.base import GenerationMode, RequestGenerator
