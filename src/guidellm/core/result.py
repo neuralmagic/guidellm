@@ -1,5 +1,5 @@
 from time import time
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Literal, Optional, Union
 
 from loguru import logger
 from pydantic import Field
@@ -9,11 +9,11 @@ from guidellm.core.request import TextGenerationRequest
 from guidellm.core.serializable import Serializable
 
 __all__ = [
-    "TextGenerationResult",
-    "TextGenerationError",
+    "RequestConcurrencyMeasurement",
     "TextGenerationBenchmark",
     "TextGenerationBenchmarkReport",
-    "RequestConcurrencyMeasurement",
+    "TextGenerationError",
+    "TextGenerationResult",
 ]
 
 
@@ -98,10 +98,15 @@ class TextGenerationResult(Serializable):
         :param token: The decoded token.
         :type token: str
         """
-        current_counter = time()
+        self._check_recording_started()
 
-        if not self.last_time:
-            raise ValueError("Last time is not specified to get the output token.")
+        if self.last_time is None:
+            raise ValueError(
+                "last time is not specified. "
+                "Did you call `text_generation_benchmark.start()`?"
+            )
+
+        current_counter = time()
 
         if not self.first_token_set:
             self.first_token_time = current_counter - self.last_time
@@ -113,7 +118,7 @@ class TextGenerationResult(Serializable):
             logger.debug(f"Token '{token}' decoded in {decode_time} seconds")
 
         self.last_time = current_counter
-        self.output += f"{token} "
+        self.output += token
         logger.debug("Added token {} to output", token)
 
     def end(
@@ -134,6 +139,7 @@ class TextGenerationResult(Serializable):
             defaults to word count.
         :type output_token_count: Optional[int]
         """
+        self._check_recording_started()
         self.end_time = time()
 
         if output:
@@ -147,25 +153,12 @@ class TextGenerationResult(Serializable):
 
     def _check_recording_started(
         self,
-        raise_exception: bool = True,  # noqa: FBT001, FBT002
-    ) -> bool:
-        """
-        Ensure that the benchmark text generation recording is started.
-
-        We can assume that if the `self._start_time` exist,
-        then the `start()` has been called.
-        """
-
-        if self.start_time is not None:
-            return True
-
-        if raise_exception is True:
+    ):
+        if self.start_time is None:
             raise ValueError(
                 "start time is not specified. "
                 "Did you make the `text_generation_benchmark.start()`?",
             )
-
-        return False
 
 
 class TextGenerationError(Serializable):
@@ -203,7 +196,9 @@ class TextGenerationBenchmark(Serializable):
     This is a set of results and errors for a specific mode and rate.
     """
 
-    mode: str = Field(description="The generation mode, either 'async' or 'sync'.")
+    mode: Literal["asynchronous", "synchronous", "throughput"] = Field(
+        description="The generation mode, one of 'async', 'sync', or 'throughput'."
+    )
     rate: Optional[float] = Field(
         default=None,
         description="The requested rate of requests per second.",
@@ -260,41 +255,43 @@ class TextGenerationBenchmark(Serializable):
         if not self.results:
             return 0.0
 
-        if not self.results[0].start_time or not self.results[-1].end_time:
+        if self.results[0].start_time is None or self.results[-1].end_time is None:
             raise ValueError("Start time and End time are not defined")
 
-        return self.request_count / (
-            self.results[-1].end_time - self.results[0].start_time
-        )
+        time_diff = self.results[-1].end_time - self.results[0].start_time
+
+        return len(self.results) / time_diff
 
     @property
     def overloaded(self) -> bool:
-        if not self.results or not self.concurrencies:
-            raise ValueError("No results or concurrencies to check for overload.")
-
-        if self.rate is None or len(self.concurrencies) < 2:  # noqa: PLR2004
+        if (
+            self.rate is None
+            or not self.results
+            or not self.concurrencies
+            or len(self.concurrencies) < 2  # noqa: PLR2004
+        ):
             # if rate was not set, sync mode is assumed,
             # or we have less than 2 data points,
             # then we cannot be overloaded by definition
             return False
 
-        # if the calculated rate is less than 60% of the requested rate,
+        # if the calculated rate is less than 75% of the requested rate,
         # safe to assume the system is overloaded
-        return self.completed_request_rate < 0.60 * self.rate
+        return self.completed_request_rate < 0.75 * self.rate
 
     def request_started(self):
         """
         Record the start of a generation request.
         """
         if not self.concurrencies:
-            self.concurrencies.append(
+            self.concurrencies = [
                 RequestConcurrencyMeasurement(
                     time=time(),
                     completed=0,
                     errored=0,
                     processing=1,
                 ),
-            )
+            ]
         else:
             last = self.concurrencies[-1]
             self.concurrencies.append(
@@ -318,32 +315,33 @@ class TextGenerationBenchmark(Serializable):
         :param result: The completed result or error.
         :type result: Union[TextGenerationResult, TextGenerationError]
         """
+        if not self.concurrencies:
+            raise ValueError("Request completed without starting")
+
         if isinstance(result, TextGenerationError):
+            is_error = True
             self.errors.append(result)
-            last = self.concurrencies[-1]
-            self.concurrencies.append(
-                RequestConcurrencyMeasurement(
-                    time=time(),
-                    completed=last.completed,
-                    errored=last.errored + 1,
-                    processing=last.processing - 1,
-                ),
-            )
             logger.warning(
-                f"Text generation request resulted in error: {result.message}",
+                "Text generation request resulted in error: {}",
+                result.message,
             )
         else:
+            if not result.start_time or not result.end_time:
+                raise ValueError("Start time and End time are not defined")
+
+            is_error = False
             self.results.append(result)
-            last = self.concurrencies[-1]
-            self.concurrencies.append(
-                RequestConcurrencyMeasurement(
-                    time=time(),
-                    completed=last.completed + 1,
-                    errored=last.errored,
-                    processing=last.processing - 1,
-                ),
-            )
             logger.info("Text generation request completed successfully: {}", result)
+
+        last = self.concurrencies[-1]
+        self.concurrencies.append(
+            RequestConcurrencyMeasurement(
+                time=time(),
+                completed=last.completed + (not is_error),
+                errored=last.errored + is_error,
+                processing=last.processing - 1,
+            )
+        )
 
 
 class TextGenerationBenchmarkReport(Serializable):
@@ -357,8 +355,8 @@ class TextGenerationBenchmarkReport(Serializable):
         default_factory=list,
         description="The benchmarks of text generation requests.",
     )
-    args: List[Dict[str, Any]] = Field(
-        default_factory=list,
+    args: Dict[str, Any] = Field(
+        default_factory=dict,
         description="The arguments used for the benchmarks.",
     )
 

@@ -1,16 +1,12 @@
 from pathlib import Path
 from typing import Union
 
-import requests
 from pydantic import BaseModel
 
 from guidellm.config import settings
-from guidellm.utils.constants import (
-    REPORT_HTML_MATCH,
-    REPORT_HTML_PLACEHOLDER,
-)
+from guidellm.utils.text import load_text
 
-__all__ = ["create_report", "inject_data", "load_html_file"]
+__all__ = ["create_report", "inject_data"]
 
 
 def create_report(model: BaseModel, output_path: Union[str, Path]) -> Path:
@@ -29,9 +25,12 @@ def create_report(model: BaseModel, output_path: Union[str, Path]) -> Path:
     if not isinstance(output_path, Path):
         output_path = Path(output_path)
 
-    html_content = load_html_file(settings.report_generation.source)
+    html_content = load_text(settings.report_generation.source)
     report_content = inject_data(
-        model, html_content, REPORT_HTML_MATCH, REPORT_HTML_PLACEHOLDER
+        model,
+        html_content,
+        settings.report_generation.report_html_match,
+        settings.report_generation.report_html_placeholder,
     )
 
     if not output_path.suffix:
@@ -69,26 +68,3 @@ def inject_data(
     inject_str = match.replace(placeholder, model_str)
 
     return html.replace(match, inject_str)
-
-
-def load_html_file(path_or_url: str) -> str:
-    """
-    Load an HTML file from a path or URL
-
-    :param path_or_url: the path or URL to load the HTML file from
-    :type path_or_url: str
-    :return: the HTML content
-    :rtype: str
-    """
-    if path_or_url.startswith("http"):
-        response = requests.get(path_or_url, timeout=settings.request_timeout)
-        response.raise_for_status()
-
-        return response.text
-
-    path = Path(path_or_url)
-
-    if not path.exists():
-        raise FileNotFoundError(f"File not found: {path_or_url}")
-
-    return path.read_text()

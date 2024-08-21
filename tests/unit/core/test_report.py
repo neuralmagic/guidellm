@@ -2,6 +2,7 @@ import tempfile
 from pathlib import Path
 
 import pytest
+
 from guidellm.core import (
     Distribution,
     GuidanceReport,
@@ -34,14 +35,14 @@ def sample_benchmark_report() -> TextGenerationBenchmarkReport:
     )
     sample_error = TextGenerationError(request=sample_request, message="sample error")
     sample_benchmark = TextGenerationBenchmark(
-        mode="async",
+        mode="asynchronous",
         rate=1.0,
         results=[sample_result],
         errors=[sample_error],
         concurrencies=[],
     )
     return TextGenerationBenchmarkReport(
-        benchmarks=[sample_benchmark], args=[{"arg1": "value1"}]
+        benchmarks=[sample_benchmark], args={"arg1": "value1"}
     )
 
 

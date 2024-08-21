@@ -1,12 +1,13 @@
 from pathlib import Path
 
 import pytest
+
 from guidellm import configure_logger, logger
-from guidellm.config.base import LoggingSettings
+from guidellm.config import LoggingSettings
 
 
 @pytest.fixture(autouse=True)
-def reset_logger():
+def reset_logger():  # noqa: PT004
     # Ensure logger is reset before each test
     logger.remove()
     yield
@@ -105,5 +106,5 @@ def test_logging_disabled(capsys):
     logger.error("Error message")
 
     captured = capsys.readouterr()
-    assert captured.out == ""
-    assert captured.err == ""
+    assert not captured.out
+    assert not captured.err

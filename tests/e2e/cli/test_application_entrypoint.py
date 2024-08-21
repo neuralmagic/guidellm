@@ -3,6 +3,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from click.testing import CliRunner
+
 from guidellm.main import main
 
 
@@ -23,7 +24,11 @@ def test_main_cli_overrided(
         ["--target", "localhost:9000", "--backend", "test", "--rate-type", "sweep"],
     )
     default_main_kwargs.update(
-        {"target": "localhost:9000", "backend": "test", "rate_type": "sweep"}
+        {
+            "target": "localhost:9000",
+            "backend": "test",
+            "rate_type": "sweep",
+        }
     )
 
     assert patch_main.call_count == 1

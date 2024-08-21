@@ -3,12 +3,21 @@ import threading
 import time
 from abc import ABC, abstractmethod
 from queue import Empty, Full, Queue
-from typing import Iterator, Optional, Union
+from typing import Iterator, Literal, Optional, Union
 
 from loguru import logger
-from transformers import AutoTokenizer, PreTrainedTokenizer
+from transformers import (  # type: ignore  # noqa: PGH003
+    AutoTokenizer,
+    PreTrainedTokenizer,
+)
 
+from guidellm.config import settings
 from guidellm.core.request import TextGenerationRequest
+
+__all__ = ["GenerationMode", "RequestGenerator"]
+
+
+GenerationMode = Literal["async", "sync"]
 
 
 class RequestGenerator(ABC):
@@ -19,7 +28,7 @@ class RequestGenerator(ABC):
         for tokenizing prompts.
     :type tokenizer: Union[str, PreTrainedTokenizer]
     :param mode: The generation mode, either 'async' or 'sync'.
-    :type mode: str
+    :type mode: GenerationMode
     :param async_queue_size: The size of the request queue.
     :type async_queue_size: int
     """
@@ -27,7 +36,7 @@ class RequestGenerator(ABC):
     def __init__(
         self,
         tokenizer: Optional[Union[str, PreTrainedTokenizer]] = None,
-        mode: str = "async",
+        mode: GenerationMode = "async",
         async_queue_size: int = 50,
     ):
         self._async_queue_size: int = async_queue_size
@@ -35,16 +44,20 @@ class RequestGenerator(ABC):
         self._queue: Queue = Queue(maxsize=async_queue_size)
         self._stop_event: threading.Event = threading.Event()
 
-        if tokenizer is not None:
+        if not tokenizer:
+            self._tokenizer = AutoTokenizer.from_pretrained(
+                settings.dataset.default_tokenizer
+            )
+            logger.info("Initialized fake tokenizer for request generation")
+        else:
             self._tokenizer = (
                 AutoTokenizer.from_pretrained(tokenizer)
                 if isinstance(tokenizer, str)
                 else tokenizer
             )
-            logger.info("Tokenizer initialized: {}", self._tokenizer)
-        else:
-            self._tokenizer = None
-            logger.debug("No tokenizer provided")
+            logger.info(
+                "Tokenizer initialized for request generation: {}", self._tokenizer
+            )
 
         if self._mode == "async":
             self._thread = threading.Thread(target=self._populate_queue, daemon=True)
@@ -82,18 +95,19 @@ class RequestGenerator(ABC):
                     self._queue.task_done()
                     yield item
                 except Empty:
+                    time.sleep(0.01)
                     continue
         else:
             while not self._stop_event.is_set():
                 yield self.create_item()
 
     @property
-    def tokenizer(self) -> Optional[PreTrainedTokenizer]:
+    def tokenizer(self) -> PreTrainedTokenizer:
         """
         Get the tokenizer instance.
 
         :return: The tokenizer instance.
-        :rtype: Optional[PreTrainedTokenizer]
+        :rtype: PreTrainedTokenizer
         """
         return self._tokenizer
 
