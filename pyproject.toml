@@ -36,6 +36,7 @@ dependencies = [
     "pyyaml>=6.0.0",
     "requests",
     "transformers",
+    "deepsparse[llm]>=1.8.0",
 ]
 
 [project.optional-dependencies]
