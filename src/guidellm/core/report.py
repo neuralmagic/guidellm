@@ -118,17 +118,15 @@ def _create_benchmark_report_data_tokens_summary(
     return table
 
 
-def _create_benchmark_report_tokens_perf_summary(
+def _create_benchmark_report_dist_perf_summary(
     report: TextGenerationBenchmarkReport,
 ) -> Table:
     table = Table(
         "Benchmark",
-        "Time to First Token",
-        "TTFT (1%, 5%, 50%, 95%, 99%)",
-        "Inter Token Latency",
-        "ITL (1%, 5%, 50%, 95%, 99%)",
-        "Output Token Throughput",
-        title="[magenta]Tokens Performance Stats by Benchmark[/magenta]",
+        "Request Latency [1%, 5%, 10%, 50%, 90%, 95%, 99%] (sec)",
+        "Time to First Token [1%, 5%, 10%, 50%, 90%, 95%, 99%] (ms)",
+        "Inter Token Latency [1%, 5%, 10%, 50%, 90% 95%, 99%] (ms)",
+        title="[magenta]Performance Stats by Benchmark[/magenta]",
         title_style="bold",
         title_justify="left",
         show_header=True,
@@ -137,18 +135,23 @@ def _create_benchmark_report_tokens_perf_summary(
     for benchmark in report.benchmarks_sorted:
         table.add_row(
             _benchmark_rate_id(benchmark),
-            f"{benchmark.time_to_first_token:.2f} ms",
+            ", ".join(
+                f"{percentile:.2f}"
+                for percentile in benchmark.request_latency_distribution.percentiles(
+                    [1, 5, 10, 50, 90, 95, 99]
+                )
+            ),
             ", ".join(
                 f"{percentile*1000:.1f}"
                 for percentile in benchmark.ttft_distribution.percentiles(
-                    [1, 5, 50, 95, 99]
+                    [1, 5, 10, 50, 90, 95, 99]
                 )
             ),
             f"{benchmark.inter_token_latency:.2f} ms",
             ", ".join(
                 f"{percentile*1000:.1f}"
                 for percentile in benchmark.itl_distribution.percentiles(
-                    [1, 5, 50, 95, 99]
+                    [1, 5, 10, 50, 90, 95, 99]
                 )
             ),
             f"{benchmark.output_token_throughput:.2f} tokens/sec",
@@ -215,7 +218,7 @@ class GuidanceReport(Serializable):
                         "",
                         _create_benchmark_report_data_tokens_summary(benchmark),
                         "",
-                        _create_benchmark_report_tokens_perf_summary(benchmark),
+                        _create_benchmark_report_dist_perf_summary(benchmark),
                         "",
                         _create_benchmark_report_summary(benchmark),
                     ),
