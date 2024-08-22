@@ -26,6 +26,7 @@ repos:
         pydantic_settings,
         pyyaml,
         requests,
+        rich,
         transformers,
 
         # dev dependencies

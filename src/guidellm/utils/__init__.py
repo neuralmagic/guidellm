@@ -1,4 +1,5 @@
 from .injector import create_report, inject_data
+from .progress import BenchmarkReportProgress
 from .text import (
     clean_text,
     filter_text,
@@ -19,6 +20,7 @@ from .transformers import (
 )
 
 __all__ = [
+    "BenchmarkReportProgress",
     "clean_text",
     "create_report",
     "filter_text",

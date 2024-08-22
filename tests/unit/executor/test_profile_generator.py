@@ -55,10 +55,17 @@ def test_profile_generator_instantiation(mode, rate):
 
     if mode == "sweep":
         assert len(generator) == settings.num_sweep_profiles
+        assert generator.profile_generation_modes == ["synchronous", "throughput"] + [
+            "constant"
+        ] * (settings.num_sweep_profiles - 2)
     elif mode in ("throughput", "synchronous"):
         assert len(generator) == 1
+        assert generator.profile_generation_modes == [mode]
     else:
         assert len(generator) == len(rate) if isinstance(rate, list) else 1
+        assert generator.profile_generation_modes == [mode] * (
+            len(rate) if isinstance(rate, list) else 1
+        )
 
     assert generator.generated_count == 0
 
