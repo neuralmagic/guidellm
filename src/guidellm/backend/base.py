@@ -10,7 +10,7 @@ from guidellm.core import TextGenerationRequest, TextGenerationResult
 __all__ = ["Backend", "BackendEngine", "GenerativeResponse"]
 
 
-BackendEngine = Literal["test", "openai_server"]
+BackendEngine = Literal["test", "openai_server", "deepsparse"]
 
 
 class GenerativeResponse(BaseModel):

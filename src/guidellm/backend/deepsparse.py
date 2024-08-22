@@ -1,66 +1,33 @@
-from typing import Any, Dict, Generator, List, Optional
+from typing import Any, AsyncGenerator, List, Optional
 
-import openai
+from deepsparse import Pipeline
 from loguru import logger
-from openai import OpenAI, Stream
-from openai.types import Completion
 from transformers import AutoTokenizer
 
-from guidellm.backend import Backend, BackendEngine, GenerativeResponse
-from guidellm.config import settings
+from guidellm.backend import Backend, GenerativeResponse
 from guidellm.core import TextGenerationRequest
 
 __all__ = ["DeepsparseBackend"]
 
 
-@Backend.register(BackendEngine.DEEPSPARSE)
+@Backend.register("deepsparse")
 class DeepsparseBackend(Backend):
     """
     An Deepsparse backend implementation for the generative AI result.
-
-    :param XXX: Description
-    :type XXX: str
     """
 
-    def __init__(
-        self,
-        target: Optional[str] = None,
-        host: Optional[str] = None,
-        port: Optional[int] = None,
-        model: Optional[str] = None,
-        **request_args,
-    ):
-        """
-        Initialize an OpenAI Client
-        """
-
+    def __init__(self, model: Optional[str] = None, **request_args):
         self.request_args = request_args
+        self.pipeline: Pipeline = Pipeline.create(
+            task="sentiment-analysis",
+            model_path=model or self.default_model,
+        )
 
-
-        breakpoint()  # TODO: remove
-        if target is not None:
-            base_url = target
-        elif host and port:
-            base_url = f"{host}:{port}"
-        elif settings.openai.base_url is not None:
-            base_url = settings.openai.base_url
-        else:
-            raise ValueError(
-                "`GUIDELLM__DEEPSPARSE__BASE_URL` environment variable "
-                "or --target CLI parameter must be specified for the OpenAI backend."
-            )
-
-        self.openai_client = OpenAI(api_key=_api_key, base_url=base_url)
-        self.model = model or self.default_model
-
-        logger.info("OpenAI {} Backend listening on {}", self.model, target)
-
-    def make_request(
-        self,
-        request: TextGenerationRequest,
-    ) -> Generator[GenerativeResponse, None, None]:
+    async def make_request(
+        self, request: TextGenerationRequest
+    ) -> AsyncGenerator[GenerativeResponse, None]:
         """
-        Make a request to the OpenAI backend.
+        Make a request to the Deepsparse Python API client.
 
         :param request: The result request to submit.
         :type request: TextGenerationRequest
@@ -68,44 +35,30 @@ class DeepsparseBackend(Backend):
         :rtype: Iterator[GenerativeResponse]
         """
 
-        logger.debug(f"Making request to OpenAI backend with prompt: {request.prompt}")
-
-        # How many completions to generate for each prompt
-        request_args: Dict = {"n": 1}
-
-        num_gen_tokens: int = (
-            request.params.get("generated_tokens", None)
-            or settings.openai.max_gen_tokens
-        )
-        request_args.update({"max_tokens": num_gen_tokens, "stop": None})
-
-        if self.request_args:
-            request_args.update(self.request_args)
-
-        response: Stream[Completion] = self.openai_client.completions.create(
-            model=self.model,
-            prompt=request.prompt,
-            stream=True,
-            **request_args,
+        logger.debug(
+            f"Making request to Deepsparse backend with prompt: {request.prompt}"
         )
 
-        for chunk in response:
-            chunk_content: str = getattr(chunk, "content", "")
-
-            if getattr(chunk, "stop", True) is True:
-                logger.debug("Received final response from OpenAI backend")
-
+        token_count = 0
+        for response in self.pipeline.generations:
+            if not (token := response.text):
                 yield GenerativeResponse(
                     type_="final",
-                    prompt=getattr(chunk, "prompt", request.prompt),
-                    prompt_token_count=(
-                        request.prompt_token_count or self._token_count(request.prompt)
-                    ),
-                    output_token_count=(self._token_count(chunk_content)),
+                    prompt=request.prompt,
+                    prompt_token_count=request.prompt_token_count,
+                    output_token_count=token_count,
                 )
+                break
             else:
-                logger.debug("Received token from OpenAI backend")
-                yield GenerativeResponse(type_="token_iter", add_token=chunk_content)
+                token_count += 1
+                yield GenerativeResponse(
+                    type_="token_iter",
+                    add_token=token,
+                    prompt=request.prompt,
+                    prompt_token_count=request.prompt_token_count,
+                    output_token_count=token_count,
+                )
+
 
     def available_models(self) -> List[str]:
         """
@@ -115,16 +68,11 @@ class DeepsparseBackend(Backend):
         :rtype: List[str]
         """
 
-        try:
-            models: List[str] = [
-                model.id for model in self.openai_client.models.list().data
-            ]
-        except openai.NotFoundError as error:
-            logger.error("No available models for OpenAI Backend")
-            raise error
-        else:
-            logger.info(f"Available models: {models}")
-            return models
+        # WARNING: The default model from the documentation is defined here
+
+        return [
+            "zoo:nlp/sentiment_analysis/obert-base/pytorch/huggingface/sst2/pruned90_quant-none"
+        ]
 
     def model_tokenizer(self, model: str) -> Optional[Any]:
         """
@@ -135,6 +83,7 @@ class DeepsparseBackend(Backend):
         :return: The tokenizer for the model, or None if it cannot be created.
         :rtype: Optional[Any]
         """
+
         try:
             tokenizer = AutoTokenizer.from_pretrained(model)
             logger.info(f"Tokenizer created for model: {model}")
@@ -147,4 +96,3 @@ class DeepsparseBackend(Backend):
         token_count = len(text.split())
         logger.debug(f"Token count for text '{text}': {token_count}")
         return token_count
-

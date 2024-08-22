@@ -109,14 +109,10 @@ class OpenAISettings(BaseModel):
 
 class DeepsparseSettings(BaseModel):
     """
-    Deepsparse settings for the application to connect to the API
-    for Deepsparse server based pathways
+    Deepsparse settings for the Python API library
     """
 
-    # NOTE: The default value is default address of deepsparse.server
-    base_url: str = "http://localhost:5543"
-
-    max_gen_tokens: int = 4096
+    model: str = "zoo:mpt-7b-dolly_mpt_pretrain-pruned50_quantized"
 
 
 class ReportGenerationSettings(BaseModel):

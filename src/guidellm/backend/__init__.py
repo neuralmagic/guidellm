@@ -1,4 +1,5 @@
 from .base import Backend, BackendEngine, GenerativeResponse
+from .deepsparse import DeepsparseBackend
 from .openai import OpenAIBackend
 
 __all__ = [
@@ -6,4 +7,5 @@ __all__ = [
     "BackendEngine",
     "GenerativeResponse",
     "OpenAIBackend",
+    "DeepsparseBackend",
 ]
