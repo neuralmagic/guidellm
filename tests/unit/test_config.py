@@ -1,4 +1,5 @@
 import pytest
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from guidellm.config import (
     Environment,
@@ -9,9 +10,18 @@ from guidellm.config import (
 )
 
 
+class DefaultSettings(Settings, BaseSettings):
+    """
+    This class overrides the original `Settings` class with another `model_config`
+    to ignore local environment variables for each runtime.
+    """
+
+    model_config = SettingsConfigDict()
+
+
 @pytest.mark.smoke()
 def test_default_settings():
-    settings = Settings()
+    settings = DefaultSettings()
     assert settings.env == Environment.PROD
     assert settings.logging == LoggingSettings()
     assert settings.openai == OpenAISettings()

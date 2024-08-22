@@ -22,12 +22,9 @@ def mock_auto_tokenizer():
 
 @pytest.fixture()
 def mock_requests_pride_and_prejudice():
-    text_path = Path(__file__).parent / "dummy" / "data" / "pride_and_prejudice.txt"
+    text_path = Path(__file__).parent.parent / "dummy/data/pride_and_prejudice.txt"
     text_content = text_path.read_text()
 
     with requests_mock.Mocker() as mock:
-        mock.get(
-            "https://www.gutenberg.org/files/1342/1342-0.txt",
-            text=text_content,
-        )
+        mock.get("https://www.gutenberg.org/files/1342/1342-0.txt", text=text_content)
         yield mock

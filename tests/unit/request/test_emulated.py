@@ -347,6 +347,8 @@ def test_emulated_request_generator_lifecycle(
             generator = EmulatedRequestGenerator(
                 str(file_path) if config_type == "file_str" else file_path
             )
+    else:
+        raise
 
     for _ in range(5):
         request = generator.create_item()
