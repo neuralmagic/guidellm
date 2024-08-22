@@ -35,6 +35,8 @@ jobs:
     strategy:
       matrix:
         python: ["3.12", "3.8"]
+    env:
+      GUIDELLM__OPENAI__API_KEY: ${{secrets.openai-automation-token}}
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python
