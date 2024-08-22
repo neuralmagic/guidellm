@@ -26,7 +26,7 @@ from guidellm.request.base import RequestGenerator
 @click.option("--port", type=str, default=None, help="Port for benchmarking")
 @click.option(
     "--backend",
-    type=click.Choice(["test", "openai_server"]),
+    type=click.Choice(["test", "openai_server", "deepsparse"]),
     default="openai_server",
     help="Backend type for benchmarking",
 )

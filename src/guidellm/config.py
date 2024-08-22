@@ -107,6 +107,18 @@ class OpenAISettings(BaseModel):
     max_gen_tokens: int = 4096
 
 
+class DeepsparseSettings(BaseModel):
+    """
+    Deepsparse settings for the application to connect to the API
+    for Deepsparse server based pathways
+    """
+
+    # NOTE: The default value is default address of deepsparse.server
+    base_url: str = "http://localhost:5543"
+
+    max_gen_tokens: int = 4096
+
+
 class ReportGenerationSettings(BaseModel):
     """
     Report generation settings for the application
@@ -151,8 +163,7 @@ class Settings(BaseSettings):
 
     # Request settings
     openai: OpenAISettings = OpenAISettings()
-
-    # Report settings
+    deepsprase: DeepsparseSettings = DeepsparseSettings()
     report_generation: ReportGenerationSettings = ReportGenerationSettings()
 
     @model_validator(mode="after")
