@@ -151,6 +151,7 @@ def _create_benchmark_report_tokens_perf_summary(
                     [1, 5, 50, 95, 99]
                 )
             ),
+            f"{benchmark.output_token_throughput:.2f} tokens/sec",
         )
 
     return table

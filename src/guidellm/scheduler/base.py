@@ -314,8 +314,10 @@ class Scheduler:
                 nonlocal completed
                 completed += 1
                 _res = _task.result()
-                benchmark.request_completed(_res)
-                logger.debug("Request completed: {}", _res)
+
+                if _res:
+                    benchmark.request_completed(_res)
+                    logger.debug("Request completed: {}", _res)
 
             benchmark.request_started()
             task = asyncio.create_task(
