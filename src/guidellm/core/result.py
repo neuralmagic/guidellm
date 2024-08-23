@@ -298,7 +298,7 @@ class TextGenerationBenchmark(Serializable):
         :return: The rate of requests per second.
         :rtype: float
         """
-        if not self.results:
+        if not self.results or not self.duration:
             return 0.0
 
         return len(self.results) / self.duration
@@ -396,7 +396,7 @@ class TextGenerationBenchmark(Serializable):
         :return: The average token throughput.
         :rtype: float
         """
-        if not self.results:
+        if not self.results or not self.duration:
             return 0.0
 
         total_tokens = sum(result.output_token_count for result in self.results)

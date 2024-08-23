@@ -142,7 +142,7 @@ class Settings(BaseSettings):
     env: Environment = Environment.PROD
     request_timeout: int = 30
     max_concurrency: int = 512
-    num_sweep_profiles: int = 10
+    num_sweep_profiles: int = 9
     logging: LoggingSettings = LoggingSettings()
 
     # Data settings

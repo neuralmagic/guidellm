@@ -128,174 +128,85 @@ def test_executor_instantiation(mode, rate):
     assert executor.max_duration == 60.0
 
 
-def _check_executor_result(
+def _check_executor_result_base(
     result: ExecutorResult,
-    num_profiles: int,
-    num_requests: int,
+    expected_completed: bool,
+    expected_count_total: int,
+    expected_count_completed: int,
+    expected_generation_modes: List[ProfileGenerationMode],
+):
+    assert result.completed == expected_completed
+    assert result.count_total == expected_count_total
+    assert result.count_completed == expected_count_completed
+    assert result.generation_modes == expected_generation_modes
+
+
+def _check_executor_result_report(
+    result: ExecutorResult,
     mode: ProfileGenerationMode,
     rate: Optional[Union[float, List[float]]],
-    expected_complete: bool,
-    expected_completed: int,
-    expected_scheduler_result: bool,
-    expected_current: bool,
-    expected_profile_index: Optional[int] = None,
+    max_number: Optional[int],
+    max_duration: Optional[float],
+    benchmarks_count: int,
 ):
-    if mode == "sweep":
-        generation_modes = ["synchronous", "throughput"] + ["constant"] * (
-            num_profiles - 2
-        )
-        generation_rates = [None, None] + [
-            count + 2 for count in range(num_profiles - 2)
-        ]
-    elif mode in ("throughput", "synchronous"):
-        generation_modes = [mode]
-        generation_rates = [None]
-    else:
-        generation_modes = [mode] * num_profiles
-        generation_rates = [rate] if not rate or isinstance(rate, list) else [rate]  # type: ignore  # noqa: PGH003
-
-    # check completed and progress
-    assert result.completed == expected_complete
-    assert result.count_total == num_profiles
-    assert result.count_completed == expected_completed
-
-    # check modes
-    assert result.generation_modes is not None
-    assert len(result.generation_modes) == num_profiles
-    assert result.generation_modes == generation_modes
-
-    # check report
     assert result.report is not None
     assert isinstance(result.report, TextGenerationBenchmarkReport)
-    assert len(result.report.benchmarks) == expected_completed
-    assert "mode" in result.report.args
+
+    # check args
+    for expected in (
+        "backend_type",
+        "target",
+        "model",
+        "data_type",
+        "data",
+        "tokenizer",
+        "mode",
+        "rate",
+        "max_number",
+        "max_duration",
+    ):
+        assert expected in result.report.args
+
     assert result.report.args["mode"] == mode
-    assert "rate" in result.report.args
     assert (
         result.report.args["rate"] == rate
-        if rate is None or isinstance(rate, list)
+        if rate is None or not isinstance(rate, (float, int))
         else [rate]
     )
-    assert "max_number" in result.report.args
-    assert result.report.args["max_number"] == num_requests
-    assert "max_duration" in result.report.args
-    assert result.report.args["max_duration"] is None
+    assert result.report.args["max_number"] == max_number
+    assert result.report.args["max_duration"] == max_duration
 
-    # check scheduler result
-    if expected_scheduler_result:
-        assert result.scheduler_result is not None
-        assert isinstance(result.scheduler_result, SchedulerResult)
-    else:
+    # check benchmarks
+    assert len(result.report.benchmarks) == benchmarks_count
+    for benchmark in result.report.benchmarks:
+        assert isinstance(benchmark, TextGenerationBenchmarkReport)
+
+
+def _check_executor_result_scheduler(
+    result: ExecutorResult,
+    expected_scheduler_result: bool,
+    expected_generation_modes: List[ProfileGenerationMode],
+    expected_index: Optional[int],
+    expected_profile_mode: Optional[ProfileGenerationMode],
+    expected_profile_rate: Optional[float],
+):
+    if not expected_scheduler_result:
         assert result.scheduler_result is None
-
-    # check current index and profile
-    if expected_current:
-        assert result.current_index is not None
-        assert result.current_index == expected_profile_index
-        assert result.current_profile is not None
-        assert isinstance(result.current_profile, Profile)
-        assert (
-            result.current_profile.load_gen_mode
-            == generation_modes[expected_profile_index]
-        )
-        assert (
-            result.current_profile.load_gen_rate
-            == generation_rates[expected_profile_index]
-        )
-    else:
         assert result.current_index is None
         assert result.current_profile is None
 
+        return
 
-async def _run_executor_tests(
-    executor: Executor,
-    num_profiles: int,
-    num_requests: int,
-    mode: ProfileGenerationMode,
-    rate: Optional[Union[float, List[float]]],
-):
-    iterator = executor.run()
-
-    if mode == "sweep":
-        benchmark_rates = [1.0, float(num_profiles)] + [
-            float(count + 2) for count in range(num_profiles - 2)
-        ]
-    elif mode in ("throughput", "synchronous"):
-        benchmark_rates = [1.0]
-    else:
-        benchmark_rates = [rate] if not rate or isinstance(rate, list) else [rate]  # type: ignore  # noqa: PGH003
-
-    result = await iterator.__anext__()
-    _check_executor_result(
-        result=result,
-        num_profiles=num_profiles,
-        num_requests=num_requests,
-        mode=mode,
-        rate=rate,
-        expected_complete=False,
-        expected_completed=0,
-        expected_scheduler_result=False,
-        expected_current=False,
-    )
-
-    for benchmark_index in range(num_profiles):
-        result = await iterator.__anext__()
-        _check_executor_result(
-            result=result,
-            num_profiles=num_profiles,
-            num_requests=num_requests,
-            mode=mode,
-            rate=rate,
-            expected_complete=False,
-            expected_completed=benchmark_index,
-            expected_scheduler_result=True,
-            expected_current=True,
-            expected_profile_index=benchmark_index,
-        )
-
-        for _ in range(num_requests):
-            result = await iterator.__anext__()
-            _check_executor_result(
-                result=result,
-                num_profiles=num_profiles,
-                num_requests=num_requests,
-                mode=mode,
-                rate=rate,
-                expected_complete=False,
-                expected_completed=benchmark_index,
-                expected_scheduler_result=True,
-                expected_current=True,
-                expected_profile_index=benchmark_index,
-            )
-
-        result = await iterator.__anext__()
-        result.scheduler_result.benchmark.completed_request_rate = benchmark_rates[  # type: ignore  # noqa: PGH003
-            benchmark_index
-        ]
-        _check_executor_result(
-            result=result,
-            num_profiles=num_profiles,
-            num_requests=num_requests,
-            mode=mode,
-            rate=rate,
-            expected_complete=False,
-            expected_completed=benchmark_index + 1,
-            expected_scheduler_result=True,
-            expected_current=True,
-            expected_profile_index=benchmark_index,
-        )
-
-    result = await iterator.__anext__()
-    _check_executor_result(
-        result=result,
-        num_profiles=num_profiles,
-        num_requests=num_requests,
-        mode=mode,
-        rate=rate,
-        expected_complete=True,
-        expected_completed=num_profiles,
-        expected_scheduler_result=False,
-        expected_current=False,
+    assert result.scheduler_result is not None
+    assert isinstance(result.scheduler_result, SchedulerResult)
+    assert result.current_index == expected_index
+    assert result.current_profile is not None
+    assert isinstance(result.current_profile, Profile)
+    assert result.current_profile.load_gen_mode == expected_profile_mode
+    assert result.current_profile.load_gen_rate == expected_profile_rate
+    assert (
+        result.current_profile.load_gen_mode
+        == expected_generation_modes[expected_index]  # type: ignore
     )
 
 
@@ -314,14 +225,116 @@ async def test_executor_run_sweep(mock_scheduler):
         max_number=num_requests,
     )
 
-    await _run_executor_tests(
-        executor, settings.num_sweep_profiles, num_requests, "sweep", None
+    num_profiles = 2 + settings.num_sweep_profiles
+    generation_modes = ["synchronous", "throughput"] + [
+        "constant"
+    ] * settings.num_sweep_profiles
+    generation_rates = [None, None] + list(range(2, settings.num_sweep_profiles + 2))
+    output_rates = [1, settings.num_sweep_profiles + 1] + list(
+        range(2, settings.num_sweep_profiles + 2)
+    )
+
+    iterator = executor.run()
+
+    # Check start result
+    result = await iterator.__anext__()
+    _check_executor_result_base(
+        result=result,
+        expected_completed=False,
+        expected_count_total=num_profiles,
+        expected_count_completed=0,
+        expected_generation_modes=generation_modes,  # type: ignore
+    )
+    _check_executor_result_report(
+        result=result,
+        mode="sweep",
+        rate=None,
+        max_number=num_requests,
+        max_duration=None,
+        benchmarks_count=0,
+    )
+    _check_executor_result_scheduler(
+        result=result,
+        expected_scheduler_result=False,
+        expected_generation_modes=generation_modes,  # type: ignore
+        expected_index=None,
+        expected_profile_mode=None,
+        expected_profile_rate=None,
+    )
+
+    for scheduler_index in range(num_profiles):
+        for request_index in range(num_requests + 2):
+            result = await iterator.__anext__()
+            _check_executor_result_base(
+                result=result,
+                expected_completed=False,
+                expected_count_total=num_profiles,
+                expected_count_completed=scheduler_index
+                if request_index < num_requests + 1
+                else scheduler_index + 1,
+                expected_generation_modes=generation_modes,  # type: ignore
+            )
+            _check_executor_result_report(
+                result=result,
+                mode="sweep",
+                rate=None,
+                max_number=num_requests,
+                max_duration=None,
+                benchmarks_count=scheduler_index
+                if request_index < num_requests + 1
+                else scheduler_index + 1,
+            )
+            _check_executor_result_scheduler(
+                result=result,
+                expected_scheduler_result=True,
+                expected_generation_modes=generation_modes,  # type: ignore
+                expected_index=scheduler_index,
+                expected_profile_mode=generation_modes[scheduler_index],  # type: ignore
+                expected_profile_rate=generation_rates[scheduler_index],
+            )
+        # set the rate for the benchmark for sweep profile generation
+        result.report.benchmarks[-1].completed_request_rate = output_rates[  # type: ignore
+            scheduler_index
+        ]
+        result.report.benchmarks[-1].request_count = num_requests  # type: ignore
+
+    # Check end result
+    result = await iterator.__anext__()
+    _check_executor_result_base(
+        result=result,
+        expected_completed=True,
+        expected_count_total=num_profiles,
+        expected_count_completed=num_profiles,
+        expected_generation_modes=generation_modes,  # type: ignore
+    )
+    _check_executor_result_report(
+        result=result,
+        mode="sweep",
+        rate=None,
+        max_number=num_requests,
+        max_duration=None,
+        benchmarks_count=num_profiles,
+    )
+    _check_executor_result_scheduler(
+        result=result,
+        expected_scheduler_result=False,
+        expected_generation_modes=generation_modes,  # type: ignore
+        expected_index=None,
+        expected_profile_mode=None,
+        expected_profile_rate=None,
     )
 
 
 @pytest.mark.smoke()
 @pytest.mark.asyncio()
-async def test_executor_run_synchronous(mock_scheduler):
+@pytest.mark.parametrize(
+    "mode",
+    [
+        "synchronous",
+        "throughput",
+    ],
+)
+async def test_executor_run_non_rate_modes(mock_scheduler, mode):
     num_requests = 15
 
     backend = create_autospec(Backend, instance=True)
@@ -329,30 +342,90 @@ async def test_executor_run_synchronous(mock_scheduler):
     executor = Executor(
         backend=backend,
         request_generator=request_generator,
-        mode="synchronous",
+        mode=mode,
         rate=None,
         max_number=num_requests,
     )
 
-    await _run_executor_tests(executor, 1, num_requests, "synchronous", None)
+    iterator = executor.run()
 
-
-@pytest.mark.smoke()
-@pytest.mark.asyncio()
-async def test_executor_run_throughput(mock_scheduler):
-    num_requests = 15
-
-    backend = create_autospec(Backend, instance=True)
-    request_generator = create_autospec(RequestGenerator, instance=True)
-    executor = Executor(
-        backend=backend,
-        request_generator=request_generator,
-        mode="throughput",
+    # Check start result
+    result = await iterator.__anext__()
+    _check_executor_result_base(
+        result=result,
+        expected_completed=False,
+        expected_count_total=1,
+        expected_count_completed=0,
+        expected_generation_modes=[mode],
+    )
+    _check_executor_result_report(
+        result=result,
+        mode=mode,
         rate=None,
         max_number=num_requests,
+        max_duration=None,
+        benchmarks_count=0,
+    )
+    _check_executor_result_scheduler(
+        result=result,
+        expected_scheduler_result=False,
+        expected_generation_modes=[mode],
+        expected_index=None,
+        expected_profile_mode=None,
+        expected_profile_rate=None,
     )
 
-    await _run_executor_tests(executor, 1, num_requests, "throughput", None)
+    for request_index in range(num_requests + 2):
+        result = await iterator.__anext__()
+        _check_executor_result_base(
+            result=result,
+            expected_completed=False,
+            expected_count_total=1,
+            expected_count_completed=0 if request_index < num_requests + 1 else 1,
+            expected_generation_modes=[mode],
+        )
+        _check_executor_result_report(
+            result=result,
+            mode=mode,
+            rate=None,
+            max_number=num_requests,
+            max_duration=None,
+            benchmarks_count=0 if request_index < num_requests + 1 else 1,
+        )
+        _check_executor_result_scheduler(
+            result=result,
+            expected_scheduler_result=True,
+            expected_generation_modes=[mode],
+            expected_index=0,
+            expected_profile_mode=mode,
+            expected_profile_rate=None,
+        )
+
+    # Check end result
+    result = await iterator.__anext__()
+    _check_executor_result_base(
+        result=result,
+        expected_completed=True,
+        expected_count_total=1,
+        expected_count_completed=1,
+        expected_generation_modes=[mode],
+    )
+    _check_executor_result_report(
+        result=result,
+        mode=mode,
+        rate=None,
+        max_number=num_requests,
+        max_duration=None,
+        benchmarks_count=1,
+    )
+    _check_executor_result_scheduler(
+        result=result,
+        expected_scheduler_result=False,
+        expected_generation_modes=[mode],
+        expected_index=None,
+        expected_profile_mode=None,
+        expected_profile_rate=None,
+    )
 
 
 @pytest.mark.smoke()
@@ -366,7 +439,7 @@ async def test_executor_run_throughput(mock_scheduler):
         ("poisson", [10, 20, 30]),
     ],
 )
-async def test_executor_run_constant_poisson(mock_scheduler, mode, rate):
+async def test_executor_run_rate_modes(mock_scheduler, mode, rate):
     num_requests = 15
 
     backend = create_autospec(Backend, instance=True)
@@ -379,6 +452,91 @@ async def test_executor_run_constant_poisson(mock_scheduler, mode, rate):
         max_number=num_requests,
     )
 
-    await _run_executor_tests(
-        executor, len(rate) if isinstance(rate, list) else 1, num_requests, mode, rate
+    num_profiles = len(rate) if isinstance(rate, list) else 1
+    generation_modes = [mode] * num_profiles
+    generation_rates = rate if isinstance(rate, list) else [rate]
+
+    iterator = executor.run()
+
+    # Check start result
+    result = await iterator.__anext__()
+    _check_executor_result_base(
+        result=result,
+        expected_completed=False,
+        expected_count_total=num_profiles,
+        expected_count_completed=0,
+        expected_generation_modes=generation_modes,
+    )
+    _check_executor_result_report(
+        result=result,
+        mode=mode,
+        rate=rate,
+        max_number=num_requests,
+        max_duration=None,
+        benchmarks_count=0,
+    )
+    _check_executor_result_scheduler(
+        result=result,
+        expected_scheduler_result=False,
+        expected_generation_modes=generation_modes,
+        expected_index=None,
+        expected_profile_mode=None,
+        expected_profile_rate=None,
+    )
+
+    for scheduler_index in range(num_profiles):
+        for request_index in range(num_requests + 2):
+            result = await iterator.__anext__()
+            _check_executor_result_base(
+                result=result,
+                expected_completed=False,
+                expected_count_total=num_profiles,
+                expected_count_completed=scheduler_index
+                if request_index < num_requests + 1
+                else scheduler_index + 1,
+                expected_generation_modes=generation_modes,
+            )
+            _check_executor_result_report(
+                result=result,
+                mode=mode,
+                rate=rate,
+                max_number=num_requests,
+                max_duration=None,
+                benchmarks_count=scheduler_index
+                if request_index < num_requests + 1
+                else scheduler_index + 1,
+            )
+            _check_executor_result_scheduler(
+                result=result,
+                expected_scheduler_result=True,
+                expected_generation_modes=generation_modes,
+                expected_index=scheduler_index,
+                expected_profile_mode=generation_modes[scheduler_index],
+                expected_profile_rate=generation_rates[scheduler_index],
+            )
+
+    # Check end result
+    result = await iterator.__anext__()
+    _check_executor_result_base(
+        result=result,
+        expected_completed=True,
+        expected_count_total=num_profiles,
+        expected_count_completed=num_profiles,
+        expected_generation_modes=generation_modes,
+    )
+    _check_executor_result_report(
+        result=result,
+        mode=mode,
+        rate=rate,
+        max_number=num_requests,
+        max_duration=None,
+        benchmarks_count=num_profiles,
+    )
+    _check_executor_result_scheduler(
+        result=result,
+        expected_scheduler_result=False,
+        expected_generation_modes=generation_modes,
+        expected_index=None,
+        expected_profile_mode=None,
+        expected_profile_rate=None,
     )

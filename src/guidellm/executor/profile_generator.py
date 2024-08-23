@@ -93,7 +93,7 @@ class ProfileGenerator:
         :rtype: int
         """
         if self._mode == "sweep":
-            return settings.num_sweep_profiles
+            return settings.num_sweep_profiles + 2
 
         if self._mode in ("throughput", "synchronous"):
             return 1
@@ -143,7 +143,7 @@ class ProfileGenerator:
         """
         if self._mode == "sweep":
             return ["synchronous", "throughput"] + ["constant"] * (  # type: ignore  # noqa: PGH003
-                settings.num_sweep_profiles - 1
+                settings.num_sweep_profiles
             )
 
         if self._mode in ["throughput", "synchronous"]:
@@ -308,6 +308,9 @@ class ProfileGenerator:
         :return: The generated profile or None if index is out of range.
         :rtype: Optional[Profile]
         """
+        if index < 0 or index >= settings.num_sweep_profiles + 2:
+            return None
+
         if index == 0:
             return ProfileGenerator.create_synchronous_profile(0)
 
@@ -331,21 +334,10 @@ class ProfileGenerator:
         min_rate = sync_benchmark.completed_request_rate
         max_rate = throughput_benchmark.completed_request_rate
         intermediate_rates = list(
-            np.linspace(min_rate, max_rate, settings.num_sweep_profiles)
+            np.linspace(min_rate, max_rate, settings.num_sweep_profiles + 1)
+        )[1:]
+
+        return Profile(
+            load_gen_mode="constant",
+            load_gen_rate=intermediate_rates[index - 2],
         )
-
-        profile: Optional[Profile] = None
-
-        if index < len(intermediate_rates):
-            profile = Profile(
-                load_gen_mode="constant",
-                load_gen_rate=intermediate_rates[index - 1],
-            )
-        elif index == len(intermediate_rates):
-            profile = Profile(
-                load_gen_mode="constant",
-                load_gen_rate=max_rate,
-            )
-
-        logger.debug("Created sweep profile: {}", profile)
-        return profile

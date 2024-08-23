@@ -22,9 +22,12 @@ def test_default_logger_settings(capsys):
     # Default settings should log to console with INFO level and no file logging
     logger.info("Info message")
     logger.debug("Debug message")
+    logger.warning("Warning message")
+    logger.error("Error message")
 
     captured = capsys.readouterr()
-    assert captured.out.count("Info message") == 1
+    assert captured.out.count("Warning message") == 1
+    assert captured.out.count("Error message") == 1
     assert "Debug message" not in captured.out
 
 

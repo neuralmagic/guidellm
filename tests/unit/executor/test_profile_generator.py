@@ -27,6 +27,7 @@ def test_profile_instantiation():
     profile = Profile(load_gen_mode="constant", load_gen_rate=10)
     assert profile.load_gen_mode == "constant"
     assert profile.load_gen_rate == 10
+    assert profile.args == {}
 
 
 @pytest.mark.smoke()
@@ -54,10 +55,12 @@ def test_profile_generator_instantiation(mode, rate):
         assert generator.rates == [rate]
 
     if mode == "sweep":
-        assert len(generator) == settings.num_sweep_profiles
-        assert generator.profile_generation_modes == ["synchronous", "throughput"] + [
-            "constant"
-        ] * (settings.num_sweep_profiles - 2)
+        assert len(generator) == settings.num_sweep_profiles + 2
+        assert (
+            generator.profile_generation_modes
+            == ["synchronous", "throughput"]
+            + ["constant"] * settings.num_sweep_profiles
+        )
     elif mode in ("throughput", "synchronous"):
         assert len(generator) == 1
         assert generator.profile_generation_modes == [mode]
@@ -102,7 +105,7 @@ def test_profile_generator_next_sweep():
     generator = ProfileGenerator(mode="sweep")
     current_report = TextGenerationBenchmarkReport()
 
-    for index in range(settings.num_sweep_profiles):
+    for index in range(settings.num_sweep_profiles + 2):
         profile: Profile = generator.next(current_report)  # type: ignore
 
         if index == 0:

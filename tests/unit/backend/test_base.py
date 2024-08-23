@@ -7,6 +7,9 @@ from guidellm.core import TextGenerationRequest, TextGenerationResult
 @pytest.mark.smoke()
 def test_backend_registry():
     class MockBackend(Backend):
+        def __init__(self):
+            super().__init__("test", "http://localhost:8000", "mock-model")
+
         async def make_request(self, request):
             yield GenerativeResponse(type_="final", output="Test")
 
@@ -42,6 +45,9 @@ def test_generative_response_creation():
 @pytest.mark.asyncio()
 async def test_backend_make_request():
     class MockBackend(Backend):
+        def __init__(self):
+            super().__init__("test", "http://localhost:8000", "mock-model")
+
         async def make_request(self, request):
             yield GenerativeResponse(
                 type_="token_iter",
@@ -60,9 +66,7 @@ async def test_backend_make_request():
         def available_models(self):
             return ["mock-model"]
 
-    backend = MockBackend(
-        type_="test", target="http://localhost:8000", model="mock-model"
-    )
+    backend = MockBackend()
     index = 0
 
     async for response in backend.make_request(TextGenerationRequest(prompt="Test")):
@@ -84,15 +88,16 @@ async def test_backend_make_request():
 @pytest.mark.asyncio()
 async def test_backend_submit_final():
     class MockBackend(Backend):
+        def __init__(self):
+            super().__init__("test", "http://localhost:8000", "mock-model")
+
         async def make_request(self, request):
             yield GenerativeResponse(type_="final", output="Test")
 
         def available_models(self):
             return ["mock-model"]
 
-    backend = MockBackend(
-        type_="test", target="http://localhost:8000", model="mock-model"
-    )
+    backend = MockBackend()
     result = await backend.submit(TextGenerationRequest(prompt="Test"))
     assert isinstance(result, TextGenerationResult)
     assert result.output == "Test"
@@ -102,6 +107,9 @@ async def test_backend_submit_final():
 @pytest.mark.asyncio()
 async def test_backend_submit_multi():
     class MockBackend(Backend):
+        def __init__(self):
+            super().__init__("test", "http://localhost:8000", "mock-model")
+
         async def make_request(self, request):
             yield GenerativeResponse(type_="token_iter", add_token="Token")
             yield GenerativeResponse(type_="token_iter", add_token=" ")
@@ -111,9 +119,7 @@ async def test_backend_submit_multi():
         def available_models(self):
             return ["mock-model"]
 
-    backend = MockBackend(
-        type_="test", target="http://localhost:8000", model="mock-model"
-    )
+    backend = MockBackend()
     result = await backend.submit(TextGenerationRequest(prompt="Test"))
     assert isinstance(result, TextGenerationResult)
     assert result.output == "Token Test"
@@ -123,6 +129,9 @@ async def test_backend_submit_multi():
 @pytest.mark.asyncio()
 async def test_backend_submit_no_response():
     class MockBackend(Backend):
+        def __init__(self):
+            super().__init__("test", "http://localhost:8000", "mock-model")
+
         async def make_request(self, request):
             if False:  # simulate no yield
                 yield
@@ -130,9 +139,7 @@ async def test_backend_submit_no_response():
         def available_models(self):
             return ["mock-model"]
 
-    backend = MockBackend(
-        type_="test", target="http://localhost:8000", model="mock-model"
-    )
+    backend = MockBackend()
 
     with pytest.raises(ValueError):
         await backend.submit(TextGenerationRequest(prompt="Test"))
@@ -142,6 +149,9 @@ async def test_backend_submit_no_response():
 @pytest.mark.asyncio()
 async def test_backend_submit_multi_final():
     class MockBackend(Backend):
+        def __init__(self):
+            super().__init__("test", "http://localhost:8000", "mock-model")
+
         async def make_request(self, request):
             yield GenerativeResponse(type_="token_iter", add_token="Token")
             yield GenerativeResponse(type_="token_iter", add_token=" ")
@@ -152,9 +162,7 @@ async def test_backend_submit_multi_final():
         def available_models(self):
             return ["mock-model"]
 
-    backend = MockBackend(
-        type_="test", target="http://localhost:8000", model="mock-model"
-    )
+    backend = MockBackend()
 
     with pytest.raises(ValueError):
         await backend.submit(TextGenerationRequest(prompt="Test"))
@@ -163,15 +171,16 @@ async def test_backend_submit_multi_final():
 @pytest.mark.smoke()
 def test_backend_models():
     class MockBackend(Backend):
+        def __init__(self):
+            super().__init__("test", "http://localhost:8000", "mock-model")
+
         def available_models(self):
             return ["mock-model", "mock-model-2"]
 
         async def make_request(self, request):
             yield GenerativeResponse(type_="final", output="")
 
-    backend = MockBackend(
-        type_="test", target="http://localhost:8000", model="mock-model"
-    )
+    backend = MockBackend()
     assert backend.available_models() == ["mock-model", "mock-model-2"]
     assert backend.default_model == "mock-model"
 
@@ -182,6 +191,9 @@ def test_backend_abstract_methods():
         Backend()  # type: ignore
 
     class IncompleteBackend(Backend):
+        def __init__(self):
+            super().__init__("test", "http://localhost:8000", "mock-model")
+
         async def make_request(self, request):
             yield GenerativeResponse(type_="final", output="Test")
 

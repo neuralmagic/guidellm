@@ -87,7 +87,7 @@ def mock_openai_client():
             {"arg1": "value1"},
             "http://test-target",
         ),
-        ("test_key", None, "localhost", 8000, "test-model", {}, "localhost:8000"),
+        ("test_key", None, "localhost", 8000, "test-model", {}, "localhost:8000/v1"),
         (None, None, None, None, None, {}, settings.openai.base_url),
     ],
 )
@@ -256,8 +256,8 @@ def test_openai_backend_target(mock_openai_client):
     assert backend._client.kwargs["base_url"] == "http://test-target"  # type: ignore
 
     backend = OpenAIBackend(host="localhost", port=8000)
-    assert backend._async_client.kwargs["base_url"] == "localhost:8000"  # type: ignore
-    assert backend._client.kwargs["base_url"] == "localhost:8000"  # type: ignore
+    assert backend._async_client.kwargs["base_url"] == "localhost:8000/v1"  # type: ignore
+    assert backend._client.kwargs["base_url"] == "localhost:8000/v1"  # type: ignore
 
     backend = OpenAIBackend()
     assert backend._async_client.kwargs["base_url"] == settings.openai.base_url  # type: ignore
