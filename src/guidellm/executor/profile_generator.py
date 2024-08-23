@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Literal, Optional, Union, get_args
+from typing import Any, Dict, Literal, Optional, Sequence, Union, get_args
 
 import numpy as np
 from loguru import logger
@@ -44,13 +44,13 @@ class ProfileGenerator:
     :param mode: The mode for profile generation (e.g., sweep, synchronous).
     :type mode: ProfileGenerationMode
     :param rate: The rate(s) for load generation; could be a float or list of floats.
-    :type rate: Optional[Union[float, List[float]]]
+    :type rate: Optional[Union[float, Sequence[float]]]
     """
 
     def __init__(
         self,
         mode: ProfileGenerationMode,
-        rate: Optional[Union[float, List[float]]] = None,
+        rate: Optional[Union[float, Sequence[float]]] = None,
     ):
         if mode not in get_args(ProfileGenerationMode):
             err = ValueError(
@@ -73,7 +73,7 @@ class ProfileGenerator:
                 err = ValueError(f"Rates are required for {self._mode} mode")
                 logger.error(err)
                 raise err
-            self._rates = rate if isinstance(rate, list) else [rate]
+            self._rates = rate if isinstance(rate, Sequence) else [rate]
 
             for rt in self._rates:
                 if rt <= 0:
@@ -114,12 +114,12 @@ class ProfileGenerator:
         return self._mode
 
     @property
-    def rates(self) -> Optional[List[float]]:
+    def rates(self) -> Optional[Sequence[float]]:
         """
         Returns the list of rates for load generation, if any.
 
-        :return: List of rates or None if not applicable.
-        :rtype: Optional[List[float]]
+        :return: Sequence of rates or None if not applicable.
+        :rtype: Optional[Sequence[float]]
         """
         return self._rates
 
@@ -134,12 +134,12 @@ class ProfileGenerator:
         return self._generated_count
 
     @property
-    def profile_generation_modes(self) -> List[ProfileGenerationMode]:
+    def profile_generation_modes(self) -> Sequence[ProfileGenerationMode]:
         """
         Return the list of profile modes to be run in the report.
 
-        :return: List of profile modes to be run in the report.
-        :rtype: List[ProfileGenerationMode]
+        :return: Sequence of profile modes to be run in the report.
+        :rtype: Sequence[ProfileGenerationMode]
         """
         if self._mode == "sweep":
             return ["synchronous", "throughput"] + ["constant"] * (  # type: ignore  # noqa: PGH003
@@ -212,7 +212,7 @@ class ProfileGenerator:
 
     @staticmethod
     def create_fixed_rate_profile(
-        index: int, mode: ProfileGenerationMode, rates: List[float]
+        index: int, mode: ProfileGenerationMode, rates: Sequence[float]
     ) -> Optional[Profile]:
         """
         Creates a profile with a fixed rate.
@@ -222,7 +222,7 @@ class ProfileGenerator:
         :param mode: The mode for profile generation (e.g., constant, poisson).
         :type mode: ProfileGenerationMode
         :param rates: The list of rates for load generation.
-        :type rates: List[float]
+        :type rates: Sequence[float]
         :return: The generated profile or None if index is out of range.
         :rtype: Optional[Profile]
         """

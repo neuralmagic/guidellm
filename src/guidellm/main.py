@@ -1,11 +1,12 @@
 import asyncio
+from typing import get_args
 
 import click
 from loguru import logger
 
 from guidellm.backend import Backend
 from guidellm.core import GuidanceReport, TextGenerationBenchmarkReport
-from guidellm.executor import Executor
+from guidellm.executor import Executor, ProfileGenerationMode
 from guidellm.logger import configure_logger
 from guidellm.request import (
     EmulatedRequestGenerator,
@@ -27,7 +28,7 @@ from guidellm.utils import BenchmarkReportProgress
 @click.option("--port", type=str, default=None, help="Port for benchmarking")
 @click.option(
     "--backend",
-    type=click.Choice(["test", "openai_server"]),
+    type=click.Choice(["openai_server"]),
     default="openai_server",
     help="Backend type for benchmarking",
 )
@@ -47,7 +48,7 @@ from guidellm.utils import BenchmarkReportProgress
 )
 @click.option(
     "--rate-type",
-    type=click.Choice(["sweep", "synchronous", "throughput", "constant", "poisson"]),
+    type=click.Choice(get_args(ProfileGenerationMode)),
     default="sweep",
     help="Type of rate generation for benchmarking",
 )
@@ -145,7 +146,7 @@ def main(
     guidance_report = GuidanceReport()
     guidance_report.benchmarks.append(report)
     guidance_report.save_file(output_path)
-    guidance_report.print(output_path)
+    guidance_report.print(output_path, continual_refresh=True)
 
 
 async def _run_executor_for_result(executor: Executor) -> TextGenerationBenchmarkReport:

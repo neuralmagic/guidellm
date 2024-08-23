@@ -72,17 +72,8 @@ class OpenAIBackend(Backend):
         self._client = OpenAI(api_key=api_key, base_url=base_url)
         self._model = model or self.default_model
 
+        super().__init__(type_="openai_server", target=base_url, model=self._model)
         logger.info("OpenAI {} Backend listening on {}", self._model, base_url)
-
-    @property
-    def model(self) -> str:
-        """
-        Get the model used by this backend.
-
-        :return: The model name.
-        :rtype: str
-        """
-        return self._model
 
     async def make_request(
         self,

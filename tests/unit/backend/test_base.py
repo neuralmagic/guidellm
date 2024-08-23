@@ -60,7 +60,9 @@ async def test_backend_make_request():
         def available_models(self):
             return ["mock-model"]
 
-    backend = MockBackend()
+    backend = MockBackend(
+        type_="test", target="http://localhost:8000", model="mock-model"
+    )
     index = 0
 
     async for response in backend.make_request(TextGenerationRequest(prompt="Test")):
@@ -88,7 +90,9 @@ async def test_backend_submit_final():
         def available_models(self):
             return ["mock-model"]
 
-    backend = MockBackend()
+    backend = MockBackend(
+        type_="test", target="http://localhost:8000", model="mock-model"
+    )
     result = await backend.submit(TextGenerationRequest(prompt="Test"))
     assert isinstance(result, TextGenerationResult)
     assert result.output == "Test"
@@ -107,7 +111,9 @@ async def test_backend_submit_multi():
         def available_models(self):
             return ["mock-model"]
 
-    backend = MockBackend()
+    backend = MockBackend(
+        type_="test", target="http://localhost:8000", model="mock-model"
+    )
     result = await backend.submit(TextGenerationRequest(prompt="Test"))
     assert isinstance(result, TextGenerationResult)
     assert result.output == "Token Test"
@@ -124,7 +130,9 @@ async def test_backend_submit_no_response():
         def available_models(self):
             return ["mock-model"]
 
-    backend = MockBackend()
+    backend = MockBackend(
+        type_="test", target="http://localhost:8000", model="mock-model"
+    )
 
     with pytest.raises(ValueError):
         await backend.submit(TextGenerationRequest(prompt="Test"))
@@ -144,7 +152,9 @@ async def test_backend_submit_multi_final():
         def available_models(self):
             return ["mock-model"]
 
-    backend = MockBackend()
+    backend = MockBackend(
+        type_="test", target="http://localhost:8000", model="mock-model"
+    )
 
     with pytest.raises(ValueError):
         await backend.submit(TextGenerationRequest(prompt="Test"))
@@ -159,7 +169,9 @@ def test_backend_models():
         async def make_request(self, request):
             yield GenerativeResponse(type_="final", output="")
 
-    backend = MockBackend()
+    backend = MockBackend(
+        type_="test", target="http://localhost:8000", model="mock-model"
+    )
     assert backend.available_models() == ["mock-model", "mock-model-2"]
     assert backend.default_model == "mock-model"
 

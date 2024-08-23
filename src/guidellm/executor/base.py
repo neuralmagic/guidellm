@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import AsyncGenerator, List, Optional, Union
+from typing import AsyncGenerator, Optional, Sequence, Union
 
 from loguru import logger
 
@@ -36,7 +36,7 @@ class ExecutorResult:
     completed: bool
     count_total: int
     count_completed: int
-    generation_modes: List[ProfileGenerationMode]
+    generation_modes: Sequence[ProfileGenerationMode]
     report: TextGenerationBenchmarkReport
     scheduler_result: Optional[SchedulerResult] = None
     current_index: Optional[int] = None
@@ -70,7 +70,7 @@ class Executor:
         backend: Backend,
         request_generator: RequestGenerator,
         mode: ProfileGenerationMode = "sweep",
-        rate: Optional[Union[float, List[float]]] = None,
+        rate: Optional[Union[float, Sequence[float]]] = None,
         max_number: Optional[int] = None,
         max_duration: Optional[float] = None,
     ):
@@ -140,8 +140,18 @@ class Executor:
         """
         report = TextGenerationBenchmarkReport()
         report.args = {
+            # backend args
+            "backend_type": self.backend.type_,
+            "target": self.backend.target,
+            "model": self.backend.model,
+            # data args
+            "data_type": self.request_generator.type_,
+            "data": self.request_generator.source,
+            "tokenizer": self.request_generator.tokenizer.name_or_path,
+            # rate args
             "mode": self.profile_generator.mode,
             "rate": self.profile_generator.rates,
+            # limits args
             "max_number": self.max_number,
             "max_duration": self.max_duration,
         }
