@@ -51,6 +51,12 @@ class Backend(ABC):
 
     :cvar _registry: A dictionary that maps BackendEngine types to backend classes.
     :type _registry: Dict[BackendEngine, Type[Backend]]
+    :param type_: The type of the backend.
+    :type type_: BackendEngine
+    :param target: The target URL for the backend.
+    :type target: str
+    :param model: The model used by the backend.
+    :type model: str
     """
 
     _registry: Dict[BackendEngine, "Type[Backend]"] = {}
@@ -96,6 +102,11 @@ class Backend(ABC):
 
         return Backend._registry[backend_type](**kwargs)
 
+    def __init__(self, type_: BackendEngine, target: str, model: str):
+        self._type = type_
+        self._target = target
+        self._model = model
+
     @property
     def default_model(self) -> str:
         """
@@ -106,6 +117,36 @@ class Backend(ABC):
         :raises ValueError: If no models are available.
         """
         return _cachable_default_model(self)
+
+    @property
+    def type_(self) -> BackendEngine:
+        """
+        Get the type of the backend.
+
+        :return: The type of the backend.
+        :rtype: BackendEngine
+        """
+        return self._type
+
+    @property
+    def target(self) -> str:
+        """
+        Get the target URL for the backend.
+
+        :return: The target URL.
+        :rtype: str
+        """
+        return self._target
+
+    @property
+    def model(self) -> str:
+        """
+        Get the model used by the backend.
+
+        :return: The model name.
+        :rtype: str
+        """
+        return self._model
 
     async def submit(self, request: TextGenerationRequest) -> TextGenerationResult:
         """

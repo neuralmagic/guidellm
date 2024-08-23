@@ -1,11 +1,15 @@
 from dataclasses import dataclass
-from typing import AsyncGenerator, List, Optional, Union
+from typing import AsyncGenerator, Optional, Sequence, Union
 
 from loguru import logger
 
 from guidellm.backend import Backend
 from guidellm.core import TextGenerationBenchmarkReport
-from guidellm.executor.profile_generator import ProfileGenerationMode, ProfileGenerator
+from guidellm.executor.profile_generator import (
+    Profile,
+    ProfileGenerationMode,
+    ProfileGenerator,
+)
 from guidellm.request import RequestGenerator
 from guidellm.scheduler import Scheduler, SchedulerResult
 
@@ -23,7 +27,7 @@ class ExecutorResult:
     :type count_total: int
     :param count_completed: Number of completed profiles.
     :type count_completed: int
-    :param report: A benchmark report for text generation.
+    :param report: A report report for text generation.
     :type report: TextGenerationBenchmarkReport
     :param scheduler_result: Optional scheduler result for the last task.
     :type scheduler_result: Optional[SchedulerResult]
@@ -32,8 +36,11 @@ class ExecutorResult:
     completed: bool
     count_total: int
     count_completed: int
+    generation_modes: Sequence[ProfileGenerationMode]
     report: TextGenerationBenchmarkReport
     scheduler_result: Optional[SchedulerResult] = None
+    current_index: Optional[int] = None
+    current_profile: Optional[Profile] = None
 
 
 class Executor:
@@ -51,10 +58,10 @@ class Executor:
     :param rate: The list of rates for load generation, or None.
     :type rate: Optional[List[float]]
     :param max_number: Maximum number of requests to generate for the scheduler
-        (a single benchmark run), or None.
+        (a single report run), or None.
     :type max_number: Optional[int]
     :param max_duration: Maximum duration for generating requests for the scheduler,
-        (a single benchmark run), or None.
+        (a single report run), or None.
     :type max_duration: Optional[float]
     """
 
@@ -63,7 +70,7 @@ class Executor:
         backend: Backend,
         request_generator: RequestGenerator,
         mode: ProfileGenerationMode = "sweep",
-        rate: Optional[Union[float, List[float]]] = None,
+        rate: Optional[Union[float, Sequence[float]]] = None,
         max_number: Optional[int] = None,
         max_duration: Optional[float] = None,
     ):
@@ -133,17 +140,29 @@ class Executor:
         """
         report = TextGenerationBenchmarkReport()
         report.args = {
+            # backend args
+            "backend_type": self.backend.type_,
+            "target": self.backend.target,
+            "model": self.backend.model,
+            # data args
+            "data_type": self.request_generator.type_,
+            "data": self.request_generator.source,
+            "tokenizer": self.request_generator.tokenizer.name_or_path,
+            # rate args
             "mode": self.profile_generator.mode,
             "rate": self.profile_generator.rates,
+            # limits args
             "max_number": self.max_number,
             "max_duration": self.max_duration,
         }
+        profile_index = -1
         logger.info("Starting Executor run")
 
         yield ExecutorResult(
             completed=False,
             count_total=len(self.profile_generator),
             count_completed=0,
+            generation_modes=self.profile_generator.profile_generation_modes,
             report=report,
         )
 
@@ -154,9 +173,10 @@ class Executor:
                 worker=self.backend,
                 mode=profile.load_gen_mode,
                 rate=profile.load_gen_rate,
-                max_number=self.max_number,
+                max_number=self.max_number or profile.args.get("max_number", None),
                 max_duration=self.max_duration,
             )
+            profile_index += 1
 
             logger.info(
                 "Scheduling tasks with mode: {}, rate: {}",
@@ -176,8 +196,11 @@ class Executor:
                     completed=False,
                     count_total=len(self.profile_generator),
                     count_completed=len(report.benchmarks),
+                    generation_modes=self.profile_generator.profile_generation_modes,
                     report=report,
                     scheduler_result=scheduler_result,
+                    current_index=profile_index,
+                    current_profile=profile,
                 )
 
         logger.info("Executor run completed")
@@ -185,5 +208,6 @@ class Executor:
             completed=True,
             count_total=len(self.profile_generator),
             count_completed=len(report.benchmarks),
+            generation_modes=self.profile_generator.profile_generation_modes,
             report=report,
         )

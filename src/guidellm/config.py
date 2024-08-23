@@ -43,7 +43,7 @@ class LoggingSettings(BaseModel):
 
     disabled: bool = False
     clear_loggers: bool = True
-    console_log_level: str = "INFO"
+    console_log_level: str = "WARNING"
     log_file: Optional[str] = None
     log_file_level: Optional[str] = None
 
@@ -98,7 +98,7 @@ class OpenAISettings(BaseModel):
     """
 
     # OpenAI API key.
-    api_key: str = ""
+    api_key: str = "invalid_token"
 
     # OpenAI-compatible server URL
     # NOTE: The default value is default address of llama.cpp web server
@@ -141,8 +141,8 @@ class Settings(BaseSettings):
     # general settings
     env: Environment = Environment.PROD
     request_timeout: int = 30
-    max_concurrency: int = 128
-    num_sweep_profiles: int = 10
+    max_concurrency: int = 512
+    num_sweep_profiles: int = 9
     logging: LoggingSettings = LoggingSettings()
 
     # Data settings

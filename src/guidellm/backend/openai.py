@@ -45,10 +45,19 @@ class OpenAIBackend(Backend):
         self._request_args: Dict = request_args
         api_key: str = openai_api_key or settings.openai.api_key
 
+        if not api_key:
+            err = ValueError(
+                "`GUIDELLM__OPENAI__API_KEY` environment variable or "
+                "--openai-api-key CLI parameter must be specified for the "
+                "OpenAI backend."
+            )
+            logger.error("{}", err)
+            raise err
+
         if target:
             base_url = target
         elif host and port:
-            base_url = f"{host}:{port}"
+            base_url = f"{host}:{port}/v1"
         elif settings.openai.base_url:
             base_url = settings.openai.base_url
         else:
@@ -61,21 +70,10 @@ class OpenAIBackend(Backend):
 
         self._async_client = AsyncOpenAI(api_key=api_key, base_url=base_url)
         self._client = OpenAI(api_key=api_key, base_url=base_url)
-
-        self.validate_connection()
         self._model = model or self.default_model
 
+        super().__init__(type_="openai_server", target=base_url, model=self._model)
         logger.info("OpenAI {} Backend listening on {}", self._model, base_url)
-
-    @property
-    def model(self) -> str:
-        """
-        Get the model used by this backend.
-
-        :return: The model name.
-        :rtype: str
-        """
-        return self._model
 
     async def make_request(
         self,

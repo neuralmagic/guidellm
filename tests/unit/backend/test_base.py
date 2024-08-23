@@ -7,6 +7,9 @@ from guidellm.core import TextGenerationRequest, TextGenerationResult
 @pytest.mark.smoke()
 def test_backend_registry():
     class MockBackend(Backend):
+        def __init__(self):
+            super().__init__("test", "http://localhost:8000", "mock-model")
+
         async def make_request(self, request):
             yield GenerativeResponse(type_="final", output="Test")
 
@@ -42,6 +45,9 @@ def test_generative_response_creation():
 @pytest.mark.asyncio()
 async def test_backend_make_request():
     class MockBackend(Backend):
+        def __init__(self):
+            super().__init__("test", "http://localhost:8000", "mock-model")
+
         async def make_request(self, request):
             yield GenerativeResponse(
                 type_="token_iter",
@@ -82,6 +88,9 @@ async def test_backend_make_request():
 @pytest.mark.asyncio()
 async def test_backend_submit_final():
     class MockBackend(Backend):
+        def __init__(self):
+            super().__init__("test", "http://localhost:8000", "mock-model")
+
         async def make_request(self, request):
             yield GenerativeResponse(type_="final", output="Test")
 
@@ -98,6 +107,9 @@ async def test_backend_submit_final():
 @pytest.mark.asyncio()
 async def test_backend_submit_multi():
     class MockBackend(Backend):
+        def __init__(self):
+            super().__init__("test", "http://localhost:8000", "mock-model")
+
         async def make_request(self, request):
             yield GenerativeResponse(type_="token_iter", add_token="Token")
             yield GenerativeResponse(type_="token_iter", add_token=" ")
@@ -117,6 +129,9 @@ async def test_backend_submit_multi():
 @pytest.mark.asyncio()
 async def test_backend_submit_no_response():
     class MockBackend(Backend):
+        def __init__(self):
+            super().__init__("test", "http://localhost:8000", "mock-model")
+
         async def make_request(self, request):
             if False:  # simulate no yield
                 yield
@@ -134,6 +149,9 @@ async def test_backend_submit_no_response():
 @pytest.mark.asyncio()
 async def test_backend_submit_multi_final():
     class MockBackend(Backend):
+        def __init__(self):
+            super().__init__("test", "http://localhost:8000", "mock-model")
+
         async def make_request(self, request):
             yield GenerativeResponse(type_="token_iter", add_token="Token")
             yield GenerativeResponse(type_="token_iter", add_token=" ")
@@ -153,6 +171,9 @@ async def test_backend_submit_multi_final():
 @pytest.mark.smoke()
 def test_backend_models():
     class MockBackend(Backend):
+        def __init__(self):
+            super().__init__("test", "http://localhost:8000", "mock-model")
+
         def available_models(self):
             return ["mock-model", "mock-model-2"]
 
@@ -170,6 +191,9 @@ def test_backend_abstract_methods():
         Backend()  # type: ignore
 
     class IncompleteBackend(Backend):
+        def __init__(self):
+            super().__init__("test", "http://localhost:8000", "mock-model")
+
         async def make_request(self, request):
             yield GenerativeResponse(type_="final", output="Test")
 

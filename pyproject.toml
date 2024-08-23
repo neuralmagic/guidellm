@@ -35,6 +35,7 @@ dependencies = [
     "pydantic-settings>=2.0.0",
     "pyyaml>=6.0.0",
     "requests",
+    "rich",
     "transformers",
 ]
 
@@ -182,6 +183,7 @@ select = [
     "N806", # allow uppercase variable names in tests
     "PGH003", # allow general ignores in tests
     "S106", # allow hardcoded passwords in tests
+    "PLR0915", # allow complext statements in tests
 ]
 
 [tool.ruff.lint.isort]
