@@ -1,16 +1,19 @@
 from enum import Enum
-from typing import Optional
+from typing import Dict, List, Optional
 
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 __all__ = [
-    "settings",
-    "Settings",
+    "DatasetSettings",
+    "EmulatedDataSettings",
     "Environment",
     "LoggingSettings",
     "OpenAISettings",
     "ReportGenerationSettings",
+    "Settings",
+    "reload_settings",
+    "settings",
 ]
 
 
@@ -40,9 +43,52 @@ class LoggingSettings(BaseModel):
 
     disabled: bool = False
     clear_loggers: bool = True
-    console_log_level: str = "INFO"
+    console_log_level: str = "WARNING"
     log_file: Optional[str] = None
     log_file_level: Optional[str] = None
+
+
+class DatasetSettings(BaseModel):
+    """
+    Dataset settings for the application
+    """
+
+    preferred_data_columns: List[str] = Field(
+        default_factory=lambda: [
+            "prompt",
+            "instruction",
+            "input",
+            "inputs",
+            "question",
+            "context",
+            "text",
+            "content",
+            "body",
+            "data",
+        ]
+    )
+    preferred_data_splits: List[str] = Field(
+        default_factory=lambda: ["test", "tst", "validation", "val", "train"]
+    )
+    default_tokenizer: str = "neuralmagic/Meta-Llama-3.1-8B-FP8"
+
+
+class EmulatedDataSettings(BaseModel):
+    """
+    Emulated data settings for the application to use
+    """
+
+    source: str = "https://www.gutenberg.org/files/1342/1342-0.txt"
+    filter_start: str = "It is a truth universally acknowledged, that a"
+    filter_end: str = "CHISWICK PRESS:--CHARLES WHITTINGHAM AND CO."
+    clean_text_args: Dict[str, bool] = Field(
+        default_factory=lambda: {
+            "fix_encoding": True,
+            "clean_whitespace": True,
+            "remove_empty_lines": True,
+            "force_new_line_punctuation": True,
+        }
+    )
 
 
 class OpenAISettings(BaseModel):
@@ -52,7 +98,7 @@ class OpenAISettings(BaseModel):
     """
 
     # OpenAI API key.
-    api_key: str = "invalid"
+    api_key: str = "invalid_token"
 
     # OpenAI-compatible server URL
     # NOTE: The default value is default address of llama.cpp web server
@@ -62,7 +108,13 @@ class OpenAISettings(BaseModel):
 
 
 class ReportGenerationSettings(BaseModel):
+    """
+    Report generation settings for the application
+    """
+
     source: str = ""
+    report_html_match: str = "window.report_data = {};"
+    report_html_placeholder: str = "{}"
 
 
 class Settings(BaseSettings):
@@ -76,7 +128,6 @@ class Settings(BaseSettings):
     export GUIDELLM__LOGGING__DISABLED=true
     export GUIDELLM__OPENAI__API_KEY=******
     ```
-
     """
 
     model_config = SettingsConfigDict(
@@ -87,11 +138,21 @@ class Settings(BaseSettings):
         env_file=".env",
     )
 
+    # general settings
     env: Environment = Environment.PROD
     request_timeout: int = 30
-
+    max_concurrency: int = 512
+    num_sweep_profiles: int = 9
     logging: LoggingSettings = LoggingSettings()
+
+    # Data settings
+    dataset: DatasetSettings = DatasetSettings()
+    emulated_data: EmulatedDataSettings = EmulatedDataSettings()
+
+    # Request settings
     openai: OpenAISettings = OpenAISettings()
+
+    # Report settings
     report_generation: ReportGenerationSettings = ReportGenerationSettings()
 
     @model_validator(mode="after")
@@ -104,3 +165,11 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+
+def reload_settings():
+    """
+    Reload the settings from the environment variables
+    """
+    new_settings = Settings()
+    settings.__dict__.update(new_settings.__dict__)

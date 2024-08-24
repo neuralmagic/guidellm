@@ -20,7 +20,7 @@ class TextGenerationRequest(Serializable):
         default=None,
         description="The number of tokens in the input prompt.",
     )
-    generate_token_count: Optional[int] = Field(
+    output_token_count: Optional[int] = Field(
         default=None,
         description="The number of tokens to generate.",
     )

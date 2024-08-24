@@ -1,18 +1,21 @@
+from pathlib import Path
 from typing import Optional, Union
 
-from datasets import (
+from datasets import (  # type: ignore  # noqa: PGH003
     Dataset,
     DatasetDict,
     IterableDataset,
     IterableDatasetDict,
-    load_dataset,
 )
 from loguru import logger
-from transformers import PreTrainedTokenizer
+from transformers import PreTrainedTokenizer  # type: ignore  # noqa: PGH003
 
 from guidellm.core.request import TextGenerationRequest
-from guidellm.request.base import RequestGenerator
-from guidellm.utils import PREFERRED_DATA_COLUMNS, PREFERRED_DATA_SPLITS
+from guidellm.request.base import GenerationMode, RequestGenerator
+from guidellm.utils import (
+    load_transformers_dataset,
+    resolve_transformers_dataset_column,
+)
 
 __all__ = ["TransformersDatasetRequestGenerator"]
 
@@ -39,11 +42,13 @@ class TransformersDatasetRequestGenerator(RequestGenerator):
 
     def __init__(
         self,
-        dataset: str,
+        dataset: Union[
+            str, Path, DatasetDict, Dataset, IterableDatasetDict, IterableDataset
+        ],
         split: Optional[str] = None,
         column: Optional[str] = None,
         tokenizer: Optional[Union[str, PreTrainedTokenizer]] = None,
-        mode: str = "async",
+        mode: GenerationMode = "async",
         async_queue_size: int = 50,
         **kwargs,
     ):
@@ -51,12 +56,22 @@ class TransformersDatasetRequestGenerator(RequestGenerator):
         self._split = split
         self._column = column
         self._kwargs = kwargs
-        self._hf_dataset = self._load_dataset()
-        self._iterator = iter(self._hf_dataset)
+
+        self._hf_dataset = load_transformers_dataset(dataset, split=split, **kwargs)
+        self._hf_column = resolve_transformers_dataset_column(
+            self._hf_dataset, column=column
+        )
+        self._hf_dataset_iterator = iter(self._hf_dataset)
 
         # NOTE: Must be after all the parameters since the queue population
         #       function requires attributes above
-        super().__init__(tokenizer, mode, async_queue_size)
+        super().__init__(
+            type_="transformers_dataset",
+            source=str(dataset),
+            tokenizer=tokenizer,
+            mode=mode,
+            async_queue_size=async_queue_size,
+        )
 
     def create_item(self) -> TextGenerationRequest:
         """
@@ -66,12 +81,16 @@ class TransformersDatasetRequestGenerator(RequestGenerator):
         :rtype: TextGenerationRequest
         """
 
-        data = next(self._iterator)
+        logger.debug("Creating new request item from dataset")
 
-        prompt = data[self._column] if self._column in data else str(data)
-        token_count = (
-            self._tokenizer(prompt)["input_ids"].shape[0] if self._tokenizer else None
-        )
+        try:
+            data = next(self._hf_dataset_iterator)
+        except StopIteration:
+            self._hf_dataset_iterator = iter(self._hf_dataset)
+            data = next(self._hf_dataset_iterator)
+
+        prompt = data[self._hf_column]
+        token_count = len(self.tokenizer.tokenize(prompt))
         request = TextGenerationRequest(
             prompt=prompt,
             prompt_token_count=token_count,
@@ -79,76 +98,3 @@ class TransformersDatasetRequestGenerator(RequestGenerator):
         logger.debug(f"Created new TextGenerationRequest: {request}")
 
         return request
-
-    def _load_dataset(self) -> Dataset:
-        dataset = self._load_hf_dataset()
-
-        if isinstance(dataset, (DatasetDict, IterableDatasetDict)):
-            split = self._load_data_split(dataset)
-
-            if split not in dataset:
-                raise ValueError(f"Split '{split}' not found in dataset")
-
-            dataset = dataset[split]
-        else:
-            self._split = str(dataset.split) if dataset else None
-
-        column = self._load_data_column(dataset)
-
-        if column not in dataset.column_names:
-            raise ValueError(f"Column '{column}' not found in dataset")
-
-        logger.info(
-            f"Loaded dataset {self._dataset} with split: {self._split} "
-            f"and column: {self._column}",
-        )
-
-        return dataset
-
-    def _load_hf_dataset(
-        self,
-    ) -> Union[DatasetDict, Dataset, IterableDatasetDict, IterableDataset]:
-        if self._dataset.endswith(".csv") or self._dataset.endswith(".json"):
-            logger.debug(f"Loading dataset from local path: {self._dataset}")
-            extension = self._dataset.split(".")[-1]
-
-            return load_dataset(extension, data_files=self._dataset, **self._kwargs)
-
-        if self._dataset.endswith(".py"):
-            logger.debug(f"Loading dataset from local script: {self._dataset}")
-
-            return load_dataset(self._dataset, **self._kwargs)
-
-        logger.debug(f"Loading dataset: {self._dataset}")
-
-        return load_dataset(self._dataset, **self._kwargs)
-
-    def _load_data_split(self, dataset: Union[DatasetDict, IterableDatasetDict]) -> str:
-        if self._split:
-            return self._split
-
-        for split in PREFERRED_DATA_SPLITS:
-            if split in dataset:
-                self._split = split
-                break
-        if self._split is None:
-            self._split = list(dataset)[0]
-
-        logger.info(f"Inferred split to use: {self._split}")
-
-        return self._split
-
-    def _load_data_column(self, dataset: Union[Dataset, IterableDataset]) -> str:
-        if self._column:
-            return self._column
-
-        for col in PREFERRED_DATA_COLUMNS:
-            if col in dataset.column_names:
-                self._column = col
-                break
-        if self._column is None:
-            self._column = list(dataset.column_names)[0]
-
-        logger.info(f"Inferred column to use for prompts: {self._column}")
-
-        return self._column

@@ -1,15 +1,10 @@
 from pathlib import Path
-from unittest.mock import mock_open, patch
 
 import pytest
-import requests
-from guidellm.config import settings
-from guidellm.utils.constants import (
-    REPORT_HTML_MATCH,
-    REPORT_HTML_PLACEHOLDER,
-)
-from guidellm.utils.injector import create_report, inject_data, load_html_file
 from pydantic import BaseModel
+
+from guidellm.config import settings
+from guidellm.utils.injector import create_report, inject_data
 
 
 class ExampleModel(BaseModel):
@@ -23,48 +18,13 @@ def test_inject_data():
     html = "window.report_data = {};"
     expected_html = 'window.report_data = {"name":"Example App","version":"1.0.0"};'
 
-    result = inject_data(model, html, REPORT_HTML_MATCH, REPORT_HTML_PLACEHOLDER)
+    result = inject_data(
+        model,
+        html,
+        settings.report_generation.report_html_match,
+        settings.report_generation.report_html_placeholder,
+    )
     assert result == expected_html
-
-
-@pytest.mark.smoke()
-def test_load_html_file_from_url(requests_mock):
-    url = "http://example.com/report.html"
-    mock_content = "<html>Sample Report</html>"
-    requests_mock.get(url, text=mock_content)
-
-    result = load_html_file(url)
-    assert result == mock_content
-
-
-@pytest.mark.sanity()
-def test_load_html_file_from_invalid_url(requests_mock):
-    url = "http://example.com/404.html"
-    requests_mock.get(url, status_code=404)
-
-    with pytest.raises(requests.exceptions.HTTPError):
-        load_html_file(url)
-
-
-@pytest.mark.smoke()
-def test_load_html_file_from_path():
-    path = "sample_report.html"
-    mock_content = "<html>Sample Report</html>"
-
-    with patch("pathlib.Path.open", mock_open(read_data=mock_content)), patch(
-        "pathlib.Path.exists", return_value=True
-    ):
-        result = load_html_file(path)
-
-    assert result == mock_content
-
-
-@pytest.mark.sanity()
-def test_load_html_file_from_invalid_path():
-    path = "invalid_report.html"
-
-    with pytest.raises(FileNotFoundError):
-        load_html_file(path)
 
 
 @pytest.mark.smoke()

@@ -1,13 +1,12 @@
+import asyncio
+from typing import get_args
+
 import click
 from loguru import logger
 
 from guidellm.backend import Backend
-from guidellm.core import GuidanceReport
-from guidellm.executor import (
-    RATE_TYPE_TO_LOAD_GEN_MODE_MAPPER,
-    RATE_TYPE_TO_PROFILE_MODE_MAPPER,
-    Executor,
-)
+from guidellm.core import GuidanceReport, TextGenerationBenchmarkReport
+from guidellm.executor import Executor, ProfileGenerationMode
 from guidellm.logger import configure_logger
 from guidellm.request import (
     EmulatedRequestGenerator,
@@ -15,6 +14,7 @@ from guidellm.request import (
     TransformersDatasetRequestGenerator,
 )
 from guidellm.request.base import RequestGenerator
+from guidellm.utils import BenchmarkReportProgress
 
 
 @click.command()
@@ -28,7 +28,7 @@ from guidellm.request.base import RequestGenerator
 @click.option("--port", type=str, default=None, help="Port for benchmarking")
 @click.option(
     "--backend",
-    type=click.Choice(["test", "openai_server"]),
+    type=click.Choice(["openai_server"]),
     default="openai_server",
     help="Backend type for benchmarking",
 )
@@ -48,8 +48,8 @@ from guidellm.request.base import RequestGenerator
 )
 @click.option(
     "--rate-type",
-    type=click.Choice(["sweep", "synchronous", "constant", "poisson"]),
-    default="synchronous",
+    type=click.Choice(get_args(ProfileGenerationMode)),
+    default="sweep",
     help="Type of rate generation for benchmarking",
 )
 @click.option(
@@ -75,7 +75,7 @@ from guidellm.request.base import RequestGenerator
     "--output-path",
     type=str,
     default="benchmark_report.json",
-    help="Path to save benchmark report to",
+    help="Path to save report report to",
 )
 def main(
     target,
@@ -94,7 +94,7 @@ def main(
     output_path,
 ):
     # Create backend
-    _backend = Backend.create(
+    backend = Backend.create(
         backend_type=backend,
         target=target,
         host=host,
@@ -113,7 +113,7 @@ def main(
             config=data, tokenizer=tokenizer
         )
     elif data_type == "file":
-        request_generator = FileRequestGenerator(file_path=data, tokenizer=tokenizer)
+        request_generator = FileRequestGenerator(path=data, tokenizer=tokenizer)
     elif data_type == "transformers":
         request_generator = TransformersDatasetRequestGenerator(
             dataset=data, tokenizer=tokenizer
@@ -121,32 +121,69 @@ def main(
     else:
         raise ValueError(f"Unknown data type: {data_type}")
 
-    profile_mode = RATE_TYPE_TO_PROFILE_MODE_MAPPER.get(rate_type)
-    load_gen_mode = RATE_TYPE_TO_LOAD_GEN_MODE_MAPPER.get(rate_type)
-
-    if not profile_mode or not load_gen_mode:
-        raise ValueError("Invalid rate type")
-
-    # Create executor
     executor = Executor(
+        backend=backend,
         request_generator=request_generator,
-        backend=_backend,
-        profile_mode=profile_mode,
-        profile_args={"load_gen_mode": load_gen_mode, "rates": rate},
-        max_requests=max_requests,
+        mode=rate_type,
+        rate=rate if rate_type in ("constant", "poisson") else None,
+        max_number=max_requests,
         max_duration=max_seconds,
     )
-
-    logger.debug("Running the executor")
-    report = executor.run()
+    logger.debug(
+        "Running executor with args: {}",
+        {
+            "backend": backend,
+            "request_generator": request_generator,
+            "mode": rate_type,
+            "rate": rate,
+            "max_number": max_requests,
+            "max_duration": max_seconds,
+        },
+    )
+    report = asyncio.run(_run_executor_for_result(executor))
 
     # Save or print results
     guidance_report = GuidanceReport()
     guidance_report.benchmarks.append(report)
     guidance_report.save_file(output_path)
+    guidance_report.print(output_path, continual_refresh=True)
 
-    print("Guidance Report Complete:")  # noqa: T201
-    print(guidance_report)  # noqa: T201
+
+async def _run_executor_for_result(executor: Executor) -> TextGenerationBenchmarkReport:
+    report = None
+    progress = BenchmarkReportProgress()
+    started = False
+
+    async for result in executor.run():
+        if not started:
+            progress.start(result.generation_modes)  # type: ignore  # noqa: PGH003
+            started = True
+
+        if result.current_index is not None:
+            description = f"{result.current_profile.load_gen_mode}"  # type: ignore  # noqa: PGH003
+            if result.current_profile.load_gen_mode in ("constant", "poisson"):  # type: ignore  # noqa: PGH003
+                description += f"@{result.current_profile.load_gen_rate:.2f} req/s"  # type: ignore  # noqa: PGH003
+
+            progress.update_benchmark(
+                index=result.current_index,
+                description=description,
+                completed=result.scheduler_result.completed,  # type: ignore  # noqa: PGH003
+                completed_count=result.scheduler_result.count_completed,  # type: ignore  # noqa: PGH003
+                completed_total=result.scheduler_result.count_total,  # type: ignore  # noqa: PGH003
+                start_time=result.scheduler_result.benchmark.start_time,  # type: ignore  # noqa: PGH003
+                req_per_sec=result.scheduler_result.benchmark.completed_request_rate,  # type: ignore  # noqa: PGH003
+            )
+
+        if result.completed:
+            report = result.report
+            break
+
+    progress.finish()
+
+    if not report:
+        raise ValueError("No report generated by executor")
+
+    return report
 
 
 if __name__ == "__main__":
