@@ -8,16 +8,17 @@ from .result import (
     TextGenerationError,
     TextGenerationResult,
 )
-from .serializable import Serializable
+from .serializable import Serializable, SerializableFileType
 
 __all__ = [
     "Distribution",
-    "TextGenerationRequest",
-    "TextGenerationResult",
-    "TextGenerationError",
-    "TextGenerationBenchmark",
-    "TextGenerationBenchmarkReport",
+    "GuidanceReport",
     "RequestConcurrencyMeasurement",
     "Serializable",
-    "GuidanceReport",
+    "SerializableFileType",
+    "TextGenerationBenchmark",
+    "TextGenerationBenchmarkReport",
+    "TextGenerationError",
+    "TextGenerationRequest",
+    "TextGenerationResult",
 ]

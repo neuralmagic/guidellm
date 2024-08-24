@@ -18,6 +18,7 @@ repos:
         # main dependencies
         click,
         datasets,
+        ftfy,
         loguru,
         numpy,
         openai,
@@ -25,11 +26,13 @@ repos:
         pydantic_settings,
         pyyaml,
         requests,
+        rich,
         transformers,
 
         # dev dependencies
         pytest,
         pydantic_settings,
+        requests-mock,
 
         # types
         types-click,

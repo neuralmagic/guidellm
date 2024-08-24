@@ -1,12 +1,13 @@
 from pathlib import Path
 
 import pytest
+
 from guidellm import configure_logger, logger
-from guidellm.config.base import LoggingSettings
+from guidellm.config import LoggingSettings
 
 
 @pytest.fixture(autouse=True)
-def reset_logger():
+def reset_logger():  # noqa: PT004
     # Ensure logger is reset before each test
     logger.remove()
     yield
@@ -21,9 +22,12 @@ def test_default_logger_settings(capsys):
     # Default settings should log to console with INFO level and no file logging
     logger.info("Info message")
     logger.debug("Debug message")
+    logger.warning("Warning message")
+    logger.error("Error message")
 
     captured = capsys.readouterr()
-    assert captured.out.count("Info message") == 1
+    assert captured.out.count("Warning message") == 1
+    assert captured.out.count("Error message") == 1
     assert "Debug message" not in captured.out
 
 
@@ -105,5 +109,5 @@ def test_logging_disabled(capsys):
     logger.error("Error message")
 
     captured = capsys.readouterr()
-    assert captured.out == ""
-    assert captured.err == ""
+    assert not captured.out
+    assert not captured.err

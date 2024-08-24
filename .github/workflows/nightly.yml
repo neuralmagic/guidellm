@@ -57,6 +57,9 @@ jobs:
   publish:
     needs: [unit-tests, integration-tests, e2e-tests]
     runs-on: ubuntu-latest
+    env:
+      GUIDELLM_BUILD_TYPE: nightly
+      GUIDELLM_BUILD_NUMBER: ${{ github.event.pull_request.number || github.run_number }}
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python
@@ -68,4 +71,3 @@ jobs:
         with:
           publish_pypi: true
           publish_pypi_internal: true
-          build_type: nightly
