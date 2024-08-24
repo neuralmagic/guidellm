@@ -1,16 +1,16 @@
 ---
-name: Development Branch Workflow
+name: Main Branch Workflow
 
 on:
-  pull_request:
-    branches: ["**"]
+  push:
+    branches: [main]
 
 jobs:
   quality-checks:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python: ["3.9", "3.12"]
+        python: [ "3.9", "3.12" ]
     steps:
       - uses: actions/checkout@v4
       - name: Setup Python
@@ -55,11 +55,9 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       - name: Install dependencies
-        run: |
-          python -m pip install tox
+        run: python -m pip install tox
       - name: Run tests (smoke)
-        run: |
-          python -m tox -e test-integration -- -m smoke
+        run: python -m tox -e test-integration -- -m smoke
 
   publish:
     runs-on: ubuntu-latest

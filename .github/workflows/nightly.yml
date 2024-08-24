@@ -1,20 +1,16 @@
+---
 name: Nightly
 
 on:
   schedule:
-    - cron: "0 0 * * *"
+    - cron: 0 0 * * *
 
 jobs:
   unit-tests:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python:
-          - "3.12"
-          - "3.11"
-          - "3.10"
-          - "3.9"
-          - "3.8"
+        python: ["3.12", "3.11", "3.10", "3.9", "3.8"]
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python
@@ -30,12 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python:
-          - "3.12"
-          - "3.11"
-          - "3.10"
-          - "3.9"
-          - "3.8"
+        python: ["3.12", "3.11", "3.10", "3.9", "3.8"]
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python
@@ -51,12 +42,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python:
-          - "3.12"
-          - "3.11"
-          - "3.10"
-          - "3.9"
-          - "3.8"
+        python: ["3.12", "3.11", "3.10", "3.9", "3.8"]
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python
@@ -82,4 +68,4 @@ jobs:
         with:
           publish_pypi: true
           publish_pypi_internal: true
-          build_type: "nightly"
+          build_type: nightly

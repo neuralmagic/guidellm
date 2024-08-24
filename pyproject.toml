@@ -183,3 +183,10 @@ markers = [
     "sanity: detailed tests to ensure major functions work correctly",
     "regression: tests to ensure that new changes do not break existing functionality"
 ]
+
+[tool.yamlfix]
+whitelines = 1
+section_whitelines = 1
+line_length = 88
+none_representation = "null"
+quote_representation = '"'
