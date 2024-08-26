@@ -9,6 +9,8 @@ from guidellm.config import (
 )
 
 
+# FIX: This test is failing in case .env file or environment variables
+#      have some values defined.
 @pytest.mark.smoke()
 def test_default_settings():
     settings = Settings()
