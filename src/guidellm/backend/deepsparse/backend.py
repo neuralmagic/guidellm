@@ -7,10 +7,8 @@ from transformers import AutoTokenizer
 from guidellm.backend import Backend, GenerativeResponse
 from guidellm.core import TextGenerationRequest
 
-__all__ = ["DeepsparseBackend"]
 
-
-@Backend.register("deepsparse")
+@Backend.register(backend_type="deepsparse")
 class DeepsparseBackend(Backend):
     """
     An Deepsparse backend implementation for the generative AI result.
@@ -58,7 +56,6 @@ class DeepsparseBackend(Backend):
                     prompt_token_count=request.prompt_token_count,
                     output_token_count=token_count,
                 )
-
 
     def available_models(self) -> List[str]:
         """

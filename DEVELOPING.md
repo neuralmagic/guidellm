@@ -15,19 +15,33 @@ Before you begin, ensure you have the following installed:
 - `pip` (Python package installer)
 - `git` (version control system)
 
-### Installation
+### Clone the repository:
 
-1. Clone the repository:
+```sh
+git clone https://github.com/neuralmagic/guidellm.git
+cd guidellm
+```
 
-   ```bash
-   git clone https://github.com/neuralmagic/guidellm.git
-   cd guidellm
-   ```
+### Install dependencies:
 
-2. Install the required dependencies:
-   ```bash
-   pip install -e .[dev]
-   ```
+All the dependencies are specified in `pyproject.toml` file. There is an option to install only required dependencies and optional dependencies
+
+Install required dependencies along with optional `dev` dependencies.
+
+```sh
+pip install -e .[dev]
+# or pip install -e '.[dev]'
+```
+
+#### Working with **Not-Default** backends
+
+If you work with `deepsparse` backend, etc it has some other software limitations.
+In order to install dependencies for the specific backend, run:
+
+```sh
+pip install -e .[deepsparse]
+# or pip install -e '.[deepsparse]'
+```
 
 ## Project Structure
 
@@ -46,8 +60,9 @@ guidellm/
 └── README.md
 ```
 
-- **src/guidellm/**: Main source code for the project.
-- **tests/**: Test cases categorized into unit, integration, and end-to-end tests.
+- `pyproject.toml`: Project metadata
+- `**src/guidellm/**`: Main source code for the project.
+- `**tests/**`: Test cases categorized into unit, integration, and end-to-end tests.
 
 ## Development Environment Setup
 

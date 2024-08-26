@@ -1,3 +1,4 @@
+from .dependencies import check_python_version, module_is_available
 from .injector import create_report, inject_data
 from .text import (
     clean_text,
@@ -35,4 +36,6 @@ __all__ = [
     "resolve_transformers_dataset_split",
     "split_lines_by_punctuation",
     "split_text",
+    "check_python_version",
+    "module_is_available",
 ]
