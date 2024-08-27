@@ -39,7 +39,6 @@ def test_generative_response_creation():
 
 
 @pytest.mark.smoke()
-@pytest.mark.asyncio()
 async def test_backend_make_request():
     class MockBackend(Backend):
         async def make_request(self, request):
@@ -79,7 +78,6 @@ async def test_backend_make_request():
 
 
 @pytest.mark.smoke()
-@pytest.mark.asyncio()
 async def test_backend_submit_final():
     class MockBackend(Backend):
         async def make_request(self, request):
@@ -95,7 +93,6 @@ async def test_backend_submit_final():
 
 
 @pytest.mark.smoke()
-@pytest.mark.asyncio()
 async def test_backend_submit_multi():
     class MockBackend(Backend):
         async def make_request(self, request):
@@ -114,7 +111,6 @@ async def test_backend_submit_multi():
 
 
 @pytest.mark.regression()
-@pytest.mark.asyncio()
 async def test_backend_submit_no_response():
     class MockBackend(Backend):
         async def make_request(self, request):
@@ -131,7 +127,6 @@ async def test_backend_submit_no_response():
 
 
 @pytest.mark.smoke()
-@pytest.mark.asyncio()
 async def test_backend_submit_multi_final():
     class MockBackend(Backend):
         async def make_request(self, request):

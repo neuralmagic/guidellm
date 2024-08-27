@@ -161,7 +161,6 @@ def test_openai_backend_models(mock_openai_client):
         ),
     ],
 )
-@pytest.mark.asyncio()
 async def test_openai_backend_make_request(req, request_args, mock_openai_client):
     backend = OpenAIBackend(**(request_args or {}))
     counter = 0
@@ -204,7 +203,6 @@ async def test_openai_backend_make_request(req, request_args, mock_openai_client
 
 
 @pytest.mark.sanity()
-@pytest.mark.asyncio()
 async def test_openai_backend_submit(mock_openai_client):
     backend = OpenAIBackend()
     request = TextGenerationRequest(prompt="Test", prompt_token_count=1)

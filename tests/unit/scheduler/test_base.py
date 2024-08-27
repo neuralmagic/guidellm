@@ -110,7 +110,6 @@ def test_scheduler_invalid_instantiation(
 
 
 @pytest.mark.sanity()
-@pytest.mark.asyncio()
 @pytest.mark.parametrize(
     "mode",
     [
@@ -177,7 +176,6 @@ async def test_scheduler_run_number(mode):
 
 
 @pytest.mark.sanity()
-@pytest.mark.asyncio()
 @pytest.mark.parametrize(
     "mode",
     [

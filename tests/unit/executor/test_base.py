@@ -194,7 +194,6 @@ async def _run_executor_tests(
 
 
 @pytest.mark.smoke()
-@pytest.mark.asyncio()
 async def test_executor_run_sweep(mock_scheduler):
     num_requests = 15
 
@@ -214,7 +213,6 @@ async def test_executor_run_sweep(mock_scheduler):
 
 
 @pytest.mark.smoke()
-@pytest.mark.asyncio()
 async def test_executor_run_synchronous(mock_scheduler):
     num_requests = 15
 
@@ -232,7 +230,6 @@ async def test_executor_run_synchronous(mock_scheduler):
 
 
 @pytest.mark.smoke()
-@pytest.mark.asyncio()
 async def test_executor_run_throughput(mock_scheduler):
     num_requests = 15
 
@@ -250,7 +247,6 @@ async def test_executor_run_throughput(mock_scheduler):
 
 
 @pytest.mark.smoke()
-@pytest.mark.asyncio()
 @pytest.mark.parametrize(
     ("mode", "rate"),
     [
