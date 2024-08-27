@@ -3,48 +3,69 @@ import threading
 import time
 from abc import ABC, abstractmethod
 from queue import Empty, Full, Queue
-from typing import Iterator, Optional, Union
+from typing import Iterator, Literal, Optional, Union
 
 from loguru import logger
-from transformers import AutoTokenizer, PreTrainedTokenizer
+from transformers import (  # type: ignore  # noqa: PGH003
+    AutoTokenizer,
+    PreTrainedTokenizer,
+)
 
+from guidellm.config import settings
 from guidellm.core.request import TextGenerationRequest
+
+__all__ = ["GenerationMode", "RequestGenerator"]
+
+
+GenerationMode = Literal["async", "sync"]
 
 
 class RequestGenerator(ABC):
     """
     A base class for request generators that generate result requests.
 
+    :param type_: The type of the request generator.
+    :type type_: str
+    :param source: The data source for the request generator.
+    :type source: str
     :param tokenizer: The tokenizer instance or the name/config to use
         for tokenizing prompts.
     :type tokenizer: Union[str, PreTrainedTokenizer]
     :param mode: The generation mode, either 'async' or 'sync'.
-    :type mode: str
+    :type mode: GenerationMode
     :param async_queue_size: The size of the request queue.
     :type async_queue_size: int
     """
 
     def __init__(
         self,
+        type_: str,
+        source: str,
         tokenizer: Optional[Union[str, PreTrainedTokenizer]] = None,
-        mode: str = "async",
+        mode: GenerationMode = "async",
         async_queue_size: int = 50,
     ):
+        self._type = type_
+        self._source = source
         self._async_queue_size: int = async_queue_size
         self._mode: str = mode
         self._queue: Queue = Queue(maxsize=async_queue_size)
         self._stop_event: threading.Event = threading.Event()
 
-        if tokenizer is not None:
+        if not tokenizer:
+            self._tokenizer = AutoTokenizer.from_pretrained(
+                settings.dataset.default_tokenizer
+            )
+            logger.info("Initialized fake tokenizer for request generation")
+        else:
             self._tokenizer = (
                 AutoTokenizer.from_pretrained(tokenizer)
                 if isinstance(tokenizer, str)
                 else tokenizer
             )
-            logger.info("Tokenizer initialized: {}", self._tokenizer)
-        else:
-            self._tokenizer = None
-            logger.debug("No tokenizer provided")
+            logger.info(
+                "Tokenizer initialized for request generation: {}", self._tokenizer
+            )
 
         if self._mode == "async":
             self._thread = threading.Thread(target=self._populate_queue, daemon=True)
@@ -82,18 +103,39 @@ class RequestGenerator(ABC):
                     self._queue.task_done()
                     yield item
                 except Empty:
+                    time.sleep(0.01)
                     continue
         else:
             while not self._stop_event.is_set():
                 yield self.create_item()
 
     @property
-    def tokenizer(self) -> Optional[PreTrainedTokenizer]:
+    def type_(self) -> str:
+        """
+        Get the type of the request generator.
+
+        :return: The type of the request generator.
+        :rtype: str
+        """
+        return self._type
+
+    @property
+    def source(self) -> str:
+        """
+        Get the data source for the request generator.
+
+        :return: The data source.
+        :rtype: str
+        """
+        return self._source
+
+    @property
+    def tokenizer(self) -> PreTrainedTokenizer:
         """
         Get the tokenizer instance.
 
         :return: The tokenizer instance.
-        :rtype: Optional[PreTrainedTokenizer]
+        :rtype: PreTrainedTokenizer
         """
         return self._tokenizer
 
@@ -140,6 +182,7 @@ class RequestGenerator(ABC):
         """
         Populate the request queue in the background.
         """
+
         while not self._stop_event.is_set():
             with contextlib.suppress(Full):
                 if self._queue.qsize() < self._async_queue_size:

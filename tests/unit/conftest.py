@@ -1,38 +1,35 @@
-from typing import List, cast
+from pathlib import Path
+from typing import List
+from unittest.mock import MagicMock, patch
 
-import openai
 import pytest
-from openai.pagination import SyncPage
-
-from tests import dummy
+import requests_mock
 
 
-@pytest.fixture(autouse=True)
-def openai_completion_create_patch(
-    mocker,
-) -> openai.Stream[openai.types.Completion]:
-    """
-    Mock available models function to avoid OpenAI API call.
-    """
+@pytest.fixture()
+def mock_auto_tokenizer():
+    with patch("transformers.AutoTokenizer.from_pretrained") as mock_from_pretrained:
 
-    items = [item for item in dummy.data.openai_completion_factory()]
-    mocker.patch("openai.resources.completions.Completions.create", return_value=items)
+        def _fake_tokenize(text: str) -> List[int]:
+            tokens = text.split()
+            return [0] * len(tokens)
 
-    return cast(openai.Stream[openai.types.Completion], items)
+        mock_tokenizer = MagicMock()
+        mock_tokenizer.tokenize = MagicMock(side_effect=_fake_tokenize)
+        mock_from_pretrained.return_value = mock_tokenizer
+        yield mock_tokenizer
 
 
-@pytest.fixture(autouse=True)
-def openai_models_list_patch(mocker) -> List[openai.types.Model]:
-    """
-    Mock available models function to avoid OpenAI API call.
-    """
-
-    items: List[openai.types.Model] = [
-        item for item in dummy.data.openai_model_factory()
-    ]
-    mocker.patch(
-        "openai.resources.models.Models.list",
-        return_value=SyncPage(object="list", data=items),
+@pytest.fixture()
+def mock_requests_pride_and_prejudice():
+    text_path = (
+        Path(__file__).parent.parent / "dummy" / "data" / "pride_and_prejudice.txt"
     )
+    text_content = text_path.read_text()
 
-    return items
+    with requests_mock.Mocker() as mock:
+        mock.get(
+            "https://www.gutenberg.org/files/1342/1342-0.txt",
+            text=text_content,
+        )
+        yield mock

@@ -1,177 +1,168 @@
-import functools
-import os
-from typing import Any, Dict, Generator, List, Optional
+from typing import AsyncGenerator, Dict, List, Optional
 
 from loguru import logger
-from openai import OpenAI, Stream
-from openai.types import Completion
-from transformers import AutoTokenizer
+from openai import AsyncOpenAI, OpenAI
 
-from guidellm.backend import Backend, BackendEngine, GenerativeResponse
+from guidellm.backend.base import Backend, GenerativeResponse
+from guidellm.config import settings
 from guidellm.core import TextGenerationRequest
 
 __all__ = ["OpenAIBackend"]
 
 
-@Backend.register(BackendEngine.OPENAI_SERVER)
+@Backend.register("openai_server")
 class OpenAIBackend(Backend):
     """
-    An OpenAI backend implementation for the generative AI result.
+    An OpenAI backend implementation for generative AI results.
 
+    This class provides an interface to communicate with the
+    OpenAI server for generating responses based on given prompts.
+
+    :param openai_api_key: The API key for OpenAI.
+        If not provided, it will default to the key from settings.
+    :type openai_api_key: Optional[str]
     :param target: The target URL string for the OpenAI server.
-    :type target: str
-    :param host: Optional host for the OpenAI server.
-    :type host: Optional[str]
-    :param port: Optional port for the OpenAI server.
-    :type port: Optional[int]
-    :param path: Optional path for the OpenAI server.
-    :type path: Optional[str]
+    :type target: Optional[str]
     :param model: The OpenAI model to use, defaults to the first available model.
     :type model: Optional[str]
-    :param api_key: The OpenAI API key to use.
-    :type api_key: Optional[str]
-    :param request_args: Optional arguments for the OpenAI request.
+    :param request_args: Additional arguments for the OpenAI request.
     :type request_args: Dict[str, Any]
     """
 
     def __init__(
         self,
         openai_api_key: Optional[str] = None,
-        internal_callback_url: Optional[str] = None,
+        target: Optional[str] = None,
         model: Optional[str] = None,
-        **request_args: Any,
+        **request_args,
     ):
-        """
-        Initialize an OpenAI Client
-        """
+        self._request_args: Dict = request_args
+        api_key: str = openai_api_key or settings.openai.api_key
 
-        self.request_args = request_args
-
-        if not (_api_key := (openai_api_key or os.getenv("OPENAI_API_KEY", None))):
-            raise ValueError(
-                "`OPENAI_API_KEY` environment variable "
-                "or --openai-api-key CLI parameter "
-                "must be specify for the OpenAI backend"
+        if not api_key:
+            err = ValueError(
+                "`GUIDELLM__OPENAI__API_KEY` environment variable or "
+                "--openai-api-key CLI parameter must be specified for the "
+                "OpenAI backend."
             )
+            logger.error("{}", err)
+            raise err
 
-        if not (
-            _base_url := (internal_callback_url or os.getenv("OPENAI_BASE_URL", None))
-        ):
-            raise ValueError(
-                "`OPENAI_BASE_URL` environment variable "
-                "or --openai-base-url CLI parameter "
-                "must be specify for the OpenAI backend"
+        base_url = target or settings.openai.base_url
+
+        if not base_url:
+            err = ValueError(
+                "`GUIDELLM__OPENAI__BASE_URL` environment variable or "
+                "target parameter must be specified for the OpenAI backend."
             )
-        self.openai_client = OpenAI(api_key=_api_key, base_url=_base_url)
-        self.model = model or self.default_model
+            logger.error("{}", err)
+            raise err
 
-        logger.info(
-            f"Initialized OpenAIBackend with callback url: {internal_callback_url} "
-            f"and model: {self.model}"
-        )
+        self._async_client = AsyncOpenAI(api_key=api_key, base_url=base_url)
+        self._client = OpenAI(api_key=api_key, base_url=base_url)
+        self._model = model or self.default_model
 
-    def make_request(
-        self, request: TextGenerationRequest
-    ) -> Generator[GenerativeResponse, None, None]:
+        super().__init__(type_="openai_server", target=base_url, model=self._model)
+        logger.info("OpenAI {} Backend listening on {}", self._model, base_url)
+
+    async def make_request(
+        self,
+        request: TextGenerationRequest,
+    ) -> AsyncGenerator[GenerativeResponse, None]:
         """
         Make a request to the OpenAI backend.
 
-        :param request: The result request to submit.
+        This method sends a prompt to the OpenAI backend and streams
+        the response tokens back.
+
+        :param request: The text generation request to submit.
         :type request: TextGenerationRequest
-        :return: An iterator over the generative responses.
-        :rtype: Iterator[GenerativeResponse]
+        :yield: A stream of GenerativeResponse objects.
+        :rtype: AsyncGenerator[GenerativeResponse, None]
         """
 
-        logger.debug(f"Making request to OpenAI backend with prompt: {request.prompt}")
+        logger.debug("Making request to OpenAI backend with prompt: {}", request.prompt)
 
-        # How many completions to generate for each prompt
-        request_args: Dict = {"n": 1}
+        request_args: Dict = {
+            "n": 1,  # Number of completions for each prompt
+        }
 
-        if (num_gen_tokens := request.params.get("generated_tokens", None)) is not None:
-            request_args.update(max_tokens=num_gen_tokens, stop=None)
+        if request.output_token_count is not None:
+            request_args.update(
+                {
+                    "max_tokens": request.output_token_count,
+                    "stop": None,
+                }
+            )
+        elif settings.openai.max_gen_tokens and settings.openai.max_gen_tokens > 0:
+            request_args.update(
+                {
+                    "max_tokens": settings.openai.max_gen_tokens,
+                }
+            )
 
-        if self.request_args:
-            request_args.update(self.request_args)
+        request_args.update(self._request_args)
 
-        response: Stream[Completion] = self.openai_client.completions.create(
+        stream = await self._async_client.chat.completions.create(
             model=self.model,
-            prompt=request.prompt,
+            messages=[
+                {"role": "system", "content": request.prompt},
+            ],
             stream=True,
             **request_args,
         )
+        token_count = 0
+        async for chunk in stream:
+            choice = chunk.choices[0]
+            token = choice.delta.content or ""
 
-        for chunk in response:
-            chunk_content: str = getattr(chunk, "content", "")
-
-            if getattr(chunk, "stop", True) is True:
-                logger.debug("Received final response from OpenAI backend")
-
+            if choice.finish_reason is not None:
                 yield GenerativeResponse(
                     type_="final",
-                    prompt=getattr(chunk, "prompt", request.prompt),
-                    prompt_token_count=(
-                        request.prompt_token_count or self._token_count(request.prompt)
-                    ),
-                    output_token_count=(
-                        num_gen_tokens
-                        if num_gen_tokens
-                        else self._token_count(chunk_content)
-                    ),
+                    prompt=request.prompt,
+                    prompt_token_count=request.prompt_token_count,
+                    output_token_count=token_count,
                 )
-            else:
-                logger.debug("Received token from OpenAI backend")
-                yield GenerativeResponse(type_="token_iter", add_token=chunk_content)
+                break
+
+            token_count += 1
+            yield GenerativeResponse(
+                type_="token_iter",
+                add_token=token,
+                prompt=request.prompt,
+                prompt_token_count=request.prompt_token_count,
+                output_token_count=token_count,
+            )
 
     def available_models(self) -> List[str]:
         """
         Get the available models for the backend.
 
+        This method queries the OpenAI API to retrieve a list of available models.
+
         :return: A list of available models.
         :rtype: List[str]
+        :raises openai.OpenAIError: If an error occurs while retrieving models.
         """
 
-        models: List[str] = [
-            model.id for model in self.openai_client.models.list().data
-        ]
-        logger.info(f"Available models: {models}")
-
-        return models
-
-    @property
-    @functools.lru_cache(maxsize=1)
-    def default_model(self) -> str:
-        """
-        Get the default model for the backend.
-
-        :return: The default model.
-        :rtype: str
-        """
-
-        if models := self.available_models():
-            logger.info(f"Default model: {models[0]}")
-            return models[0]
-
-        logger.error("No models available.")
-        raise ValueError("No models available.")
-
-    def model_tokenizer(self, model: str) -> Optional[Any]:
-        """
-        Get the tokenizer for a model.
-
-        :param model: The model to get the tokenizer for.
-        :type model: str
-        :return: The tokenizer for the model, or None if it cannot be created.
-        :rtype: Optional[Any]
-        """
         try:
-            tokenizer = AutoTokenizer.from_pretrained(model)
-            logger.info(f"Tokenizer created for model: {model}")
-            return tokenizer
-        except Exception as e:
-            logger.warning(f"Could not create tokenizer for model {model}: {e}")
-            return None
+            return [model.id for model in self._client.models.list().data]
+        except Exception as error:
+            logger.error("Failed to retrieve available models: {}", error)
+            raise error
 
-    def _token_count(self, text: str) -> int:
-        token_count = len(text.split())
-        logger.debug(f"Token count for text '{text}': {token_count}")
-        return token_count
+    def validate_connection(self):
+        """
+        Validate the connection to the OpenAI backend.
+
+        This method checks that the OpenAI backend is reachable and
+        the API key is valid.
+
+        :raises openai.OpenAIError: If the connection is invalid.
+        """
+
+        try:
+            self._client.models.list()
+        except Exception as error:
+            logger.error("Failed to validate OpenAI connection: {}", error)
+            raise error
