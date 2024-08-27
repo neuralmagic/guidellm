@@ -102,7 +102,7 @@ class OpenAISettings(BaseModel):
 
     # OpenAI-compatible server URL
     # NOTE: The default value is default address of llama.cpp web server
-    base_url: str = "http://localhost:8080"
+    base_url: str = "http://localhost:8000/v1"
 
     max_gen_tokens: int = 4096
 
