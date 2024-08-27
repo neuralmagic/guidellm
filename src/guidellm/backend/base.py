@@ -1,16 +1,17 @@
 import functools
 from abc import ABC, abstractmethod
-from typing import AsyncGenerator, Dict, List, Literal, Optional, Type
+from typing import AsyncGenerator, Dict, List, Literal, Optional, Type, Union
 
 from loguru import logger
 from pydantic import BaseModel
 
 from guidellm.core import TextGenerationRequest, TextGenerationResult
 
-__all__ = ["Backend", "BackendEngine", "GenerativeResponse"]
+__all__ = ["Backend", "BackendEngine", "BackendEnginePublic", "GenerativeResponse"]
 
 
-BackendEngine = Literal["test", "openai_server"]
+BackendEnginePublic = Literal["openai_server"]
+BackendEngine = Union[BackendEnginePublic, Literal["test"]]
 
 
 class GenerativeResponse(BaseModel):
@@ -87,7 +88,6 @@ class Backend(ABC):
         :param backend_type: The type of backend to create.
         :type backend_type: BackendEngine
         :param kwargs: Additional arguments for backend initialization.
-        :type kwargs: dict
         :return: An instance of a subclass of Backend.
         :rtype: Backend
         :raises ValueError: If the backend type is not registered.

@@ -33,7 +33,7 @@ class EmulatedConfig:
     """
 
     @staticmethod
-    def create_config(config: Union[str, Path, Dict]) -> "EmulatedConfig":
+    def create_config(config: Optional[Union[str, Path, Dict]]) -> "EmulatedConfig":
         """
         Create an EmulatedConfig instance from a configuration source.
 
@@ -45,6 +45,10 @@ class EmulatedConfig:
         :raises FileNotFoundError: If the configuration file is not found.
         :raises ValueError: If the configuration format is invalid.
         """
+        if not config:
+            logger.debug("Creating default configuration")
+            return EmulatedConfig(prompt_tokens=1024, generated_tokens=256)
+
         if isinstance(config, dict):
             logger.debug("Loading configuration from dict: {}", config)
             return EmulatedConfig(**config)
@@ -296,7 +300,7 @@ class EmulatedRequestGenerator(RequestGenerator):
 
     def __init__(
         self,
-        config: Union[str, Path, Dict],
+        config: Optional[Union[str, Path, Dict]],
         random_seed: Optional[int] = None,
         tokenizer: Optional[Union[str, PreTrainedTokenizer]] = None,
         mode: GenerationMode = "async",
@@ -307,7 +311,7 @@ class EmulatedRequestGenerator(RequestGenerator):
 
         :param config: Configuration source, can be a dictionary,
             JSON string, or file path.
-        :type config: Union[str, Path, Dict]
+        :type config: Optional[Union[str, Path, Dict]]
         :param random_seed: Optional seed for random number generator.
         :type random_seed: Optional[int]
         :param tokenizer: Tokenizer instance or configuration for tokenizing prompts.

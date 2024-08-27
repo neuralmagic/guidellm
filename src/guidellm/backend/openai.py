@@ -23,10 +23,6 @@ class OpenAIBackend(Backend):
     :type openai_api_key: Optional[str]
     :param target: The target URL string for the OpenAI server.
     :type target: Optional[str]
-    :param host: Optional host for the OpenAI server.
-    :type host: Optional[str]
-    :param port: Optional port for the OpenAI server.
-    :type port: Optional[int]
     :param model: The OpenAI model to use, defaults to the first available model.
     :type model: Optional[str]
     :param request_args: Additional arguments for the OpenAI request.
@@ -37,8 +33,6 @@ class OpenAIBackend(Backend):
         self,
         openai_api_key: Optional[str] = None,
         target: Optional[str] = None,
-        host: Optional[str] = None,
-        port: Optional[int] = None,
         model: Optional[str] = None,
         **request_args,
     ):
@@ -54,16 +48,12 @@ class OpenAIBackend(Backend):
             logger.error("{}", err)
             raise err
 
-        if target:
-            base_url = target
-        elif host and port:
-            base_url = f"{host}:{port}/v1"
-        elif settings.openai.base_url:
-            base_url = settings.openai.base_url
-        else:
+        base_url = target or settings.openai.base_url
+
+        if not base_url:
             err = ValueError(
                 "`GUIDELLM__OPENAI__BASE_URL` environment variable or "
-                "--target CLI parameter must be specified for the OpenAI backend."
+                "target parameter must be specified for the OpenAI backend."
             )
             logger.error("{}", err)
             raise err
