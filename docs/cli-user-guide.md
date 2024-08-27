@@ -1,7 +1,7 @@
 
 # GuideLLM CLI User Guide 
 
-For more details on setup and installation, see the Setup and [Installation](https://apps.neuralmagic.com/GuideLLM/README.MD/#Installation) sections. 
+For more details on setup and installation, see the Setup and [Installation](https://github.com/neuralmagic/guidellm?tab=readme-ov-file#installation) sections. 
 
 ## About GuideLLM
 
@@ -9,17 +9,46 @@ The GuideLLM CLI is a performance benchmarking tool to enable you to evaluate an
 
 ## GuideLLM CLI Quickstart 
 
-To get started with GuideLLM, you will need to have an inference server installed and available within the same cluster as GuideLLM. GuideLLM will take a target to an inference server as a mandatory argument, so it is important to have both libraries installed on the same GPU/TPU cluster. 
+#### 1. Start an OpenAI Compatible Server (vLLM)
 
-To get started with GuideLLM: 
-1. Deploy your model on the inference server of your choice. We recommend [vLLM](https://github.com/vllm-project/vllm). The inference server you choose should be `open-ai server` compatible for the best results. 
-2. Pip install GuideLLm with: `pip install guidellm`. 
-3. Once installed, cd into the GuideLLm directory with: `cd guidellm`. 
-4. In order to avoid compatibility issues with GuideLLm, it is recommended to run it in a fresh [virtual environment](https://docs.python.org/3/library/venv.html).
-5. Create a virtual environment with: `virtualenv -p python3.8 venv`. 
-6. Now activate the venv with: source `venv/bin/activate`.
-7. To run a benchmark on Neural Magic's W4A16 quantized Llama 3.1 8B , you can run the following command: ``python src/guidellm/main.py --target "http://HOST_URL/v1" --model "neuralmagic/Meta-Llama-3.1-8B-Instruct-quantized.w4a16" --data-type emulated --data "prompt_tokens=512,generated_tokens=128" --max-seconds 60``
-	- This benchmark will run with default values, unless otherwise specified. 
+GuideLLM requires an OpenAI-compatible server to run evaluations. It's recommended that [vLLM](https://github.com/vllm-project/vllm) be used for this purpose. To start a vLLM server with a Llama 3.1 8B quantized model, run the following command:
+
+```bash
+vllm serve "neuralmagic/Meta-Llama-3.1-8B-Instruct-quantized.w4a16"
+```
+
+For more information on starting a vLLM server, see the [vLLM Documentation](https://docs.vllm.ai/en/latest/serving/openai_compatible_server.html).
+
+#### 2. Run a GuideLLM Evaluation
+
+To run a GuideLLM evaluation, use the `guidellm` command with the appropriate model name and options on the server hosting the model or one with network access to the deployment server. For example, to evaluate the full performance range of the previously deployed Llama 3.1 8B model, run the following command:
+
+```bash
+guidellm \
+  --target "http://localhost:8000/v1" \
+  --model "neuralmagic/Meta-Llama-3.1-8B-Instruct-quantized.w4a16"
+```
+
+The above command will begin the evaluation and output progress updates similar to the following: <img src="https://github.com/neuralmagic/guidellm/blob/main/docs/assets/sample-benchmark.gif" />
+
+Notes:
+
+- The `--target` flag specifies the server hosting the model. In this case, it is a local vLLM server.
+- The `--model` flag specifies the model to evaluate. The model name should match the name of the model deployed on the server
+- By default, GuideLLM will run a `sweep` of performance evaluations across different request rates, each lasting 120 seconds. The results will be saved to a local directory.
+
+#### 3. Analyze the Results
+
+After the evaluation is completed, GuideLLM will output a summary of the results, including various performance metrics. The results will also be saved to a local directory for further analysis.
+
+The output results will start with a summary of the evaluation, followed by the requests data for each benchmark run. For example, the start of the output will look like the following:
+
+<img alt="Sample GuideLLM benchmark start output" src="https://github.com/neuralmagic/guidellm/blob/main/docs/assets/sample-output-start.png" />
+
+The end of the output will include important performance summary metrics such as request latency, time to first token (TTFT), inter-token latency (ITL), and more:
+
+<img alt="Sample GuideLLM benchmark end output" src="https://github.com/neuralmagic/guidellm/blob/main/docs/assets/sample-output-end.png" />
+
 	
 
 ## GuideLLM CLI Details
