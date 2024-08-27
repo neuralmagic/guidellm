@@ -16,11 +16,15 @@ class Distribution(Serializable):
     """
 
     data: Sequence[float] = Field(
-        default_factory=list, description="The data points of the distribution."
+        default_factory=list,
+        description="The data points of the distribution.",
     )
 
     def __str__(self):
         return f"Distribution({self.describe()})"
+
+    def __len__(self):
+        return len(self.data)
 
     @property
     def mean(self) -> float:
@@ -102,7 +106,7 @@ class Distribution(Serializable):
             logger.warning("No data points available to calculate percentiles.")
             return [0.0] * len(percentiles)
 
-        percentiles_values = np.percentile(self.data, percentiles).tolist()
+        percentiles_values: List[float] = np.percentile(self.data, percentiles).tolist()  # type: ignore  # noqa: PGH003
         logger.debug(f"Calculated percentiles {percentiles}: {percentiles_values}")
         return percentiles_values
 
@@ -116,7 +120,7 @@ class Distribution(Serializable):
             logger.warning("No data points available to calculate minimum.")
             return 0.0
 
-        min_value = np.min(self.data)
+        min_value: float = np.min(self.data)
         logger.debug(f"Calculated min: {min_value}")
         return min_value
 
@@ -130,7 +134,7 @@ class Distribution(Serializable):
             logger.warning("No data points available to calculate maximum.")
             return 0.0
 
-        max_value = np.max(self.data)
+        max_value: float = np.max(self.data)
         logger.debug(f"Calculated max: {max_value}")
         return max_value
 
@@ -160,7 +164,7 @@ class Distribution(Serializable):
             "std_deviation": self.std_deviation,
             "percentile_indices": [10, 20, 30, 40, 50, 60, 70, 80, 90, 95, 99],
             "percentile_values": self.percentiles(
-                [10, 20, 30, 40, 50, 60, 70, 80, 90, 95, 99]
+                [10, 20, 30, 40, 50, 60, 70, 80, 90, 95, 99],
             ),
             "min": self.min,
             "max": self.max,

@@ -164,3 +164,8 @@ cython_debug/
 
 # MacOS files
 .DS_Store
+
+
+# Project specific files
+*.json
+*.yaml
