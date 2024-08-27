@@ -254,12 +254,14 @@ The project configuration entrypoint is represented by lazy-loaded `settigns` si
 The project is fully configurable with environment variables. All the default values and
 
 ```py
-class NestedIntoLogging(BaseModel):
+class Nested(BaseModel):
     nested: str = "default value"
 
 class LoggingSettings(BaseModel):
     # ...
+
     disabled: bool = False
+    nested: Nested = Nested()
 
 
 class Settings(BaseSettings):
