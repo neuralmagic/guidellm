@@ -15,7 +15,8 @@ Scale Efficiently: Evaluate and Optimize Your LLM Deployments for Real-World Inf
 
 <p>
   <picture>
-    <img alt="GuideLLM User Flows" src="https://github.com/neuralmagic/guidellm/blob/main/docs/assets/guidellm-user-flows.png">
+    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/neuralmagic/guidellm/blob/main/docs/assets/guidellm-user-flows-dark.png">
+    <img alt="GuideLLM User Flows" src="https://github.com/neuralmagic/guidellm/blob/main/docs/assets/guidellm-user-flows-light.png">
   </picture>
 </p>
 
