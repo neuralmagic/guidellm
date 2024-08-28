@@ -237,7 +237,7 @@ def test_endless_data_words_create_text(data, start, length, expected_text):
 
 
 @pytest.mark.smoke()
-def test_emulated_request_generator_construction(mocker):
+def test_emulated_request_generator_construction(mocker, mock_auto_tokenizer):
     mocker.patch(
         "guidellm.request.emulated.EmulatedConfig.create_config",
         return_value=EmulatedConfig(prompt_tokens=10),
@@ -246,7 +246,9 @@ def test_emulated_request_generator_construction(mocker):
         "guidellm.request.emulated.EndlessTokens",
         return_value=EndlessTokens("word1 word2"),
     )
-    generator = EmulatedRequestGenerator(config="mock_config", mode="sync")
+    generator = EmulatedRequestGenerator(
+        config="mock_config", tokenizer="mock-tokenizer", mode="sync"
+    )
     assert isinstance(generator._config, EmulatedConfig)
     assert isinstance(generator._tokens, EndlessTokens)
 
@@ -276,7 +278,9 @@ def test_emulated_request_generator_sample_prompt(mocker, mock_auto_tokenizer):
         "guidellm.request.emulated.EndlessTokens",
         return_value=EndlessTokens("word1 word2"),
     )
-    generator = EmulatedRequestGenerator(config={"prompt_tokens": 3}, mode="sync")
+    generator = EmulatedRequestGenerator(
+        config={"prompt_tokens": 3}, tokenizer="mock-tokenizer", mode="sync"
+    )
     prompt = generator.sample_prompt(3)
     assert prompt == "word1 word2 word1"
 
@@ -285,7 +289,7 @@ def test_emulated_request_generator_sample_prompt(mocker, mock_auto_tokenizer):
 
 
 @pytest.mark.smoke()
-def test_emulated_request_generator_random_seed(mocker):
+def test_emulated_request_generator_random_seed(mocker, mock_auto_tokenizer):
     mocker.patch(
         "guidellm.request.emulated.EndlessTokens",
         return_value=EndlessTokens("word1 word2"),
@@ -293,16 +297,19 @@ def test_emulated_request_generator_random_seed(mocker):
 
     rand_gen = EmulatedRequestGenerator(
         config={"prompt_tokens": 20, "prompt_tokens_variance": 10},
+        tokenizer="mock-tokenizer",
         random_seed=42,
         mode="sync",
     )
     rand_gen_comp_pos = EmulatedRequestGenerator(
         config={"prompt_tokens": 20, "prompt_tokens_variance": 10},
+        tokenizer="mock-tokenizer",
         random_seed=42,
         mode="sync",
     )
     rand_gen_comp_neg = EmulatedRequestGenerator(
         config={"prompt_tokens": 20, "prompt_tokens_variance": 10},
+        tokenizer="mock-tokenizer",
         random_seed=43,
         mode="sync",
     )
@@ -339,13 +346,14 @@ def test_emulated_request_generator_lifecycle(
     config: Union[str, dict, Path],
 ):
     if config_type in ["dict", "json_str", "key_value_str"]:
-        generator = EmulatedRequestGenerator(config)
+        generator = EmulatedRequestGenerator(config, tokenizer="mock-tokenizer")
     elif config_type in ["file_str", "file_path"]:
         with tempfile.TemporaryDirectory() as temp_dir:
             file_path = Path(temp_dir) / "test.json"
             file_path.write_text(config)  # type: ignore
             generator = EmulatedRequestGenerator(
-                str(file_path) if config_type == "file_str" else file_path
+                str(file_path) if config_type == "file_str" else file_path,
+                tokenizer="mock-tokenizer",
             )
 
     for _ in range(5):

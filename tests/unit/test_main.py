@@ -232,6 +232,8 @@ def test_generate_benchmark_report_cli_smoke(
             "openai_server",
             "--data-type",
             "emulated",
+            "--data",
+            "prompt_tokens=512",
             "--rate-type",
             "sweep",
             "--max-seconds",
@@ -240,9 +242,11 @@ def test_generate_benchmark_report_cli_smoke(
             "10",
             "--output-path",
             "benchmark_report.json",
-            "--disable-continuous-refresh",
         ],
     )
+
+    if result.stdout:
+        print(result.stdout)  # noqa: T201
 
     assert result.exit_code == 0
     assert "Benchmarks" in result.output

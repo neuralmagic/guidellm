@@ -28,3 +28,17 @@ class TextGenerationRequest(Serializable):
         default_factory=dict,
         description="The parameters for the text generation request.",
     )
+
+    def __str__(self) -> str:
+        prompt_short = (
+            self.prompt[:32] + "..."
+            if self.prompt and len(self.prompt) > 32  # noqa: PLR2004
+            else self.prompt
+        )
+
+        return (
+            f"TextGenerationRequest(id={self.id}, "
+            f"prompt={prompt_short}, prompt_token_count={self.prompt_token_count}, "
+            f"output_token_count={self.output_token_count}, "
+            f"params={self.params})"
+        )

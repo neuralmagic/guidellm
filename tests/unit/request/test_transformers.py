@@ -28,6 +28,7 @@ def test_transformers_dataset_request_generator_constructor(
             dataset="dummy_dataset",
             split="train",
             column="text",
+            tokenizer="mock-tokenizer",
         )
         assert generator._dataset == "dummy_dataset"
         assert generator._split == "train"
@@ -45,6 +46,7 @@ def test_transformers_dataset_request_generator_create_item(
         dataset=create_sample_dataset_dict(),
         split="train",
         column="text",
+        tokenizer="mock-tokenizer",
         mode="sync",
     )
     request = generator.create_item()
@@ -83,7 +85,7 @@ def test_transformers_dataset_request_generator_lifecycle(
         return_value=dataset,
     ):
         generator = TransformersDatasetRequestGenerator(
-            dataset=dataset_arg, mode="sync"
+            dataset=dataset_arg, tokenizer="mock-tokenizer", mode="sync"
         )
 
         for index, request in enumerate(generator):

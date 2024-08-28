@@ -3,7 +3,7 @@ import threading
 import time
 from abc import ABC, abstractmethod
 from queue import Empty, Full, Queue
-from typing import Iterator, Literal, Optional, Union
+from typing import Iterator, Literal, Union
 
 from loguru import logger
 from transformers import (  # type: ignore  # noqa: PGH003
@@ -11,7 +11,6 @@ from transformers import (  # type: ignore  # noqa: PGH003
     PreTrainedTokenizer,
 )
 
-from guidellm.config import settings
 from guidellm.core.request import TextGenerationRequest
 
 __all__ = ["GenerationMode", "RequestGenerator"]
@@ -41,7 +40,7 @@ class RequestGenerator(ABC):
         self,
         type_: str,
         source: str,
-        tokenizer: Optional[Union[str, PreTrainedTokenizer]] = None,
+        tokenizer: Union[str, PreTrainedTokenizer],
         mode: GenerationMode = "async",
         async_queue_size: int = 50,
     ):
@@ -53,19 +52,16 @@ class RequestGenerator(ABC):
         self._stop_event: threading.Event = threading.Event()
 
         if not tokenizer:
-            self._tokenizer = AutoTokenizer.from_pretrained(
-                settings.dataset.default_tokenizer
-            )
-            logger.info("Initialized fake tokenizer for request generation")
-        else:
-            self._tokenizer = (
-                AutoTokenizer.from_pretrained(tokenizer)
-                if isinstance(tokenizer, str)
-                else tokenizer
-            )
-            logger.info(
-                "Tokenizer initialized for request generation: {}", self._tokenizer
-            )
+            err = "Tokenizer must be provided for request generation"
+            logger.error(err)
+            raise ValueError(err)
+
+        self._tokenizer = (
+            AutoTokenizer.from_pretrained(tokenizer)
+            if isinstance(tokenizer, str)
+            else tokenizer
+        )
+        logger.info("Tokenizer initialized for request generation: {}", self._tokenizer)
 
         if self._mode == "async":
             self._thread = threading.Thread(target=self._populate_queue, daemon=True)

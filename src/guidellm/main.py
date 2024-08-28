@@ -22,6 +22,7 @@ __all__ = ["generate_benchmark_report"]
 @click.option(
     "--target",
     type=str,
+    required=True,
     help=(
         "The target path or url for the backend to evaluate. "
         "Ex: 'http://localhost:8000/v1'"
@@ -33,8 +34,8 @@ __all__ = ["generate_benchmark_report"]
     default="openai_server",
     help=(
         "The backend to use for benchmarking. "
-        "The default is OpenAI Server enabling compatiability with any server that "
-        "follows the OpenAI spec including vLLM"
+        "The default is OpenAI Server enabling compatability with any server that "
+        "follows the OpenAI spec including vLLM."
     ),
 )
 @click.option(
@@ -49,18 +50,25 @@ __all__ = ["generate_benchmark_report"]
 @click.option(
     "--data",
     type=str,
-    default=None,
+    required=True,
     help=(
-        "The data source to use for benchmarking. Depending on the data-type, "
-        "it should be a path to a file, a dataset name, "
-        "or a configuration for emulated data."
+        "The data source to use for benchmarking. "
+        "Depending on the data-type, it should be a "
+        "path to a data file containing prompts to run (ex: data.txt), "
+        "a HuggingFace dataset name (ex: 'neuralmagic/LLM_compression_calibration'), "
+        "or a configuration for emulated data "
+        "(ex: 'prompt_tokens=128,generated_tokens=128')."
     ),
 )
 @click.option(
     "--data-type",
     type=click.Choice(["emulated", "file", "transformers"]),
-    default="emulated",
-    help="The type of data given for benchmarking",
+    required=True,
+    help=(
+        "The type of data to use for benchmarking. "
+        "Use 'emulated' for synthetic data, 'file' for a file, or 'transformers' "
+        "for a HuggingFace dataset. Specify the data source with the --data flag."
+    ),
 )
 @click.option(
     "--tokenizer",
@@ -68,7 +76,10 @@ __all__ = ["generate_benchmark_report"]
     default=None,
     help=(
         "The tokenizer to use for calculating the number of prompt tokens. "
-        "If not provided, will use a Llama 3.1 tokenizer."
+        "This should match the tokenizer used by the model."
+        "By default, it will use the --model flag to determine the tokenizer. "
+        "If not provided and the model is not available, will raise an error. "
+        "Ex: 'neuralmagic/Meta-Llama-3.1-8B-quantized.w8a8'"
     ),
 )
 @click.option(
@@ -77,15 +88,21 @@ __all__ = ["generate_benchmark_report"]
     default="sweep",
     help=(
         "The type of request rate to use for benchmarking. "
-        "The default is sweep, which will run a synchronous and throughput "
-        "rate-type and then interfill with constant rates between the two values"
+        "Use sweep to run a full range from synchronous to throughput (default), "
+        "synchronous for sending requests one after the other, "
+        "throughput to send requests as fast as possible, "
+        "constant for a fixed request rate, "
+        "or poisson for a real-world variable request rate."
     ),
 )
 @click.option(
     "--rate",
     type=float,
     default=None,
-    help="The request rate to use for constant and poisson rate types",
+    help=(
+        "The request rate to use for constant and poisson rate types. "
+        "To run multiple, provide the flag multiple times. "
+    ),
     multiple=True,
 )
 @click.option(
@@ -117,18 +134,20 @@ __all__ = ["generate_benchmark_report"]
 @click.option(
     "--output-path",
     type=str,
-    default="guidance_report.json",
+    default=None,
     help=(
-        "The output path to save the output report to. "
-        "The default is guidance_report.json."
+        "The output path to save the output report to for loading later. "
+        "Ex: guidance_report.json. "
+        "The default is None, meaning no output is saved and results are only "
+        "printed to the console."
     ),
 )
 @click.option(
-    "--disable-continuous-refresh",
+    "--enable-continuous-refresh",
     is_flag=True,
     default=False,
     help=(
-        "Disable continual refreshing of the output table in the CLI "
+        "Enable continual refreshing of the output table in the CLI "
         "until the user exits. "
     ),
 )
@@ -144,7 +163,7 @@ def generate_benchmark_report_cli(
     max_seconds: Optional[int],
     max_requests: Optional[int],
     output_path: str,
-    disable_continuous_refresh: bool,
+    enable_continuous_refresh: bool,
 ):
     """
     Generate a benchmark report for a specified backend and dataset.
@@ -161,7 +180,7 @@ def generate_benchmark_report_cli(
         max_seconds=max_seconds,
         max_requests=max_requests,
         output_path=output_path,
-        cont_refresh_table=not disable_continuous_refresh,
+        cont_refresh_table=enable_continuous_refresh,
     )
 
 
@@ -177,7 +196,7 @@ def generate_benchmark_report(
     max_seconds: Optional[int],
     max_requests: Optional[int],
     output_path: str,
-    cont_refresh_table: bool = True,
+    cont_refresh_table: bool,
 ) -> GuidanceReport:
     """
     Generate a benchmark report for a specified backend and dataset.
@@ -213,14 +232,26 @@ def generate_benchmark_report(
 
     request_generator: RequestGenerator
 
-    # Create request generator
+    # Create tokenizer and request generator
+    tokenizer_inst = tokenizer
+    if not tokenizer_inst:
+        try:
+            tokenizer_inst = backend_inst.model_tokenizer()
+        except Exception as err:
+            raise ValueError(
+                "Could not load model's tokenizer, "
+                "--tokenizer must be provided for request generation"
+            ) from err
+
     if data_type == "emulated":
-        request_generator = EmulatedRequestGenerator(config=data, tokenizer=tokenizer)
+        request_generator = EmulatedRequestGenerator(
+            config=data, tokenizer=tokenizer_inst
+        )
     elif data_type == "file":
-        request_generator = FileRequestGenerator(path=data, tokenizer=tokenizer)
+        request_generator = FileRequestGenerator(path=data, tokenizer=tokenizer_inst)
     elif data_type == "transformers":
         request_generator = TransformersDatasetRequestGenerator(
-            dataset=data, tokenizer=tokenizer
+            dataset=data, tokenizer=tokenizer_inst
         )
     else:
         raise ValueError(f"Unknown data type: {data_type}")
@@ -252,8 +283,14 @@ def generate_benchmark_report(
     # Save and print report
     guidance_report = GuidanceReport()
     guidance_report.benchmarks.append(report)
-    guidance_report.save_file(output_path)
-    guidance_report.print(output_path, continual_refresh=cont_refresh_table)
+
+    if output_path:
+        guidance_report.save_file(output_path)
+
+    guidance_report.print(
+        save_path=output_path if output_path is not None else "stdout",
+        continual_refresh=cont_refresh_table,
+    )
 
     return guidance_report
 
