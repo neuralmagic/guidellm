@@ -13,8 +13,6 @@ from guidellm.executor import (
     ProfileGenerationMode,
     ProfileGenerator,
 )
-from guidellm.executor.base import Executor, ExecutorResult
-from guidellm.executor.profile_generator import ProfileGenerator
 from guidellm.request import RequestGenerator
 from guidellm.scheduler import Scheduler, SchedulerResult
 

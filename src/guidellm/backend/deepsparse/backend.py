@@ -15,9 +15,16 @@ class DeepsparseBackend(Backend):
     """
 
     def __init__(self, model: Optional[str] = None, **request_args):
+        super().__init__(
+            type_="deepsparse",
+            model=self._get_model(model),
+            target="not used",
+        )
+
         self._request_args: Dict[str, Any] = request_args
-        self.model: str = self._get_model(model)
-        self.pipeline: Pipeline = TextGeneration(model=self.model)
+        self.pipeline: Pipeline = TextGeneration(model=self._model)
+
+        logger.info("Deepsparse Backend uses model {}", self._model)
 
     def _get_model(self, model_from_cli: Optional[str] = None) -> str:
         """Provides the model by the next priority list:
