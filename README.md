@@ -9,7 +9,7 @@
 Scale Efficiently: Evaluate and Optimize Your LLM Deployments for Real-World Inference Needs
 </h3>
 
-[![GitHub Release](https://img.shields.io/github/release/neuralmagic/guidellm.svg?label=Version)](https://github.com/neuralmagic/guidellm/releases) [![Documentation](https://img.shields.io/badge/Documentation-8A2BE2?logo=read-the-docs&logoColor=%23ffffff&color=%231BC070)](https://github.com/neuralmagic/guidellm/tree/main/docs) [![License](https://img.shields.io/github/license/neuralmagic/guidellm.svg)](https://github.com/neuralmagic/guidellm/blob/main/LICENSE) [![PyPi Release](https://img.shields.io/pypi/v/guidellm.svg?label=PyPi%20Release)](https://pypi.python.org/pypi/guidellm) [![Pypi Release](https://img.shields.io/pypi/v/guidellm-nightly.svg?label=PyPi%20Nightly)](https://pypi.python.org/pypi/guidellm-nightly) [![Python Versions](https://img.shields.io/pypi/pyversions/guidellm.svg?label=Python)](https://pypi.python.org/pypi/guidellm) [![Nightly Build](https://img.shields.io/github/actions/workflow/status/neuralmagic/guidellm/nightly.yml?branch=main&label=Nightly%20Build)](https://github.com/neuralmagic/guidellm/actions/workflows/nightly.yml)
+[![GitHub Release](https://img.shields.io/github/release/neuralmagic/guidellm.svg?label=Version)](https://github.com/neuralmagic/guidellm/releases) [![Documentation](https://img.shields.io/badge/Documentation-8A2BE2?logo=read-the-docs&logoColor=%23ffffff&color=%231BC070)](https://github.com/neuralmagic/guidellm/tree/main/docs) [![License](https://img.shields.io/github/license/neuralmagic/guidellm.svg)](https://github.com/neuralmagic/guidellm/blob/main/LICENSE) [![PyPI Release](https://img.shields.io/pypi/v/guidellm.svg?label=PyPI%20Release)](https://pypi.python.org/pypi/guidellm) [![Pypi Release](https://img.shields.io/pypi/v/guidellm-nightly.svg?label=PyPI%20Nightly)](https://pypi.python.org/pypi/guidellm-nightly) [![Python Versions](https://img.shields.io/pypi/pyversions/guidellm.svg?label=Python)](https://pypi.python.org/pypi/guidellm) [![Nightly Build](https://img.shields.io/github/actions/workflow/status/neuralmagic/guidellm/nightly.yml?branch=main&label=Nightly%20Build)](https://github.com/neuralmagic/guidellm/actions/workflows/nightly.yml)
 
 ## Overview
 
@@ -64,10 +64,12 @@ To run a GuideLLM evaluation, use the `guidellm` command with the appropriate mo
 ```bash
 guidellm \
   --target "http://localhost:8000/v1" \
-  --model "neuralmagic/Meta-Llama-3.1-8B-Instruct-quantized.w4a16"
+  --model "neuralmagic/Meta-Llama-3.1-8B-Instruct-quantized.w4a16" \
+  --data-type emulated \
+  --data "prompt_tokens=512,generated_tokens=128"
 ```
 
-The above command will begin the evaluation and output progress updates similar to the following: <img src="https://github.com/neuralmagic/guidellm/blob/main/docs/assets/sample-benchmark.gif" />
+The above command will begin the evaluation and output progress updates similar to the following (if running on a different server, be sure to update the target!): <img src="https://github.com/neuralmagic/guidellm/blob/main/docs/assets/sample-benchmark.gif" />
 
 Notes:
 
@@ -87,16 +89,38 @@ The end of the output will include important performance summary metrics such as
 
 <img alt="Sample GuideLLM benchmark end output" src="https://github.com/neuralmagic/guidellm/blob/main/docs/assets/sample-output-end.png" />
 
-### Advanced Settings
+### Configurations
 
-GuideLLM provides various options to customize evaluations, including setting the duration of each benchmark run, the number of concurrent requests, and the request rate. For a complete list of options and advanced settings, see the [GuideLLM CLI Documentation](https://github.com/neuralmagic/guidellm/blob/main/docs/guides/cli.md).
+GuideLLM provides various CLI and environment options to customize evaluations, including setting the duration of each benchmark run, the number of concurrent requests, and the request rate.
 
-Some common advanced settings include:
+Some common configurations for the CLI include:
 
-- `--rate-type`: The rate to use for benchmarking. Options include `sweep` (shown above), `synchronous` (one request at a time), `throughput` (all requests at once), `constant` (a constant rate defined by `--rate`), and `poisson` (a poisson distribution rate defined by `--rate`).
-- `--data-type`: The data to use for the benchmark. Options include `emulated` (default shown above, emulated to match a given prompt and output length), `transformers` (a transformers dataset), and `file` (a {text, json, jsonl, csv} file with a list of prompts).
+- `--rate-type`: The rate to use for benchmarking. Options include `sweep`, `synchronous`, `throughput`, `constant`, and `poisson`.
+  - `--rate-type sweep`: (default) Sweep runs through the full range of performance for the server. Starting with a `synchronous` rate first, then `throughput`, and finally 10 `constant` rates between the min and max request rate found.
+  - `--rate-type synchronous`: Synchronous runs requests in a synchronous manner, one after the other.
+  - `--rate-type throughput`: Throughput runs requests in a throughput manner, sending requests as fast as possible.
+  - `--rate-type constant`: Constant runs requests at a constant rate. Specify the rate in requests per second with the `--rate` argument. For example, `--rate 10` or multiple rates with `--rate 10 --rate 20 --rate 30`.
+  - `--rate-type poisson`: Poisson draws from a poisson distribution with the mean at the specified rate, adding some real-world variance to the runs. Specify the rate in requests per second with the `--rate` argument. For example, `--rate 10` or multiple rates with `--rate 10 --rate 20 --rate 30`.
+- `--data-type`: The data to use for the benchmark. Options include `emulated`, `transformers`, and `file`.
+  - `--data-type emulated`: Emulated supports an EmulationConfig in string or file format for the `--data` argument to generate fake data. Specify the number of prompt tokens at a minimum and optionally the number of output tokens and other params for variance in the length. For example, `--data "prompt_tokens=128"`, `--data "prompt_tokens=128,generated_tokens=128"`, or `--data "prompt_tokens=128,prompt_tokens_variance=10"`.
+  - `--data-type file`: File supports a file path or URL to a file for the `--data` argument. The file should contain data encoded as a CSV, JSONL, TXT, or JSON/YAML file with a single prompt per line for CSV, JSONL, and TXT or a list of prompts for JSON/YAML. For example, `--data "data.txt"` where data.txt contents are `"prompt1\nprompt2\nprompt3"`.
+  - `--data-type transformers`: Transformers supports a dataset name or dataset file path for the `--data` argument. For example, `--data "neuralmagic/LLM_compression_calibration"`.
 - `--max-seconds`: The maximum number of seconds to run each benchmark. The default is 120 seconds.
 - `--max-requests`: The maximum number of requests to run in each benchmark.
+
+For a full list of supported CLI arguments, run the following command:
+
+```bash
+guidellm --help
+```
+
+For a full list of configuration options, run the following command:
+
+```bash
+guidellm-config
+```
+
+For further information, see the [GuideLLM Documentation](#Documentation).
 
 ## Resources
 
@@ -108,7 +132,7 @@ Our comprehensive documentation provides detailed guides and resources to help y
 
 - [**Installation Guide**](https://github.com/neuralmagic/guidellm/tree/main/docs/install.md) - Step-by-step instructions to install GuideLLM, including prerequisites and setup tips.
 - [**Architecture Overview**](https://github.com/neuralmagic/guidellm/tree/main/docs/architecture.md) - A detailed look at GuideLLM's design, components, and how they interact.
-- [**CLI Guide**](https://github.com/neuralmagic/guidellm/tree/main/docs/guides/cli_usage.md) - Comprehensive usage information for running GuideLLM via the command line, including available commands and options.
+- [**CLI Guide**](https://github.com/neuralmagic/guidellm/tree/main/docs/guides/cli.md) - Comprehensive usage information for running GuideLLM via the command line, including available commands and options.
 - [**Configuration Guide**](https://github.com/neuralmagic/guidellm/tree/main/docs/guides/configuration.md) - Instructions on configuring GuideLLM to suit various deployment needs and performance goals.
 
 ### Supporting External Documentation

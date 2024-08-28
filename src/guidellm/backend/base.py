@@ -1,9 +1,14 @@
+import asyncio
 import functools
 from abc import ABC, abstractmethod
 from typing import AsyncGenerator, Dict, List, Literal, Optional, Type, Union
 
 from loguru import logger
 from pydantic import BaseModel
+from transformers import (  # type: ignore  # noqa: PGH003
+    AutoTokenizer,
+    PreTrainedTokenizer,
+)
 
 from guidellm.core import TextGenerationRequest, TextGenerationResult
 
@@ -103,9 +108,20 @@ class Backend(ABC):
         return Backend._registry[backend_type](**kwargs)
 
     def __init__(self, type_: BackendEngine, target: str, model: str):
+        """
+        Base constructor for the Backend class.
+        Calls into test_connection to ensure the backend is reachable.
+        Ensure all setup is done in the subclass constructor before calling super.
+
+        :param type_: The type of the backend.
+        :param target: The target URL for the backend.
+        :param model: The model used by the backend.
+        """
         self._type = type_
         self._target = target
         self._model = model
+
+        self.test_connection()
 
     @property
     def default_model(self) -> str:
@@ -147,6 +163,48 @@ class Backend(ABC):
         :rtype: str
         """
         return self._model
+
+    def model_tokenizer(self) -> PreTrainedTokenizer:
+        """
+        Get the tokenizer for the backend model.
+
+        :return: The tokenizer instance.
+        """
+        return AutoTokenizer.from_pretrained(self.model)
+
+    def test_connection(self) -> bool:
+        """
+        Test the connection to the backend by running a short text generation request.
+        If successful, returns True, otherwise raises an exception.
+
+        :return: True if the connection is successful.
+        :rtype: bool
+        :raises ValueError: If the connection test fails.
+        """
+        try:
+            asyncio.get_running_loop()
+            is_async = True
+        except RuntimeError:
+            is_async = False
+
+        if is_async:
+            logger.warning("Running in async mode, cannot test connection")
+            return True
+
+        try:
+            request = TextGenerationRequest(
+                prompt="Test connection", output_token_count=5
+            )
+
+            asyncio.run(self.submit(request))
+            return True
+        except Exception as err:
+            raise_err = RuntimeError(
+                f"Backend connection test failed for backend type={self.type_} "
+                f"with target={self.target} and model={self.model} with error: {err}"
+            )
+            logger.error(raise_err)
+            raise raise_err from err
 
     async def submit(self, request: TextGenerationRequest) -> TextGenerationResult:
         """

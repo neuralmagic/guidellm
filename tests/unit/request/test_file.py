@@ -12,7 +12,7 @@ def test_file_request_generator_constructor(mock_auto_tokenizer):
     with tempfile.TemporaryDirectory() as temp_dir:
         file_path = Path(temp_dir) / "example.txt"
         file_path.write_text("This is a test.\nThis is another test.")
-        generator = FileRequestGenerator(file_path)
+        generator = FileRequestGenerator(file_path, tokenizer="mock-tokenizer")
         assert generator._path == file_path
         assert generator._data == ["This is a test.", "This is another test."]
         assert generator._iterator is not None
@@ -23,7 +23,9 @@ def test_file_request_generator_create_item(mock_auto_tokenizer):
     with tempfile.TemporaryDirectory() as temp_dir:
         file_path = Path(temp_dir) / "example.txt"
         file_path.write_text("This is a test.\nThis is another test.")
-        generator = FileRequestGenerator(file_path, mode="sync")
+        generator = FileRequestGenerator(
+            file_path, tokenizer="mock-tokenizer", mode="sync"
+        )
         request = generator.create_item()
         assert isinstance(request, TextGenerationRequest)
         assert request.prompt == "This is a test."
@@ -87,7 +89,7 @@ def test_file_request_generator_file_types_lifecycle(
     with tempfile.TemporaryDirectory() as temp_dir:
         file_path = Path(temp_dir) / f"example.{file_extension}"
         file_path.write_text(file_content)
-        generator = FileRequestGenerator(file_path)
+        generator = FileRequestGenerator(file_path, tokenizer="mock-tokenizer")
 
         for index, request in enumerate(generator):
             assert isinstance(request, TextGenerationRequest)
