@@ -1,10 +1,12 @@
-from typing import Any, AsyncGenerator, List, Optional
+import os
+from typing import Any, AsyncGenerator, Dict, List, Optional
 
-from deepsparse import Pipeline
+from deepsparse import Pipeline, TextGeneration
 from loguru import logger
 from transformers import AutoTokenizer
 
 from guidellm.backend import Backend, GenerativeResponse
+from guidellm.config import settings
 from guidellm.core import TextGenerationRequest
 
 
@@ -15,11 +17,30 @@ class DeepsparseBackend(Backend):
     """
 
     def __init__(self, model: Optional[str] = None, **request_args):
-        self.request_args = request_args
-        self.pipeline: Pipeline = Pipeline.create(
-            task="sentiment-analysis",
-            model_path=model or self.default_model,
-        )
+        self._request_args: Dict[str, Any] = request_args
+        self.model: str = self._get_model(model)
+        self.pipeline: Pipeline = TextGeneration(model=self.model)
+
+    def _get_model(self, model_from_cli: Optional[str] = None) -> str:
+        """Provides the model by the next priority list:
+        1. from function argument (comes from CLI)
+        1. from environment variable
+        2. `self.default_model` from `self.available_models`
+        """
+
+        if model_from_cli is not None:
+            return model_from_cli
+        elif settings.deepsprase.model is not None:
+            logger.info(
+                "Using Deepsparse model from environment variable: {}".format(
+                    settings.deepsprase.model
+                )
+            )
+            return settings.deepsprase.model
+
+        else:
+            logger.info(f"Using default Deepsparse model: {self.default_model}")
+            return self.default_model
 
     async def make_request(
         self, request: TextGenerationRequest
@@ -38,8 +59,23 @@ class DeepsparseBackend(Backend):
         )
 
         token_count = 0
-        for response in self.pipeline.generations:
-            if not (token := response.text):
+        request_args = {
+            **self._request_args,
+            "streaming": True,
+            "max_new_tokens": request.output_token_count,
+        }
+
+        if not (output := self.pipeline(prompt=request.prompt, **request_args)):
+            yield GenerativeResponse(
+                type_="final",
+                prompt=request.prompt,
+                prompt_token_count=request.prompt_token_count,
+                output_token_count=token_count,
+            )
+            return
+
+        for generation in output.generations:
+            if not (token := generation.text):
                 yield GenerativeResponse(
                     type_="final",
                     prompt=request.prompt,
@@ -66,10 +102,7 @@ class DeepsparseBackend(Backend):
         """
 
         # WARNING: The default model from the documentation is defined here
-
-        return [
-            "zoo:nlp/sentiment_analysis/obert-base/pytorch/huggingface/sst2/pruned90_quant-none"
-        ]
+        return ["hf:mgoin/TinyStories-33M-quant-deepsparse"]
 
     def model_tokenizer(self, model: str) -> Optional[Any]:
         """

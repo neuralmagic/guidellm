@@ -112,7 +112,7 @@ class DeepsparseSettings(BaseModel):
     Deepsparse settings for the Python API library
     """
 
-    model: str = "zoo:mpt-7b-dolly_mpt_pretrain-pruned50_quantized"
+    model: Optional[str] = None
 
 
 class ReportGenerationSettings(BaseModel):
@@ -135,6 +135,7 @@ class Settings(BaseSettings):
     ```sh
     export GUIDELLM__LOGGING__DISABLED=true
     export GUIDELLM__OPENAI__API_KEY=******
+    export GUIDELLM__DEEPSPARSE__MODEL=******
     ```
     """
 

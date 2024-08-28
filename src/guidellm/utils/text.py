@@ -1,8 +1,10 @@
 import csv
 import json
+import random
 import re
+import string
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, Generator, List, Optional, Tuple, Union
 from urllib.parse import urlparse
 
 import ftfy
@@ -23,6 +25,7 @@ __all__ = [
     "parse_text_objects",
     "split_lines_by_punctuation",
     "split_text",
+    "random_strings",
 ]
 
 
@@ -453,3 +456,30 @@ def load_text_lines(
 
     # extract the lines from the data
     return [row[filter_] for row in data] if filter_ else [str(row) for row in data]
+
+
+def random_strings(
+    min: int, max: int, n: int = 0, dataset: Optional[str] = None
+) -> Generator[str, None, None]:
+    """Yield random strings.
+
+    :param min: the min number of output characters
+    :param max: the max number of output characters
+    :param n: the number of outputs. If `0` -> works for infinite
+    :param dataset: represents allowed characters for the operation
+    """
+
+    characters: str = dataset or string.printable
+
+    if n < 0:
+        raise ValueError("'n' must be >= '0'")
+    elif n == 0:
+        while True:
+            yield "".join(
+                (random.choice(characters) for _ in range(random.randint(min, max)))
+            )
+    else:
+        for _ in range(n):
+            yield "".join(
+                (random.choice(characters) for _ in range(random.randint(min, max)))
+            )

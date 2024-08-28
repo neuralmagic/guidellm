@@ -1,5 +1,5 @@
 from .base import Backend, BackendEngine, GenerativeResponse
-from .deepsparse import DeepsparseBackend
+from .deepsparse.backend import DeepsparseBackend
 from .openai import OpenAIBackend
 
 __all__ = [

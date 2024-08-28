@@ -9,6 +9,7 @@ from .text import (
     load_text,
     load_text_lines,
     parse_text_objects,
+    random_strings,
     split_lines_by_punctuation,
     split_text,
 )
@@ -30,6 +31,7 @@ __all__ = [
     "load_text",
     "load_text_lines",
     "load_transformers_dataset",
+    "random_strings",
     "parse_text_objects",
     "resolve_transformers_dataset",
     "resolve_transformers_dataset_column",

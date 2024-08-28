@@ -22,7 +22,3 @@ module_is_available(
         "Please try `pip install -e '.[deepsparse]'`"
     ),
 )
-
-from .backend import DeepsparseBackend
-
-__all__ = ["DeepsparseBackend"]
