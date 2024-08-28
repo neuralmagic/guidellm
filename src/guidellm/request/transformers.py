@@ -65,7 +65,13 @@ class TransformersDatasetRequestGenerator(RequestGenerator):
 
         # NOTE: Must be after all the parameters since the queue population
         #       function requires attributes above
-        super().__init__(tokenizer, mode, async_queue_size)
+        super().__init__(
+            type_="transformers_dataset",
+            source=str(dataset),
+            tokenizer=tokenizer,
+            mode=mode,
+            async_queue_size=async_queue_size,
+        )
 
     def create_item(self) -> TextGenerationRequest:
         """

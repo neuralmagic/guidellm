@@ -71,8 +71,6 @@ def mock_openai_client():
     (
         "openai_api_key",
         "target",
-        "host",
-        "port",
         "model",
         "request_args",
         "expected_base_url",
@@ -81,21 +79,16 @@ def mock_openai_client():
         (
             "test_key",
             "http://test-target",
-            None,
-            None,
             "test-model",
             {"arg1": "value1"},
             "http://test-target",
         ),
-        ("test_key", None, "localhost", 8000, "test-model", {}, "localhost:8000"),
-        (None, None, None, None, None, {}, settings.openai.base_url),
+        (None, None, None, {}, settings.openai.base_url),
     ],
 )
 def test_openai_backend_create(
     openai_api_key,
     target,
-    host,
-    port,
     model,
     request_args,
     expected_base_url,
@@ -106,16 +99,12 @@ def test_openai_backend_create(
             "openai_server",
             openai_api_key=openai_api_key,
             target=target,
-            host=host,
-            port=port,
             model=model,
             **request_args,
         ),
         OpenAIBackend(
             openai_api_key=openai_api_key,
             target=target,
-            host=host,
-            port=port,
             model=model,
             **request_args,
         ),
@@ -255,9 +244,9 @@ def test_openai_backend_target(mock_openai_client):
     assert backend._async_client.kwargs["base_url"] == "http://test-target"  # type: ignore
     assert backend._client.kwargs["base_url"] == "http://test-target"  # type: ignore
 
-    backend = OpenAIBackend(host="localhost", port=8000)
-    assert backend._async_client.kwargs["base_url"] == "localhost:8000"  # type: ignore
-    assert backend._client.kwargs["base_url"] == "localhost:8000"  # type: ignore
+    backend = OpenAIBackend()
+    assert backend._async_client.kwargs["base_url"] == "http://localhost:8000/v1"  # type: ignore
+    assert backend._client.kwargs["base_url"] == "http://localhost:8000/v1"  # type: ignore
 
     backend = OpenAIBackend()
     assert backend._async_client.kwargs["base_url"] == settings.openai.base_url  # type: ignore
@@ -290,4 +279,4 @@ def test_openai_backend_target_none_error(mock_openai_client, mocker):
     reload_settings()
 
     with pytest.raises(ValueError):
-        OpenAIBackend(target=None, host=None, port=None)
+        OpenAIBackend(target=None)

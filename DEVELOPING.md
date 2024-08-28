@@ -2,8 +2,7 @@
 
 ## Introduction
 
-Welcome to the developer documentation for `guidellm`, a guidance platform for evaluating large language model deployments.
-This document aims to provide developers with all the necessary information to contribute to the project effectively.
+Welcome to the developer documentation for `guidellm`, a guidance platform for evaluating large language model deployments. This document aims to provide developers with all the necessary information to contribute to the project effectively.
 
 ## Getting Started
 
@@ -28,12 +27,11 @@ All the dependencies are specified in `pyproject.toml` file. There is an option 
 
 Install required dependencies along with optional `dev` dependencies.
 
-```sh
+```bash
+git clone https://github.com/neuralmagic/guidellm.git
+cd guidellm
 pip install -e .[dev]
-# or pip install -e '.[dev]'
 ```
-
-#### Working with **Not-Default** backends
 
 If you work with `deepsparse` backend, etc it has some other software limitations.
 In order to install dependencies for the specific backend, run:
@@ -75,6 +73,7 @@ To set up your development environment, follow these steps:
    ```
 
 2. Ensure all dependencies are installed:
+
    ```bash
    pip install -e .[dev]
    ```
@@ -135,8 +134,7 @@ To run all tests:
 tox
 ```
 
-Additionally, all tests are marked with smoke, sanity, or regression tags for better organization.
-To run tests with a specific tag, use the `-m` flag:
+Additionally, all tests are marked with smoke, sanity, or regression tags for better organization. To run tests with a specific tag, use the `-m` flag:
 
 ```bash
 tox -- -m "smoke or sanity"
@@ -144,8 +142,7 @@ tox -- -m "smoke or sanity"
 
 ### Running Unit Tests
 
-The unit tests are located in the `tests/unit` directory.
-To run the unit tests, use the following command:
+The unit tests are located in the `tests/unit` directory. To run the unit tests, use the following command:
 
 ```bash
 tox -e test-unit
@@ -153,8 +150,7 @@ tox -e test-unit
 
 ### Running Integration Tests
 
-The integration tests are located in the `tests/integration` directory.
-To run the integration tests, use the following command:
+The integration tests are located in the `tests/integration` directory. To run the integration tests, use the following command:
 
 ```bash
 tox -e test-integration
@@ -162,8 +158,7 @@ tox -e test-integration
 
 ### Running End-to-End Tests
 
-The end-to-end tests are located in the `tests/e2e` directory.
-To run the end-to-end tests, use the following command:
+The end-to-end tests are located in the `tests/e2e` directory. To run the end-to-end tests, use the following command:
 
 ```bash
 tox -e test-e2e
@@ -213,9 +208,7 @@ tox -e clean
 
 ## Continuous Integration/Continuous Deployment (CI/CD)
 
-Our CI/CD pipeline is configured using GitHub Actions.
-The configuration files are located in the .github/workflows/ directory.
-You can run the CI/CD pipeline locally using act or similar tools.
+Our CI/CD pipeline is configured using GitHub Actions. The configuration files are located in the .github/workflows/ directory. You can run the CI/CD pipeline locally using act or similar tools.
 
 ## Contributing
 

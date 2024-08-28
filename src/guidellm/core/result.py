@@ -174,9 +174,6 @@ class TextGenerationError(Serializable):
         description="The error message that occurred during text generation.",
     )
 
-    def model_post_init(self, _: Any):
-        logger.error(f"Text generation error occurred: {self.message}")
-
 
 class RequestConcurrencyMeasurement(Serializable):
     """
@@ -191,7 +188,7 @@ class RequestConcurrencyMeasurement(Serializable):
 
 class TextGenerationBenchmark(Serializable):
     """
-    A class to represent a benchmark of text generation requests
+    A class to represent a report of text generation requests
     (results and errors) for generative AI workloads.
     This is a set of results and errors for a specific mode and rate.
     """
@@ -245,6 +242,55 @@ class TextGenerationBenchmark(Serializable):
         return len(self.errors)
 
     @property
+    def total_count(self) -> int:
+        """
+        Get the total number of requests in the result.
+
+        :return: The total number of requests.
+        :rtype: int
+        """
+        return self.request_count + self.error_count
+
+    @property
+    def start_time(self) -> Optional[float]:
+        """
+        Get the start time of the first request in the result.
+
+        :return: The start time of the first request.
+        :rtype: Optional[float]
+        """
+        if not self.results:
+            return None
+
+        return self.results[0].start_time
+
+    @property
+    def end_time(self) -> Optional[float]:
+        """
+        Get the end time of the last request in the result.
+
+        :return: The end time of the last request.
+        :rtype: Optional[float]
+        """
+        if not self.results:
+            return None
+
+        return self.results[-1].end_time
+
+    @property
+    def duration(self) -> float:
+        """
+        Get the duration of the result in seconds.
+
+        :return: The duration of the result.
+        :rtype: float
+        """
+        if not self.results or not self.start_time or not self.end_time:
+            return 0.0
+
+        return self.end_time - self.start_time
+
+    @property
     def completed_request_rate(self) -> float:
         """
         Get the rate of requests per second in the result.
@@ -252,15 +298,130 @@ class TextGenerationBenchmark(Serializable):
         :return: The rate of requests per second.
         :rtype: float
         """
+        if not self.results or not self.duration:
+            return 0.0
+
+        return len(self.results) / self.duration
+
+    @property
+    def request_latency(self) -> float:
+        """
+        Get the average request latency in seconds.
+
+        :return: The average request latency in seconds.
+        :rtype: float
+        """
         if not self.results:
             return 0.0
 
-        if self.results[0].start_time is None or self.results[-1].end_time is None:
-            raise ValueError("Start time and End time are not defined")
+        return self.request_latency_distribution.mean
 
-        time_diff = self.results[-1].end_time - self.results[0].start_time
+    @property
+    def request_latency_distribution(self) -> Distribution:
+        """
+        Get the distribution of request latencies.
 
-        return len(self.results) / time_diff
+        :return: The distribution of request latencies.
+        :rtype: Distribution
+        """
+        return Distribution(
+            data=[
+                result.end_time - result.start_time
+                for result in self.results
+                if result.end_time is not None and result.start_time is not None
+            ]
+        )
+
+    @property
+    def time_to_first_token(self) -> float:
+        """
+        Get the time taken to decode the first token in milliseconds.
+
+        :return: The time taken to decode the first token in milliseconds.
+        :rtype: float
+        """
+        if not self.results:
+            return 0.0
+
+        return 1000 * self.ttft_distribution.mean
+
+    @property
+    def ttft_distribution(self) -> Distribution:
+        """
+        Get the distribution of time taken to decode the first token.
+
+        :return: The distribution of time taken to decode the first token.
+        :rtype: Distribution
+        """
+        return Distribution(
+            data=[
+                result.first_token_time
+                for result in self.results
+                if result.first_token_time is not None
+            ]
+        )
+
+    @property
+    def inter_token_latency(self) -> float:
+        """
+        Get the average time between tokens in milliseconds.
+
+        :return: The average time between tokens.
+        :rtype: float
+        """
+        if not self.results:
+            return 0.0
+
+        return 1000 * self.itl_distribution.mean
+
+    @property
+    def itl_distribution(self) -> Distribution:
+        """
+        Get the distribution of time between tokens.
+
+        :return: The distribution of time between tokens.
+        :rtype: Distribution
+        """
+        return Distribution(
+            data=[
+                decode for result in self.results for decode in result.decode_times.data
+            ]
+        )
+
+    @property
+    def output_token_throughput(self) -> float:
+        """
+        Get the average token throughput in tokens per second.
+
+        :return: The average token throughput.
+        :rtype: float
+        """
+        if not self.results or not self.duration:
+            return 0.0
+
+        total_tokens = sum(result.output_token_count for result in self.results)
+
+        return total_tokens / self.duration
+
+    @property
+    def prompt_token_distribution(self) -> Distribution:
+        """
+        Get the distribution of prompt token counts.
+
+        :return: The distribution of prompt token counts.
+        :rtype: Distribution
+        """
+        return Distribution(data=[result.prompt_token_count for result in self.results])
+
+    @property
+    def output_token_distribution(self) -> Distribution:
+        """
+        Get the distribution of output token counts.
+
+        :return: The distribution of output token counts.
+        :rtype: Distribution
+        """
+        return Distribution(data=[result.output_token_count for result in self.results])
 
     @property
     def overloaded(self) -> bool:
@@ -321,7 +482,7 @@ class TextGenerationBenchmark(Serializable):
         if isinstance(result, TextGenerationError):
             is_error = True
             self.errors.append(result)
-            logger.warning(
+            logger.info(
                 "Text generation request resulted in error: {}",
                 result.message,
             )

@@ -17,7 +17,7 @@ class FileRequestGenerator(RequestGenerator):
     A request generator implementation for files.
 
     :param path: The path to the file containing the data.
-    :type path: Union[str, Path]
+    :type path: Optional[Union[str, Path]]
     :param tokenizer: The tokenizer instance or the name/config to use
         for tokenizing prompts.
     :type tokenizer: Union[str, PreTrainedTokenizer]
@@ -29,11 +29,14 @@ class FileRequestGenerator(RequestGenerator):
 
     def __init__(
         self,
-        path: Union[str, Path],
+        path: Optional[Union[str, Path]],
         tokenizer: Optional[Union[str, PreTrainedTokenizer]] = None,
         mode: GenerationMode = "async",
         async_queue_size: int = 50,
     ):
+        if not path:
+            raise ValueError("File path must be provided for FileRequestGenerator")
+
         self._path = path
         self._data = load_text_lines(
             path,
@@ -43,7 +46,13 @@ class FileRequestGenerator(RequestGenerator):
 
         # NOTE: Must be after all the parameters since the queue population
         #       function requires attributes above
-        super().__init__(tokenizer, mode, async_queue_size)
+        super().__init__(
+            type_="file",
+            source=str(path),
+            tokenizer=tokenizer,
+            mode=mode,
+            async_queue_size=async_queue_size,
+        )
 
     def create_item(self) -> TextGenerationRequest:
         """

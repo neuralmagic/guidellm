@@ -35,6 +35,7 @@ dependencies = [
     "pydantic-settings>=2.0.0",
     "pyyaml>=6.0.0",
     "requests",
+    "rich",
     "transformers",
 ]
 
@@ -58,6 +59,12 @@ dev = [
     "mypy~=1.10.1",
     "ruff~=0.5.2",
 
+    # docs quality
+    "mdformat~=0.7.17",
+    "mdformat-footnote~=0.1.1",
+    "mdformat-frontmatter~=2.0.8",
+    "mdformat-gfm~=0.3.6",
+
     # type-checking
     "types-click~=7.1.8",
     "types-PyYAML~=6.0.1",
@@ -70,7 +77,7 @@ deepsparse = [
 
 
 [project.entry-points.console_scripts]
-guidellm = "guidellm.main:main"
+guidellm = "guidellm.main:generate_benchmark_report_cli"
 
 
 # ************************************************
@@ -192,6 +199,7 @@ select = [
     "PT011", # allow generic exceptions in tests
     "N806", # allow uppercase variable names in tests
     "PGH003", # allow general ignores in tests
+    "PLR0915", # allow complext statements in tests
 ]
 
 [tool.ruff.lint.isort]

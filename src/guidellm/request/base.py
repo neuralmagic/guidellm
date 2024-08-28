@@ -24,6 +24,10 @@ class RequestGenerator(ABC):
     """
     A base class for request generators that generate result requests.
 
+    :param type_: The type of the request generator.
+    :type type_: str
+    :param source: The data source for the request generator.
+    :type source: str
     :param tokenizer: The tokenizer instance or the name/config to use
         for tokenizing prompts.
     :type tokenizer: Union[str, PreTrainedTokenizer]
@@ -35,10 +39,14 @@ class RequestGenerator(ABC):
 
     def __init__(
         self,
+        type_: str,
+        source: str,
         tokenizer: Optional[Union[str, PreTrainedTokenizer]] = None,
         mode: GenerationMode = "async",
         async_queue_size: int = 50,
     ):
+        self._type = type_
+        self._source = source
         self._async_queue_size: int = async_queue_size
         self._mode: str = mode
         self._queue: Queue = Queue(maxsize=async_queue_size)
@@ -100,6 +108,26 @@ class RequestGenerator(ABC):
         else:
             while not self._stop_event.is_set():
                 yield self.create_item()
+
+    @property
+    def type_(self) -> str:
+        """
+        Get the type of the request generator.
+
+        :return: The type of the request generator.
+        :rtype: str
+        """
+        return self._type
+
+    @property
+    def source(self) -> str:
+        """
+        Get the data source for the request generator.
+
+        :return: The data source.
+        :rtype: str
+        """
+        return self._source
 
     @property
     def tokenizer(self) -> PreTrainedTokenizer:

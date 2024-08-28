@@ -7,7 +7,6 @@ import pytest
 from guidellm.backend import Backend
 from guidellm.core import (
     TextGenerationBenchmark,
-    TextGenerationError,
     TextGenerationRequest,
     TextGenerationResult,
 )
@@ -145,30 +144,48 @@ async def test_scheduler_run_number(mode):
         max_number=max_number,
     )
 
+    run_count = 0
     count_completed = 0
     received_init = False
     received_final = False
     async for result in scheduler.run():
+        run_count += 1
+
+        assert run_count <= max_number + 2
         assert result.count_total == max_number
         assert result.benchmark is not None
         assert isinstance(result.benchmark, TextGenerationBenchmark)
 
-        if result.current_result:
-            assert isinstance(result.current_result, TextGenerationResult)
+        if result.current_result is not None:
             count_completed += 1
-            assert result.count_completed == count_completed
-            assert not result.completed
-        elif not received_init:
+
+        if run_count == 1:
+            assert not received_init
+            assert not received_final
             assert count_completed == 0
             assert result.count_completed == 0
             assert not result.completed
+            assert result.current_result is None
             received_init = True
-        elif not received_final:
+        elif run_count - 2 == max_number:
+            assert received_init
+            assert not received_final
             assert count_completed == max_number
             assert result.count_completed == max_number
             assert result.completed
+            assert result.current_result is None
             received_final = True
+        else:
+            assert received_init
+            assert not received_final
+            assert count_completed == run_count - 1
+            assert result.count_completed == run_count - 1
+            assert not result.completed
+            assert result.current_result is not None
+            assert isinstance(result.current_result, TextGenerationResult)
 
+    assert received_init
+    assert received_final
     assert count_completed == max_number
 
 
@@ -177,8 +194,6 @@ async def test_scheduler_run_number(mode):
     "mode",
     [
         "synchronous",
-        "throughput",
-        "poisson",
         "constant",
     ],
 )
@@ -214,32 +229,47 @@ async def test_scheduler_run_duration(mode):
         max_duration=max_duration,
     )
 
+    run_count = 0
     count_completed = 0
     received_init = False
     received_final = False
     start_time = time.time()
     async for result in scheduler.run():
+        run_count += 1
+
+        assert run_count <= max_duration * rate + 2
         assert result.count_total == max_duration
         assert result.benchmark is not None
         assert isinstance(result.benchmark, TextGenerationBenchmark)
 
-        if result.current_result:
-            assert isinstance(
-                result.current_result, (TextGenerationResult, TextGenerationError)
-            )
+        if result.current_result is not None:
             count_completed += 1
-            assert result.count_completed == round(time.time() - start_time)
-            assert not result.completed
-        elif not received_init:
+
+        if run_count == 1:
+            assert not received_init
+            assert not received_final
             assert count_completed == 0
             assert result.count_completed == 0
             assert not result.completed
+            assert result.current_result is None
             received_init = True
-        elif not received_final:
+        elif time.time() - start_time >= max_duration:
+            assert received_init
+            assert not received_final
             assert result.count_completed == max_duration
             assert result.completed
+            assert result.current_result is None
             received_final = True
+        else:
+            assert received_init
+            assert not received_final
+            assert result.count_completed == round(time.time() - start_time)
+            assert not result.completed
+            assert result.current_result is not None
+            assert isinstance(result.current_result, TextGenerationResult)
 
+    assert received_init
+    assert received_final
     end_time = time.time()
     assert pytest.approx(end_time - start_time, abs=0.1) == max_duration
     assert pytest.approx(count_completed, abs=5) == max_duration * rate

@@ -1,7 +1,8 @@
-from typing import Dict, List, Literal, Optional, Union, get_args
+from typing import Any, Dict, Literal, Optional, Sequence, Union, get_args
 
 import numpy as np
 from loguru import logger
+from pydantic import Field
 
 from guidellm.config import settings
 from guidellm.core import TextGenerationBenchmark, TextGenerationBenchmarkReport
@@ -27,10 +28,13 @@ class Profile(Serializable):
     :type load_gen_mode: LoadGenerationMode
     :param load_gen_rate: The rate of load generation, if applicable.
     :type load_gen_rate: Optional[float]
+    :param args: Additional arguments for the profile.
+    :type args: Optional[Dict[str, Any]]
     """
 
     load_gen_mode: LoadGenerationMode
     load_gen_rate: Optional[float] = None
+    args: Dict[str, Any] = Field(default_factory=dict)
 
 
 class ProfileGenerator:
@@ -40,13 +44,13 @@ class ProfileGenerator:
     :param mode: The mode for profile generation (e.g., sweep, synchronous).
     :type mode: ProfileGenerationMode
     :param rate: The rate(s) for load generation; could be a float or list of floats.
-    :type rate: Optional[Union[float, List[float]]]
+    :type rate: Optional[Union[float, Sequence[float]]]
     """
 
     def __init__(
         self,
         mode: ProfileGenerationMode,
-        rate: Optional[Union[float, List[float]]] = None,
+        rate: Optional[Union[float, Sequence[float]]] = None,
     ):
         if mode not in get_args(ProfileGenerationMode):
             err = ValueError(
@@ -69,7 +73,7 @@ class ProfileGenerator:
                 err = ValueError(f"Rates are required for {self._mode} mode")
                 logger.error(err)
                 raise err
-            self._rates = rate if isinstance(rate, list) else [rate]
+            self._rates = rate if isinstance(rate, Sequence) else [rate]
 
             for rt in self._rates:
                 if rt <= 0:
@@ -89,7 +93,7 @@ class ProfileGenerator:
         :rtype: int
         """
         if self._mode == "sweep":
-            return settings.num_sweep_profiles
+            return settings.num_sweep_profiles + 2
 
         if self._mode in ("throughput", "synchronous"):
             return 1
@@ -110,12 +114,12 @@ class ProfileGenerator:
         return self._mode
 
     @property
-    def rates(self) -> Optional[List[float]]:
+    def rates(self) -> Optional[Sequence[float]]:
         """
         Returns the list of rates for load generation, if any.
 
-        :return: List of rates or None if not applicable.
-        :rtype: Optional[List[float]]
+        :return: Sequence of rates or None if not applicable.
+        :rtype: Optional[Sequence[float]]
         """
         return self._rates
 
@@ -129,11 +133,35 @@ class ProfileGenerator:
         """
         return self._generated_count
 
+    @property
+    def profile_generation_modes(self) -> Sequence[ProfileGenerationMode]:
+        """
+        Return the list of profile modes to be run in the report.
+
+        :return: Sequence of profile modes to be run in the report.
+        :rtype: Sequence[ProfileGenerationMode]
+        """
+        if self._mode == "sweep":
+            return ["synchronous", "throughput"] + ["constant"] * (  # type: ignore  # noqa: PGH003
+                settings.num_sweep_profiles
+            )
+
+        if self._mode in ["throughput", "synchronous"]:
+            return [self._mode]
+
+        if self._rates is None:
+            raise ValueError(f"Rates are required for {self._mode} mode")
+
+        if self._mode in ["constant", "poisson"]:
+            return [self._mode] * len(self._rates)
+
+        raise ValueError(f"Invalid mode: {self._mode}")
+
     def next(self, current_report: TextGenerationBenchmarkReport) -> Optional[Profile]:
         """
         Generates the next profile based on the current mode and report.
 
-        :param current_report: The current benchmark report.
+        :param current_report: The current report report.
         :type current_report: TextGenerationBenchmarkReport
         :return: The generated profile or None if no more profiles.
         :rtype: Optional[Profile]
@@ -186,7 +214,7 @@ class ProfileGenerator:
 
     @staticmethod
     def create_fixed_rate_profile(
-        index: int, mode: ProfileGenerationMode, rates: List[float]
+        index: int, mode: ProfileGenerationMode, rates: Sequence[float]
     ) -> Optional[Profile]:
         """
         Creates a profile with a fixed rate.
@@ -196,7 +224,7 @@ class ProfileGenerator:
         :param mode: The mode for profile generation (e.g., constant, poisson).
         :type mode: ProfileGenerationMode
         :param rates: The list of rates for load generation.
-        :type rates: List[float]
+        :type rates: Sequence[float]
         :return: The generated profile or None if index is out of range.
         :rtype: Optional[Profile]
         """
@@ -275,42 +303,43 @@ class ProfileGenerator:
 
         :param index: The index of the profile to create.
         :type index: int
-        :param sync_benchmark: The synchronous benchmark data.
+        :param sync_benchmark: The synchronous report data.
         :type sync_benchmark: Optional[TextGenerationBenchmark]
-        :param throughput_benchmark: The throughput benchmark data.
+        :param throughput_benchmark: The throughput report data.
         :type throughput_benchmark: Optional[TextGenerationBenchmark]
         :return: The generated profile or None if index is out of range.
         :rtype: Optional[Profile]
         """
+        if index < 0 or index >= settings.num_sweep_profiles + 2:
+            return None
+
         if index == 0:
             return ProfileGenerator.create_synchronous_profile(0)
 
         if not sync_benchmark:
-            err = ValueError("Synchronous benchmark is required for sweep mode")
+            err = ValueError("Synchronous report is required for sweep mode")
             logger.error(err)
             raise err
 
         if index == 1:
-            return ProfileGenerator.create_throughput_profile(0)
+            throughput_profile: Profile = ProfileGenerator.create_throughput_profile(0)  # type: ignore  # noqa: PGH003
+            # set the max number of requests to 5 times the number of requests
+            # incase it is not set for the sweep to limit the number of requests
+            throughput_profile.args = {"max_number": sync_benchmark.request_count * 5}
+            return throughput_profile
 
         if not throughput_benchmark:
-            err = ValueError("Throughput benchmark is required for sweep mode")
+            err = ValueError("Throughput report is required for sweep mode")
             logger.error(err)
             raise err
 
         min_rate = sync_benchmark.completed_request_rate
         max_rate = throughput_benchmark.completed_request_rate
         intermediate_rates = list(
-            np.linspace(min_rate, max_rate, settings.num_sweep_profiles)
-        )
+            np.linspace(min_rate, max_rate, settings.num_sweep_profiles + 1)
+        )[1:]
 
-        profile = (
-            Profile(
-                load_gen_mode="constant",
-                load_gen_rate=intermediate_rates[index - 1],
-            )
-            if index < len(intermediate_rates)
-            else None
+        return Profile(
+            load_gen_mode="constant",
+            load_gen_rate=intermediate_rates[index - 2],
         )
-        logger.debug("Created sweep profile: {}", profile)
-        return profile

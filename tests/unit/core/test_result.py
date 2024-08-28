@@ -365,7 +365,7 @@ def test_text_generation_benchmark_report_iter():
         elif index == 1:
             assert benchmark == slow_benchmark
         else:
-            raise AssertionError("Unexpected benchmark in report")
+            raise AssertionError("Unexpected report in report")
 
     for index, benchmark in enumerate(report.benchmarks_sorted):
         if index == 0:
@@ -373,7 +373,7 @@ def test_text_generation_benchmark_report_iter():
         elif index == 1:
             assert benchmark == fast_benchmark
         else:
-            raise AssertionError("Unexpected benchmark in report")
+            raise AssertionError("Unexpected report in report")
 
 
 @pytest.mark.regression()
