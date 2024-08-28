@@ -1,4 +1,4 @@
-from typing import Any, Dict, Generator, Optional, Type
+from typing import Any, Dict, Generator, List, Optional, cast
 
 import pytest
 from pydantic import BaseModel
@@ -31,7 +31,7 @@ class TestTextGenerationPipeline:
     """
 
     def __init__(self):
-        self._generations: list[TestDeepsparseTextGeneration] = []
+        self._generations: List[TestDeepsparseTextGeneration] = []
         self._prompt: Optional[str] = None
         self._max_new_tokens: Optional[int] = None
 
@@ -50,7 +50,9 @@ class TestTextGenerationPipeline:
     @property
     def generations(self) -> Generator[TestDeepsparseTextGeneration, None, None]:
         for text in random_strings(
-            min=10, max=50, n=self._max_new_tokens if self._max_new_tokens else 10
+            min_chars=10,
+            max_chars=50,
+            n=self._max_new_tokens if self._max_new_tokens else 10,
         ):
             generation = TestDeepsparseTextGeneration(text=text)
             self._generations.append(generation)
@@ -78,17 +80,20 @@ def test_backend_creation(create_payload: Dict):
     with defaults and custom input parameters.
     """
 
-    backends: list[DeepsparseBackend] = [
-        Backend.create("deepsparse", **create_payload),
-        DeepsparseBackend(**create_payload),
-    ]
+    backends: List[DeepsparseBackend] = cast(
+        List[DeepsparseBackend],
+        [
+            Backend.create("deepsparse", **create_payload),
+            DeepsparseBackend(**create_payload),
+        ],
+    )
 
     for backend in backends:
-        assert getattr(backend, "pipeline")
+        assert backend.pipeline
         (
-            getattr(backend, "model") == custom_model
+            backend.model == custom_model
             if (custom_model := create_payload.get("model"))
-            else getattr(backend, "default_model")
+            else backend.default_model
         )
 
 
@@ -101,13 +106,16 @@ def test_backend_model_from_env(mocker):
 
     reload_settings()
 
-    backends: list[DeepsparseBackend] = [
-        Backend.create("deepsparse"),
-        DeepsparseBackend(),
-    ]
+    backends: List[DeepsparseBackend] = cast(
+        List[DeepsparseBackend],
+        [
+            Backend.create("deepsparse"),
+            DeepsparseBackend(),
+        ],
+    )
 
     for backend in backends:
-        assert getattr(backend, "model") == "test_backend_model_from_env"
+        assert backend.model == "test_backend_model_from_env"
 
 
 @pytest.mark.smoke()
@@ -122,14 +130,14 @@ def test_backend_model_from_env(mocker):
 async def test_make_request(text_generation_request_create_payload: Dict):
     backend = DeepsparseBackend()
 
-    output_tokens: list[str] = []
+    output_tokens: List[str] = []
     async for response in backend.make_request(
         request=TextGenerationRequest(**text_generation_request_create_payload)
     ):
         if response.add_token:
             output_tokens.append(response.add_token)
     assert "".join(output_tokens) == "".join(
-        (generation.text for generation in backend.pipeline._generations)
+        generation.text for generation in backend.pipeline._generations
     )
 
     if max_tokens := text_generation_request_create_payload.get("output_token_count"):
@@ -138,18 +146,23 @@ async def test_make_request(text_generation_request_create_payload: Dict):
 
 @pytest.mark.smoke()
 @pytest.mark.parametrize(
-    "text_generation_request_create_payload,error",
+    ("text_generation_request_create_payload", "error"),
     [
-        ({"prompt": "Test prompt", "output_token_count": -1}, ValueError),
+        (
+            {"prompt": "Test prompt", "output_token_count": -1},
+            ValueError,
+        ),
     ],
 )
 @pytest.mark.asyncio()
 async def test_make_request_invalid_request_payload(
-    text_generation_request_create_payload: Dict, error: Type[Exception]
+    text_generation_request_create_payload: Dict, error
 ):
     backend = DeepsparseBackend()
     with pytest.raises(error):
-        async for _ in backend.make_request(
-            request=TextGenerationRequest(**text_generation_request_create_payload)
-        ):
-            pass
+        [
+            respnose
+            async for respnose in backend.make_request(
+                request=TextGenerationRequest(**text_generation_request_create_payload)
+            )
+        ]

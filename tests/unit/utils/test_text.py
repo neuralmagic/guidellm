@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import List
 from unittest.mock import patch
 
 import pytest
@@ -13,6 +14,7 @@ from guidellm.utils.text import (
     load_text,
     load_text_lines,
     parse_text_objects,
+    random_strings,
     split_lines_by_punctuation,
     split_text,
 )
@@ -392,3 +394,25 @@ def test_split_text_with_mixed_separators():
     assert words == ["This", "is", "a", "test", "with", "mixed", "separators."]
     assert separators == ["\t", " ", " ", "\n", " ", " ", " "]
     assert new_lines == [0, 4]
+
+
+@pytest.mark.regression()
+@pytest.mark.parametrize(
+    ("min_chars", "max_chars", "n", "dataset", "total_chars_len"),
+    [
+        (5, 5, 10, None, 50),  # always 5 chars per response
+        (1, 10, 10, None, None),  # 1..10 chars per each
+    ],
+)
+def test_random_strings_generation(min_chars, max_chars, n, dataset, total_chars_len):
+    results: List[str] = list(
+        random_strings(min_chars=min_chars, max_chars=max_chars, n=n, dataset=dataset)
+    )
+
+    # Ensure total results
+    assert len(results) == n
+
+    if total_chars_len is not None:
+        assert sum(len(r) for r in results) == total_chars_len
+    else:
+        assert min_chars * n <= sum(len(r) for r in results) < max_chars * n

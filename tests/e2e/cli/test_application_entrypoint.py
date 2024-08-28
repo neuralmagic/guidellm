@@ -43,7 +43,7 @@ def test_main_cli_overrided(
             (
                 b"Usage: main [OPTIONS]\nTry 'main --help' for help.\n\n"
                 b"Error: Invalid value for '--backend': "
-                b"'invalid' is not one of 'test', 'openai_server'.\n"
+                b"'invalid' is not one of 'test', 'openai_server', 'deepsparse'.\n"
             ),
         ),
         (

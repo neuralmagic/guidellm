@@ -9,7 +9,7 @@ def _extract_python_version(data: str) -> Tuple[int, ...]:
     if len(items := data.split(".")) > 2:
         raise ValueError("Python version format: MAJOR.MINOR")
 
-    if not all((item.isnumeric() for item in items)):
+    if not all(item.isnumeric() for item in items):
         raise ValueError("Python version must include only numbers")
 
     return tuple(int(item) for item in items)
@@ -43,4 +43,4 @@ def module_is_available(module: str, helper: str):
     try:
         importlib.import_module(module)
     except ImportError:
-        raise RuntimeError(f"Module '{module}' is not available. {helper}")
+        raise RuntimeError(f"Module '{module}' is not available. {helper}") from None

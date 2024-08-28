@@ -229,16 +229,16 @@ class Scheduler:
             return (
                 self.max_number
                 if self.max_number
-                else round(self.max_duration)
-                if self.max_duration
-                else 0
+                else round(self.max_duration) if self.max_duration else 0
             )
 
         def _get_count_completed():
             return min(
-                benchmark.request_count + benchmark.error_count
-                if self.max_number
-                else round(time.time() - start_time),
+                (
+                    benchmark.request_count + benchmark.error_count
+                    if self.max_number
+                    else round(time.time() - start_time)
+                ),
                 _get_count_total(),
             )
 

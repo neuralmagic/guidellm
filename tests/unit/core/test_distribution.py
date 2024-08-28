@@ -73,9 +73,9 @@ def test_distribution_str():
         "'percentile_values': [1.4, 1.8, 2.2, 2.6, 3.0, 3.4, 3.8, 4.2, 4.6, 4.8, 4.96]"
         in str(dist)
     )
-    assert "'min': np.float64(1.0)" in str(dist)
-    assert "'max': np.float64(5.0)" in str(dist)
-    assert "'range': np.float64(4.0)" in str(dist)
+    assert "'min': 1.0" in str(dist)
+    assert "'max': 5.0" in str(dist)
+    assert "'range': 4.0" in str(dist)
 
 
 @pytest.mark.regression()

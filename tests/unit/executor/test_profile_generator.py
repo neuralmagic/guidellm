@@ -4,10 +4,7 @@ from unittest.mock import create_autospec
 import pytest
 
 from guidellm import settings
-from guidellm.core import (
-    TextGenerationBenchmark,
-    TextGenerationBenchmarkReport,
-)
+from guidellm.core import TextGenerationBenchmark, TextGenerationBenchmarkReport
 from guidellm.executor import Profile, ProfileGenerationMode, ProfileGenerator
 
 

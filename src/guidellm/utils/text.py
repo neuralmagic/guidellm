@@ -459,7 +459,7 @@ def load_text_lines(
 
 
 def random_strings(
-    min: int, max: int, n: int = 0, dataset: Optional[str] = None
+    min_chars: int, max_chars: int, n: int = 0, dataset: Optional[str] = None
 ) -> Generator[str, None, None]:
     """Yield random strings.
 
@@ -476,10 +476,12 @@ def random_strings(
     elif n == 0:
         while True:
             yield "".join(
-                (random.choice(characters) for _ in range(random.randint(min, max)))
+                random.choice(characters)
+                for _ in range(random.randint(min_chars, max_chars))
             )
     else:
         for _ in range(n):
             yield "".join(
-                (random.choice(characters) for _ in range(random.randint(min, max)))
+                random.choice(characters)
+                for _ in range(random.randint(min_chars, max_chars))
             )

@@ -162,12 +162,14 @@ class ProfileGenerator:
         elif self.mode == "sweep":
             profile = self.create_sweep_profile(
                 self.generated_count,
-                sync_benchmark=current_report.benchmarks[0]
-                if current_report.benchmarks
-                else None,
-                throughput_benchmark=current_report.benchmarks[1]
-                if len(current_report.benchmarks) > 1
-                else None,
+                sync_benchmark=(
+                    current_report.benchmarks[0] if current_report.benchmarks else None
+                ),
+                throughput_benchmark=(
+                    current_report.benchmarks[1]
+                    if len(current_report.benchmarks) > 1
+                    else None
+                ),
             )
         else:
             err = ValueError(f"Invalid mode: {self.mode}")

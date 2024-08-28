@@ -1,9 +1,7 @@
-import os
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
 from deepsparse import Pipeline, TextGeneration
 from loguru import logger
-from transformers import AutoTokenizer
 
 from guidellm.backend import Backend, GenerativeResponse
 from guidellm.config import settings
@@ -32,12 +30,10 @@ class DeepsparseBackend(Backend):
             return model_from_cli
         elif settings.deepsprase.model is not None:
             logger.info(
-                "Using Deepsparse model from environment variable: {}".format(
-                    settings.deepsprase.model
-                )
+                "Using Deepsparse model from environment variable: "
+                f"{settings.deepsprase.model}"
             )
             return settings.deepsprase.model
-
         else:
             logger.info(f"Using default Deepsparse model: {self.default_model}")
             return self.default_model
@@ -103,24 +99,6 @@ class DeepsparseBackend(Backend):
 
         # WARNING: The default model from the documentation is defined here
         return ["hf:mgoin/TinyStories-33M-quant-deepsparse"]
-
-    def model_tokenizer(self, model: str) -> Optional[Any]:
-        """
-        Get the tokenizer for a model.
-
-        :param model: The model to get the tokenizer for.
-        :type model: str
-        :return: The tokenizer for the model, or None if it cannot be created.
-        :rtype: Optional[Any]
-        """
-
-        try:
-            tokenizer = AutoTokenizer.from_pretrained(model)
-            logger.info(f"Tokenizer created for model: {model}")
-            return tokenizer
-        except Exception as err:  # noqa: BLE001
-            logger.warning(f"Could not create tokenizer for model {model}: {err}")
-            return None
 
     def _token_count(self, text: str) -> int:
         token_count = len(text.split())

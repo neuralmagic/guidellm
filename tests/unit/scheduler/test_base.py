@@ -12,11 +12,7 @@ from guidellm.core import (
     TextGenerationResult,
 )
 from guidellm.request import RequestGenerator
-from guidellm.scheduler import (
-    LoadGenerator,
-    Scheduler,
-    SchedulerResult,
-)
+from guidellm.scheduler import LoadGenerator, Scheduler, SchedulerResult
 
 
 @pytest.mark.smoke()

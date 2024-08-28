@@ -99,6 +99,10 @@ exclude = ["venv", ".tox"]
 # Check: https://mypy.readthedocs.io/en/latest/config_file.html#import-discovery
 follow_imports = 'silent'
 
+[[tool.mypy.overrides]]
+module = ["deepsparse.*", "transformers.*"]
+ignore_missing_imports=true
+
 
 [tool.ruff]
 line-length = 88
@@ -112,11 +116,14 @@ indent-style = "space"
 [tool.ruff.lint]
 ignore = [
     "PLR0913",
+    "PLR2004", # allow numbers without constants definitions
+    "RET505", # allow `else` block after `if (condition): return value` line
     "TCH001",
     "COM812",
     "ISC001",
     "TCH002",
     "PLW1514", # allow Path.open without encoding
+    "S311", # allow standard pseudo-random generators
 
 ]
 select = [
@@ -172,19 +179,19 @@ select = [
     "FIX", # flake8-fixme: detects FIXMEs and other temporary comments that should be resolved
 ]
 
-[tool.ruff.lint.extend-per-file-ignores]
-"tests/**/*.py" = [
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = [
     "S101", # asserts allowed in tests
+    "S105", # allow hardcoded passwords in tests
+    "S106", # allow hardcoded passwords in tests
     "ARG", # Unused function args allowed in tests
     "PLR2004", # Magic value used in comparison
     "TCH002", # No import only type checking in tests
     "SLF001", # enable private member access in tests
-    "S105", # allow hardcoded passwords in tests
-    "S311", # allow standard pseudo-random generators in tests
     "PT011", # allow generic exceptions in tests
     "N806", # allow uppercase variable names in tests
     "PGH003", # allow general ignores in tests
-    "S106", # allow hardcoded passwords in tests
 ]
 
 [tool.ruff.lint.isort]
