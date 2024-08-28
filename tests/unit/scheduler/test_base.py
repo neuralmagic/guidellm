@@ -119,6 +119,7 @@ def test_scheduler_invalid_instantiation(
         "constant",
     ],
 )
+@pytest.mark.asyncio()
 async def test_scheduler_run_number(mode):
     rate = 10.0
     max_number = 20
@@ -186,6 +187,7 @@ async def test_scheduler_run_number(mode):
     ],
 )
 @pytest.mark.flaky(reruns=5)
+@pytest.mark.asyncio()
 async def test_scheduler_run_duration(mode):
     rate = 10
     max_duration = 2

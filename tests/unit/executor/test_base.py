@@ -5,9 +5,7 @@ import pytest
 
 from guidellm.backend import Backend
 from guidellm.config import settings
-from guidellm.core import (
-    TextGenerationBenchmarkReport,
-)
+from guidellm.core import TextGenerationBenchmarkReport
 from guidellm.executor.base import Executor, ExecutorResult
 from guidellm.executor.profile_generator import ProfileGenerator
 from guidellm.request import RequestGenerator
@@ -194,6 +192,7 @@ async def _run_executor_tests(
 
 
 @pytest.mark.smoke()
+@pytest.mark.asyncio()
 async def test_executor_run_sweep(mock_scheduler):
     num_requests = 15
 
@@ -213,6 +212,7 @@ async def test_executor_run_sweep(mock_scheduler):
 
 
 @pytest.mark.smoke()
+@pytest.mark.asyncio()
 async def test_executor_run_synchronous(mock_scheduler):
     num_requests = 15
 
@@ -230,6 +230,7 @@ async def test_executor_run_synchronous(mock_scheduler):
 
 
 @pytest.mark.smoke()
+@pytest.mark.asyncio()
 async def test_executor_run_throughput(mock_scheduler):
     num_requests = 15
 
@@ -256,6 +257,7 @@ async def test_executor_run_throughput(mock_scheduler):
         ("poisson", [10, 20, 30]),
     ],
 )
+@pytest.mark.asyncio()
 async def test_executor_run_constant_poisson(mock_scheduler, mode, rate):
     num_requests = 15
 
