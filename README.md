@@ -70,7 +70,7 @@ guidellm \
   --data "prompt_tokens=512,generated_tokens=128"
 ```
 
-The above command will begin the evaluation and output progress updates similar to the following (if running on a different server, be sure to update the target!): <img src="https://github.com/neuralmagic/guidellm/blob/main/docs/assets/sample-benchmark.gif" />
+The above command will begin the evaluation and output progress updates similar to the following (if running on a different server, be sure to update the target!): <img src="https://raw.githubusercontent.com/neuralmagic/guidellm/main/docs/assets/sample-benchmarks.gif" />
 
 Notes:
 
