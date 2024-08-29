@@ -24,7 +24,7 @@ class DeepsparseBackend(Backend):
         self._request_args: Dict[str, Any] = request_args
         self.pipeline: Pipeline = TextGeneration(model=self._model)
 
-        logger.info("Deepsparse Backend uses model {}", self._model)
+        logger.info(f"Deepsparse Backend uses model {self._model}")
 
     def _get_model(self, model_from_cli: Optional[str] = None) -> str:
         """Provides the model by the next priority list:
@@ -35,14 +35,18 @@ class DeepsparseBackend(Backend):
 
         if model_from_cli is not None:
             return model_from_cli
-        elif settings.deepsprase.model is not None:
+        elif settings.llm_model is not None:
             logger.info(
                 "Using Deepsparse model from environment variable: "
-                f"{settings.deepsprase.model}"
+                f"{settings.llm_model}"
             )
-            return settings.deepsprase.model
+            return settings.llm_model
         else:
             logger.info(f"Using default Deepsparse model: {self.default_model}")
+            logger.info(
+                "To customize the model either set the 'GUIDELLM__LLM_MODEL' "
+                "environment variable or set the CLI argument '--model'"
+            )
             return self.default_model
 
     async def make_request(
