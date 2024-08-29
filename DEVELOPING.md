@@ -33,8 +33,7 @@ cd guidellm
 pip install -e .[dev]
 ```
 
-If you work with `deepsparse` backend, etc it has some other software limitations.
-In order to install dependencies for the specific backend, run:
+If you work with `deepsparse` backend, etc it has some other software limitations. In order to install dependencies for the specific backend, run:
 
 ```sh
 pip install -e .[deepsparse]
