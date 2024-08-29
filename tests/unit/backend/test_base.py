@@ -10,6 +10,9 @@ def test_backend_registry():
         def __init__(self):
             super().__init__("test", "http://localhost:8000", "mock-model")
 
+        def test_connection(self) -> bool:
+            return True
+
         async def make_request(self, request):
             yield GenerativeResponse(type_="final", output="Test")
 
@@ -47,6 +50,9 @@ async def test_backend_make_request():
     class MockBackend(Backend):
         def __init__(self):
             super().__init__("test", "http://localhost:8000", "mock-model")
+
+        def test_connection(self) -> bool:
+            return True
 
         async def make_request(self, request):
             yield GenerativeResponse(
@@ -91,6 +97,9 @@ async def test_backend_submit_final():
         def __init__(self):
             super().__init__("test", "http://localhost:8000", "mock-model")
 
+        def test_connection(self) -> bool:
+            return True
+
         async def make_request(self, request):
             yield GenerativeResponse(type_="final", output="Test")
 
@@ -109,6 +118,9 @@ async def test_backend_submit_multi():
     class MockBackend(Backend):
         def __init__(self):
             super().__init__("test", "http://localhost:8000", "mock-model")
+
+        def test_connection(self) -> bool:
+            return True
 
         async def make_request(self, request):
             yield GenerativeResponse(type_="token_iter", add_token="Token")
@@ -132,6 +144,9 @@ async def test_backend_submit_no_response():
         def __init__(self):
             super().__init__("test", "http://localhost:8000", "mock-model")
 
+        def test_connection(self) -> bool:
+            return True
+
         async def make_request(self, request):
             if False:  # simulate no yield
                 yield
@@ -151,6 +166,9 @@ async def test_backend_submit_multi_final():
     class MockBackend(Backend):
         def __init__(self):
             super().__init__("test", "http://localhost:8000", "mock-model")
+
+        def test_connection(self) -> bool:
+            return True
 
         async def make_request(self, request):
             yield GenerativeResponse(type_="token_iter", add_token="Token")
@@ -174,6 +192,9 @@ def test_backend_models():
         def __init__(self):
             super().__init__("test", "http://localhost:8000", "mock-model")
 
+        def test_connection(self) -> bool:
+            return True
+
         def available_models(self):
             return ["mock-model", "mock-model-2"]
 
@@ -185,6 +206,39 @@ def test_backend_models():
     assert backend.default_model == "mock-model"
 
 
+@pytest.mark.smoke()
+def test_backend_test_connection():
+    class MockBackend(Backend):
+        def __init__(self):
+            super().__init__("test", "http://localhost:8000", "mock-model")
+
+        def available_models(self):
+            return ["mock-model", "mock-model-2"]
+
+        async def make_request(self, request):
+            yield GenerativeResponse(type_="final", output="")
+
+    assert MockBackend().test_connection()
+
+
+@pytest.mark.smoke()
+def test_backend_tokenizer(mock_auto_tokenizer):
+    class MockBackend(Backend):
+        def __init__(self):
+            super().__init__("test", "http://localhost:8000", "mock-model")
+
+        def available_models(self):
+            return ["mock-model", "mock-model-2"]
+
+        async def make_request(self, request):
+            yield GenerativeResponse(type_="final", output="")
+
+    backend = MockBackend()
+    tokenizer = backend.model_tokenizer()
+    assert tokenizer is not None
+    assert tokenizer.tokenize("text") is not None
+
+
 @pytest.mark.regression()
 def test_backend_abstract_methods():
     with pytest.raises(TypeError):
@@ -193,6 +247,9 @@ def test_backend_abstract_methods():
     class IncompleteBackend(Backend):
         def __init__(self):
             super().__init__("test", "http://localhost:8000", "mock-model")
+
+        def test_connection(self) -> bool:
+            return True
 
         async def make_request(self, request):
             yield GenerativeResponse(type_="final", output="Test")

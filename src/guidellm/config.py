@@ -1,5 +1,6 @@
+import json
 from enum import Enum
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Sequence
 
 from pydantic import BaseModel, Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -10,6 +11,7 @@ __all__ = [
     "Environment",
     "LoggingSettings",
     "OpenAISettings",
+    "print_config",
     "ReportGenerationSettings",
     "Settings",
     "reload_settings",
@@ -70,7 +72,6 @@ class DatasetSettings(BaseModel):
     preferred_data_splits: List[str] = Field(
         default_factory=lambda: ["test", "tst", "validation", "val", "train"]
     )
-    default_tokenizer: str = "neuralmagic/Meta-Llama-3.1-8B-FP8"
 
 
 class EmulatedDataSettings(BaseModel):
@@ -163,6 +164,53 @@ class Settings(BaseSettings):
 
         return values
 
+    def generate_env_file(self) -> str:
+        """
+        Generate the .env file from the current settings
+        """
+        return Settings._recursive_generate_env(
+            self,
+            self.model_config["env_prefix"],  # type: ignore  # noqa: PGH003
+            self.model_config["env_nested_delimiter"],  # type: ignore  # noqa: PGH003
+        )
+
+    @staticmethod
+    def _recursive_generate_env(model: BaseModel, prefix: str, delimiter: str) -> str:
+        env_file = ""
+        add_models = []
+        for key, value in model.model_dump().items():
+            if isinstance(value, BaseModel):
+                # add nested properties to be processed after the current level
+                add_models.append((key, value))
+                continue
+
+            dict_values = (
+                {
+                    f"{prefix}{key.upper()}{delimiter}{sub_key.upper()}": sub_value
+                    for sub_key, sub_value in value.items()
+                }
+                if isinstance(value, dict)
+                else {f"{prefix}{key.upper()}": value}
+            )
+
+            for tag, sub_value in dict_values.items():
+                if isinstance(sub_value, Sequence) and not isinstance(sub_value, str):
+                    value_str = ",".join(f'"{item}"' for item in sub_value)
+                    env_file += f"{tag}=[{value_str}]\n"
+                elif isinstance(sub_value, Dict):
+                    value_str = json.dumps(sub_value)
+                    env_file += f"{tag}={value_str}\n"
+                elif not sub_value:
+                    env_file += f"{tag}=\n"
+                else:
+                    env_file += f'{tag}="{sub_value}"\n'
+
+        for key, value in add_models:
+            env_file += Settings._recursive_generate_env(
+                value, f"{prefix}{key.upper()}{delimiter}", delimiter
+            )
+        return env_file
+
 
 settings = Settings()
 
@@ -173,3 +221,14 @@ def reload_settings():
     """
     new_settings = Settings()
     settings.__dict__.update(new_settings.__dict__)
+
+
+def print_config():
+    """
+    Print the current configuration settings
+    """
+    print(f"Settings: \n{settings.generate_env_file()}")  # noqa: T201
+
+
+if __name__ == "__main__":
+    print_config()

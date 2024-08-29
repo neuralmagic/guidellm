@@ -78,6 +78,7 @@ deepsparse = [
 
 [project.entry-points.console_scripts]
 guidellm = "guidellm.main:generate_benchmark_report_cli"
+guidellm-config = "guidellm.config:print_config"
 
 
 # ************************************************

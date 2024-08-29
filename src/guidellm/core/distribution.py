@@ -120,7 +120,7 @@ class Distribution(Serializable):
             logger.warning("No data points available to calculate minimum.")
             return 0.0
 
-        min_value: float = np.min(self.data)
+        min_value: float = np.min(self.data).item()  # type: ignore  # noqa: PGH003
         logger.debug(f"Calculated min: {min_value}")
         return min_value
 
@@ -134,7 +134,7 @@ class Distribution(Serializable):
             logger.warning("No data points available to calculate maximum.")
             return 0.0
 
-        max_value: float = np.max(self.data)
+        max_value: float = np.max(self.data).item()  # type: ignore  # noqa: PGH003
         logger.debug(f"Calculated max: {max_value}")
         return max_value
 
