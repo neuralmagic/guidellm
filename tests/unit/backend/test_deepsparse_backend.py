@@ -101,7 +101,7 @@ def test_backend_creation(create_payload: Dict):
 def test_backend_model_from_env(mocker):
     mocker.patch.dict(
         "os.environ",
-        {"GUIDELLM__DEEPSPRASE__MODEL": "test_backend_model_from_env"},
+        {"GUIDELLM__LLM_MODEL": "test_backend_model_from_env"},
     )
 
     reload_settings()

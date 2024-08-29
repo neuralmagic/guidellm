@@ -15,14 +15,11 @@ class DeepsparseBackend(Backend):
     """
 
     def __init__(self, model: Optional[str] = None, **request_args):
-        super().__init__(
-            type_="deepsparse",
-            model=self._get_model(model),
-            target="not used",
-        )
-
         self._request_args: Dict[str, Any] = request_args
+        self._model = self._get_model(model)
         self.pipeline: Pipeline = TextGeneration(model=self._model)
+
+        super().__init__(type_="deepsparse", model=self._model, target="not used")
 
         logger.info(f"Deepsparse Backend uses model {self._model}")
 
@@ -89,7 +86,7 @@ class DeepsparseBackend(Backend):
                     prompt_token_count=request.prompt_token_count,
                     output_token_count=token_count,
                 )
-                break
+                return
             else:
                 token_count += 1
                 yield GenerativeResponse(
@@ -99,6 +96,13 @@ class DeepsparseBackend(Backend):
                     prompt_token_count=request.prompt_token_count,
                     output_token_count=token_count,
                 )
+
+        yield GenerativeResponse(
+            type_="final",
+            prompt=request.prompt,
+            prompt_token_count=request.prompt_token_count,
+            output_token_count=token_count,
+        )
 
     def available_models(self) -> List[str]:
         """
