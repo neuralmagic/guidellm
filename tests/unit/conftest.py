@@ -5,6 +5,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 import requests_mock
 
+from guidellm.config import settings
+
 
 @pytest.fixture()
 def mock_auto_tokenizer():
@@ -26,5 +28,5 @@ def mock_requests_pride_and_prejudice():
     text_content = text_path.read_text()
 
     with requests_mock.Mocker() as mock:
-        mock.get("https://www.gutenberg.org/files/1342/1342-0.txt", text=text_content)
+        mock.get(settings.emulated_data.source, text=text_content)
         yield mock
