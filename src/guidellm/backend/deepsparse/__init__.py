@@ -23,6 +23,6 @@ module_is_available(
     ),
 )
 
-from .backend import DeepsparseBackend
+from .backend import DeepsparseBackend  # noqa: E402
 
 __all__ = ["DeepsparseBackend"]

@@ -34,7 +34,9 @@ def check_python_version(
     )
 
     if not (min_version_info <= current_version_info <= max_version_info):
-        if raise_error:
+        if raise_error is False:
+            return False
+        else:
             raise RuntimeError(
                 "This feature requires Python version "
                 f"to be in range: {min_version}..{max_version}."
@@ -44,8 +46,6 @@ def check_python_version(
                     sys.version_info.micro,
                 )
             )
-        else:
-            return False
     else:
         return True
 

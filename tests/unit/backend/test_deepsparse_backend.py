@@ -1,5 +1,5 @@
 import sys
-from typing import Any, Dict, Generator, List, Optional, cast
+from typing import Any, Dict, Generator, List, Optional
 
 import pytest
 from pydantic import BaseModel
@@ -94,13 +94,10 @@ def test_backend_creation(create_payload: Dict, backend_class):
     with defaults and custom input parameters.
     """
 
-    backends: List[backend_class] = cast(
-        List[backend_class],
-        [
-            Backend.create("deepsparse", **create_payload),
-            backend_class(**create_payload),
-        ],
-    )
+    backends = [
+        Backend.create("deepsparse", **create_payload),
+        backend_class(**create_payload),
+    ]
 
     for backend in backends:
         assert backend.pipeline
@@ -120,13 +117,7 @@ def test_backend_model_from_env(mocker, backend_class):
 
     reload_settings()
 
-    backends: List[backend_class] = cast(
-        List[backend_class],
-        [
-            Backend.create("deepsparse"),
-            backend_class(),
-        ],
-    )
+    backends = [Backend.create("deepsparse"), backend_class()]
 
     for backend in backends:
         assert backend.model == "test_backend_model_from_env"
