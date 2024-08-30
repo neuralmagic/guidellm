@@ -1,3 +1,10 @@
+"""
+This module includes unit tests for the Deepsparse backend.
+
+Notes: tests from this module are going to be skipped in case
+    the Python version is >= 3.12 according to the deepsparse limitation.
+"""
+
 import sys
 from typing import Any, Dict, Generator, List, Optional
 

@@ -8,7 +8,7 @@ from guidellm.config import settings
 from guidellm.core import TextGenerationRequest
 
 
-@Backend.register(backend_type="deepsparse")
+@Backend.register(backend_type="vllm")
 class VllmBackend(Backend):
     """
     An vLLM Backend implementation for the generative AI result.

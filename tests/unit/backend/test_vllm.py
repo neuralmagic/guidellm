@@ -1,14 +1,35 @@
-from typing import Dict, List, cast
+"""
+This module includes unit tests for the vLLM backend.
+
+Notes: tests from this module are going to be skipped in case
+    the rimtime platform is not a Linux / WSL according to vllm documentation.
+"""
+
+import importlib
+import sys
+from typing import Dict
 
 import pytest
-from vllm import LLM
 
-from guidellm.backend import Backend, VllmBackend
+from guidellm.backend import Backend
+
+pytestmark = pytest.mark.skipif(
+    sys.platform != "linux",
+    reason="Unsupported Platform. Try using Linux or WSL instead.",
+)
+
+
+@pytest.fixture(scope="module")
+def backend_class():
+    from guidellm.backend.vllm import VllmBackend
+
+    return VllmBackend
 
 
 @pytest.fixture(autouse=True)
 def mock_vllm_llm(mocker):
-    llm = LLM(
+    module = importlib.import_module("vllm")
+    llm = module.LLM(
         model="facebook/opt-125m",
         max_num_batched_tokens=4096,
         tensor_parallel_size=1,
@@ -27,18 +48,15 @@ def mock_vllm_llm(mocker):
         {"model": "test/custom_llm"},
     ],
 )
-def test_backend_creation(create_payload: Dict):
+def test_backend_creation(create_payload: Dict, backend_class):
     """Test the "Deepspaarse Backend" class
     with defaults and custom input parameters.
     """
 
-    backends: List[VllmBackend] = cast(
-        List[VllmBackend],
-        [
-            Backend.create("vllm", **create_payload),
-            VllmBackend(**create_payload),
-        ],
-    )
+    backends = [
+        Backend.create("vllm", **create_payload),
+        backend_class(**create_payload),
+    ]
 
     for backend in backends:
         assert backend.llm
