@@ -15,7 +15,7 @@ from guidellm.core import TextGenerationRequest, TextGenerationResult
 __all__ = ["Backend", "BackendEngine", "BackendEnginePublic", "GenerativeResponse"]
 
 
-BackendEnginePublic = Literal["openai_server", "deepsparse"]
+BackendEnginePublic = Literal["openai_server", "deepsparse", "vllm"]
 BackendEngine = Union[BackendEnginePublic, Literal["test"]]
 
 

@@ -74,6 +74,9 @@ dev = [
 deepsparse = [
     "deepsparse; python_version < '3.12'",
 ]
+vllm = [
+    "vllm",
+]
 
 
 [project.entry-points.console_scripts]
@@ -108,7 +111,7 @@ exclude = ["venv", ".tox"]
 follow_imports = 'silent'
 
 [[tool.mypy.overrides]]
-module = ["deepsparse.*", "transformers.*"]
+module = ["deepsparse.*", "transformers.*", "vllm.*"]
 ignore_missing_imports=true
 
 
