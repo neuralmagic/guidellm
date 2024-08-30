@@ -1,12 +1,24 @@
+import sys
 from typing import Any, Dict, Generator, List, Optional, cast
 
 import pytest
 from pydantic import BaseModel
 
-from guidellm.backend import Backend, DeepsparseBackend
+from guidellm.backend import Backend
 from guidellm.config import reload_settings
 from guidellm.core import TextGenerationRequest
 from guidellm.utils import random_strings
+
+pytestmark = pytest.mark.skipif(
+    sys.version_info >= (3, 12), reason="Unsupported Python version"
+)
+
+
+@pytest.fixture(scope="module")
+def backend_class():
+    from guidellm.backend.deepsparse import DeepsparseBackend
+
+    return DeepsparseBackend
 
 
 class TestDeepsparseTextGeneration(BaseModel):
@@ -39,7 +51,10 @@ class TestTextGenerationPipeline:
         self, *_, prompt: str, max_new_tokens: Optional[int] = None, **kwargs
     ) -> Any:
         """Mocks the result from `deepsparse.pipeline.Pipeline()()`.
-        Set reserved request arguments on call
+        Set reserved request arguments on call.
+
+        Note: `**kwargs` is required since it allows to mimic
+            the `deepsparse.Pipeline` behavior.
         """
 
         self._prompt = prompt
@@ -62,8 +77,7 @@ class TestTextGenerationPipeline:
 @pytest.fixture(autouse=True)
 def mock_deepsparse_pipeline(mocker):
     return mocker.patch(
-        "deepsparse.Pipeline.create",
-        return_value=TestTextGenerationPipeline(),
+        "deepsparse.Pipeline.create", return_value=TestTextGenerationPipeline()
     )
 
 
@@ -75,16 +89,16 @@ def mock_deepsparse_pipeline(mocker):
         {"model": "test/custom_llm"},
     ],
 )
-def test_backend_creation(create_payload: Dict):
+def test_backend_creation(create_payload: Dict, backend_class):
     """Test the "Deepspaarse Backend" class
     with defaults and custom input parameters.
     """
 
-    backends: List[DeepsparseBackend] = cast(
-        List[DeepsparseBackend],
+    backends: List[backend_class] = cast(
+        List[backend_class],
         [
             Backend.create("deepsparse", **create_payload),
-            DeepsparseBackend(**create_payload),
+            backend_class(**create_payload),
         ],
     )
 
@@ -98,7 +112,7 @@ def test_backend_creation(create_payload: Dict):
 
 
 @pytest.mark.smoke()
-def test_backend_model_from_env(mocker):
+def test_backend_model_from_env(mocker, backend_class):
     mocker.patch.dict(
         "os.environ",
         {"GUIDELLM__LLM_MODEL": "test_backend_model_from_env"},
@@ -106,11 +120,11 @@ def test_backend_model_from_env(mocker):
 
     reload_settings()
 
-    backends: List[DeepsparseBackend] = cast(
-        List[DeepsparseBackend],
+    backends: List[backend_class] = cast(
+        List[backend_class],
         [
             Backend.create("deepsparse"),
-            DeepsparseBackend(),
+            backend_class(),
         ],
     )
 
@@ -127,8 +141,10 @@ def test_backend_model_from_env(mocker):
     ],
 )
 @pytest.mark.asyncio()
-async def test_make_request(text_generation_request_create_payload: Dict):
-    backend = DeepsparseBackend()
+async def test_make_request(
+    text_generation_request_create_payload: Dict, backend_class
+):
+    backend = backend_class()
 
     output_tokens: List[str] = []
     async for response in backend.make_request(
@@ -156,9 +172,9 @@ async def test_make_request(text_generation_request_create_payload: Dict):
 )
 @pytest.mark.asyncio()
 async def test_make_request_invalid_request_payload(
-    text_generation_request_create_payload: Dict, error
+    text_generation_request_create_payload: Dict, error, backend_class
 ):
-    backend = DeepsparseBackend()
+    backend = backend_class()
     with pytest.raises(error):
         [
             respnose

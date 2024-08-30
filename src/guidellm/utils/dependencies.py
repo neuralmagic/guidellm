@@ -1,6 +1,6 @@
 import importlib
 import sys
-from typing import Tuple
+from typing import NoReturn, Tuple, Union
 
 
 def _extract_python_version(data: str) -> Tuple[int, ...]:
@@ -15,8 +15,16 @@ def _extract_python_version(data: str) -> Tuple[int, ...]:
     return tuple(int(item) for item in items)
 
 
-def check_python_version(min_version: str, max_version: str) -> None:
-    """Raises the error if the current version is not in the range."""
+def check_python_version(
+    min_version: str, max_version: str, raise_error=True
+) -> Union[NoReturn, bool]:
+    """Validate Python version.
+
+    :param min_version: the min (included) Python version in format: MAJOR.MINOR
+    :param max_version: the max (included) Python version in format: MAJOR.MINOR
+    :param raise_error: set to False if you don't want to raise the RuntimeError in
+                        case the validation is failed
+    """
 
     min_version_info: Tuple[int, ...] = _extract_python_version(min_version)
     max_version_info: Tuple[int, ...] = _extract_python_version(max_version)
@@ -26,15 +34,20 @@ def check_python_version(min_version: str, max_version: str) -> None:
     )
 
     if not (min_version_info <= current_version_info <= max_version_info):
-        raise RuntimeError(
-            "This feature requires Python version "
-            f"to be in range: {min_version}..{max_version}."
-            "You are using Python {}.{}.{}".format(
-                sys.version_info.major,
-                sys.version_info.minor,
-                sys.version_info.micro,
+        if raise_error:
+            raise RuntimeError(
+                "This feature requires Python version "
+                f"to be in range: {min_version}..{max_version}."
+                "You are using Python {}.{}.{}".format(
+                    sys.version_info.major,
+                    sys.version_info.minor,
+                    sys.version_info.micro,
+                )
             )
-        )
+        else:
+            return False
+    else:
+        return True
 
 
 def module_is_available(module: str, helper: str):
