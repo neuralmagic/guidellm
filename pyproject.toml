@@ -75,7 +75,7 @@ deepsparse = [
     "deepsparse; python_version < '3.12'",
 ]
 vllm = [
-    "vllm",
+    "vllm; sys_platform == 'linux'",
 ]
 
 
