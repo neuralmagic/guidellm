@@ -14,7 +14,7 @@ In the end ensure that the `vllm` package is installed.
 
 from guidellm.utils import check_python_version, module_is_available
 
-check_python_version(min_version="3.8", max_version="3.11")
+check_python_version(min_version="3.8", max_version="3.12")
 
 module_is_available(
     module="vllm",
