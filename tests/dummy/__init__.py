@@ -5,4 +5,4 @@ test.dummy.data.openai_model_factory - openai.types.Model test factory
 test.dummy.data.openai_completion_factory - openai.types.Completion test factory
 """
 
-from . import data, services  # noqa: F401
+from . import data, services, vllm  # noqa: F401

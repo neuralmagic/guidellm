@@ -5,8 +5,6 @@ Notes: tests from this module are going to be skipped in case
     the rimtime platform is not a Linux / WSL according to vllm documentation.
 """
 
-import importlib
-import sys
 from typing import Dict, List
 
 import pytest
@@ -14,6 +12,7 @@ import pytest
 from guidellm.backend import Backend
 from guidellm.config import reload_settings
 from guidellm.core import TextGenerationRequest
+from tests import dummy
 
 # pytestmark = pytest.mark.skipif(
 #     sys.platform != "linux",
@@ -30,13 +29,9 @@ def backend_class():
 
 @pytest.fixture(autouse=True)
 def mock_vllm_llm(mocker):
-    module = importlib.import_module("vllm")
-    llm = getattr(module, "LLM")(
+    llm = dummy.vllm.TestLLM(
         model="facebook/opt-125m",
         max_num_batched_tokens=4096,
-        tensor_parallel_size=1,
-        gpu_memory_utilization=0.10,
-        enforce_eager=True,
     )
 
     return mocker.patch("vllm.LLM", return_value=llm)
