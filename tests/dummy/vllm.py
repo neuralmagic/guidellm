@@ -45,7 +45,8 @@ class TestLLM(BaseModel):
     model: str
     max_num_batched_tokens: int
 
-    _outputs_number: int = Field(default_factory=partial(random.randint, 10, 20))
+    # NOTE: This value is used only for testing purposes
+    outputs_number: int = Field(default_factory=partial(random.randint, 10, 20))
 
     def _generate_completion_outputs(self, max_tokens: int) -> List[CompletionOutput]:
         self._outputs_number = random.randint(10, 20)
