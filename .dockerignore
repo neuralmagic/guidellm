@@ -1,0 +1,14 @@
+venv*/
+Dockerfile
+.gitignore
+.env
+.git
+.github/
+.ruff_cache/
+.pre-commit-config.yaml
+docs/
+*.md
+LICENSE
+MANIFEST.in
+__pycache__/
+*.egg-info/

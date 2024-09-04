@@ -33,12 +33,29 @@ cd guidellm
 pip install -e .[dev]
 ```
 
-If you work with `deepsparse` backend, etc it has some other software limitations. In order to install dependencies for the specific backend, run:
+In case of working with `deepsparse` backend, etc it has some other software limitations. In order to install dependencies for the specific backend, run:
 
 ```sh
 pip install -e .[deepsparse]
 # or pip install -e '.[deepsparse]'
 ```
+
+In case of working with `vllm` backend, etc it has some other software limitations. In order to install dependencies for the specific backend, run:
+
+```sh
+pip install -e .[vllm]
+# or pip install -e '.[vllm]'
+```
+
+According to the [installation guide](https://docs.vllm.ai/en/v0.4.0.post1/getting_started/installation.html) `vllm` is supported only on **Linux**. It means that running the application and tests will fail.
+
+Workaround with Docker:
+```sh
+cd guidellm/
+docker build -t guidellm:latest .
+docker run -v ./:./ guidellm:latest python -m pytest -s -v src/unit/backend/test_vllm.py
+```
+
 
 ## Project Structure
 

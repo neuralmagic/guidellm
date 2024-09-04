@@ -12,9 +12,9 @@ RUN apt-get update \
 
 # Python dependencies
 RUN pip install --upgrade pip setuptools
+COPY requirements.txt ./
+RUN pip install -r requirements.txt
+
 
 WORKDIR /app/
-
 COPY ./ ./
-
-RUN pip install -e '.[dev,deepsparse,vllm]'

@@ -1,0 +1,26 @@
+BUILDPLATFORM=linux/amd64
+PYTHONPATH=/Users/dmytroparfeniuk/Projects/neuralmagic/vllm/
+
+# commands
+# https://huggingface.co/datasets/openai/openai_humaneval
+alias act="source .tox/py39/bin/activate"
+alias install="python -m pip install -e '.[dev,deepsparse]'"
+alias run='python -m src.guidellm.main --data=openai_humaneval --max-requests=1 --max-seconds=20 --rate-type=constant --rate=1.0 --backend=deepsparse --model='
+alias e2e='python -m pytest -vvv -s tests/e2e'
+
+alias test='docker run --rm --env-file='.env' -v ./:/app/guidellm guidellm:latest pytest -s -vvv tests/unit/backend/test_vllm.py::test_backend_creation'
+
+alias unit='python -m pytest -vvv -s tests/unit'
+alias fix='python -m ruff check --fix'
+alias check='python -m ruff check . && python -m mypy --check-untyped-defs && python -m mdformat --check README.md DEVELOPING.md docs/ src/ tests/'
+alias types='python -m mypy --check-untyped-defs'
+alias clean='rm -rf build dist .mypy_cache .pytest_cache .tox .ruff_cache .coverage && find . -type f- name ".pyc" | xargs rm && find . -type d -name "__pycache__" -exec rm -r {} + && rm-rf *.egg-info'
+
+# Application
+GUIDELLM__LOGGING__CONSOLE_LOG_LEVEL=WARNING
+
+# OpenAI
+# GUIDELLM__OPENAI__BASE_URL=http://127.0.0.1:8080
+GUIDELLM__OPENAI__BASE_URL=http://192.168.50.36:7070
+GUIDELLM__OPENAI__API_KEY=invalid
+

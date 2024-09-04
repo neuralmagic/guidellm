@@ -15,15 +15,15 @@ class VllmBackend(Backend):
     """
 
     def __init__(self, model: Optional[str] = None, **request_args):
+        self._request_args: Dict[str, Any] = request_args
+
         super().__init__(
             type_="vllm",
             model=self._get_model(model),
             target="not used",
         )
 
-        self._request_args: Dict[str, Any] = request_args
         self.llm = LLM(self._model)
-
         logger.info(f"vLLM Backend uses model '{self._model}'")
 
     def _get_model(self, model_from_cli: Optional[str] = None) -> str:
