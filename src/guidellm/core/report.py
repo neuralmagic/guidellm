@@ -147,19 +147,15 @@ def _create_benchmark_report_data_tokens_summary(
     for benchmark in report.benchmarks_sorted:
         table.add_row(
             _benchmark_rate_id(benchmark),
-            f"{benchmark.prompt_token_distribution.mean:.2f}",
+            f"{benchmark.prompt_token:.2f}",
             ", ".join(
                 f"{percentile:.1f}"
-                for percentile in benchmark.prompt_token_distribution.percentiles(
-                    [1, 5, 50, 95, 99]
-                )
+                for percentile in benchmark.prompt_token_percentiles
             ),
-            f"{benchmark.output_token_distribution.mean:.2f}",
+            f"{benchmark.output_token:.2f}",
             ", ".join(
                 f"{percentile:.1f}"
-                for percentile in benchmark.output_token_distribution.percentiles(
-                    [1, 5, 50, 95, 99]
-                )
+                for percentile in benchmark.output_token_percentiles
             ),
         )
     logger.debug("Created data tokens summary table for the report.")
@@ -181,7 +177,7 @@ def _create_benchmark_report_dist_perf_summary(
         "Benchmark",
         "Request Latency [1%, 5%, 10%, 50%, 90%, 95%, 99%] (sec)",
         "Time to First Token [1%, 5%, 10%, 50%, 90%, 95%, 99%] (ms)",
-        "Inter Token Latency [1%, 5%, 10%, 50%, 90% 95%, 99%] (ms)",
+        "Inter Token Latency [1%, 5%, 10%, 50%, 90%, 95%, 99%] (ms)",
         title="[magenta]Performance Stats by Benchmark[/magenta]",
         title_style="bold",
         title_justify="left",
@@ -193,21 +189,15 @@ def _create_benchmark_report_dist_perf_summary(
             _benchmark_rate_id(benchmark),
             ", ".join(
                 f"{percentile:.2f}"
-                for percentile in benchmark.request_latency_distribution.percentiles(
-                    [1, 5, 10, 50, 90, 95, 99]
-                )
+                for percentile in benchmark.request_latency_percentiles
             ),
             ", ".join(
                 f"{percentile * 1000:.1f}"
-                for percentile in benchmark.ttft_distribution.percentiles(
-                    [1, 5, 10, 50, 90, 95, 99]
-                )
+                for percentile in benchmark.time_to_first_token_percentiles
             ),
             ", ".join(
                 f"{percentile * 1000:.1f}"
-                for percentile in benchmark.itl_distribution.percentiles(
-                    [1, 5, 10, 50, 90, 95, 99]
-                )
+                for percentile in benchmark.inter_token_latency_percentiles
             ),
         )
     logger.debug("Created distribution performance summary table for the report.")
