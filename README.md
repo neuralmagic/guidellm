@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/neuralmagic/guidellm/blob/main/docs/assets/guidellm-logo-light.png">
-    <img alt="GuideLLM Logo" src="https://github.com/neuralmagic/guidellm/blob/main/docs/assets/guidellm-logo-dark.png" width=55%>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/neuralmagic/guidellm/main/docs/assets/guidellm-logo-light.png">
+    <img alt="GuideLLM Logo" src="https://raw.githubusercontent.com/neuralmagic/guidellm/main/docs/assets/guidellm-logo-dark.png" width=55%>
   </picture>
 </p>
 
@@ -9,14 +9,14 @@
 Scale Efficiently: Evaluate and Optimize Your LLM Deployments for Real-World Inference
 </h3>
 
-[![GitHub Release](https://img.shields.io/github/release/neuralmagic/guidellm.svg?label=Version)](https://github.com/neuralmagic/guidellm/releases) [![Documentation](https://img.shields.io/badge/Documentation-8A2BE2?logo=read-the-docs&logoColor=%23ffffff&color=%231BC070)](https://github.com/neuralmagic/guidellm/tree/main/docs) [![License](https://img.shields.io/github/license/neuralmagic/guidellm.svg)](https://github.com/neuralmagic/guidellm/blob/main/LICENSE) [![PyPI Release](https://img.shields.io/pypi/v/guidellm.svg?label=PyPI%20Release)](https://pypi.python.org/pypi/guidellm) [![Pypi Release](https://img.shields.io/pypi/v/guidellm-nightly.svg?label=PyPI%20Nightly)](https://pypi.python.org/pypi/guidellm-nightly) [![Python Versions](https://img.shields.io/pypi/pyversions/guidellm.svg?label=Python)](https://pypi.python.org/pypi/guidellm) [![Nightly Build](https://img.shields.io/github/actions/workflow/status/neuralmagic/guidellm/nightly.yml?branch=main&label=Nightly%20Build)](https://github.com/neuralmagic/guidellm/actions/workflows/nightly.yml)
+[![GitHub Release](https://img.shields.io/github/release/neuralmagic/guidellm.svg?label=Version)](https://github.com/neuralmagic/guidellm/releases) [![Documentation](https://img.shields.io/badge/Documentation-8A2BE2?logo=read-the-docs&logoColor=%23ffffff&color=%231BC070)](https://github.com/neuralmagic/guidellm/tree/main/docs) [![License](https://img.shields.io/github/license/neuralmagic/guidellm.svg)](https://github.com/neuralmagic/guidellm/blob/main/LICENSE) [![PyPI Release](https://img.shields.io/pypi/v/guidellm.svg?label=PyPI%20Release)](https://pypi.python.org/pypi/guidellm) [![Pypi Release](https://img.shields.io/pypi/v/guidellm-nightly.svg?label=PyPI%20Nightly)](https://pypi.python.org/pypi/guidellm-nightly) [![Python Versions](https://img.shields.io/badge/Python-3.8--3.12-orange)](https://pypi.python.org/pypi/guidellm) [![Nightly Build](https://img.shields.io/github/actions/workflow/status/neuralmagic/guidellm/nightly.yml?branch=main&label=Nightly%20Build)](https://github.com/neuralmagic/guidellm/actions/workflows/nightly.yml)
 
 ## Overview
 
 <p>
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/neuralmagic/guidellm/blob/main/docs/assets/guidellm-user-flows-dark.png">
-    <img alt="GuideLLM User Flows" src="https://github.com/neuralmagic/guidellm/blob/main/docs/assets/guidellm-user-flows-light.png">
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/neuralmagic/guidellm/main/docs/assets/guidellm-user-flows-dark.png">
+    <img alt="GuideLLM User Flows" src="https://raw.githubusercontent.com/neuralmagic/guidellm/main/docs/assets/guidellm-user-flows-light.png">
   </picture>
 </p>
 
@@ -84,11 +84,11 @@ After the evaluation is completed, GuideLLM will summarize the results, includin
 
 The output results will start with a summary of the evaluation, followed by the requests data for each benchmark run. For example, the start of the output will look like the following:
 
-<img alt="Sample GuideLLM benchmark start output" src="https://github.com/neuralmagic/guidellm/blob/main/docs/assets/sample-output-start.png" />
+<img alt="Sample GuideLLM benchmark start output" src="https://raw.githubusercontent.com/neuralmagic/guidellm/main/docs/assets/sample-output-start.png" />
 
 The end of the output will include important performance summary metrics such as request latency, time to first token (TTFT), inter-token latency (ITL), and more:
 
-<img alt="Sample GuideLLM benchmark end output" src="https://github.com/neuralmagic/guidellm/blob/main/docs/assets/sample-output-end.png" />
+<img alt="Sample GuideLLM benchmark end output" src="https://raw.githubusercontent.com/neuralmagic/guidellm/main/docs/assets/sample-output-end.png" />
 
 #### 4. Use the Results
 
