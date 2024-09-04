@@ -6,7 +6,7 @@
 </p>
 
 <h3 align="center">
-Scale Efficiently: Evaluate and Optimize Your LLM Deployments for Real-World Inference
+Scale Efficiently: Evaluate and Enhance Your LLM Deployments for Real-World Inference
 </h3>
 
 [![GitHub Release](https://img.shields.io/github/release/neuralmagic/guidellm.svg?label=Version)](https://github.com/neuralmagic/guidellm/releases) [![Documentation](https://img.shields.io/badge/Documentation-8A2BE2?logo=read-the-docs&logoColor=%23ffffff&color=%231BC070)](https://github.com/neuralmagic/guidellm/tree/main/docs) [![License](https://img.shields.io/github/license/neuralmagic/guidellm.svg)](https://github.com/neuralmagic/guidellm/blob/main/LICENSE) [![PyPI Release](https://img.shields.io/pypi/v/guidellm.svg?label=PyPI%20Release)](https://pypi.python.org/pypi/guidellm) [![Pypi Release](https://img.shields.io/pypi/v/guidellm-nightly.svg?label=PyPI%20Nightly)](https://pypi.python.org/pypi/guidellm-nightly) [![Python Versions](https://img.shields.io/badge/Python-3.8--3.12-orange)](https://pypi.python.org/pypi/guidellm) [![Nightly Build](https://img.shields.io/github/actions/workflow/status/neuralmagic/guidellm/nightly.yml?branch=main&label=Nightly%20Build)](https://github.com/neuralmagic/guidellm/actions/workflows/nightly.yml)
@@ -20,7 +20,7 @@ Scale Efficiently: Evaluate and Optimize Your LLM Deployments for Real-World Inf
   </picture>
 </p>
 
-**GuideLLM** is a powerful tool for evaluating and optimizing the deployment of large language models (LLMs). By simulating real-world inference workloads, GuideLLM helps users gauge the performance, resource needs, and cost implications of deploying LLMs on various hardware configurations. This approach ensures efficient, scalable, and cost-effective LLM inference serving while maintaining high service quality.
+**GuideLLM** is a powerful tool for evaluating and enhancing the deployment of large language models (LLMs). By simulating real-world inference workloads, GuideLLM helps users gauge the performance, resource needs, and cost implications of deploying LLMs on various hardware configurations. This approach ensures efficient, scalable, and cost-effective LLM inference serving while maintaining high service quality.
 
 ### Key Features
 
@@ -92,7 +92,7 @@ The end of the output will include important performance summary metrics such as
 
 #### 4. Use the Results
 
-The results from GuideLLM are used to optimize your LLM deployment for performance, resource efficiency, and cost. By analyzing the performance metrics, you can identify bottlenecks, determine the optimal request rate, and select the most cost-effective hardware configuration for your deployment.
+The results from GuideLLM are used to enhance your LLM deployment for performance, resource efficiency, and cost. By analyzing the performance metrics, you can identify bottlenecks, determine the optimal request rate, and select the most cost-effective hardware configuration for your deployment.
 
 For example, if we deploy a latency-sensitive chat application, we likely want to optimize for low time to first token (TTFT) and inter-token latency (ITL). A reasonable threshold will depend on the application requirements. Still, we may want to ensure time to first token (TTFT) is under 200ms and inter-token latency (ITL) is under 50ms (20 updates per second). From the example results above, we can see that the model can meet these requirements on average at a request rate of 2.37 requests per second for each server. If you'd like to target a higher percentage of requests meeting these requirements, you can use the **Performance Stats by Benchmark** section to determine the rate at which 90% or 95% of requests meet these requirements.
 
