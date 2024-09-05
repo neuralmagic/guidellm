@@ -422,6 +422,7 @@ class TextGenerationBenchmark(Serializable):
             ]
         )
 
+
     @computed_field  # type: ignore[misc]
     @property
     def inter_token_latency_percentiles(self) -> List[float]:
