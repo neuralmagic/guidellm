@@ -386,9 +386,11 @@ class TextGenerationBenchmark(Serializable):
     @property
     def time_to_first_token_percentiles(self) -> List[float]:
         """
-        Get standard percentiles for time taken to decode the first token in milliseconds.
+        Get standard percentiles for time taken to decode the first token
+        in milliseconds.
 
-        :return: List of percentile time taken to decode the first token in milliseconds.
+        :return: List of percentile time taken to decode the first token
+        in milliseconds.
         :rtype: List[float]
         """
         return self.ttft_distribution.percentiles([1, 5, 10, 50, 90, 95, 99])
