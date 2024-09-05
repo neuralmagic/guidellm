@@ -369,6 +369,7 @@ class TextGenerationBenchmark(Serializable):
         """
         return self.itl_distribution.mean
 
+
     @computed_field  # type: ignore[misc]
     @property
     def inter_token_latency_percentiles(self) -> Dict[str, float]:
