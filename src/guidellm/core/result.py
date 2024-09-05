@@ -381,7 +381,7 @@ class TextGenerationBenchmark(Serializable):
                 if result.first_token_time is not None
             ]
         )
-    
+
     @computed_field
     @property
     def time_to_first_token_percentiles(self) -> List[float]:
@@ -390,7 +390,7 @@ class TextGenerationBenchmark(Serializable):
 
         :return: List of percentile time taken to decode the first token in milliseconds.
         :rtype: List[float]
-        """        
+        """
         return self.ttft_distribution.percentiles([1, 5, 10, 50, 90, 95, 99])
 
     @computed_field
@@ -420,7 +420,7 @@ class TextGenerationBenchmark(Serializable):
                 decode for result in self.results for decode in result.decode_times.data
             ]
         )
-    
+
     @computed_field
     @property
     def inter_token_latency_percentiles(self) -> List[float]:
