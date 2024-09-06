@@ -221,7 +221,7 @@ class TextGenerationBenchmark(Serializable):
         """
         return iter(self.results)
 
-    @computed_field
+    @computed_field # type: ignore[misc]
     @property
     def request_count(self) -> int:
         """
@@ -232,7 +232,7 @@ class TextGenerationBenchmark(Serializable):
         """
         return len(self.results)
 
-    @computed_field
+    @computed_field # type: ignore[misc]
     @property
     def error_count(self) -> int:
         """
@@ -243,7 +243,7 @@ class TextGenerationBenchmark(Serializable):
         """
         return len(self.errors)
 
-    @computed_field
+    @computed_field # type: ignore[misc]
     @property
     def total_count(self) -> int:
         """
@@ -254,7 +254,7 @@ class TextGenerationBenchmark(Serializable):
         """
         return self.request_count + self.error_count
 
-    @computed_field
+    @computed_field # type: ignore[misc]
     @property
     def start_time(self) -> Optional[float]:
         """
@@ -268,7 +268,7 @@ class TextGenerationBenchmark(Serializable):
 
         return self.results[0].start_time
 
-    @computed_field
+    @computed_field # type: ignore[misc]
     @property
     def end_time(self) -> Optional[float]:
         """
@@ -282,7 +282,7 @@ class TextGenerationBenchmark(Serializable):
 
         return self.results[-1].end_time
 
-    @computed_field
+    @computed_field # type: ignore[misc]
     @property
     def duration(self) -> float:
         """
@@ -296,7 +296,7 @@ class TextGenerationBenchmark(Serializable):
 
         return self.end_time - self.start_time
 
-    @computed_field
+    @computed_field # type: ignore[misc]
     @property
     def completed_request_rate(self) -> float:
         """
@@ -310,7 +310,7 @@ class TextGenerationBenchmark(Serializable):
 
         return len(self.results) / self.duration
 
-    @computed_field
+    @computed_field # type: ignore[misc]
     @property
     def request_latency(self) -> float:
         """
@@ -340,7 +340,7 @@ class TextGenerationBenchmark(Serializable):
             ]
         )
 
-    @computed_field
+    @computed_field # type: ignore[misc]
     @property
     def request_latency_percentiles(self) -> List[float]:
         """
@@ -352,7 +352,7 @@ class TextGenerationBenchmark(Serializable):
         return self.request_latency_distribution.percentiles([1, 5, 10, 50, 90, 95, 99])
 
 
-    @computed_field
+    @computed_field # type: ignore[misc]
     @property
     def time_to_first_token(self) -> float:
         """
@@ -382,7 +382,7 @@ class TextGenerationBenchmark(Serializable):
             ]
         )
 
-    @computed_field
+    @computed_field # type: ignore[misc]
     @property
     def time_to_first_token_percentiles(self) -> List[float]:
         """
@@ -395,7 +395,7 @@ class TextGenerationBenchmark(Serializable):
         """
         return self.ttft_distribution.percentiles([1, 5, 10, 50, 90, 95, 99])
 
-    @computed_field
+    @computed_field # type: ignore[misc]
     @property
     def inter_token_latency(self) -> float:
         """
@@ -423,7 +423,7 @@ class TextGenerationBenchmark(Serializable):
             ]
         )
 
-    @computed_field
+    @computed_field # type: ignore[misc]
     @property
     def inter_token_latency_percentiles(self) -> List[float]:
         """
@@ -434,7 +434,7 @@ class TextGenerationBenchmark(Serializable):
         """
         return self.itl_distribution.percentiles([1, 5, 10, 50, 90, 95, 99])
 
-    @computed_field
+    @computed_field # type: ignore[misc]
     @property
     def output_token_throughput(self) -> float:
         """
@@ -450,7 +450,7 @@ class TextGenerationBenchmark(Serializable):
 
         return total_tokens / self.duration
 
-    @computed_field
+    @computed_field # type: ignore[misc]
     @property
     def prompt_token(self) -> float:
         """
@@ -471,7 +471,7 @@ class TextGenerationBenchmark(Serializable):
         """
         return Distribution(data=[result.prompt_token_count for result in self.results])
 
-    @computed_field
+    @computed_field # type: ignore[misc]
     @property
     def prompt_token_percentiles(self) -> List[float]:
         """
@@ -482,7 +482,7 @@ class TextGenerationBenchmark(Serializable):
         """
         return self.prompt_token_distribution.percentiles([1, 5, 50, 95, 99])
 
-    @computed_field
+    @computed_field # type: ignore[misc]
     @property
     def output_token(self) -> float:
         """
@@ -503,7 +503,7 @@ class TextGenerationBenchmark(Serializable):
         """
         return Distribution(data=[result.output_token_count for result in self.results])
 
-    @computed_field
+    @computed_field # type: ignore[misc]
     @property
     def output_token_percentiles(self) -> List[float]:
         """
@@ -514,7 +514,7 @@ class TextGenerationBenchmark(Serializable):
         """
         return self.output_token_distribution.percentiles([1, 5, 50, 95, 99])
 
-    @computed_field
+    @computed_field # type: ignore[misc]
     @property
     def overloaded(self) -> bool:
         if (
