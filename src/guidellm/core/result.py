@@ -183,7 +183,7 @@ class TextGenerationBenchmark(Serializable):
         """
         return iter(self.results)
 
-    @computed_field  # type: ignore[misc]
+    @computed_field  # type: ignore
     @property
     def request_count(self) -> int:
         """
@@ -368,7 +368,6 @@ class TextGenerationBenchmark(Serializable):
         :return: The average time between tokens.
         """
         return self.itl_distribution.mean
-
 
     @computed_field  # type: ignore[misc]
     @property
