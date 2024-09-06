@@ -105,6 +105,21 @@ class RequestGenerator(ABC):
             while not self._stop_event.is_set():
                 yield self.create_item()
 
+    @abstractmethod
+    def __len__(self) -> int:
+        """
+        Abstract method to get the length of the collection to be generated.
+        """
+
+    @abstractmethod
+    def create_item(self) -> TextGenerationRequest:
+        """
+        Abstract method to create a new result request item.
+
+        :return: A new result request.
+        :rtype: TextGenerationRequest
+        """
+
     @property
     def type_(self) -> str:
         """
@@ -154,15 +169,6 @@ class RequestGenerator(ABC):
         :rtype: int
         """
         return self._async_queue_size
-
-    @abstractmethod
-    def create_item(self) -> TextGenerationRequest:
-        """
-        Abstract method to create a new result request item.
-
-        :return: A new result request.
-        :rtype: TextGenerationRequest
-        """
 
     def stop(self):
         """

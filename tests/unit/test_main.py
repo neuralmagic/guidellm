@@ -252,3 +252,57 @@ def test_generate_benchmark_report_cli_smoke(
     assert "Benchmarks" in result.output
     assert "Generating report..." in result.output
     assert "Benchmark Report 1" in result.output
+
+
+@pytest.mark.smoke()
+def test_generate_benchmark_report_emulated_with_dataset_requests(
+    mock_backend, mock_request_generator_emulated, mock_executor
+):
+    with pytest.raises(ValueError, match="Cannot use 'dataset' for emulated data"):
+        generate_benchmark_report(
+            target="http://localhost:8000/v1",
+            backend="openai_server",
+            model=None,
+            data=None,
+            data_type="emulated",  # Emulated data type
+            tokenizer=None,
+            rate_type="sweep",
+            rate=None,
+            max_seconds=10,
+            max_requests="dataset",  # Set max_requests to 'dataset'
+            output_path="benchmark_report.json",
+            cont_refresh_table=False,
+        )
+
+
+@pytest.mark.smoke()
+def test_generate_benchmark_report_cli_emulated_with_dataset_requests(
+    mock_backend, mock_request_generator_emulated, mock_executor
+):
+    with pytest.raises(ValueError, match="Cannot use 'dataset' for emulated data"):
+        runner = CliRunner()
+        result = runner.invoke(
+            generate_benchmark_report_cli,
+            [
+                "--target",
+                "http://localhost:8000/v1",
+                "--backend",
+                "openai_server",
+                "--data-type",
+                "emulated",
+                "--data",
+                "prompt_tokens=512",
+                "--rate-type",
+                "sweep",
+                "--max-seconds",
+                "10",
+                "--max-requests",
+                "dataset",
+                "--output-path",
+                "benchmark_report.json",
+            ],
+            catch_exceptions=False,
+        )
+
+        if result.stdout:
+            print(result.stdout)  # noqa: T201

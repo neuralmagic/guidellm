@@ -13,7 +13,7 @@ from guidellm.request import (
     TransformersDatasetRequestGenerator,
 )
 from guidellm.request.base import RequestGenerator
-from guidellm.utils import BenchmarkReportProgress
+from guidellm.utils import BenchmarkReportProgress, cli_params
 
 __all__ = ["generate_benchmark_report"]
 
@@ -120,7 +120,7 @@ __all__ = ["generate_benchmark_report"]
 )
 @click.option(
     "--max-requests",
-    type=int,
+    type=cli_params.MAX_REQUESTS,
     default=None,
     help=(
         "The maximum number of requests for each benchmark run. "

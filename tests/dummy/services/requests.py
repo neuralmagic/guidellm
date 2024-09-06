@@ -26,3 +26,6 @@ class TestRequestGenerator(RequestGenerator):
 
     def create_item(self) -> TextGenerationRequest:
         return TextGenerationRequest(prompt="Test prompt")
+
+    def __len__(self) -> int:
+        raise NotImplementedError

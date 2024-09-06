@@ -95,3 +95,38 @@ def test_transformers_dataset_request_generator_lifecycle(
 
             if index == 2:
                 break
+
+
+@pytest.mark.smoke()
+@pytest.mark.parametrize(
+    ("dataset_arg", "dataset"),
+    [
+        (
+            "mock/directory/file.csv",
+            create_sample_dataset_dict(splits=["train"]),
+        ),
+        (
+            "mock/directory/file.json",
+            create_sample_dataset(column="prompt"),
+        ),
+        (
+            "mock/directory/file.py",
+            create_sample_dataset_dict(splits=["test"], column="output"),
+        ),
+        (create_sample_dataset_dict(splits=["val", "train"], column="custom"), None),
+        (create_sample_dataset(), None)
+    ],
+)
+def test_transformers_dataset_request_generator_len(
+    mock_auto_tokenizer, dataset_arg, dataset
+):
+    with patch(
+        "guidellm.utils.transformers.load_dataset",
+        return_value=dataset,
+    ):
+        generator = TransformersDatasetRequestGenerator(
+            dataset=dataset_arg, tokenizer="mock-tokenizer", mode="sync"
+        )
+
+        # Check if __len__ returns the correct length
+        assert len(generator) == 3

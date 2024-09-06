@@ -1,12 +1,8 @@
 from pathlib import Path
 from typing import Optional, Union
 
-from datasets import (  # type: ignore  # noqa: PGH003
-    Dataset,
-    DatasetDict,
-    IterableDataset,
-    IterableDatasetDict,
-)
+from datasets import DatasetDict  # type: ignore  # noqa: PGH003
+from datasets import Dataset, IterableDataset, IterableDatasetDict
 from loguru import logger
 from transformers import PreTrainedTokenizer  # type: ignore  # noqa: PGH003
 
@@ -57,7 +53,9 @@ class TransformersDatasetRequestGenerator(RequestGenerator):
         self._column = column
         self._kwargs = kwargs
 
-        self._hf_dataset = load_transformers_dataset(dataset, split=split, **kwargs)
+        self._hf_dataset: Union[Dataset, IterableDataset] = load_transformers_dataset(
+            dataset, split=split, **kwargs
+        )
         self._hf_column = resolve_transformers_dataset_column(
             self._hf_dataset, column=column
         )
@@ -72,6 +70,12 @@ class TransformersDatasetRequestGenerator(RequestGenerator):
             mode=mode,
             async_queue_size=async_queue_size,
         )
+
+    def __len__(self) -> int:
+        if not isinstance(self._hf_dataset, Dataset):
+            raise ValueError(f"Can't get dataset size for IterableDataset object")
+        else:
+            return len(self._hf_dataset)
 
     def create_item(self) -> TextGenerationRequest:
         """
