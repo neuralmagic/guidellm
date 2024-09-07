@@ -279,9 +279,9 @@ def test_generate_benchmark_report_emulated_with_dataset_requests(
 def test_generate_benchmark_report_cli_emulated_with_dataset_requests(
     mock_backend, mock_request_generator_emulated, mock_executor
 ):
+    runner = CliRunner()
     with pytest.raises(ValueError, match="Cannot use 'dataset' for emulated data"):
-        runner = CliRunner()
-        result = runner.invoke(
+        runner.invoke(
             generate_benchmark_report_cli,
             [
                 "--target",
@@ -303,6 +303,3 @@ def test_generate_benchmark_report_cli_emulated_with_dataset_requests(
             ],
             catch_exceptions=False,
         )
-
-        if result.stdout:
-            print(result.stdout)  # noqa: T201

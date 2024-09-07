@@ -104,6 +104,10 @@ exclude = ["venv", ".tox"]
 # Check: https://mypy.readthedocs.io/en/latest/config_file.html#import-discovery
 follow_imports = 'silent'
 
+[[tool.mypy.overrides]]
+module = ["datasets.*"]
+ignore_missing_imports=true
+
 
 [tool.ruff]
 line-length = 88
@@ -122,6 +126,8 @@ ignore = [
     "ISC001",
     "TCH002",
     "PLW1514", # allow Path.open without encoding
+    "RET505", # allow `else` blocks
+    "RET506" # allow `else` blocks
 
 ]
 select = [

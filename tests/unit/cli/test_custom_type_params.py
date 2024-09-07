@@ -4,7 +4,7 @@ from click import BadParameter
 from guidellm.utils import cli_params
 
 
-@pytest.fixture
+@pytest.fixture()
 def max_requests_param_type():
     return cli_params.MaxRequestsType()
 

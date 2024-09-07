@@ -23,8 +23,7 @@ class MaxRequestsType(ParamType):
             return value
 
         try:
-            value = int(value)
-            return value
+            return int(value)
         except ValueError:
             if value == "dataset":
                 return value

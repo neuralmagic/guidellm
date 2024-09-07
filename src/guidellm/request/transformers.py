@@ -1,8 +1,12 @@
 from pathlib import Path
 from typing import Optional, Union
 
-from datasets import DatasetDict  # type: ignore  # noqa: PGH003
-from datasets import Dataset, IterableDataset, IterableDatasetDict
+from datasets import (
+    Dataset,
+    DatasetDict,  # type: ignore  # noqa: PGH003
+    IterableDataset,
+    IterableDatasetDict,
+)
 from loguru import logger
 from transformers import PreTrainedTokenizer  # type: ignore  # noqa: PGH003
 
@@ -73,7 +77,7 @@ class TransformersDatasetRequestGenerator(RequestGenerator):
 
     def __len__(self) -> int:
         if not isinstance(self._hf_dataset, Dataset):
-            raise ValueError(f"Can't get dataset size for IterableDataset object")
+            raise ValueError("Can't get dataset size for IterableDataset object")
         else:
             return len(self._hf_dataset)
 
