@@ -56,6 +56,8 @@ GuideLLM requires an OpenAI-compatible server to run evaluations. [vLLM](https:/
 vllm serve "neuralmagic/Meta-Llama-3.1-8B-Instruct-quantized.w4a16"
 ```
 
+For more information on starting a vLLM server, see the [vLLM Documentation](https://docs.vllm.ai/en/latest/serving/openai_compatible_server.html).
+
 #### 1b. Start an OpenAI Compatible Server (Hugging Face TGI)
 
 GuideLLM requires an OpenAI-compatible server to run evaluations. [Text Generation Inference](https://github.com/huggingface/text-generation-inference) can be used here. To start a TGI server with a Llama 3.1 8B using docker, run the following command:
