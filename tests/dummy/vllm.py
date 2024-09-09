@@ -3,9 +3,9 @@ This module includes data models factories for the `vllm` 3-rd party package
 """
 
 import random
-from typing import Generator, List, Optional
+from typing import Generator, List
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
 from guidellm.utils import random_strings
 
@@ -52,7 +52,7 @@ class TestLLM(BaseModel):
 
     def _generate_completion_outputs(
         self, max_tokens: int
-    ) -> Generator[CompletionOutputs, None, None]:
+    ) -> Generator[CompletionOutput, None, None]:
 
         # NOTE: This value is used only for testing purposes
         self._expected_outputs: List[CompletionOutput] = []
@@ -70,8 +70,10 @@ class TestLLM(BaseModel):
     ) -> List[CompletionOutputs]:
         return [
             CompletionOutputs(
-                outputs=self._generate_completion_outputs(
-                    max_tokens=sampling_params.max_tokens
+                outputs=list(
+                    self._generate_completion_outputs(
+                        max_tokens=sampling_params.max_tokens
+                    )
                 )
             )
         ]

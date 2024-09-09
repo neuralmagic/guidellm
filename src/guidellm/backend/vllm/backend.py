@@ -19,6 +19,8 @@ class VllmBackend(Backend):
         self._request_args: Dict[str, Any] = request_args
         self.llm = LLM(_model)
 
+        # NOTE: Must be after all the parameters since ``self.llm`` is going to be used
+        #       by ``make_request`` within ``Backend.test_connection()``
         super().__init__(type_="vllm", model=_model, target="not used")
 
         logger.info(f"vLLM Backend uses model '{self._model}'")

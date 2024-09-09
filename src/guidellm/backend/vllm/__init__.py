@@ -16,10 +16,10 @@ from guidellm.utils import check_python_version, module_is_available
 
 check_python_version(min_version="3.8", max_version="3.12")
 
-# module_is_available(
-#     module="vllm",
-#     helper=("`vllm` package is not available. Try run: `pip install -e '.[vllm]'`"),
-# )
+module_is_available(
+    module="vllm",
+    helper=("`vllm` package is not available. Try run: `pip install -e '.[vllm]'`"),
+)
 
 from .backend import VllmBackend  # noqa: E402
 

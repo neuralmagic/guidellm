@@ -108,7 +108,7 @@ def test_backend_model_from_env(mocker, backend_class):
 @pytest.mark.parametrize(
     "text_generation_request_create_payload",
     [
-        # {"prompt": "Test prompt"},
+        {"prompt": "Test prompt"},
         {"prompt": "Test prompt", "output_token_count": 20},
     ],
 )
@@ -126,11 +126,11 @@ async def test_make_request(
             output_tokens.append(response.add_token)
 
     assert "".join(output_tokens) == "".join(
-        generation.text for generation in getattr(backend.llm, "_expected_outputs")
+        generation.text for generation in backend.llm._expected_outputs
     )
 
     if max_tokens := text_generation_request_create_payload.get("output_token_count"):
-        assert len(getattr(backend.llm, "_expected_outputs")) == max_tokens
+        assert len(backend.llm._expected_outputs) == max_tokens
 
 
 @pytest.mark.smoke()
