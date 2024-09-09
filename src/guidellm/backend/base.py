@@ -228,7 +228,6 @@ class Backend(ABC):
         result.start(request.prompt)
         received_final = False
 
-        breakpoint()  # TODO: remove
         async for response in self.make_request(request):
             logger.debug("Received response: {}", response)
             if response.type_ == "token_iter":

@@ -45,7 +45,7 @@ class TestTextGenerationPipeline:
     Method `__call__` allows to mock the result object that comes from
     `deepsparse.pipeline.Pipeline()` so everything is encapsulated right here.
 
-    :param self._generation: dynamic representation of generated responses
+    :param self._generations: dynamic representation of generated responses
         from deepsparse interface.
     """
 

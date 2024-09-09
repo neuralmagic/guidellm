@@ -3,8 +3,7 @@ This module includes data models factories for the `vllm` 3-rd party package
 """
 
 import random
-from functools import partial
-from typing import List, Optional
+from typing import Generator, List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -25,6 +24,10 @@ class SamplingParams(BaseModel):
     max_tokens: int
 
 
+class CompletionOutputs(BaseModel):
+    outputs: List[CompletionOutput]
+
+
 class TestLLM(BaseModel):
     """Test interface of `vllm.LLM`.
 
@@ -32,6 +35,8 @@ class TestLLM(BaseModel):
         _outputs_number(int | None): the number of generated tokens per output.
             Should be used only for testing purposes.
             Default: randint(10..20)
+        _generations: dynamic representation of generated responses
+            from deepsparse interface.
 
     """
 
@@ -45,23 +50,28 @@ class TestLLM(BaseModel):
     model: str
     max_num_batched_tokens: int
 
-    # NOTE: This value is used only for testing purposes
-    outputs_number: int = Field(default_factory=partial(random.randint, 10, 20))
+    def _generate_completion_outputs(
+        self, max_tokens: int
+    ) -> Generator[CompletionOutputs, None, None]:
 
-    def _generate_completion_outputs(self, max_tokens: int) -> List[CompletionOutput]:
-        self._outputs_number = random.randint(10, 20)
+        # NOTE: This value is used only for testing purposes
+        self._expected_outputs: List[CompletionOutput] = []
 
-        return [
-            CompletionOutput(text=text)
-            for text in random_strings(
-                min_chars=0, max_chars=max_tokens, n=self._outputs_number
-            )
-        ]
+        for text in random_strings(
+            min_chars=0, max_chars=random.randint(10, 20), n=max_tokens
+        ):
+            instance = CompletionOutput(text=text)
+            self._expected_outputs.append(instance)
+
+            yield instance
 
     def generate(
         self, inputs: List[str], sampling_params: SamplingParams
-    ) -> Optional[List[List[CompletionOutput]]]:
-        breakpoint()  # TODO: remove
+    ) -> List[CompletionOutputs]:
         return [
-            self._generate_completion_outputs(max_tokens=sampling_params.max_tokens)
+            CompletionOutputs(
+                outputs=self._generate_completion_outputs(
+                    max_tokens=sampling_params.max_tokens
+                )
+            )
         ]

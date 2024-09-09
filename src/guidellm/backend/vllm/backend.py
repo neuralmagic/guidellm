@@ -14,7 +14,7 @@ class VllmBackend(Backend):
     An vLLM Backend implementation for the generative AI result.
     """
 
-    def __init__(self, model: str = settings.llm_model, **request_args):
+    def __init__(self, model: Optional[str] = None, **request_args):
         _model = self._get_model(model)
         self._request_args: Dict[str, Any] = request_args
         self.llm = LLM(_model)
@@ -69,7 +69,6 @@ class VllmBackend(Backend):
             output_token_count=token_count,
         )
 
-        breakpoint()  # TODO: remove
         if not (result := self.llm.generate(**request_args)):
             yield final_response
             return
@@ -82,12 +81,6 @@ class VllmBackend(Backend):
 
         for generation in generations:
             if not (token := generation.text):
-                yield GenerativeResponse(
-                    type_="final",
-                    prompt=request.prompt,
-                    prompt_token_count=request.prompt_token_count,
-                    output_token_count=token_count,
-                )
                 break
             else:
                 token_count += 1
@@ -98,6 +91,13 @@ class VllmBackend(Backend):
                     prompt_token_count=request.prompt_token_count,
                     output_token_count=token_count,
                 )
+
+        yield GenerativeResponse(
+            type_="final",
+            prompt=request.prompt,
+            prompt_token_count=request.prompt_token_count,
+            output_token_count=token_count,
+        )
 
     def available_models(self) -> List[str]:
         """

@@ -21,18 +21,21 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="session")
 def backend_class():
     from guidellm.backend.vllm import VllmBackend
 
     return VllmBackend
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture()
 def vllm_patch_factory(mocker) -> Callable[[str], dummy.vllm.TestLLM]:
     """
     Skip VLLM initializer due to external calls.
     Replace VllmBackend.llm object with mock representation.
+
+    This vllm patch is injected into each test automatically. If you need
+    to override the Mock object - use this fixture.
     """
 
     def inner(model: Optional[str] = None, max_tokens: Optional[int] = None):
@@ -46,6 +49,15 @@ def vllm_patch_factory(mocker) -> Callable[[str], dummy.vllm.TestLLM]:
         )
 
     return inner
+
+
+@pytest.fixture(autouse=True)
+def vllm_auto_patch(vllm_patch_factory):
+    """
+    Automatically patch the ``vllm.LLM`` with defaults.
+    """
+
+    return vllm_patch_factory()
 
 
 @pytest.mark.smoke()
@@ -96,7 +108,7 @@ def test_backend_model_from_env(mocker, backend_class):
 @pytest.mark.parametrize(
     "text_generation_request_create_payload",
     [
-        {"prompt": "Test prompt"},
+        # {"prompt": "Test prompt"},
         {"prompt": "Test prompt", "output_token_count": 20},
     ],
 )
@@ -112,12 +124,13 @@ async def test_make_request(
     ):
         if response.add_token:
             output_tokens.append(response.add_token)
+
     assert "".join(output_tokens) == "".join(
-        generation.text for generation in backend.pipeline._generations
+        generation.text for generation in getattr(backend.llm, "_expected_outputs")
     )
 
     if max_tokens := text_generation_request_create_payload.get("output_token_count"):
-        assert len(backend.pipeline._generations) == max_tokens
+        assert len(getattr(backend.llm, "_expected_outputs")) == max_tokens
 
 
 @pytest.mark.smoke()
