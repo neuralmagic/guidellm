@@ -5,19 +5,20 @@ Notes: tests from this module are going to be skipped in case
     the rimtime platform is not a Linux / WSL according to vllm documentation.
 """
 
-from typing import Dict, List
+import sys
+from typing import Callable, Dict, List, Optional
 
 import pytest
 
 from guidellm.backend import Backend
-from guidellm.config import reload_settings
+from guidellm.config import reload_settings, settings
 from guidellm.core import TextGenerationRequest
 from tests import dummy
 
-# pytestmark = pytest.mark.skipif(
-#     sys.platform != "linux",
-#     reason="Unsupported Platform. Try using Linux or WSL instead.",
-# )
+pytestmark = pytest.mark.skipif(
+    sys.platform != "linux",
+    reason="Unsupported Platform. Try using Linux or WSL instead.",
+)
 
 
 @pytest.fixture(scope="module")
@@ -28,13 +29,23 @@ def backend_class():
 
 
 @pytest.fixture(autouse=True)
-def mock_vllm_llm(mocker):
-    llm = dummy.vllm.TestLLM(
-        model="facebook/opt-125m",
-        max_num_batched_tokens=4096,
-    )
+def vllm_patch_factory(mocker) -> Callable[[str], dummy.vllm.TestLLM]:
+    """
+    Skip VLLM initializer due to external calls.
+    Replace VllmBackend.llm object with mock representation.
+    """
 
-    return mocker.patch("vllm.LLM", return_value=llm)
+    def inner(model: Optional[str] = None, max_tokens: Optional[int] = None):
+
+        return mocker.patch(
+            "vllm.LLM.__new__",
+            return_value=dummy.vllm.TestLLM(
+                model=model or settings.llm_model,
+                max_num_batched_tokens=max_tokens or 4096,
+            ),
+        )
+
+    return inner
 
 
 @pytest.mark.smoke()
@@ -45,10 +56,12 @@ def mock_vllm_llm(mocker):
         {"model": "test/custom_llm"},
     ],
 )
-def test_backend_creation(create_payload: Dict, backend_class):
+def test_backend_creation(create_payload: Dict, backend_class, vllm_patch_factory):
     """Test the "Deepspaarse Backend" class
     with defaults and custom input parameters.
     """
+
+    vllm_patch_factory(model=create_payload.get("model"))
 
     backends = [
         Backend.create("vllm", **create_payload),

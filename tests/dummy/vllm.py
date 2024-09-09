@@ -61,6 +61,7 @@ class TestLLM(BaseModel):
     def generate(
         self, inputs: List[str], sampling_params: SamplingParams
     ) -> Optional[List[List[CompletionOutput]]]:
+        breakpoint()  # TODO: remove
         return [
             self._generate_completion_outputs(max_tokens=sampling_params.max_tokens)
         ]

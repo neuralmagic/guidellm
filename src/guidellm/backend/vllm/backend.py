@@ -14,16 +14,13 @@ class VllmBackend(Backend):
     An vLLM Backend implementation for the generative AI result.
     """
 
-    def __init__(self, model: Optional[str] = None, **request_args):
+    def __init__(self, model: str = settings.llm_model, **request_args):
+        _model = self._get_model(model)
         self._request_args: Dict[str, Any] = request_args
+        self.llm = LLM(_model)
 
-        super().__init__(
-            type_="vllm",
-            model=self._get_model(model),
-            target="not used",
-        )
+        super().__init__(type_="vllm", model=_model, target="not used")
 
-        self.llm = LLM(self._model)
         logger.info(f"vLLM Backend uses model '{self._model}'")
 
     def _get_model(self, model_from_cli: Optional[str] = None) -> str:
@@ -72,6 +69,7 @@ class VllmBackend(Backend):
             output_token_count=token_count,
         )
 
+        breakpoint()  # TODO: remove
         if not (result := self.llm.generate(**request_args)):
             yield final_response
             return

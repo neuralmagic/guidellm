@@ -2,6 +2,7 @@ FROM --platform=linux/amd64 python:3.8-slim
 
 # Environment variables
 ENV PYTHONUNBUFFERED=1
+ENV PYTHONPATH=/app/guidellm/src/
 
 RUN apt-get update \
     # dependencies for building Python packages && cleaning up unused files
@@ -14,6 +15,5 @@ RUN apt-get update \
 RUN pip install --upgrade pip setuptools
 COPY requirements.txt ./
 RUN pip install -r requirements.txt
-
 
 WORKDIR /app/
