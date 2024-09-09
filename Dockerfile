@@ -7,17 +7,20 @@ ENV PYTHONPATH=/app/guidellm/src/
 RUN : \
     && apt-get update \
     # dependencies for building Python packages && cleaning up unused files
-    && apt-get install -y --no-insatll-recommend \
+    && apt-get install -y \
         build-essential \
         libcurl4-openssl-dev \
         libssl-dev \
     && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && pip install --upgrade \
+        pip \
+        setuptools
 
 
-# Python dependencies
-RUN pip install --upgrade pip setuptools
-COPY requirements.txt ./
-RUN pip install -r requirements.txt
+WORKDIR /app
 
-WORKDIR /app/
+# Install project dependencies
+COPY ./ ./
+RUN pip install -e .[dev,deepsparse,vllm]
+

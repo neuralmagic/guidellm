@@ -12,3 +12,4 @@ LICENSE
 MANIFEST.in
 __pycache__/
 *.egg-info/
+*log

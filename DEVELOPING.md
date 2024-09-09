@@ -187,11 +187,9 @@ Some of the test might be not supported on your system (_for instance `vllm` is 
 In order to run under the Docker just run the command below:
 
 ```sh
-docker build -t guidellm:latest --shm-size=1024m .
-docker run --rm --env-file .env -v ./:/app/guidellm -it guidellm:latest pytest tests/
+docker build -t guidellm:latest .
+docker run --rm --env-file .env guidellm:latest pytest tests/
 ```
-
-Using `--shm-size=1024m` is recommended due to potential local Docker configuration. Increase or decrease this value depending on your needs.
 
 <br>
 
