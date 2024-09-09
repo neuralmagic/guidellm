@@ -171,7 +171,7 @@ async def test_openai_backend_make_request(req, request_args, mock_openai_client
     assert backend._async_client.create_args == ()  # type: ignore
     assert backend._async_client.create_kwargs["model"] == "mock-model"  # type: ignore
     assert backend._async_client.create_kwargs["messages"] == [  # type: ignore
-        {"role": "system", "content": req.prompt}
+        {"role": "user", "content": req.prompt}
     ]
     assert backend._async_client.create_kwargs["stream"]  # type: ignore
     assert backend._async_client.create_kwargs["n"] == 1  # type: ignore
