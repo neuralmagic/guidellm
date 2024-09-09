@@ -50,12 +50,12 @@ pip install -e .[vllm]
 According to the [installation guide](https://docs.vllm.ai/en/v0.4.0.post1/getting_started/installation.html) `vllm` is supported only on **Linux**. It means that running the application and tests will fail.
 
 Workaround with Docker:
+
 ```sh
 cd guidellm/
 docker build -t guidellm:latest .
 docker run -v ./:./ guidellm:latest python -m pytest -s -v src/unit/backend/test_vllm.py
 ```
-
 
 ## Project Structure
 
@@ -179,6 +179,21 @@ The end-to-end tests are located in the `tests/e2e` directory. To run the end-to
 ```bash
 tox -e test-e2e
 ```
+
+### Running unsopported tests
+
+Some of the test might be not supported on your system (_for instance `vllm` is not supported on MacOS yet_). In order to run them on Linux Operating System you might use technologies like **WSL** on Windows, or **Docker** on Windows or MacOS.
+
+In order to run under the Docker just run the command below:
+
+```sh
+docker build -t guidellm:latest --shm-size=1024m .
+docker run --rm --env-file .env -v ./:/app/guidellm -it guidellm:latest pytest tests/
+```
+
+Using `--shm-size=1024m` is recommended due to potential local Docker configuration. Increase or decrease this value depending on your needs.
+
+<br>
 
 ## Formatting, Linting, and Type Checking
 
