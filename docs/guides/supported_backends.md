@@ -3,8 +3,9 @@
 
 GuideLLM requires an OpenAI-compatible server to run evaluations. [vLLM](https://github.com/vllm-project/vllm) is recommended for this purpose; however, GuideLLM is compatible with many backend inference servers such as TGI, llama.cpp, and DeepSparse. 
 
+## OpenAI/HTTP Backends
 
-## Text Generation Inference 
+### Text Generation Inference 
 [Text Generation Inference](https://github.com/huggingface/text-generation-inference) can be used with GuideLLM. To start a TGI server with a Llama 3.1 8B using docker, run the following command:
 ```bash
 docker run --gpus 1 -ti --shm-size 1g --ipc=host --rm -p 8080:80 \
@@ -19,10 +20,15 @@ docker run --gpus 1 -ti --shm-size 1g --ipc=host --rm -p 8080:80 \
 For more information on starting a TGI server, see the [TGI Documentation](https://huggingface.co/docs/text-generation-inference/index).
 
 
-## Llama.cpp
+### Llama.cpp
 TBD
 
-## DeepSparse
+### DeepSparse
+TBD
+
+
+
+## Python Backends
 TBD
 
 
