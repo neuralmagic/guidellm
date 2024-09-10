@@ -10,7 +10,7 @@ from guidellm.core import TextGenerationRequest
 __all__ = ["OpenAIBackend"]
 
 
-@Backend.register("openai_server")
+@Backend.register(backend_type="openai_server")
 class OpenAIBackend(Backend):
     """
     An OpenAI backend implementation for generative AI results.
