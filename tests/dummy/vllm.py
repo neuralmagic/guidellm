@@ -3,7 +3,7 @@ This module includes data models factories for the `vllm` 3-rd party package
 """
 
 import random
-from typing import Generator, List
+from typing import Generator, List, Optional
 
 from pydantic import BaseModel, ConfigDict
 
@@ -21,7 +21,7 @@ class CompletionOutput(BaseModel):
 class SamplingParams(BaseModel):
     """Test interface of `vllm.SamplingParams`."""
 
-    max_tokens: int
+    max_tokens: Optional[int] = 16
 
 
 class CompletionOutputs(BaseModel):
@@ -51,14 +51,16 @@ class TestLLM(BaseModel):
     max_num_batched_tokens: int
 
     def _generate_completion_outputs(
-        self, max_tokens: int
+        self, max_tokens: Optional[int]
     ) -> Generator[CompletionOutput, None, None]:
 
         # NOTE: This value is used only for testing purposes
         self._expected_outputs: List[CompletionOutput] = []
 
         for text in random_strings(
-            min_chars=0, max_chars=random.randint(10, 20), n=max_tokens
+            min_chars=5,
+            max_chars=random.randint(10, 20),
+            n=max_tokens or random.randint(10, 20),
         ):
             instance = CompletionOutput(text=text)
             self._expected_outputs.append(instance)

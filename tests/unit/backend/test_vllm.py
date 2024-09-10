@@ -6,7 +6,7 @@ Notes: tests from this module are going to be skipped in case
 """
 
 import sys
-from typing import Callable, Dict, List, Optional
+from typing import Callable, List, Optional
 
 import pytest
 
@@ -68,7 +68,7 @@ def vllm_auto_patch(vllm_patch_factory):
         {"model": "test/custom_llm"},
     ],
 )
-def test_backend_creation(create_payload: Dict, backend_class, vllm_patch_factory):
+def test_backend_creation(create_payload, backend_class, vllm_patch_factory):
     """Test the "Deepspaarse Backend" class
     with defaults and custom input parameters.
     """
@@ -113,9 +113,7 @@ def test_backend_model_from_env(mocker, backend_class):
     ],
 )
 @pytest.mark.asyncio()
-async def test_make_request(
-    text_generation_request_create_payload: Dict, backend_class
-):
+async def test_make_request(text_generation_request_create_payload, backend_class):
     backend = backend_class()
 
     output_tokens: List[str] = []
@@ -135,20 +133,25 @@ async def test_make_request(
 
 @pytest.mark.smoke()
 @pytest.mark.parametrize(
-    ("text_generation_request_create_payload", "error"),
+    ("text_generation_request", "error"),
     [
-        ({"prompt": "Test prompt"}, ValueError),
+        (
+            TextGenerationRequest(prompt="Test prompt", output_token_count=-1),
+            ValueError,
+        ),
+        (
+            TextGenerationRequest(prompt="Test prompt", output_token_count=0),
+            ValueError,
+        ),
     ],
 )
 @pytest.mark.asyncio()
 async def test_make_request_invalid_request_payload(
-    text_generation_request_create_payload: Dict, error, backend_class
+    text_generation_request, error, backend_class
 ):
     backend = backend_class()
     with pytest.raises(error):
         [
             respnose
-            async for respnose in backend.make_request(
-                request=TextGenerationRequest(**text_generation_request_create_payload)
-            )
+            async for respnose in backend.make_request(request=text_generation_request)
         ]

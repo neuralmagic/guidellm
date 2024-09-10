@@ -6,7 +6,7 @@ Notes: tests from this module are going to be skipped in case
 """
 
 import sys
-from typing import Any, Dict, Generator, List, Optional
+from typing import Any, Generator, List, Optional
 
 import pytest
 from pydantic import BaseModel
@@ -96,7 +96,7 @@ def mock_deepsparse_pipeline(mocker):
         {"model": "test/custom_llm"},
     ],
 )
-def test_backend_creation(create_payload: Dict, backend_class):
+def test_backend_creation(create_payload, backend_class):
     """Test the "Deepspaarse Backend" class
     with defaults and custom input parameters.
     """
@@ -139,9 +139,7 @@ def test_backend_model_from_env(mocker, backend_class):
     ],
 )
 @pytest.mark.asyncio()
-async def test_make_request(
-    text_generation_request_create_payload: Dict, backend_class
-):
+async def test_make_request(text_generation_request_create_payload, backend_class):
     backend = backend_class()
 
     output_tokens: List[str] = []
@@ -160,23 +158,21 @@ async def test_make_request(
 
 @pytest.mark.smoke()
 @pytest.mark.parametrize(
-    ("text_generation_request_create_payload", "error"),
+    ("text_generation_request", "error"),
     [
         (
-            {"prompt": "Test prompt", "output_token_count": -1},
+            TextGenerationRequest(prompt="Test prompt", output_token_count=-1),
             ValueError,
         ),
     ],
 )
 @pytest.mark.asyncio()
 async def test_make_request_invalid_request_payload(
-    text_generation_request_create_payload: Dict, error, backend_class
+    text_generation_request, error, backend_class
 ):
     backend = backend_class()
     with pytest.raises(error):
         [
             respnose
-            async for respnose in backend.make_request(
-                request=TextGenerationRequest(**text_generation_request_create_payload)
-            )
+            async for respnose in backend.make_request(request=text_generation_request)
         ]
