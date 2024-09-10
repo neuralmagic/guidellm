@@ -2,7 +2,6 @@ FROM --platform=linux/amd64 python:3.8-slim
 
 # Environment variables
 ENV PYTHONUNBUFFERED=1
-ENV PYTHONPATH=/app/guidellm/src/
 
 RUN : \
     && apt-get update \
@@ -17,10 +16,8 @@ RUN : \
         pip \
         setuptools
 
-
 WORKDIR /app
 
 # Install project dependencies
 COPY ./ ./
 RUN pip install -e .[dev,deepsparse,vllm]
-

@@ -187,7 +187,7 @@ Some of the test might be not supported on your system (_for instance `vllm` is 
 In order to run under the Docker just run the command below:
 
 ```sh
-docker build -t guidellm:latest .
+docker build --platform linux/amd64 --tag guidellm:latest .
 docker run --rm --env-file .env guidellm:latest pytest tests/
 ```
 
