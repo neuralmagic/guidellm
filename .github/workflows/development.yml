@@ -3,7 +3,7 @@ name: Development
 on:
   pull_request:
     branches:
-      - '**'
+      - "**"
 
 jobs:
   unit-tests:
@@ -25,13 +25,19 @@ jobs:
         run: tox -e test-unit -- -m "smoke or sanity"
 
   integration-tests:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     strategy:
       matrix:
         python:
           - "3.12"
           - "3.8"
     steps:
+      - name: Setup llama.cpp web server
+        uses: neuralmagic/nm-actions/actions/llama-cpp@main
+        with:
+          port: 8080
+          model: "aminkhalafi/Phi-3-mini-4k-instruct-Q4_K_M-GGUF"
+          context-size: 2048
       - uses: actions/checkout@v4
       - name: Set up Python
         uses: actions/setup-python@v5
