@@ -20,16 +20,26 @@ docker run --gpus 1 -ti --shm-size 1g --ipc=host --rm -p 8080:80 \
 For more information on starting a TGI server, see the [TGI Documentation](https://huggingface.co/docs/text-generation-inference/index).
 
 
-### Llama.cpp
-TBD
+### llama.cpp
+[llama.cpp](https://github.com/ggerganov/llama.cpp) can be used with GuideLLM. To start a llama.cpp server with a Llama 3 7B, run the following command:
+```bash
+llama-server --hf-repo Nialixus/Meta-Llama-3-8B-Q4_K_M-GGUF --hf-file meta-llama-3-8b-q4_k_m.gguf -c 2048
+```
+
+For more information on starting a llama.cpp server, see the [llama.cpp Documentation](https://github.com/ggerganov/llama.cpp/blob/master/examples/server/README.md).
+
 
 ### DeepSparse
-TBD
+[DeepSparse](https://github.com/neuralmagic/deepsparse) can be used with GuideLLM to run LLM inference on CPUs. To start a DeepSparse Server with a Llama 3 7B, run the following command:
+```bash
+deepsparse.server --integration openai --task text-generation --model_path neuralmagic/Llama2-7b-chat-pruned50-quant-ds --port 8000 
+```
 
+For more information on starting a DeepSparse Server, see the [llama.cpp Documentation](https://github.com/ggerganov/llama.cpp/blob/master/examples/server/README.md).
 
 
 ## Python Backends
-TBD
+Coming Soon!
 
 
 ## Contribute a new backend
