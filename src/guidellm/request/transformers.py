@@ -1,12 +1,7 @@
 from pathlib import Path
 from typing import Optional, Union
 
-from datasets import (
-    Dataset,
-    DatasetDict,  # type: ignore  # noqa: PGH003
-    IterableDataset,
-    IterableDatasetDict,
-)
+from datasets import Dataset, DatasetDict, IterableDataset, IterableDatasetDict
 from loguru import logger
 from transformers import PreTrainedTokenizer  # type: ignore  # noqa: PGH003
 
