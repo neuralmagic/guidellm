@@ -64,7 +64,7 @@ GuideLLM requires an OpenAI-compatible server to run evaluations. [Text Generati
 
 ```bash
 docker run --gpus 1 -ti --shm-size 1g --ipc=host --rm -p 8080:80 \
-  -e MODEL_ID=https://huggingface.co/llhf/Meta-Llama-3.1-8B-Instruct \
+  -e MODEL_ID=meta-llama/Meta-Llama-3.1-8B-Instruct \
   -e NUM_SHARD=1 \
   -e MAX_INPUT_TOKENS=4096 \
   -e MAX_TOTAL_TOKENS=6000 \
