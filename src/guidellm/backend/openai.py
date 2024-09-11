@@ -106,7 +106,7 @@ class OpenAIBackend(Backend):
         stream = await self._async_client.chat.completions.create(
             model=self.model,
             messages=[
-                {"role": "system", "content": request.prompt},
+                {"role": "user", "content": request.prompt},
             ],
             stream=True,
             **request_args,
