@@ -66,7 +66,7 @@ def test_guidance_report_print(sample_benchmark_report):
     report.print()  # This will output to the console
 
 
-@pytest.mark.regression()
+@pytest.mark.sanity()
 def test_guidance_report_json(sample_benchmark_report):
     report = GuidanceReport(benchmarks=[sample_benchmark_report])
     json_str = report.to_json()
@@ -74,7 +74,7 @@ def test_guidance_report_json(sample_benchmark_report):
     assert compare_guidance_reports(report, loaded_report)
 
 
-@pytest.mark.regression()
+@pytest.mark.sanity()
 def test_guidance_report_yaml(sample_benchmark_report):
     report = GuidanceReport(benchmarks=[sample_benchmark_report])
     yaml_str = report.to_yaml()
@@ -82,7 +82,7 @@ def test_guidance_report_yaml(sample_benchmark_report):
     assert compare_guidance_reports(report, loaded_report)
 
 
-@pytest.mark.regression()
+@pytest.mark.sanity()
 def test_guidance_report_save_load_file(sample_benchmark_report):
     report = GuidanceReport(benchmarks=[sample_benchmark_report])
     with tempfile.TemporaryDirectory() as temp_dir:

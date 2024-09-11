@@ -2,7 +2,7 @@ from time import time
 from typing import Any, Dict, List, Literal, Optional, Union
 
 from loguru import logger
-from pydantic import Field, computed_field
+from pydantic import Field
 
 from guidellm.core.distribution import Distribution
 from guidellm.core.request import TextGenerationRequest
@@ -221,7 +221,6 @@ class TextGenerationBenchmark(Serializable):
         """
         return iter(self.results)
 
-    @computed_field # type: ignore[misc]
     @property
     def request_count(self) -> int:
         """
@@ -232,7 +231,6 @@ class TextGenerationBenchmark(Serializable):
         """
         return len(self.results)
 
-    @computed_field # type: ignore[misc]
     @property
     def error_count(self) -> int:
         """
@@ -243,7 +241,6 @@ class TextGenerationBenchmark(Serializable):
         """
         return len(self.errors)
 
-    @computed_field # type: ignore[misc]
     @property
     def total_count(self) -> int:
         """
@@ -254,7 +251,6 @@ class TextGenerationBenchmark(Serializable):
         """
         return self.request_count + self.error_count
 
-    @computed_field # type: ignore[misc]
     @property
     def start_time(self) -> Optional[float]:
         """
@@ -268,7 +264,6 @@ class TextGenerationBenchmark(Serializable):
 
         return self.results[0].start_time
 
-    @computed_field # type: ignore[misc]
     @property
     def end_time(self) -> Optional[float]:
         """
@@ -282,7 +277,6 @@ class TextGenerationBenchmark(Serializable):
 
         return self.results[-1].end_time
 
-    @computed_field # type: ignore[misc]
     @property
     def duration(self) -> float:
         """
@@ -296,7 +290,6 @@ class TextGenerationBenchmark(Serializable):
 
         return self.end_time - self.start_time
 
-    @computed_field # type: ignore[misc]
     @property
     def completed_request_rate(self) -> float:
         """
@@ -310,7 +303,6 @@ class TextGenerationBenchmark(Serializable):
 
         return len(self.results) / self.duration
 
-    @computed_field # type: ignore[misc]
     @property
     def request_latency(self) -> float:
         """
@@ -340,19 +332,6 @@ class TextGenerationBenchmark(Serializable):
             ]
         )
 
-    @computed_field # type: ignore[misc]
-    @property
-    def request_latency_percentiles(self) -> List[float]:
-        """
-        Get standard percentiles of request latency in seconds.
-
-        :return: List of percentile request latency in seconds
-        :rtype: List[float]
-        """
-        return self.request_latency_distribution.percentiles([1, 5, 10, 50, 90, 95, 99])
-
-
-    @computed_field # type: ignore[misc]
     @property
     def time_to_first_token(self) -> float:
         """
@@ -382,20 +361,6 @@ class TextGenerationBenchmark(Serializable):
             ]
         )
 
-    @computed_field # type: ignore[misc]
-    @property
-    def time_to_first_token_percentiles(self) -> List[float]:
-        """
-        Get standard percentiles for time taken to decode the first token
-        in milliseconds.
-
-        :return: List of percentile time taken to decode the first token
-        in milliseconds.
-        :rtype: List[float]
-        """
-        return self.ttft_distribution.percentiles([1, 5, 10, 50, 90, 95, 99])
-
-    @computed_field # type: ignore[misc]
     @property
     def inter_token_latency(self) -> float:
         """
@@ -423,18 +388,6 @@ class TextGenerationBenchmark(Serializable):
             ]
         )
 
-    @computed_field # type: ignore[misc]
-    @property
-    def inter_token_latency_percentiles(self) -> List[float]:
-        """
-        Get standard percentiles for the time between tokens in milliseconds.
-
-        :return: List of percentiles for the average time between tokens.
-        :rtype: List[float]
-        """
-        return self.itl_distribution.percentiles([1, 5, 10, 50, 90, 95, 99])
-
-    @computed_field # type: ignore[misc]
     @property
     def output_token_throughput(self) -> float:
         """
@@ -450,17 +403,6 @@ class TextGenerationBenchmark(Serializable):
 
         return total_tokens / self.duration
 
-    @computed_field # type: ignore[misc]
-    @property
-    def prompt_token(self) -> float:
-        """
-        Get the average number of prompt tokens.
-
-        :return: The average number of prompt tokens.
-        :rtype: float
-        """
-        return self.prompt_token_distribution.mean
-
     @property
     def prompt_token_distribution(self) -> Distribution:
         """
@@ -470,28 +412,6 @@ class TextGenerationBenchmark(Serializable):
         :rtype: Distribution
         """
         return Distribution(data=[result.prompt_token_count for result in self.results])
-
-    @computed_field # type: ignore[misc]
-    @property
-    def prompt_token_percentiles(self) -> List[float]:
-        """
-        Get standard percentiles for number of prompt tokens.
-
-        :return: List of percentiles of number of prompt tokens.
-        :rtype: List[float]
-        """
-        return self.prompt_token_distribution.percentiles([1, 5, 50, 95, 99])
-
-    @computed_field # type: ignore[misc]
-    @property
-    def output_token(self) -> float:
-        """
-        Get the average number of output tokens.
-
-        :return: The average number of output tokens.
-        :rtype: float
-        """
-        return self.output_token_distribution.mean
 
     @property
     def output_token_distribution(self) -> Distribution:
@@ -503,18 +423,6 @@ class TextGenerationBenchmark(Serializable):
         """
         return Distribution(data=[result.output_token_count for result in self.results])
 
-    @computed_field # type: ignore[misc]
-    @property
-    def output_token_percentiles(self) -> List[float]:
-        """
-        Get standard percentiles for number of output tokens.
-
-        :return: List of percentiles of number of output tokens.
-        :rtype: List[float]
-        """
-        return self.output_token_distribution.percentiles([1, 5, 50, 95, 99])
-
-    @computed_field # type: ignore[misc]
     @property
     def overloaded(self) -> bool:
         if (
