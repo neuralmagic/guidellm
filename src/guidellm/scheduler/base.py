@@ -227,9 +227,7 @@ class Scheduler:
         count_total = (
             self.max_number
             if self.max_number
-            else round(self.max_duration)
-            if self.max_duration
-            else 0
+            else round(self.max_duration) if self.max_duration else 0
         )
 
         # yield initial result for progress tracking
@@ -246,9 +244,7 @@ class Scheduler:
             count_completed = (
                 min(run_count, self.max_number)
                 if self.max_number
-                else round(time.time() - start_time)
-                if self.max_duration
-                else 0
+                else round(time.time() - start_time) if self.max_duration else 0
             )
 
             yield SchedulerResult(
@@ -267,9 +263,7 @@ class Scheduler:
             count_completed=(
                 benchmark.request_count + benchmark.error_count
                 if self.max_number
-                else round(time.time() - start_time)
-                if self.max_duration
-                else 0
+                else round(time.time() - start_time) if self.max_duration else 0
             ),
             benchmark=benchmark,
         )

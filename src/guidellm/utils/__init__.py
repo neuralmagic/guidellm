@@ -1,3 +1,4 @@
+from .dependencies import check_python_version, module_is_available
 from .injector import create_report, inject_data
 from .progress import BenchmarkReportProgress
 from .text import (
@@ -9,6 +10,7 @@ from .text import (
     load_text,
     load_text_lines,
     parse_text_objects,
+    random_strings,
     split_lines_by_punctuation,
     split_text,
 )
@@ -31,10 +33,13 @@ __all__ = [
     "load_text",
     "load_text_lines",
     "load_transformers_dataset",
+    "random_strings",
     "parse_text_objects",
     "resolve_transformers_dataset",
     "resolve_transformers_dataset_column",
     "resolve_transformers_dataset_split",
     "split_lines_by_punctuation",
     "split_text",
+    "check_python_version",
+    "module_is_available",
 ]

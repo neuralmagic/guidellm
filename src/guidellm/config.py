@@ -128,6 +128,7 @@ class Settings(BaseSettings):
     ```sh
     export GUIDELLM__LOGGING__DISABLED=true
     export GUIDELLM__OPENAI__API_KEY=******
+    export GUIDELLM__LLM_MODEL=******
     ```
     """
 
@@ -141,6 +142,7 @@ class Settings(BaseSettings):
 
     # general settings
     env: Environment = Environment.PROD
+    llm_model: str = "mistralai/Mistral-7B-Instruct-v0.3"
     request_timeout: int = 30
     max_concurrency: int = 512
     num_sweep_profiles: int = 9
@@ -152,8 +154,6 @@ class Settings(BaseSettings):
 
     # Request settings
     openai: OpenAISettings = OpenAISettings()
-
-    # Report settings
     report_generation: ReportGenerationSettings = ReportGenerationSettings()
 
     @model_validator(mode="after")

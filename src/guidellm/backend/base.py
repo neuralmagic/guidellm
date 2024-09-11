@@ -15,7 +15,7 @@ from guidellm.core import TextGenerationRequest, TextGenerationResult
 __all__ = ["Backend", "BackendEngine", "BackendEnginePublic", "GenerativeResponse"]
 
 
-BackendEnginePublic = Literal["openai_server"]
+BackendEnginePublic = Literal["openai_server", "deepsparse"]
 BackendEngine = Union[BackendEnginePublic, Literal["test"]]
 
 
@@ -117,9 +117,10 @@ class Backend(ABC):
         :param target: The target URL for the backend.
         :param model: The model used by the backend.
         """
-        self._type = type_
-        self._target = target
-        self._model = model
+
+        self._type: BackendEngine = type_
+        self._target: str = target
+        self._model: str = model
 
         self.test_connection()
 

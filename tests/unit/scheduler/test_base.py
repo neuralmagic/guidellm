@@ -11,11 +11,7 @@ from guidellm.core import (
     TextGenerationResult,
 )
 from guidellm.request import RequestGenerator
-from guidellm.scheduler import (
-    LoadGenerator,
-    Scheduler,
-    SchedulerResult,
-)
+from guidellm.scheduler import LoadGenerator, Scheduler, SchedulerResult
 
 
 @pytest.mark.smoke()
@@ -109,7 +105,6 @@ def test_scheduler_invalid_instantiation(
 
 
 @pytest.mark.sanity()
-@pytest.mark.asyncio()
 @pytest.mark.parametrize(
     "mode",
     [
@@ -119,6 +114,7 @@ def test_scheduler_invalid_instantiation(
         "constant",
     ],
 )
+@pytest.mark.asyncio()
 async def test_scheduler_run_number(mode):
     rate = 10.0
     max_number = 20
@@ -194,7 +190,6 @@ async def test_scheduler_run_number(mode):
 
 
 @pytest.mark.sanity()
-@pytest.mark.asyncio()
 @pytest.mark.parametrize(
     "mode",
     [
@@ -203,6 +198,7 @@ async def test_scheduler_run_number(mode):
     ],
 )
 @pytest.mark.flaky(reruns=5)
+@pytest.mark.asyncio()
 async def test_scheduler_run_duration(mode):
     rate = 10
     max_duration = 2

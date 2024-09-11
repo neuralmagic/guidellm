@@ -5,9 +5,7 @@ import pytest
 
 from guidellm.backend import Backend
 from guidellm.config import settings
-from guidellm.core import (
-    TextGenerationBenchmarkReport,
-)
+from guidellm.core import TextGenerationBenchmarkReport
 from guidellm.executor import (
     Executor,
     ExecutorResult,
@@ -269,9 +267,11 @@ async def test_executor_run_sweep(mock_scheduler):
                 result=result,
                 expected_completed=False,
                 expected_count_total=num_profiles,
-                expected_count_completed=scheduler_index
-                if request_index < num_requests + 1
-                else scheduler_index + 1,
+                expected_count_completed=(
+                    scheduler_index
+                    if request_index < num_requests + 1
+                    else scheduler_index + 1
+                ),
                 expected_generation_modes=generation_modes,  # type: ignore
             )
             _check_executor_result_report(
@@ -280,9 +280,11 @@ async def test_executor_run_sweep(mock_scheduler):
                 rate=None,
                 max_number=num_requests,
                 max_duration=None,
-                benchmarks_count=scheduler_index
-                if request_index < num_requests + 1
-                else scheduler_index + 1,
+                benchmarks_count=(
+                    scheduler_index
+                    if request_index < num_requests + 1
+                    else scheduler_index + 1
+                ),
             )
             _check_executor_result_scheduler(
                 result=result,
@@ -429,7 +431,6 @@ async def test_executor_run_non_rate_modes(mock_scheduler, mode):
 
 
 @pytest.mark.smoke()
-@pytest.mark.asyncio()
 @pytest.mark.parametrize(
     ("mode", "rate"),
     [
@@ -491,9 +492,11 @@ async def test_executor_run_rate_modes(mock_scheduler, mode, rate):
                 result=result,
                 expected_completed=False,
                 expected_count_total=num_profiles,
-                expected_count_completed=scheduler_index
-                if request_index < num_requests + 1
-                else scheduler_index + 1,
+                expected_count_completed=(
+                    scheduler_index
+                    if request_index < num_requests + 1
+                    else scheduler_index + 1
+                ),
                 expected_generation_modes=generation_modes,
             )
             _check_executor_result_report(
@@ -502,9 +505,11 @@ async def test_executor_run_rate_modes(mock_scheduler, mode, rate):
                 rate=rate,
                 max_number=num_requests,
                 max_duration=None,
-                benchmarks_count=scheduler_index
-                if request_index < num_requests + 1
-                else scheduler_index + 1,
+                benchmarks_count=(
+                    scheduler_index
+                    if request_index < num_requests + 1
+                    else scheduler_index + 1
+                ),
             )
             _check_executor_result_scheduler(
                 result=result,

@@ -355,6 +355,8 @@ def test_emulated_request_generator_lifecycle(
                 str(file_path) if config_type == "file_str" else file_path,
                 tokenizer="mock-tokenizer",
             )
+    else:
+        raise Exception
 
     for _ in range(5):
         request = generator.create_item()

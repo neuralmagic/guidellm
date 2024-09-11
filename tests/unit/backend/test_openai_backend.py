@@ -2,7 +2,8 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
-from guidellm.backend import Backend, OpenAIBackend
+from guidellm.backend import Backend
+from guidellm.backend.openai import OpenAIBackend
 from guidellm.config import reload_settings, settings
 from guidellm.core import TextGenerationRequest
 
@@ -245,8 +246,8 @@ def test_openai_backend_target(mock_openai_client):
     assert backend._client.kwargs["base_url"] == "http://test-target"  # type: ignore
 
     backend = OpenAIBackend()
-    assert backend._async_client.kwargs["base_url"] == "http://localhost:8000/v1"  # type: ignore
-    assert backend._client.kwargs["base_url"] == "http://localhost:8000/v1"  # type: ignore
+    assert backend._async_client.kwargs["base_url"] == settings.openai.base_url  # type: ignore
+    assert backend._client.kwargs["base_url"] == settings.openai.base_url  # type: ignore
 
     backend = OpenAIBackend()
     assert backend._async_client.kwargs["base_url"] == settings.openai.base_url  # type: ignore
