@@ -152,9 +152,7 @@ def test_file_request_generator_file_types_lifecycle(
         ),
     ],
 )
-def test_file_request_generator_len(
-    mock_auto_tokenizer, file_extension, file_content
-):
+def test_file_request_generator_len(mock_auto_tokenizer, file_extension, file_content):
     with tempfile.TemporaryDirectory() as temp_dir:
         file_path = Path(temp_dir) / f"example.{file_extension}"
         file_path.write_text(file_content)

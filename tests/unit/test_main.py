@@ -1,3 +1,4 @@
+import tempfile
 from typing import List, Optional
 from unittest.mock import create_autospec, patch
 
@@ -7,6 +8,7 @@ from click.testing import CliRunner
 from guidellm import generate_benchmark_report
 from guidellm.backend import Backend
 from guidellm.core import TextGenerationBenchmarkReport, TextGenerationResult
+from guidellm.core.report import GuidanceReport
 from guidellm.executor import Executor, ExecutorResult, Profile, ProfileGenerationMode
 from guidellm.main import generate_benchmark_report_cli
 from guidellm.request import (
@@ -15,6 +17,24 @@ from guidellm.request import (
     TransformersDatasetRequestGenerator,
 )
 from guidellm.scheduler import SchedulerResult
+from guidellm.utils.progress import BenchmarkReportProgress
+
+
+@pytest.fixture()
+def mock_benchmark_report_progress():
+    with patch(
+        "guidellm.utils.progress.BenchmarkReportProgress"
+    ) as mock_request_generator_class:
+
+        def _mock_const(*args, **kwargs):
+            instance = create_autospec(BenchmarkReportProgress, instance=True)
+            instance.args = args
+            instance.kwargs = kwargs
+            return instance
+
+        mock_request_generator_class.side_effect = _mock_const
+
+        yield mock_request_generator_class
 
 
 @pytest.fixture()
@@ -263,13 +283,13 @@ def test_generate_benchmark_report_emulated_with_dataset_requests(
             target="http://localhost:8000/v1",
             backend="openai_server",
             model=None,
+            data_type="emulated",
             data=None,
-            data_type="emulated",  # Emulated data type
             tokenizer=None,
             rate_type="sweep",
             rate=None,
             max_seconds=10,
-            max_requests="dataset",  # Set max_requests to 'dataset'
+            max_requests="dataset",
             output_path="benchmark_report.json",
             cont_refresh_table=False,
         )
@@ -303,3 +323,33 @@ def test_generate_benchmark_report_cli_emulated_with_dataset_requests(
             ],
             catch_exceptions=False,
         )
+
+
+# TODO: Compare dataset's first item with first generated request from FileRequestGenerator
+@pytest.mark.smoke()
+def test_generate_benchmark_report_limited_by_file_dataset(
+    mock_benchmark_report_progress,
+    mock_backend,
+    mock_request_generator_emulated,
+):
+
+    with tempfile.NamedTemporaryFile(mode="+rt") as file:
+        file.write("First prompt\nSecond prompt")
+        file.seek(0)
+
+        report: GuidanceReport = generate_benchmark_report(
+            target="http://localhost:8000/v1",
+            backend="openai_server",
+            model=None,
+            data_type="file",
+            data=file.name,
+            tokenizer=None,
+            rate_type="sweep",
+            rate=None,
+            max_seconds=10,
+            max_requests="dataset",
+            output_path="benchmark_report.json",
+            cont_refresh_table=False,
+        )
+
+        assert report

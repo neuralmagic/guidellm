@@ -162,9 +162,11 @@ class BenchmarkReportProgress:
             total=completed_total,
             completed=completed_count if not completed else completed_total,
             req_per_sec=(f"{req_per_sec:.2f}" if req_per_sec else "#.##"),
-            start_time_str=datetime.fromtimestamp(start_time).strftime("%H:%M:%S")
-            if start_time
-            else "--:--:--",
+            start_time_str=(
+                datetime.fromtimestamp(start_time).strftime("%H:%M:%S")
+                if start_time
+                else "--:--:--"
+            ),
         )
         logger.debug(
             "Updated benchmark task at index {}: {}% complete",
