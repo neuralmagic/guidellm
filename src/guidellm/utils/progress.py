@@ -139,6 +139,7 @@ class BenchmarkReportProgress:
         :type req_per_sec: float
         :raises ValueError: If trying to update a completed benchmark.
         """
+
         if self.benchmark_tasks_completed[index]:
             err = ValueError(f"Benchmark {index} already completed")
             logger.error("Error updating benchmark: {}", err)

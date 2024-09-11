@@ -1,7 +1,8 @@
-from typing import Any, Dict, Literal, Optional, Sequence, Union, get_args
+from typing import Any, Dict, List, Literal, Optional, Sequence, Union, get_args
 
 import numpy as np
 from loguru import logger
+from numpy._typing import NDArray
 from pydantic import Field
 
 from guidellm.config import settings
@@ -190,12 +191,14 @@ class ProfileGenerator:
         elif self.mode == "sweep":
             profile = self.create_sweep_profile(
                 self.generated_count,
-                sync_benchmark=current_report.benchmarks[0]
-                if current_report.benchmarks
-                else None,
-                throughput_benchmark=current_report.benchmarks[1]
-                if len(current_report.benchmarks) > 1
-                else None,
+                sync_benchmark=(
+                    current_report.benchmarks[0] if current_report.benchmarks else None
+                ),
+                throughput_benchmark=(
+                    current_report.benchmarks[1]
+                    if len(current_report.benchmarks) > 1
+                    else None
+                ),
             )
         else:
             err = ValueError(f"Invalid mode: {self.mode}")
@@ -333,11 +336,15 @@ class ProfileGenerator:
 
         min_rate = sync_benchmark.completed_request_rate
         max_rate = throughput_benchmark.completed_request_rate
-        intermediate_rates = list(
+        intermediate_rates: List[NDArray] = list(
             np.linspace(min_rate, max_rate, settings.num_sweep_profiles + 1)
         )[1:]
 
         return Profile(
             load_gen_mode="constant",
-            load_gen_rate=intermediate_rates[index - 2],
+            load_gen_rate=(
+                float(load_gen_rate)
+                if (load_gen_rate := intermediate_rates[index - 2])
+                else 1.0  # the fallback value
+            ),
         )

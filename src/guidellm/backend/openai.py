@@ -111,6 +111,7 @@ class OpenAIBackend(Backend):
             stream=True,
             **request_args,
         )
+
         token_count = 0
         async for chunk in stream:
             choice = chunk.choices[0]
