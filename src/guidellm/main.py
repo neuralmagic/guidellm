@@ -132,7 +132,7 @@ __all__ = ["generate_benchmark_report"]
     ),
 )
 @click.option(
-    "--output-path",
+    "--output-report-path",
     type=str,
     default=None,
     help=(
@@ -140,6 +140,16 @@ __all__ = ["generate_benchmark_report"]
         "Ex: guidance_report.json. "
         "The default is None, meaning no output is saved and results are only "
         "printed to the console."
+    ),
+)
+@click.option(
+    "--output-data-path",
+    type=str,
+    default=None,
+    help=(
+        "The output path to save flat data results. "
+        "Ex: --output-data-path=data.csv"
+        "The default is None, meaning a file won't be generated."
     ),
 )
 @click.option(
@@ -162,7 +172,8 @@ def generate_benchmark_report_cli(
     rate: Optional[float],
     max_seconds: Optional[int],
     max_requests: Optional[int],
-    output_path: str,
+    output_report_path: str,
+    output_data_path: str,
     enable_continuous_refresh: bool,
 ):
     """
@@ -179,7 +190,8 @@ def generate_benchmark_report_cli(
         rate=rate,
         max_seconds=max_seconds,
         max_requests=max_requests,
-        output_path=output_path,
+        output_report_path=output_report_path,
+        output_data_path=output_data_path,
         cont_refresh_table=enable_continuous_refresh,
     )
 
@@ -195,7 +207,8 @@ def generate_benchmark_report(
     rate: Optional[float],
     max_seconds: Optional[int],
     max_requests: Optional[int],
-    output_path: str,
+    output_report_path: str,
+    output_data_path: str,
     cont_refresh_table: bool,
 ) -> GuidanceReport:
     """
@@ -216,6 +229,7 @@ def generate_benchmark_report(
     :param max_seconds: Maximum duration for each benchmark run in seconds.
     :param max_requests: Maximum number of requests per benchmark run.
     :param output_path: Path to save the output report file.
+    :param output_csv_path: Path to save the flat output data.
     :param cont_refresh_table: Continually refresh the table in the CLI
         until the user exits.
     """
@@ -224,7 +238,7 @@ def generate_benchmark_report(
     )
 
     # Create backend
-    backend_inst = Backend.create(
+    backend_inst: Backend = Backend.create(
         backend_type=backend,
         target=target,
         model=model,
@@ -284,11 +298,14 @@ def generate_benchmark_report(
     guidance_report = GuidanceReport()
     guidance_report.benchmarks.append(report)
 
-    if output_path:
-        guidance_report.save_file(output_path)
+    if output_report_path:
+        guidance_report.save_file(output_report_path)
+
+    if output_data_path:
+        guidance_report.save_file(output_report_path)
 
     guidance_report.print(
-        save_path=output_path if output_path is not None else "stdout",
+        save_path=output_report_path if output_report_path is not None else "stdout",
         continual_refresh=cont_refresh_table,
     )
 

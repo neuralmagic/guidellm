@@ -111,6 +111,7 @@ class OpenAIBackend(Backend):
             stream=True,
             **request_args,
         )
+
         token_count = 0
         async for chunk in stream:
             choice = chunk.choices[0]
@@ -144,6 +145,9 @@ class OpenAIBackend(Backend):
         :rtype: List[str]
         :raises openai.OpenAIError: If an error occurs while retrieving models.
         """
+
+        # TODO: Remove this line
+        return ["Meta-Llama-3-8B.Q4_K_M.gguf"]
 
         try:
             return [model.id for model in self._client.models.list().data]
