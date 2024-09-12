@@ -103,7 +103,6 @@ class OpenAIBackend(Backend):
 
         request_args.update(self._request_args)
 
-        print(">>> Creating stream object for OpenAI server ")
         stream = await self._async_client.chat.completions.create(
             model=self.model,
             messages=[
@@ -115,7 +114,6 @@ class OpenAIBackend(Backend):
 
         token_count = 0
         async for chunk in stream:
-            print(f"Getting chunk: {chunk}")
             choice = chunk.choices[0]
             token = choice.delta.content or ""
 
