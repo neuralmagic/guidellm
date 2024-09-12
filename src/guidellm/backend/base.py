@@ -309,6 +309,7 @@ def _cachable_default_model(backend: Backend) -> str:
     :rtype: str
     :raises ValueError: If no models are available.
     """
+
     logger.debug("Getting default model for backend: {}", backend)
     models = backend.available_models()
     if models:

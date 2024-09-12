@@ -103,6 +103,7 @@ class OpenAIBackend(Backend):
 
         request_args.update(self._request_args)
 
+        print(">>> Creating stream object for OpenAI server ")
         stream = await self._async_client.chat.completions.create(
             model=self.model,
             messages=[
@@ -111,8 +112,10 @@ class OpenAIBackend(Backend):
             stream=True,
             **request_args,
         )
+
         token_count = 0
         async for chunk in stream:
+            print(f"Getting chunk: {chunk}")
             choice = chunk.choices[0]
             token = choice.delta.content or ""
 
@@ -144,6 +147,9 @@ class OpenAIBackend(Backend):
         :rtype: List[str]
         :raises openai.OpenAIError: If an error occurs while retrieving models.
         """
+
+        # TODO: Remove this line
+        return ["Meta-Llama-3-8B.Q4_K_M.gguf"]
 
         try:
             return [model.id for model in self._client.models.list().data]
