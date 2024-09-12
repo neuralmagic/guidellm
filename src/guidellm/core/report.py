@@ -1,6 +1,7 @@
 import time
 from datetime import datetime
-from typing import List, Optional
+from pathlib import Path
+from typing import List, Literal, Optional, Union, get_args
 
 from loguru import logger
 from pydantic import Field
@@ -10,9 +11,12 @@ from rich.panel import Panel
 from rich.table import Table
 
 from guidellm.core.result import TextGenerationBenchmark, TextGenerationBenchmarkReport
-from guidellm.core.serializable import Serializable
+from guidellm.core.serializable import Serializable, SerializableFileType
 
 __all__ = ["GuidanceReport"]
+
+
+FlatFileType = Literal["csv"]
 
 
 def _create_benchmark_report_details(report: TextGenerationBenchmarkReport) -> str:
@@ -319,3 +323,61 @@ class GuidanceReport(Serializable):
             console.print(report_viz)
 
         logger.info("Guidance report printing completed.")
+
+    def _get_data(self):
+        """
+        Select the data from the report and return it
+        in a flat format to be saved to the CSV file.
+        """
+
+        raise NotImplementedError("Work in progress...")
+
+    def save_data(
+        self,
+        path: Union[str, Path],
+        type_: FlatFileType = "csv",
+    ) -> str:
+        """
+        Save the data to a file in CSV format.
+
+        :param path: Path to the exact file or the containing directory.
+            If it is a directory, the file name will be inferred from the class name.
+        :param type_: Optional type to save ('csv' is only supported).
+        :return: The path to the saved file.
+        """
+
+        logger.debug("Saving to file... {} with format: {}", path, type_)
+
+        if isinstance(path, str):
+            path = Path(path)
+
+        if path.suffix:
+            # is a file
+            ext = path.suffix[1:].lower()
+            if type_ not in get_args(FlatFileType):
+                raise ValueError(
+                    f"Unsupported file extension: {type_}. "
+                    f"Expected one of {SerializableFileType} "
+                    f"for {path}"
+                )
+            type_ = ext  # type: ignore # noqa: PGH003
+        else:
+            # is a directory
+            file_name = f"{self.__class__.__name__.lower()}.{type_}"
+            path = path / file_name
+
+        path.parent.mkdir(parents=True, exist_ok=True)
+
+        with path.open("w") as file:
+            if type_ == "csv":
+                file.write(self._get_data())
+            else:
+                raise ValueError(
+                    f"Unsupported file extension: {type_}"
+                    f"Expected one of {SerializableFileType} "
+                    f"for {path}"
+                )
+
+        logger.info("Successfully saved {} to {}", self.__class__.__name__, path)
+
+        return str(path)
