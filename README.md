@@ -56,6 +56,8 @@ GuideLLM requires an OpenAI-compatible server to run evaluations. [vLLM](https:/
 vllm serve "neuralmagic/Meta-Llama-3.1-8B-Instruct-quantized.w4a16"
 ```
 
+For more information on installing vLLM, see the [vLLM Installation Documentation](https://docs.vllm.ai/en/latest/getting_started/installation.html).
+
 For more information on starting a vLLM server, see the [vLLM Documentation](https://docs.vllm.ai/en/latest/serving/openai_compatible_server.html).
 
 To view more GuideLLM compatible backends such as TGI, llama.cpp, and DeepSparse, check out our [Supported Backends documentation](https://github.com/neuralmagic/guidellm/blob/main/docs/guides/supported_backends.md).
