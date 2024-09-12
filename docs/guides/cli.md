@@ -5,7 +5,7 @@ For more details on setup and installation, see the Setup and [Installation](htt
 
 ## About GuideLLM
 
-The GuideLLM CLI is a performance benchmarking tool to enable you to evaluate and visualize your LLM inference serving performance before your deploy to production. GuideLLM runs via the CLI and takes in a wide array of input arguments to enable you to configure your workload to run benchmarks to the specifications that you desire. This ultimately provides the ability to understand bottlenecks in your inference serving pipeline and make changes before your users are effected by your LLM application. 
+The GuideLLM CLI is a performance benchmarking tool to enable you to evaluate and enhance your LLM inference serving performance before you deploy to production. GuideLLM simulates user LLM workloads through rigorous benchmarking so that you can understand your LLM inference performance. This ultimately provides the ability to understand bottlenecks in your inference serving pipeline and make changes before your users are affected by your LLM application. 
 
 ## GuideLLM CLI Quickstart 
 
@@ -16,6 +16,8 @@ GuideLLM requires an OpenAI-compatible server to run evaluations. It's recommend
 ```bash
 vllm serve "neuralmagic/Meta-Llama-3.1-8B-Instruct-quantized.w4a16"
 ```
+
+For more information on installing vLLM, see the [vLLM Installation Documentation](https://docs.vllm.ai/en/latest/getting_started/installation.html).
 
 For more information on starting a vLLM server, see the [vLLM Documentation](https://docs.vllm.ai/en/latest/serving/openai_compatible_server.html).
 
@@ -41,7 +43,7 @@ Notes:
 
 After the evaluation is completed, GuideLLM will output a summary of the results, including various performance metrics. The results will also be saved to a local directory for further analysis.
 
-The output results will start with a summary of the evaluation, followed by the requests data for each benchmark run. For example, the start of the output will look like the following:
+The output results will start with a summary of the evaluation, followed by the requested data for each benchmark run. For example, the start of the output will look like the following:
 
 <img alt="Sample GuideLLM benchmark start output" src="https://github.com/neuralmagic/guidellm/blob/main/docs/assets/sample-output-start.png" />
 
@@ -63,11 +65,11 @@ Once you fill out these arguments and run the command, GuideLLM will run the sim
 
 #### Workload Overview
 
-This section of input parameters covers what to actually benchmark including the target host location, model, and task. The full list of arguments and their defintions are presented below:
+This section of input parameters covers what to actually benchmark including the target host location, model, and task. The full list of arguments and their definitions are presented below:
 
--   **--target** <em>(str, default: localhost with chat completions api for VLLM)</em>: Target for benchmarking 
+-   **--target** <em>(str, default: localhost with chat completions API for VLLM)</em>: Target for benchmarking 
     
-	-   optional breakdown args if target isn't specified:
+	-   optional breakdown args if the target isn't specified:
     
 		-   **--host** <em>(str)</em>: Host URL for benchmarking
     
@@ -75,7 +77,7 @@ This section of input parameters covers what to actually benchmark including the
     
 -   **--backend** <em>(str, default: server_openai [vllm, TGI, llama.cpp, DeepSparse, and many popular servers match this format])</em>: Backend type for benchmarking
     
--   **--model** <em>(str, default: auto populated from vllm server)</em>: Model being used for benchmarking, running on the inference server
+-   **--model** <em>(str, default: auto-populated from vllm server)</em>: Model being used for benchmarking, running on the inference server
         
 -   **--task** <em>(str), optional)</em>: Task to use for benchmarking
 
@@ -97,9 +99,9 @@ This section of input parameters covers the data arguments that need to be suppl
 
 This section of input parameters covers the type of workload that you want to run to represent the type of load you expect on your server in production such as rate-per-second and the frequency of requests. The full list of arguments and their definitions are presented below:
 
--   **--rate-type**  <em>(ENUM, default: sweep; [serial, constant, poisson] where sweep will cover a range of constant request rates and ensure saturation of server, serial will send one request at a time, constant will send a constant request rate, poisson will send a request rate sampled from a poisson distribution at a given mean) </em>: Type of rate generation for benchmarking
+-   **--rate-type**  <em>(ENUM, default: sweep; [serial, constant, poisson] where sweep will cover a range of constant request rates and ensure saturation of server, serial will send one request at a time, constant will send a constant request rate, poisson will send a request rate sampled from a Poisson distribution at a given mean) </em>: Type of rate generation for benchmarking
     
--   **--rate** <em>(float)</em>: Rate to use for constant and poisson rate types
+-   **--rate** <em>(float)</em>: Rate to use for constant and Poisson rate types
     
 -   **--max-seconds** <em>(integer)</em>: Number of seconds to result each request rate at
     
@@ -118,7 +120,7 @@ The GuideLLM Benchmarks Report surfaces key LLM metrics to help you determine th
 
 #### Requests Data by Benchmark 
 
-This section shows the request statistics for the benchmarks that were run. Request Data statistics highlight the details of the requests hitting the inference server. Viewing this information is essential to understand the health of your server processing requests sent by GuideLLM and can surface potential issues in your inference serving pipeline including software and hardware issues. 
+This section shows the request statistics for the benchmarks that were run. Request Data statistics highlight the details of the requests hitting the inference server. Viewing this information is essential to understanding the health of your server processing requests sent by GuideLLM and can surface potential issues in your inference serving pipeline including software and hardware issues. 
 
 <img alt="Sample Requests Data by Benchmark" src="https://github.com/neuralmagic/guidellm/blob/main/docs/assets/request_data.png" />
 
@@ -132,7 +134,7 @@ This table includes:
 
 
 #### Tokens Data by Benchmark
-This section shows the prompt and output token distribution statistics for the benchmarks that were run. Token Data statistics highlight the details of your dataset in terms of prompts and generated outputs from the model. Viewing this information is integral to understanding model performance on your task and to ensure you are able to hit SLOs required to guarentee a good user experience from your application. 
+This section shows the prompt and output token distribution statistics for the benchmarks that were run. Token Data statistics highlight the details of your dataset in terms of prompts and generated outputs from the model. Viewing this information is integral to understanding model performance on your task and ensuring you are able to hit SLOs required to guarantee a good user experience from your application. 
 
 <img alt="Sample Tokens Data by Benchmark" src="https://github.com/neuralmagic/guidellm/blob/main/docs/assets/tokens_data.png" />
 
@@ -144,7 +146,7 @@ This table includes:
 - **Output (1%, 5%, 50%, 95%, 99%):** Distribution of output token length
 
 #### Performance Stats by Benchmark
-This section shows the LLM peformance statistics for the benchmarks that were run. Performance Statistics highlight the performance of the model across the key LLM performance metrics including: Request Latency, Time to First Token (TTFT), Inter Token Latench (ITL or TPOT), and Output Token Throughput. Viewing these key metrics are integral to ensuring the performance of your inference server for your task on your designated hardware where you are running your inference server. 
+This section shows the LLM performance statistics for the benchmarks that were run. Performance Statistics highlight the performance of the model across the key LLM performance metrics including Request Latency, Time to First Token (TTFT), Inter Token Latench (ITL or TPOT), and Output Token Throughput. To understand the definitions and importance of these LLM performance metrics further, check out the [Nvidia Metrics Guide](https://docs.nvidia.com/nim/benchmarking/llm/latest/metrics.html). Viewing these key metrics is integral to ensuring the performance of your inference server for your task on your designated hardware where you are running your inference server. 
 
 <img alt="Sample Perf Stats by Benchmark" src="https://github.com/neuralmagic/guidellm/blob/main/docs/assets/perf_stats.png" />
 
@@ -157,7 +159,7 @@ This table includes:
 
 
 #### Performance Summary by Benchmark
-This section shows the averages for the LLM peformance statistics for the benchmarks that were run. The average Performance Statistics provide an overall summary of the model performance across the key LLM performance metrics. Viewing these summary metrics are integral to ensuring the performance of your inference server for your task on your designated hardware where you are running your inference server. 
+This section shows the averages for the LLM performance statistics for the benchmarks that were run. The average Performance Statistics provide an overall summary of the model performance across the key LLM performance metrics. Viewing these summary metrics is integral to ensuring the performance of your inference server for your task on the designated hardware where you are running your inference server. 
 
 <img alt="Sample Perf Summary by Benchmark" src="https://github.com/neuralmagic/guidellm/blob/main/docs/assets/perf_summary.png" />
 
