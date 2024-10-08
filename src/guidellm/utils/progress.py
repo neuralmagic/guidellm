@@ -139,6 +139,7 @@ class BenchmarkReportProgress:
         :type req_per_sec: float
         :raises ValueError: If trying to update a completed benchmark.
         """
+
         if self.benchmark_tasks_completed[index]:
             err = ValueError(f"Benchmark {index} already completed")
             logger.error("Error updating benchmark: {}", err)
@@ -162,9 +163,11 @@ class BenchmarkReportProgress:
             total=completed_total,
             completed=completed_count if not completed else completed_total,
             req_per_sec=(f"{req_per_sec:.2f}" if req_per_sec else "#.##"),
-            start_time_str=datetime.fromtimestamp(start_time).strftime("%H:%M:%S")
-            if start_time
-            else "--:--:--",
+            start_time_str=(
+                datetime.fromtimestamp(start_time).strftime("%H:%M:%S")
+                if start_time
+                else "--:--:--"
+            ),
         )
         logger.debug(
             "Updated benchmark task at index {}: {}% complete",

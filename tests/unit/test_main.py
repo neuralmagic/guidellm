@@ -1,3 +1,5 @@
+import tempfile
+from pathlib import Path
 from typing import List, Optional
 from unittest.mock import create_autospec, patch
 
@@ -15,6 +17,42 @@ from guidellm.request import (
     TransformersDatasetRequestGenerator,
 )
 from guidellm.scheduler import SchedulerResult
+from guidellm.utils.progress import BenchmarkReportProgress
+
+
+@pytest.fixture()
+def mock_benchmark_report():
+    with patch("guidellm.main.GuidanceReport") as mock_benchmark_report:
+
+        def _mock_const(*args, **kwargs):
+            instance = create_autospec(BenchmarkReportProgress, instance=True)
+            instance.args = args
+            instance.kwargs = kwargs
+            instance.benchmarks = []
+            instance.save_file = lambda output_path: None
+            instance.print = lambda *args, **kwargs: None
+
+            return instance
+
+        mock_benchmark_report.side_effect = _mock_const
+        yield mock_benchmark_report
+
+
+@pytest.fixture()
+def mock_benchmark_report_progress():
+    with patch(
+        "guidellm.main.BenchmarkReportProgress"
+    ) as mock_benchmark_report_progress:
+
+        def _mock_const(*args, **kwargs):
+            instance = create_autospec(BenchmarkReportProgress, instance=True)
+            instance.args = args
+            instance.kwargs = kwargs
+
+            return instance
+
+        mock_benchmark_report_progress.side_effect = _mock_const
+        yield mock_benchmark_report_progress
 
 
 @pytest.fixture()
@@ -252,3 +290,125 @@ def test_generate_benchmark_report_cli_smoke(
     assert "Benchmarks" in result.output
     assert "Generating report..." in result.output
     assert "Benchmark Report 1" in result.output
+
+
+@pytest.mark.smoke()
+def test_generate_benchmark_report_emulated_with_dataset_requests(
+    mock_backend, mock_request_generator_emulated, mock_executor
+):
+    with pytest.raises(ValueError, match="Cannot use 'dataset' for emulated data"):
+        generate_benchmark_report(
+            target="http://localhost:8000/v1",
+            backend="openai_server",
+            model=None,
+            data_type="emulated",
+            data=None,
+            tokenizer=None,
+            rate_type="sweep",
+            rate=None,
+            max_seconds=10,
+            max_requests="dataset",
+            output_path="benchmark_report.json",
+            cont_refresh_table=False,
+        )
+
+
+@pytest.mark.smoke()
+def test_generate_benchmark_report_cli_emulated_with_dataset_requests(
+    mock_backend, mock_request_generator_emulated, mock_executor
+):
+    runner = CliRunner()
+    with pytest.raises(ValueError, match="Cannot use 'dataset' for emulated data"):
+        runner.invoke(
+            generate_benchmark_report_cli,
+            [
+                "--target",
+                "http://localhost:8000/v1",
+                "--backend",
+                "openai_server",
+                "--data-type",
+                "emulated",
+                "--data",
+                "prompt_tokens=512",
+                "--rate-type",
+                "sweep",
+                "--max-seconds",
+                "10",
+                "--max-requests",
+                "dataset",
+                "--output-path",
+                "benchmark_report.json",
+            ],
+            catch_exceptions=False,
+        )
+
+
+@pytest.mark.sanity()
+@pytest.mark.parametrize(("rate_type", "rate"), [("constant", 1.0), ("sweep", 1.0)])
+@pytest.mark.parametrize(
+    ("file_extension", "file_content", "expected_results"),
+    [
+        ("txt", "Test prompt 1", 1),
+        ("txt", "Test prompt 1\nTest prompt 2\nTest prompt 3\n", 3),
+    ],
+)
+def test_generate_benchmark_report_openai_limited_by_file_dataset(
+    mocker,
+    mock_auto_tokenizer,
+    mock_benchmark_report,
+    mock_benchmark_report_progress,
+    rate_type,
+    rate,
+    file_extension,
+    file_content,
+    expected_results,
+):
+    """
+    Mock only a few functions to get the proper report result
+    from the ``Backend.make_request``.
+
+    Notes:
+        All the results are collected in the `benchmark.errors``,
+        since the most of the responses are mocked and can't be processed.
+        But the ordering of the results is still the same for both collections.
+
+        ``mock_benchmark_report`` and ``mock_benchmark_report_progress``
+        are used for preventing working with IO bound tasks.
+    """
+
+    mocker.patch("guidellm.backend.openai.AsyncOpenAI")
+    mocker.patch("openai.AsyncOpenAI")
+    mocker.patch("guidellm.backend.openai.OpenAIBackend.test_connection")
+    mocker.patch("guidellm.backend.openai.OpenAIBackend.available_models")
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        file_path = Path(temp_dir) / f"example.{file_extension}"
+        file_path.write_text(file_content)
+
+        # Run the benchmark report generation
+        report = generate_benchmark_report(
+            target="http://localhost:8000/v1",
+            backend="openai_server",
+            model=None,
+            data=str(file_path),
+            data_type="file",
+            tokenizer=None,
+            rate_type=rate_type,
+            rate=rate,
+            max_seconds=None,
+            max_requests="dataset",
+            output_path="benchmark_report.json",
+            cont_refresh_table=False,
+        )
+
+        assert report is not None
+        assert len(report.benchmarks) == 1
+        assert len(report.benchmarks[0].benchmarks[0].errors) == expected_results
+
+        file_lines: List[str] = [line for line in file_content.split("\n") if line]
+        output_prompts = [
+            text_generation.request.prompt
+            for text_generation in report.benchmarks[0].benchmarks[0].errors
+        ]
+
+        assert output_prompts == file_lines

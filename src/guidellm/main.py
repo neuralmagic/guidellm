@@ -1,5 +1,5 @@
 import asyncio
-from typing import Literal, Optional, get_args
+from typing import Literal, Optional, Union, get_args
 
 import click
 from loguru import logger
@@ -13,7 +13,7 @@ from guidellm.request import (
     TransformersDatasetRequestGenerator,
 )
 from guidellm.request.base import RequestGenerator
-from guidellm.utils import BenchmarkReportProgress
+from guidellm.utils import BenchmarkReportProgress, cli_params
 
 __all__ = ["generate_benchmark_report"]
 
@@ -120,7 +120,7 @@ __all__ = ["generate_benchmark_report"]
 )
 @click.option(
     "--max-requests",
-    type=int,
+    type=cli_params.MAX_REQUESTS,
     default=None,
     help=(
         "The maximum number of requests for each benchmark run. "
@@ -161,7 +161,7 @@ def generate_benchmark_report_cli(
     rate_type: ProfileGenerationMode,
     rate: Optional[float],
     max_seconds: Optional[int],
-    max_requests: Optional[int],
+    max_requests: Union[Literal["dataset"], int, None],
     output_path: str,
     enable_continuous_refresh: bool,
 ):
@@ -194,7 +194,7 @@ def generate_benchmark_report(
     rate_type: ProfileGenerationMode,
     rate: Optional[float],
     max_seconds: Optional[int],
-    max_requests: Optional[int],
+    max_requests: Union[Literal["dataset"], int, None],
     output_path: str,
     cont_refresh_table: bool,
 ) -> GuidanceReport:
@@ -256,13 +256,18 @@ def generate_benchmark_report(
     else:
         raise ValueError(f"Unknown data type: {data_type}")
 
+    if data_type == "emulated" and max_requests == "dataset":
+        raise ValueError("Cannot use 'dataset' for emulated data")
+
     # Create executor
     executor = Executor(
         backend=backend_inst,
         request_generator=request_generator,
         mode=rate_type,
         rate=rate if rate_type in ("constant", "poisson") else None,
-        max_number=max_requests,
+        max_number=(
+            len(request_generator) if max_requests == "dataset" else max_requests
+        ),
         max_duration=max_seconds,
     )
 

@@ -339,6 +339,12 @@ class EmulatedRequestGenerator(RequestGenerator):
             async_queue_size=async_queue_size,
         )
 
+    def __len__(self) -> int:
+        raise NotImplementedError(
+            "Can't get the length of the emulated dataset. "
+            "Check the `--data-type` CLI parameter."
+        )
+
     def create_item(self) -> TextGenerationRequest:
         """
         Create a new text generation request item from the data.

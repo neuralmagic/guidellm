@@ -428,7 +428,7 @@ def load_text_lines(
         format_ = "txt"
 
     # load the data if it's a path or URL
-    if isinstance(data, Path) or (isinstance(data, str) and data.startswith("http")):
+    if isinstance(data, (Path, str)):
         data = load_text(data, encoding=encoding)
         data = clean_text(data)
 

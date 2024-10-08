@@ -54,6 +54,13 @@ class FileRequestGenerator(RequestGenerator):
             async_queue_size=async_queue_size,
         )
 
+    def __len__(self) -> int:
+        """
+        Return the number of text lines.
+        """
+
+        return len(self._data)
+
     def create_item(self) -> TextGenerationRequest:
         """
         Create a new result request item from the data.
