@@ -151,6 +151,15 @@ __all__ = ["generate_benchmark_report"]
         "until the user exits. "
     ),
 )
+@click.option(
+    "--subset-size",
+    type=int,
+    default=None,
+    help=(
+        "The number of subsets to use from the dataset. "
+        "If not provided, all subsets will be used."
+    ),
+)
 def generate_benchmark_report_cli(
     target: str,
     backend: BackendEnginePublic,
@@ -164,6 +173,7 @@ def generate_benchmark_report_cli(
     max_requests: Union[Literal["dataset"], int, None],
     output_path: str,
     enable_continuous_refresh: bool,
+    subset_size: Optional[int],
 ):
     """
     Generate a benchmark report for a specified backend and dataset.
@@ -181,6 +191,7 @@ def generate_benchmark_report_cli(
         max_requests=max_requests,
         output_path=output_path,
         cont_refresh_table=enable_continuous_refresh,
+        subset_size=subset_size,
     )
 
 
@@ -197,6 +208,7 @@ def generate_benchmark_report(
     max_requests: Union[Literal["dataset"], int, None],
     output_path: str,
     cont_refresh_table: bool,
+    subset_size: Optional[int],
 ) -> GuidanceReport:
     """
     Generate a benchmark report for a specified backend and dataset.
@@ -251,7 +263,7 @@ def generate_benchmark_report(
         request_generator = FileRequestGenerator(path=data, tokenizer=tokenizer_inst)
     elif data_type == "transformers":
         request_generator = TransformersDatasetRequestGenerator(
-            dataset=data, tokenizer=tokenizer_inst
+            dataset=data, tokenizer=tokenizer_inst, subset_size=subset_size
         )
     else:
         raise ValueError(f"Unknown data type: {data_type}")
