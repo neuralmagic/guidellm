@@ -33,6 +33,8 @@ class TransformersDatasetRequestGenerator(RequestGenerator):
     :type mode: str
     :param async_queue_size: The size of the request queue.
     :type async_queue_size: int
+    :param subset_size: The number of the subsets to use from the database.
+    :type subset_size: Optional[int]
     """
 
     def __init__(
@@ -45,6 +47,7 @@ class TransformersDatasetRequestGenerator(RequestGenerator):
         tokenizer: Optional[Union[str, PreTrainedTokenizer]] = None,
         mode: GenerationMode = "async",
         async_queue_size: int = 50,
+        subset_size: Optional[int] = None,
         **kwargs,
     ):
         self._dataset = dataset
@@ -58,6 +61,9 @@ class TransformersDatasetRequestGenerator(RequestGenerator):
         self._hf_column = resolve_transformers_dataset_column(
             self._hf_dataset, column=column
         )
+        if subset_size is not None and isinstance(self._hf_dataset, Dataset):
+            self._hf_dataset = self._hf_dataset.select(range(subset_size))
+
         self._hf_dataset_iterator = iter(self._hf_dataset)
 
         # NOTE: Must be after all the parameters since the queue population
