@@ -1,9 +1,10 @@
 import uuid
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
 
 from pydantic import Field
 
 from guidellm.core.serializable import Serializable
+from guidellm.utils import ImageDescriptor
 
 
 class TextGenerationRequest(Serializable):
@@ -16,6 +17,10 @@ class TextGenerationRequest(Serializable):
         description="The unique identifier for the request.",
     )
     prompt: str = Field(description="The input prompt for the text generation.")
+    images: Optional[List[ImageDescriptor]] = Field(
+        default=None,
+        description="Input images.",
+    )
     prompt_token_count: Optional[int] = Field(
         default=None,
         description="The number of tokens in the input prompt.",
@@ -29,6 +34,13 @@ class TextGenerationRequest(Serializable):
         description="The parameters for the text generation request.",
     )
 
+    @property
+    def number_images(self) -> int:
+        if self.images is None:
+            return 0
+        else:
+            return len(self.images)
+
     def __str__(self) -> str:
         prompt_short = (
             self.prompt[:32] + "..."
@@ -41,4 +53,5 @@ class TextGenerationRequest(Serializable):
             f"prompt={prompt_short}, prompt_token_count={self.prompt_token_count}, "
             f"output_token_count={self.output_token_count}, "
             f"params={self.params})"
+            f"images={self.number_images}"
         )
