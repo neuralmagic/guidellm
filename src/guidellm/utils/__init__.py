@@ -12,6 +12,7 @@ from .text import (
     split_lines_by_punctuation,
     split_text,
 )
+from .images import load_images, ImageDescriptor
 from .transformers import (
     load_transformers_dataset,
     resolve_transformers_dataset,
