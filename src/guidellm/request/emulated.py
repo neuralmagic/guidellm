@@ -11,7 +11,7 @@ from transformers import PreTrainedTokenizer  # type: ignore  # noqa: PGH003
 from guidellm.config import settings
 from guidellm.core.request import TextGenerationRequest
 from guidellm.request.base import GenerationMode, RequestGenerator
-from guidellm.utils import clean_text, filter_text, load_text, split_text, load_images
+from guidellm.utils import clean_text, filter_text, load_images, load_text, split_text
 
 __all__ = ["EmulatedConfig", "EmulatedRequestGenerator", "EndlessTokens"]
 
@@ -402,8 +402,8 @@ class EmulatedRequestGenerator(RequestGenerator):
                 right = mid
 
         return self._tokens.create_text(start_line_index, left)
-    
-    
+
+
     def sample_images(self):
         image_indices = self._rng.choice(len(self._images), size=self._config.images, replace=False)
 

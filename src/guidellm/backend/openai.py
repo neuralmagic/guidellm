@@ -1,5 +1,6 @@
+import base64
+import io
 from typing import AsyncGenerator, Dict, List, Optional
-import io, base64
 
 from loguru import logger
 from openai import AsyncOpenAI, OpenAI
@@ -182,7 +183,7 @@ class OpenAIBackend(Backend):
                 image_url = {"url": f"data:image/{im_format.lower()};base64,{im_b64}"}
                 content.append({"type": "image_url", "image_url": image_url})
 
-            content.append({"type": "text", "text": request.prompt})            
+            content.append({"type": "text", "text": request.prompt})
             messages = [{"role": "user", "content": content}]
-        
+
         return messages
