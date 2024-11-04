@@ -6,6 +6,7 @@ evaluating and benchmarking large language models (LLMs).
 # flake8: noqa
 
 import os
+
 import transformers  # type: ignore
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"  # Silence warnings for tokenizers
