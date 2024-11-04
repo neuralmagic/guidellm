@@ -90,6 +90,7 @@ class EmulatedDataSettings(BaseModel):
             "force_new_line_punctuation": True,
         }
     )
+    image_source: List[str] = "https://www.gutenberg.org/cache/epub/1342/pg1342-images.html"
 
 
 class OpenAISettings(BaseModel):
