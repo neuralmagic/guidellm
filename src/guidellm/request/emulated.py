@@ -405,6 +405,8 @@ class EmulatedRequestGenerator(RequestGenerator):
 
 
     def sample_images(self):
-        image_indices = self._rng.choice(len(self._images), size=self._config.images, replace=False)
+        image_indices = self._rng.choice(
+            len(self._images), size=self._config.images, replace=False,
+        )
 
         return [self._images[i] for i in image_indices]

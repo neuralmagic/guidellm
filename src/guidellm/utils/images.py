@@ -65,4 +65,4 @@ def load_images(data: str) -> List[ImageDescriptor]:
                     )
                 )
 
-        return images
+    return images
