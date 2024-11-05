@@ -179,7 +179,7 @@ class OpenAIBackend(Backend):
                 stream = io.BytesIO()
                 im_format = image.image.format or "PNG"
                 image.image.save(stream, format=im_format)
-                im_b64 = base64.b64encode(stream.getvalue()).decode("ascii")
+                im_b64 = base64.b64encode(stream.getvalue()).decode("utf-8")
                 image_url = {"url": f"data:image/{im_format.lower()};base64,{im_b64}"}
                 content.append({"type": "image_url", "image_url": image_url})
 
