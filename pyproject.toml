@@ -36,6 +36,9 @@ dependencies = [
     "pyyaml>=6.0.0",
     "requests",
     "rich",
+    "pillow",
+    "base64",
+    "io",
     "transformers",
 ]
 
