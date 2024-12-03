@@ -27,7 +27,7 @@ class ImageDescriptor(Serializable):
     )
 
 
-def load_images(data: str) -> List[ImageDescriptor]:
+def load_images(data: str, image_resolution: Optional[List[int]]) -> List[ImageDescriptor]:
     """
     Load an HTML file from a path or URL
 
@@ -56,6 +56,10 @@ def load_images(data: str) -> List[ImageDescriptor]:
                 logger.debug("Loading image: {}", img_url)
                 img_response = requests.get(img_url)
                 img_response.raise_for_status()
+                image = Image.open(BytesIO(img_response.content))
+
+                if image_resolution is not None:
+                    image = image.resize(image_resolution)
 
                 # Load image into Pillow
                 images.append(

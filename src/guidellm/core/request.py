@@ -1,5 +1,5 @@
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from pydantic import Field
 
@@ -41,6 +41,14 @@ class TextGenerationRequest(Serializable):
         else:
             return len(self.images)
 
+    @property
+    def image_resolution(self) -> Tuple[int]:
+        if self.images is None:
+            return None
+        else:
+            return [im.size for im in self.images]
+
+
     def __str__(self) -> str:
         prompt_short = (
             self.prompt[:32] + "..."
@@ -53,5 +61,5 @@ class TextGenerationRequest(Serializable):
             f"prompt={prompt_short}, prompt_token_count={self.prompt_token_count}, "
             f"output_token_count={self.output_token_count}, "
             f"params={self.params})"
-            f"images={self.number_images}"
+            f"image_resolution={self.image_resolution}"
         )
