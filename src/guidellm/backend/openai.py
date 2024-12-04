@@ -92,6 +92,7 @@ class OpenAIBackend(Backend):
                 {
                     "max_tokens": request.output_token_count,
                     "stop": None,
+                    "ignore_eos": True,
                 }
             )
         elif settings.openai.max_gen_tokens and settings.openai.max_gen_tokens > 0:
