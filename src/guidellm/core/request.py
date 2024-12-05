@@ -42,7 +42,7 @@ class TextGenerationRequest(Serializable):
             return len(self.images)
 
     @property
-    def image_resolution(self) -> List[Tuple[int]]:
+    def image_resolution(self) -> List[Tuple[int, int]]:
         if self.images is None:
             return None
         else:
