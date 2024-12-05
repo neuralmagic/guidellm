@@ -6,7 +6,7 @@ import requests
 from bs4 import BeautifulSoup
 from loguru import logger
 from PIL import Image
-from pydantic import ConfigDict, Field
+from pydantic import ConfigDict, Field, computed_field
 
 from guidellm.config import settings
 from guidellm.core.serializable import Serializable
@@ -25,6 +25,14 @@ class ImageDescriptor(Serializable):
         default=None,
         description="Image filename.",
     )
+
+    @computed_field # type: ignore[misc]
+    @property
+    def image_resolution(self) -> List[int]:
+        if self.images is None:
+            return None
+        else:
+            return [im.size for im in self.images]
 
 
 def load_images(data: str, image_resolution: Optional[List[int]]) -> List[ImageDescriptor]:
