@@ -73,7 +73,7 @@ def load_images(data: str, image_resolution: Optional[List[int]]) -> List[ImageD
                 images.append(
                     ImageDescriptor(
                         url=img_url,
-                        image=Image.open(BytesIO(img_response.content)),
+                        image=image,
                     )
                 )
 
