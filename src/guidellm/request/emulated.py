@@ -31,7 +31,8 @@ class EmulatedConfig:
         generated_tokens_min (Optional[int]): Minimum number of generated tokens.
         generated_tokens_max (Optional[int]): Maximum number of generated tokens.
         images (Optional[int]): Number of images.
-        image_resultion (Optional[List[int]]): Resolution of images.
+        width (Optional[int]): Width of images.
+        height (Optional[int]): Height of images.
     """
 
     @staticmethod
@@ -108,7 +109,8 @@ class EmulatedConfig:
     generated_tokens_max: Optional[int] = None
 
     images: int = 0
-    image_resolution = None
+    width: int = None
+    height: int = None
 
     def __post_init__(self):
         if self.images is not None and self.image_resultion is not None and self.images > 0:
@@ -337,7 +339,7 @@ class EmulatedRequestGenerator(RequestGenerator):
             settings.emulated_data.filter_end,
         )
         if self._config.images > 0:
-            self._images = load_images(settings.emulated_data.image_source, self._config.image_resolution)
+            self._images = load_images(settings.emulated_data.image_source, [self._config.width, self._config.height])
         self._rng = np.random.default_rng(random_seed)
 
         # NOTE: Must be after all the parameters since the queue population
