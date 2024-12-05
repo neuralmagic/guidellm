@@ -40,6 +40,8 @@ dependencies = [
     "base64",
     "io",
     "transformers",
+    "pillow",
+    "bs4",
 ]
 
 [project.optional-dependencies]
