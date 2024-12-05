@@ -1,5 +1,5 @@
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from pydantic import Field
 
@@ -42,7 +42,7 @@ class TextGenerationRequest(Serializable):
             return len(self.images)
 
     @property
-    def image_resolution(self) -> List[int]:
+    def image_resolution(self) -> List[Tuple[int]]:
         if self.images is None:
             return None
         else:
