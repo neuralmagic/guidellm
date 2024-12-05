@@ -28,7 +28,7 @@ class ImageDescriptor(Serializable):
 
     @computed_field # type: ignore[misc]
     @property
-    def image_resolution(self) -> Tuple[int]:
+    def image_resolution(self) -> Tuple[int, int]:
         if self.image is None:
             return None
         else:
