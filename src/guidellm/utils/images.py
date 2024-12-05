@@ -1,5 +1,5 @@
 from io import BytesIO
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from urllib.parse import urljoin
 
 import requests
@@ -28,11 +28,11 @@ class ImageDescriptor(Serializable):
 
     @computed_field # type: ignore[misc]
     @property
-    def image_resolution(self) -> List[int]:
-        if self.images is None:
+    def image_resolution(self) -> Tuple[int]:
+        if self.image is None:
             return None
         else:
-            return [im.size for im in self.images]
+            return self.image.size
 
 
 def load_images(data: str, image_resolution: Optional[List[int]]) -> List[ImageDescriptor]:
