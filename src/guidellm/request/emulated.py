@@ -112,10 +112,6 @@ class EmulatedConfig:
     width: int = None
     height: int = None
 
-    def __post_init__(self):
-        if self.images is not None and self.image_resultion is not None and self.images > 0:
-            assert len(self.image_resolution) == 2
-
     @property
     def prompt_tokens_range(self) -> Tuple[int, int]:
         """
