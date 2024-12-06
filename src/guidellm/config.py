@@ -109,6 +109,9 @@ class OpenAISettings(BaseModel):
     max_gen_tokens: int = 4096
 
 
+class AiohttpSettings(OpenAISettings):
+    pass
+
 class ReportGenerationSettings(BaseModel):
     """
     Report generation settings for the application
@@ -153,6 +156,7 @@ class Settings(BaseSettings):
 
     # Request settings
     openai: OpenAISettings = OpenAISettings()
+    aiohttp: AiohttpSettings = AiohttpSettings()
 
     # Report settings
     report_generation: ReportGenerationSettings = ReportGenerationSettings()
