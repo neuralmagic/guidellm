@@ -106,6 +106,9 @@ class OpenAISettings(BaseModel):
     max_output_tokens: int = 16384
 
 
+class AiohttpSettings(OpenAISettings):
+    pass
+
 class ReportGenerationSettings(BaseModel):
     """
     Report generation settings for the application
@@ -154,6 +157,7 @@ class Settings(BaseSettings):
     preferred_output_tokens_source: Optional[Literal["backend", "local"]] = None
     preferred_backend: Literal["openai"] = "openai"
     openai: OpenAISettings = OpenAISettings()
+    aiohttp: AiohttpSettings = AiohttpSettings()
 
     # Report settings
     report_generation: ReportGenerationSettings = ReportGenerationSettings()
