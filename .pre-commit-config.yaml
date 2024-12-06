@@ -27,9 +27,6 @@ repos:
         pyyaml,
         requests,
         rich,
-        pillow,
-        base64,
-        io,
         transformers,
 
         # dev dependencies
