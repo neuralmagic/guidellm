@@ -1,3 +1,5 @@
+import base64
+import io
 from typing import AsyncGenerator, Dict, List, Optional
 from loguru import logger
 
@@ -92,11 +94,11 @@ class AiohttpBackend(Backend):
 
             request_args.update(self._request_args)
 
+            messages = self._build_messages(request)
+
             payload = {
                 "model": self._model,
-                "messages": [
-                    {"role": "user", "content": request.prompt},
-                ],
+                "messages": messages,
                 "stream": True,
                 **request_args,
             }
@@ -158,3 +160,21 @@ class AiohttpBackend(Backend):
         Validate the connection to the backend server.
         """
         logger.info("Connection validation is not explicitly implemented for aiohttp backend.")
+
+    def _build_messages(self, request: TextGenerationRequest) -> Dict:
+        if request.number_images == 0:
+            messages = [{"role": "user", "content": request.prompt}]
+        else:
+            content = []
+            for image in request.images:
+                stream = io.BytesIO()
+                im_format = image.image.format or "PNG"
+                image.image.save(stream, format=im_format)
+                im_b64 = base64.b64encode(stream.getvalue()).decode("utf-8")
+                image_url = {"url": f"data:image/{im_format.lower()};base64,{im_b64}"}
+                content.append({"type": "image_url", "image_url": image_url})
+
+            content.append({"type": "text", "text": request.prompt})
+            messages = [{"role": "user", "content": content}]
+
+        return messages
