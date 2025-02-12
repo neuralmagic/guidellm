@@ -127,7 +127,8 @@ ignore = [
     "TCH002",
     "PLW1514", # allow Path.open without encoding
     "RET505", # allow `else` blocks
-    "RET506" # allow `else` blocks
+    "RET506", # allow `else` blocks
+    "C901"  # allow small if/else complexity
 
 ]
 select = [

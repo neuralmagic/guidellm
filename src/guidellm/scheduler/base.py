@@ -316,7 +316,8 @@ class Scheduler:
         if self.mode == "consistent":
             if self.rate is None:
                 raise ValueError(
-                    "The rate must be specified in order to provide concurrent execution"
+                    "The `rate` must be specified in order to provide "
+                    "the concurrent execution"
                 )
             for index, request in enumerate(self.generator):
                 while (index + 1 - completed) >= settings.max_concurrency:

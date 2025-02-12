@@ -162,13 +162,6 @@ class ProfileGenerator:
         if self._mode in ["constant", "poisson"]:
             return [self._mode] * len(self._rates)
 
-        # WIP
-        # if self._mode in ["concurrent"]:
-        #     if self._rates is None:
-        #         raise ValueError("rate ")
-
-        #     return [self._mode] * int(self._rates[0])
-
         raise ValueError(f"Invalid mode: {self._mode}")
 
     def next(self, current_report: TextGenerationBenchmarkReport) -> Optional[Profile]:
