@@ -6,7 +6,9 @@ from loguru import logger
 
 __all__ = ["LoadGenerationMode", "LoadGenerator"]
 
-LoadGenerationMode = Literal["synchronous", "constant", "poisson", "throughput"]
+LoadGenerationMode = Literal[
+    "synchronous", "constant", "poisson", "throughput", "consistent"
+]
 
 
 class LoadGenerator:
@@ -18,7 +20,7 @@ class LoadGenerator:
     timestamps based on the rate provided during initialization.
 
     :param mode: The mode of load generation. Valid options are "constant",
-        "poisson", "throughput", and "synchronous".
+        "poisson", "throughput", and "synchronous", "consistent"
     :type mode: LoadGenerationMode
     :param rate: The rate at which to generate timestamps. This value is
         interpreted differently depending on the mode.
@@ -52,8 +54,8 @@ class LoadGenerator:
             logger.error(error)
             raise error
 
-        self._mode = mode
-        self._rate = rate
+        self._mode: LoadGenerationMode = mode
+        self._rate: Optional[float] = rate
         logger.debug(
             "Initialized LoadGenerator with mode: {mode}, rate: {rate}",
             mode=mode,

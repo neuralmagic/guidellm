@@ -17,7 +17,12 @@ __all__ = [
 ]
 
 ProfileGenerationMode = Literal[
-    "sweep", "synchronous", "throughput", "constant", "poisson"
+    "sweep",
+    "synchronous",
+    "throughput",
+    "constant",
+    "poisson",
+    "concurrent",
 ]
 
 
@@ -61,7 +66,7 @@ class ProfileGenerator:
             logger.error(err)
             raise err
 
-        self._mode = mode
+        self._mode: ProfileGenerationMode = mode
 
         if self._mode in ("sweep", "throughput", "synchronous"):
             if rate is not None:
@@ -135,7 +140,7 @@ class ProfileGenerator:
         return self._generated_count
 
     @property
-    def profile_generation_modes(self) -> Sequence[ProfileGenerationMode]:
+    def profile_generation_modes(self) -> List[ProfileGenerationMode]:
         """
         Return the list of profile modes to be run in the report.
 
@@ -147,7 +152,8 @@ class ProfileGenerator:
                 settings.num_sweep_profiles
             )
 
-        if self._mode in ["throughput", "synchronous"]:
+        # WIP: think about moving this concurrent above
+        if self._mode in ["throughput", "synchronous", "concurrent"]:
             return [self._mode]
 
         if self._rates is None:
@@ -155,6 +161,13 @@ class ProfileGenerator:
 
         if self._mode in ["constant", "poisson"]:
             return [self._mode] * len(self._rates)
+
+        # WIP
+        # if self._mode in ["concurrent"]:
+        #     if self._rates is None:
+        #         raise ValueError("rate ")
+
+        #     return [self._mode] * int(self._rates[0])
 
         raise ValueError(f"Invalid mode: {self._mode}")
 
@@ -173,13 +186,13 @@ class ProfileGenerator:
             current_report,
         )
 
-        if self.mode in ["constant", "poisson"]:
+        if self.mode in ("constant", "poisson", "concurrent"):
             if not self.rates:
                 err = ValueError(f"Rates are required for {self.mode} mode")
                 logger.error(err)
                 raise err
 
-            profile = self.create_fixed_rate_profile(
+            profile: Optional[Profile] = self.create_fixed_rate_profile(
                 self.generated_count,
                 self.mode,
                 self.rates,
@@ -229,9 +242,11 @@ class ProfileGenerator:
         :return: The generated profile or None if index is out of range.
         :rtype: Optional[Profile]
         """
+
         modes_map: Dict[str, LoadGenerationMode] = {
             "constant": "constant",
             "poisson": "poisson",
+            "concurrent": "consistent",
         }
 
         if mode not in modes_map:

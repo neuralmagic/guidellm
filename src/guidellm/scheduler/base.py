@@ -114,12 +114,12 @@ class Scheduler:
             logger.error(err)
             raise err
 
-        self._generator = generator
-        self._worker = worker
-        self._mode = mode
-        self._rate = rate
-        self._max_number = max_number
-        self._max_duration = max_duration
+        self._generator: RequestGenerator = generator
+        self._worker: Backend = worker
+        self._mode: LoadGenerationMode = mode
+        self._rate: Optional[float] = rate
+        self._max_number: Optional[int] = max_number
+        self._max_duration: Optional[float] = max_duration
 
         self._load_generator = LoadGenerator(mode, rate)
 
@@ -227,9 +227,7 @@ class Scheduler:
         count_total = (
             self.max_number
             if self.max_number
-            else round(self.max_duration)
-            if self.max_duration
-            else 0
+            else round(self.max_duration) if self.max_duration else 0
         )
 
         # yield initial result for progress tracking
@@ -246,9 +244,7 @@ class Scheduler:
             count_completed = (
                 min(run_count, self.max_number)
                 if self.max_number
-                else round(time.time() - start_time)
-                if self.max_duration
-                else 0
+                else round(time.time() - start_time) if self.max_duration else 0
             )
 
             yield SchedulerResult(
@@ -267,9 +263,7 @@ class Scheduler:
             count_completed=(
                 benchmark.request_count + benchmark.error_count
                 if self.max_number
-                else round(time.time() - start_time)
-                if self.max_duration
-                else 0
+                else round(time.time() - start_time) if self.max_duration else 0
             ),
             benchmark=benchmark,
         )
@@ -277,6 +271,8 @@ class Scheduler:
     async def _run_sync(
         self, benchmark: TextGenerationBenchmark, end_time: float, max_number: float
     ) -> AsyncGenerator[Union[TextGenerationResult, TextGenerationError], None]:
+        """Runs only for "synchronous" mode."""
+
         for index, (request, submit_at) in enumerate(
             zip(self.generator, self.load_generator.times())
         ):
@@ -298,42 +294,80 @@ class Scheduler:
     async def _run_async(
         self, benchmark: TextGenerationBenchmark, end_time: float, max_number: float
     ) -> AsyncGenerator[Union[TextGenerationResult, TextGenerationError], None]:
+        """
+        Notes:
+            if the Load Generation Mode is set to 'consistent' - timestamps should
+            not be generated in order to make as many requests as possible to
+            simulate concurrent clients interaction.
+        """
+
         tasks = []
         completed = 0
 
-        for index, (request, submit_at) in enumerate(
-            zip(self.generator, self.load_generator.times())
-        ):
-            while (index + 1 - completed) >= settings.max_concurrency:
-                await asyncio.sleep(0.1)
+        def _completed(_task: asyncio.Task) -> None:
+            nonlocal completed
+            completed += 1
+            _res = _task.result()
 
-            if index >= max_number or time.time() >= end_time or submit_at >= end_time:
-                break
+            if _res:
+                benchmark.request_completed(_res)
+                logger.debug("Request completed: {}", _res)
 
-            logger.debug(
-                "Running asynchronous request={} at submit_at={}",
-                request,
-                submit_at,
-            )
+        if self.mode == "consistent":
+            if self.rate is None:
+                raise ValueError(
+                    "The rate must be specified in order to provide concurrent execution"
+                )
+            for index, request in enumerate(self.generator):
+                while (index + 1 - completed) >= settings.max_concurrency:
+                    await asyncio.sleep(0.1)
 
-            def _completed(_task: asyncio.Task) -> None:
-                nonlocal completed
-                completed += 1
-                _res = _task.result()
+                if index >= max_number or time.time() >= end_time:
+                    break
 
-                if _res:
-                    benchmark.request_completed(_res)
-                    logger.debug("Request completed: {}", _res)
+                logger.debug(f"Running concurrently request={request}")
 
-            benchmark.request_started()
-            task = asyncio.create_task(
-                self._submit_task_coroutine(request, submit_at, end_time)
-            )
-            task.add_done_callback(_completed)
-            tasks.append(task)
+                benchmark.request_started()
 
-            # release control to the event loop for other tasks
-            await asyncio.sleep(0.001)
+                # Create multiple concurrent tasks
+                tasks: list[asyncio.Task] = []
+                for _ in range(int(self.rate)):
+                    task: asyncio.Task = asyncio.create_task(
+                        self._submit_task_coroutine(  # submit the call with 'Backend'
+                            request=request, submit_at=0.0, end_time=end_time
+                        )
+                    )
+                    task.add_done_callback(_completed)
+                    tasks.append(task)
+        else:
+            for index, (request, submit_at) in enumerate(
+                zip(self.generator, self.load_generator.times())
+            ):
+                while (index + 1 - completed) >= settings.max_concurrency:
+                    await asyncio.sleep(0.1)
+
+                if (
+                    index >= max_number
+                    or time.time() >= end_time
+                    or submit_at >= end_time
+                ):
+                    break
+
+                logger.debug(
+                    "Running asynchronous request={} at submit_at={}",
+                    request,
+                    submit_at,
+                )
+
+                benchmark.request_started()
+                task = asyncio.create_task(
+                    self._submit_task_coroutine(request, submit_at, end_time)
+                )
+                task.add_done_callback(_completed)
+                tasks.append(task)
+
+                # release control to the event loop for other tasks
+                await asyncio.sleep(0.001)
 
         for compl_task in asyncio.as_completed(tasks):
             task_res = await compl_task
