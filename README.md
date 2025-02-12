@@ -120,9 +120,10 @@ GuideLLM provides various CLI and environment options to customize evaluations, 
 
 Some typical configurations for the CLI include:
 
-- `--rate-type`: The rate to use for benchmarking. Options include `sweep`, `synchronous`, `throughput`, `constant`, and `poisson`.
+- `--rate-type`: The rate to use for benchmarking. Options include `sweep`, `synchronous`, `concurrent`, `throughput`, `constant`, and `poisson`.
   - `--rate-type sweep`: (default) Sweep runs through the full range of the server's performance, starting with a `synchronous` rate, then `throughput`, and finally, 10 `constant` rates between the min and max request rate found.
   - `--rate-type synchronous`: Synchronous runs requests synchronously, one after the other.
+  - `--rate-type concurrent`: Concurrent runs requests concurrently in multiple threads. One request per thread. Number of threads is specified with `--rate` argument.
   - `--rate-type throughput`: Throughput runs requests in a throughput manner, sending requests as fast as possible.
   - `--rate-type constant`: Constant runs requests at a constant rate. Specify the request rate per second with the `--rate` argument. For example, `--rate 10` or multiple rates with `--rate 10 --rate 20 --rate 30`.
   - `--rate-type poisson`: Poisson draws from a Poisson distribution with the mean at the specified rate, adding some real-world variance to the runs. Specify the request rate per second with the `--rate` argument. For example, `--rate 10` or multiple rates with `--rate 10 --rate 20 --rate 30`.

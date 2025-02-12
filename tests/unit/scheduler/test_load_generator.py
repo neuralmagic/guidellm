@@ -14,6 +14,7 @@ def test_load_generator_mode():
         "constant",
         "poisson",
         "throughput",
+        "consistent",
     }
 
 
@@ -21,10 +22,11 @@ def test_load_generator_mode():
 @pytest.mark.parametrize(
     ("mode", "rate"),
     [
+        ("synchronous", None),
         ("constant", 10),
         ("poisson", 5),
         ("throughput", None),
-        ("synchronous", None),
+        ("consistent", 2),
     ],
 )
 def test_load_generator_instantiation(mode, rate):
