@@ -132,6 +132,12 @@ __all__ = ["generate_benchmark_report"]
     ),
 )
 @click.option(
+    "--workers",
+    type=int,
+    default=1,
+    help="The maximum number of concurrent workers to be created.",
+)
+@click.option(
     "--output-path",
     type=str,
     default=None,
@@ -162,6 +168,7 @@ def generate_benchmark_report_cli(
     rate: Optional[float],
     max_seconds: Optional[int],
     max_requests: Union[Literal["dataset"], int, None],
+    workers: int,
     output_path: str,
     enable_continuous_refresh: bool,
 ):
@@ -179,6 +186,7 @@ def generate_benchmark_report_cli(
         rate=rate,
         max_seconds=max_seconds,
         max_requests=max_requests,
+        workers=workers,
         output_path=output_path,
         cont_refresh_table=enable_continuous_refresh,
     )
@@ -195,6 +203,7 @@ def generate_benchmark_report(
     rate: Optional[float],
     max_seconds: Optional[int],
     max_requests: Union[Literal["dataset"], int, None],
+    workers: int,
     output_path: str,
     cont_refresh_table: bool,
 ) -> GuidanceReport:
@@ -215,6 +224,7 @@ def generate_benchmark_report(
     :param rate: The specific request rate for constant and poisson rate types.
     :param max_seconds: Maximum duration for each benchmark run in seconds.
     :param max_requests: Maximum number of requests per benchmark run.
+    :param workers: Maximum number of concurrent workers.
     :param output_path: Path to save the output report file.
     :param cont_refresh_table: Continually refresh the table in the CLI
         until the user exits.
@@ -269,6 +279,7 @@ def generate_benchmark_report(
             len(request_generator) if max_requests == "dataset" else max_requests
         ),
         max_duration=max_seconds,
+        workers=workers,
     )
 
     # Run executor

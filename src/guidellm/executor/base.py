@@ -73,13 +73,25 @@ class Executor:
         rate: Optional[Union[float, Sequence[float]]] = None,
         max_number: Optional[int] = None,
         max_duration: Optional[float] = None,
+        workers: int = 1,
     ):
         self._backend = backend
         self._generator = request_generator
         self._max_number = max_number
         self._max_duration = max_duration
         self._profile_generator = ProfileGenerator(mode=mode, rate=rate)
+        self._workers = workers
         logger.info("Executor initialized with mode: {}, rate: {}", mode, rate)
+
+    @property
+    def workers(self) -> int:
+        """
+        Returns the number of concurrent workers (async tasks).
+
+        :return: number of concurrent tasks
+        :rtype: int
+        """
+        return self._workers
 
     @property
     def backend(self) -> Backend:
@@ -154,8 +166,9 @@ class Executor:
             # limits args
             "max_number": self.max_number,
             "max_duration": self.max_duration,
+            "workers": self.workers,
         }
-        profile_index = -1
+        self.profile_index = -1
         logger.info("Starting Executor run")
 
         yield ExecutorResult(
@@ -175,8 +188,9 @@ class Executor:
                 rate=profile.load_gen_rate,
                 max_number=self.max_number or profile.args.get("max_number", None),
                 max_duration=self.max_duration,
+                concurrent_tasks=self.workers,
             )
-            profile_index += 1
+            self.profile_index += 1
 
             logger.info(
                 "Scheduling tasks with mode: {}, rate: {}",
@@ -199,7 +213,7 @@ class Executor:
                     generation_modes=self.profile_generator.profile_generation_modes,
                     report=report,
                     scheduler_result=scheduler_result,
-                    current_index=profile_index,
+                    current_index=self.profile_index,
                     current_profile=profile,
                 )
 

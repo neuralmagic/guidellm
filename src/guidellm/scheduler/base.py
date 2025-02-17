@@ -74,6 +74,7 @@ class Scheduler:
         rate: Optional[float] = None,
         max_number: Optional[int] = None,
         max_duration: Optional[float] = None,
+        concurrent_tasks: int = 1,
     ):
         logger.info(
             "Scheduler initialized with params: generator={}, worker={}, mode={}, "
@@ -120,6 +121,9 @@ class Scheduler:
         self._rate = rate
         self._max_number = max_number
         self._max_duration = max_duration
+
+        self._concurrent_tasks = concurrent_tasks
+        self._tasks: list[asyncio.Task] = []
 
         self._load_generator = LoadGenerator(mode, rate)
 
@@ -194,6 +198,17 @@ class Scheduler:
         return self._load_generator
 
     @property
+    def concurrent_tasks(self) -> int:
+        """
+        The number of concurrent tasks to be running.
+
+        :return: the number of concurrent tasks
+        :rtype: int
+        """
+
+        return self._concurrent_tasks
+
+    @property
     def benchmark_mode(self) -> Literal["asynchronous", "synchronous", "throughput"]:
         """
         The report mode for the scheduler.
@@ -227,9 +242,7 @@ class Scheduler:
         count_total = (
             self.max_number
             if self.max_number
-            else round(self.max_duration)
-            if self.max_duration
-            else 0
+            else round(self.max_duration) if self.max_duration else 0
         )
 
         # yield initial result for progress tracking
@@ -246,9 +259,7 @@ class Scheduler:
             count_completed = (
                 min(run_count, self.max_number)
                 if self.max_number
-                else round(time.time() - start_time)
-                if self.max_duration
-                else 0
+                else round(time.time() - start_time) if self.max_duration else 0
             )
 
             yield SchedulerResult(
@@ -267,9 +278,7 @@ class Scheduler:
             count_completed=(
                 benchmark.request_count + benchmark.error_count
                 if self.max_number
-                else round(time.time() - start_time)
-                if self.max_duration
-                else 0
+                else round(time.time() - start_time) if self.max_duration else 0
             ),
             benchmark=benchmark,
         )
@@ -295,10 +304,9 @@ class Scheduler:
                 logger.debug("Request completed with output: {}", result)
                 yield result
 
-    async def _run_async(
+    async def _concurrent_worker(
         self, benchmark: TextGenerationBenchmark, end_time: float, max_number: float
-    ) -> AsyncGenerator[Union[TextGenerationResult, TextGenerationError], None]:
-        tasks = []
+    ):
         completed = 0
 
         for index, (request, submit_at) in enumerate(
@@ -310,32 +318,42 @@ class Scheduler:
             if index >= max_number or time.time() >= end_time or submit_at >= end_time:
                 break
 
-            logger.debug(
-                "Running asynchronous request={} at submit_at={}",
-                request,
-                submit_at,
-            )
+            logger.debug(f"Running asynchronous {request=} at {submit_at=}")
 
             def _completed(_task: asyncio.Task) -> None:
                 nonlocal completed
                 completed += 1
+
                 _res = _task.result()
 
                 if _res:
                     benchmark.request_completed(_res)
-                    logger.debug("Request completed: {}", _res)
+                    logger.debug(f"Request completed: {_res}")
 
             benchmark.request_started()
             task = asyncio.create_task(
                 self._submit_task_coroutine(request, submit_at, end_time)
             )
             task.add_done_callback(_completed)
-            tasks.append(task)
+            self._tasks.append(task)
 
-            # release control to the event loop for other tasks
-            await asyncio.sleep(0.001)
+            # release control to the event loop
+            await asyncio.sleep(0)
 
-        for compl_task in asyncio.as_completed(tasks):
+    async def _run_async(
+        self, benchmark: TextGenerationBenchmark, end_time: float, max_number: float
+    ) -> AsyncGenerator[Union[TextGenerationResult, TextGenerationError], None]:
+
+        tasks = [
+            asyncio.create_task(
+                self._concurrent_worker(benchmark, end_time, max_number)
+            )
+            for _ in range(self.concurrent_tasks)
+        ]
+
+        await asyncio.gather(*tasks)
+
+        for compl_task in asyncio.as_completed(self._tasks):
             task_res = await compl_task
             if task_res is not None:
                 yield task_res
