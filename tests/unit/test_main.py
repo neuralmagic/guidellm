@@ -252,6 +252,7 @@ def test_generate_benchmark_report_invoke_smoke(
         max_requests=10,
         output_path="benchmark_report.json",
         cont_refresh_table=False,
+        batch_size=None,
     )
     assert report is not None
 
@@ -308,6 +309,7 @@ def test_generate_benchmark_report_emulated_with_dataset_requests(
             rate=None,
             max_seconds=10,
             max_requests="dataset",
+            batch_size=None,
             output_path="benchmark_report.json",
             cont_refresh_table=False,
         )
@@ -397,6 +399,7 @@ def test_generate_benchmark_report_openai_limited_by_file_dataset(
             rate=rate,
             max_seconds=None,
             max_requests="dataset",
+            batch_size=None,
             output_path="benchmark_report.json",
             cont_refresh_table=False,
         )

@@ -36,7 +36,9 @@ class SchedulerResult:
     :param current_result: The result of the current request, if any.
     :type current_result: Optional[Union[TextGenerationResult, Exception]]
     :param batch_results: The result of the current batch of requests, if any
-    :type batch_results: Optional[List[Union[TextGenerationResult, TextGenerationError]]]
+    :type batch_results: Optional[List[
+                            Union[TextGenerationResult, TextGenerationError]]
+                         ]
     """
 
     completed: bool
