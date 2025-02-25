@@ -235,9 +235,6 @@ class Scheduler:
 
         return self._batch_size
 
-    async def _run_batch(self):
-        pass
-
     async def run(self) -> AsyncGenerator[SchedulerResult, None]:
         """
         Run the scheduler to process requests based on the configured mode, rate,
