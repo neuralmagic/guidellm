@@ -2,7 +2,7 @@ import asyncio
 import math
 import time
 from dataclasses import dataclass
-from typing import AsyncGenerator, Literal, Optional, Union, get_args
+from typing import AsyncGenerator, List, Literal, Optional, Tuple, Union, get_args
 
 from loguru import logger
 
@@ -35,6 +35,8 @@ class SchedulerResult:
     :type benchmark: TextGenerationBenchmark
     :param current_result: The result of the current request, if any.
     :type current_result: Optional[Union[TextGenerationResult, Exception]]
+    :param batch_results: The result of the current batch of requests, if any
+    :type batch_results: Optional[List[Union[TextGenerationResult, TextGenerationError]]]
     """
 
     completed: bool
@@ -42,6 +44,9 @@ class SchedulerResult:
     count_completed: int
     benchmark: TextGenerationBenchmark
     current_result: Optional[Union[TextGenerationResult, TextGenerationError]] = None
+    batch_results: Optional[List[Union[TextGenerationResult, TextGenerationError]]] = (
+        None
+    )
 
 
 class Scheduler:
@@ -74,6 +79,7 @@ class Scheduler:
         rate: Optional[float] = None,
         max_number: Optional[int] = None,
         max_duration: Optional[float] = None,
+        batch_size: Optional[int] = None,
     ):
         logger.info(
             "Scheduler initialized with params: generator={}, worker={}, mode={}, "
@@ -114,12 +120,19 @@ class Scheduler:
             logger.error(err)
             raise err
 
+        if batch_size and batch_size <= 0:
+            err = ValueError(f"batch_size must be > 0, given: {batch_size}")
+            logger.error(err)
+            raise err
+
         self._generator = generator
         self._worker = worker
         self._mode = mode
         self._rate = rate
         self._max_number = max_number
         self._max_duration = max_duration
+
+        self._batch_size = batch_size
 
         self._load_generator = LoadGenerator(mode, rate)
 
@@ -209,6 +222,20 @@ class Scheduler:
 
         return "asynchronous"
 
+    @property
+    def batch_size(self) -> Optional[int]:
+        """
+        Returns the maximum number of requests to generate.
+
+        :return: Maximum number of requests or None.
+        :rtype: Optional[int]
+        """
+
+        return self._batch_size
+
+    async def _run_batch(self):
+        pass
+
     async def run(self) -> AsyncGenerator[SchedulerResult, None]:
         """
         Run the scheduler to process requests based on the configured mode, rate,
@@ -223,14 +250,16 @@ class Scheduler:
         start_time = time.time()
         end_time = start_time + self.max_duration if self.max_duration else math.inf
         max_number = float(self.max_number) if self.max_number else math.inf
-        runner = self._run_sync if self._mode == "synchronous" else self._run_async
         count_total = (
             self.max_number
             if self.max_number
-            else round(self.max_duration)
-            if self.max_duration
-            else 0
+            else round(self.max_duration) if self.max_duration else 0
         )
+
+        if self.batch_size:
+            runner = self._run_batch
+        else:
+            runner = self._run_sync if self._mode == "synchronous" else self._run_async
 
         # yield initial result for progress tracking
         yield SchedulerResult(
@@ -243,21 +272,30 @@ class Scheduler:
         run_count = 0
         async for res in runner(benchmark, end_time, max_number):
             run_count += 1
+
             count_completed = (
                 min(run_count, self.max_number)
                 if self.max_number
-                else round(time.time() - start_time)
-                if self.max_duration
-                else 0
+                else round(time.time() - start_time) if self.max_duration else 0
             )
 
-            yield SchedulerResult(
-                completed=False,
-                count_total=count_total,
-                count_completed=count_completed,
-                benchmark=benchmark,
-                current_result=res,
-            )
+            if self.batch_size:
+
+                yield SchedulerResult(
+                    completed=False,
+                    count_total=count_total,
+                    count_completed=count_completed,
+                    benchmark=benchmark,
+                    batch_results=res,
+                )
+            else:
+                yield SchedulerResult(
+                    completed=False,
+                    count_total=count_total,
+                    count_completed=count_completed,
+                    benchmark=benchmark,
+                    current_result=res,
+                )
 
         logger.info("Scheduler run completed")
 
@@ -267,9 +305,7 @@ class Scheduler:
             count_completed=(
                 benchmark.request_count + benchmark.error_count
                 if self.max_number
-                else round(time.time() - start_time)
-                if self.max_duration
-                else 0
+                else round(time.time() - start_time) if self.max_duration else 0
             ),
             benchmark=benchmark,
         )
@@ -372,3 +408,81 @@ class Scheduler:
             logger.warning("Request {} failed: {}", request, exc)
 
             return TextGenerationError(request=request, message=str(exc))
+
+    async def _run_batch(
+        self, benchmark: TextGenerationBenchmark, end_time: float, max_number: float
+    ) -> AsyncGenerator[SchedulerResult, None]:
+
+        if self.batch_size is None:
+            raise ValueError("--batch-size CLI parameter is not set")
+
+        batch = []
+        count_completed = 0
+
+        for request, submit_at in zip(self.generator, self.load_generator.times()):
+            if time.time() >= end_time or count_completed >= max_number:
+                break
+
+            if len(batch) < self.batch_size:
+                batch.append((request, submit_at))
+
+            if len(batch) >= self.batch_size:
+                results = await self._process_batch(batch, benchmark, end_time)
+                count_completed += len(
+                    [r for r in results if not isinstance(r, TextGenerationError)]
+                )
+
+                yield results
+                batch = []
+
+        if batch:
+            results = await self._process_batch(batch, benchmark, end_time)
+            count_completed += len(
+                [r for r in results if not isinstance(r, TextGenerationError)]
+            )
+            yield results
+
+    async def _process_batch(
+        self,
+        batch: List[Tuple[TextGenerationRequest, float]],
+        benchmark: TextGenerationBenchmark,
+        end_time: float,
+    ) -> List[Union[TextGenerationResult, TextGenerationError]]:
+        try:
+
+            benchmark.request_started()
+            tasks = [
+                self._delayed_submit(request, submit_at, end_time)
+                for request, submit_at in batch
+            ]
+
+            timeout = end_time - time.time() if end_time < math.inf else None
+
+            results = await asyncio.wait_for(
+                asyncio.gather(*tasks, return_exceptions=True), timeout=timeout
+            )
+            processed_results = []
+            for (req, _), result in zip(batch, results):
+                if isinstance(result, Exception):
+                    error = TextGenerationError(request=req, message=str(result))
+                    benchmark.request_completed(error)
+                    processed_results.append(error)
+                else:
+                    benchmark.request_completed(result)
+                    processed_results.append(result)
+            return processed_results
+        except asyncio.TimeoutError:
+            return [
+                TextGenerationError(request=req, message="Batch timeout")
+                for req, _ in batch
+            ]
+
+    async def _delayed_submit(
+        self, request: TextGenerationRequest, submit_at: float, end_time: float
+    ) -> Union[TextGenerationResult, TextGenerationError]:
+        if submit_at > time.time():
+            await asyncio.sleep(submit_at - time.time())
+        if time.time() >= end_time:
+            raise asyncio.TimeoutError("Submission time exceeded end_time")
+
+        return await self._worker.submit(request)

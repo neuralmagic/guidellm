@@ -63,6 +63,7 @@ class Executor:
     :param max_duration: Maximum duration for generating requests for the scheduler,
         (a single report run), or None.
     :type max_duration: Optional[float]
+    :type batch_size: Optional[int]
     """
 
     def __init__(
@@ -73,12 +74,14 @@ class Executor:
         rate: Optional[Union[float, Sequence[float]]] = None,
         max_number: Optional[int] = None,
         max_duration: Optional[float] = None,
+        batch_size: Optional[int] = None,
     ):
         self._backend = backend
         self._generator = request_generator
         self._max_number = max_number
         self._max_duration = max_duration
         self._profile_generator = ProfileGenerator(mode=mode, rate=rate)
+        self._batch_size = batch_size
         logger.info("Executor initialized with mode: {}, rate: {}", mode, rate)
 
     @property
@@ -131,6 +134,16 @@ class Executor:
         """
         return self._max_duration
 
+    @property
+    def batch_size(self) -> Optional[int]:
+        """
+        Returns the number batch size.
+
+        :return: Number batch size.
+        :rtype: Optional[int]
+        """
+        return self._batch_size
+
     async def run(self) -> AsyncGenerator[ExecutorResult, None]:
         """
         Runs the Executor, generating and scheduling tasks based on the profile
@@ -154,6 +167,7 @@ class Executor:
             # limits args
             "max_number": self.max_number,
             "max_duration": self.max_duration,
+            "batch_size": self.batch_size,
         }
         profile_index = -1
         logger.info("Starting Executor run")
@@ -175,6 +189,7 @@ class Executor:
                 rate=profile.load_gen_rate,
                 max_number=self.max_number or profile.args.get("max_number", None),
                 max_duration=self.max_duration,
+                batch_size=self.batch_size,
             )
             profile_index += 1
 
