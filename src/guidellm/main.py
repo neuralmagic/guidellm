@@ -1,5 +1,5 @@
 import asyncio
-from typing import Literal, Optional, Union, get_args
+from typing import Any, Literal, Mapping, Optional, Union, get_args
 
 import click
 from loguru import logger
@@ -197,6 +197,7 @@ def generate_benchmark_report(
     max_requests: Union[Literal["dataset"], int, None],
     output_path: str,
     cont_refresh_table: bool,
+    backend_kwargs: Mapping[str, Any] = {},
 ) -> GuidanceReport:
     """
     Generate a benchmark report for a specified backend and dataset.
@@ -218,6 +219,7 @@ def generate_benchmark_report(
     :param output_path: Path to save the output report file.
     :param cont_refresh_table: Continually refresh the table in the CLI
         until the user exits.
+    :param backend_kwargs: Additional keyword arguments for the backend.
     """
     logger.info(
         "Generating benchmark report with target: {}, backend: {}", target, backend
@@ -228,6 +230,7 @@ def generate_benchmark_report(
         backend_type=backend,
         target=target,
         model=model,
+        **backend_kwargs,
     )
 
     request_generator: RequestGenerator
