@@ -197,7 +197,7 @@ def generate_benchmark_report(
     max_requests: Union[Literal["dataset"], int, None],
     output_path: str,
     cont_refresh_table: bool,
-    backend_kwargs: Mapping[str, Any] = {},
+    backend_kwargs: Optional[Mapping[str, Any]] = None,
 ) -> GuidanceReport:
     """
     Generate a benchmark report for a specified backend and dataset.
@@ -230,7 +230,7 @@ def generate_benchmark_report(
         backend_type=backend,
         target=target,
         model=model,
-        **backend_kwargs,
+        **(backend_kwargs or {}),
     )
 
     request_generator: RequestGenerator
