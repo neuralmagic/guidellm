@@ -2,7 +2,7 @@ import asyncio
 import math
 import time
 from dataclasses import dataclass
-from typing import AsyncGenerator, Literal, Optional, Union, get_args
+from typing import AsyncGenerator, Literal, Optional, Union, get_args, Generator
 
 from loguru import logger
 
@@ -109,17 +109,17 @@ class Scheduler:
             logger.error(err)
             raise err
 
-        if mode in ["constant", "poisson"] and not rate:
+        if mode in ["constant", "poisson", "concurrent"] and not rate:
             err = ValueError(f"Rate must be > 0 for mode: {mode}. Given: {rate}")
             logger.error(err)
             raise err
 
         self._generator = generator
         self._worker = worker
-        self._mode = mode
-        self._rate = rate
-        self._max_number = max_number
-        self._max_duration = max_duration
+        self._mode: LoadGenerationMode = mode
+        self._rate: Optional[float] = rate
+        self._max_number: Optional[int] = max_number
+        self._max_duration: Optional[float] = max_duration
 
         self._load_generator = LoadGenerator(mode, rate)
 
@@ -227,9 +227,7 @@ class Scheduler:
         count_total = (
             self.max_number
             if self.max_number
-            else round(self.max_duration)
-            if self.max_duration
-            else 0
+            else round(self.max_duration) if self.max_duration else 0
         )
 
         # yield initial result for progress tracking
@@ -246,9 +244,7 @@ class Scheduler:
             count_completed = (
                 min(run_count, self.max_number)
                 if self.max_number
-                else round(time.time() - start_time)
-                if self.max_duration
-                else 0
+                else round(time.time() - start_time) if self.max_duration else 0
             )
 
             yield SchedulerResult(
@@ -267,9 +263,7 @@ class Scheduler:
             count_completed=(
                 benchmark.request_count + benchmark.error_count
                 if self.max_number
-                else round(time.time() - start_time)
-                if self.max_duration
-                else 0
+                else round(time.time() - start_time) if self.max_duration else 0
             ),
             benchmark=benchmark,
         )
@@ -311,9 +305,7 @@ class Scheduler:
                 break
 
             logger.debug(
-                "Running asynchronous request={} at submit_at={}",
-                request,
-                submit_at,
+                "Running asynchronous request={} at submit_at={}", request, submit_at
             )
 
             def _completed(_task: asyncio.Task) -> None:
@@ -326,14 +318,32 @@ class Scheduler:
                     logger.debug("Request completed: {}", _res)
 
             benchmark.request_started()
-            task = asyncio.create_task(
-                self._submit_task_coroutine(request, submit_at, end_time)
-            )
-            task.add_done_callback(_completed)
-            tasks.append(task)
+
+            if self.mode == "concurrent":
+                if self.rate is None:
+                    raise ValueError(
+                        "Can not use concurrent mode with no rate specified"
+                    )
+
+                _tasks: Generator[asyncio.Task, None, None] = (
+                    asyncio.create_task(
+                        self._submit_task_coroutine(request, submit_at, end_time)
+                    )
+                    for _ in range(int(self.rate))
+                )
+
+                for task in _tasks:
+                    task.add_done_callback(_completed)
+                    tasks.append(task)
+            else:
+                task = asyncio.create_task(
+                    self._submit_task_coroutine(request, submit_at, end_time)
+                )
+                task.add_done_callback(_completed)
+                tasks.append(task)
 
             # release control to the event loop for other tasks
-            await asyncio.sleep(0.001)
+            await asyncio.sleep(0)
 
         for compl_task in asyncio.as_completed(tasks):
             task_res = await compl_task

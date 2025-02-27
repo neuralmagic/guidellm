@@ -53,7 +53,7 @@ class Executor:
     :type backend: Backend
     :param request_generator: The generator that creates requests for execution.
     :type request_generator: RequestGenerator
-    :param mode: The mode for profile generation (e.g., sweep, synchronous).
+    :param mode: The mode for profile generation (e.g., sweep, synchronous, concurrent).
     :type mode: ProfileGenerationMode
     :param rate: The list of rates for load generation, or None.
     :type rate: Optional[List[float]]

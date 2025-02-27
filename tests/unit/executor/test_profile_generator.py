@@ -19,6 +19,7 @@ def test_profile_generator_mode():
         "throughput",
         "constant",
         "poisson",
+        "concurrent",
     }
 
 
@@ -41,6 +42,7 @@ def test_profile_instantiation():
         ("constant", [10, 20, 30]),
         ("poisson", 10),
         ("poisson", [10, 20, 30]),
+        ("concurrent", 2),
     ],
 )
 def test_profile_generator_instantiation(mode, rate):
@@ -93,6 +95,8 @@ def test_profile_generator_instantiation(mode, rate):
         ("poisson", None),
         ("poisson", -1),
         ("poisson", 0),
+        ("concurrent", 0),
+        ("concurrent", -1),
     ],
 )
 def test_profile_generator_invalid_instantiation(mode, rate):
@@ -152,6 +156,20 @@ def test_profile_generator_next_throughput():
     profile: Profile = generator.next(current_report)  # type: ignore
     assert profile.load_gen_mode == "throughput"
     assert profile.load_gen_rate is None
+    assert generator.generated_count == 1
+
+    for _ in range(3):
+        assert generator.next(current_report) is None
+
+
+@pytest.mark.sanity()
+def test_profile_generator_next_concurrent():
+    generator = ProfileGenerator(mode="concurrent", rate=2.0)
+    current_report = TextGenerationBenchmarkReport()
+
+    profile: Profile = generator.next(current_report)  # type: ignore
+    assert profile.load_gen_mode == "concurrent"
+    assert profile.load_gen_rate == 2
     assert generator.generated_count == 1
 
     for _ in range(3):

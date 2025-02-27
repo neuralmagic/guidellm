@@ -264,7 +264,7 @@ def generate_benchmark_report(
         backend=backend_inst,
         request_generator=request_generator,
         mode=rate_type,
-        rate=rate if rate_type in ("constant", "poisson") else None,
+        rate=rate if rate_type in ("constant", "poisson", "concurrent") else None,
         max_number=(
             len(request_generator) if max_requests == "dataset" else max_requests
         ),
