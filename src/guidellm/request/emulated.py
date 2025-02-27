@@ -11,7 +11,7 @@ from transformers import PreTrainedTokenizer  # type: ignore  # noqa: PGH003
 from guidellm.config import settings
 from guidellm.core.request import TextGenerationRequest
 from guidellm.request.base import GenerationMode, RequestGenerator
-from guidellm.utils import clean_text, filter_text, load_text, split_text
+from guidellm.utils import clean_text, filter_text, load_images, load_text, split_text
 
 __all__ = ["EmulatedConfig", "EmulatedRequestGenerator", "EndlessTokens"]
 
@@ -30,6 +30,9 @@ class EmulatedConfig:
         generated_tokens_variance (Optional[int]): Variance for generated tokens.
         generated_tokens_min (Optional[int]): Minimum number of generated tokens.
         generated_tokens_max (Optional[int]): Maximum number of generated tokens.
+        images (Optional[int]): Number of images.
+        width (Optional[int]): Width of images.
+        height (Optional[int]): Height of images.
     """
 
     @staticmethod
@@ -47,7 +50,7 @@ class EmulatedConfig:
         """
         if not config:
             logger.debug("Creating default configuration")
-            return EmulatedConfig(prompt_tokens=1024, generated_tokens=256)
+            return EmulatedConfig(prompt_tokens=1024, generated_tokens=256, images=0)
 
         if isinstance(config, dict):
             logger.debug("Loading configuration from dict: {}", config)
@@ -104,6 +107,10 @@ class EmulatedConfig:
     generated_tokens_variance: Optional[int] = None
     generated_tokens_min: Optional[int] = None
     generated_tokens_max: Optional[int] = None
+
+    images: int = 0
+    width: int = None
+    height: int = None
 
     @property
     def prompt_tokens_range(self) -> Tuple[int, int]:
@@ -327,6 +334,8 @@ class EmulatedRequestGenerator(RequestGenerator):
             settings.emulated_data.filter_start,
             settings.emulated_data.filter_end,
         )
+        if self._config.images > 0:
+            self._images = load_images(settings.emulated_data.image_source, [self._config.width, self._config.height])
         self._rng = np.random.default_rng(random_seed)
 
         # NOTE: Must be after all the parameters since the queue population
@@ -355,6 +364,7 @@ class EmulatedRequestGenerator(RequestGenerator):
         logger.debug("Creating new text generation request")
         target_prompt_token_count = self._config.sample_prompt_tokens(self._rng)
         prompt = self.sample_prompt(target_prompt_token_count)
+        images = self.sample_images()
         prompt_token_count = len(self.tokenizer.tokenize(prompt))
         output_token_count = self._config.sample_output_tokens(self._rng)
         logger.debug("Generated prompt: {}", prompt)
@@ -363,6 +373,7 @@ class EmulatedRequestGenerator(RequestGenerator):
             prompt=prompt,
             prompt_token_count=prompt_token_count,
             output_token_count=output_token_count,
+            images=images,
         )
 
     def sample_prompt(self, tokens: int) -> str:
@@ -395,3 +406,11 @@ class EmulatedRequestGenerator(RequestGenerator):
                 right = mid
 
         return self._tokens.create_text(start_line_index, left)
+
+
+    def sample_images(self):
+        image_indices = self._rng.choice(
+            len(self._images), size=self._config.images, replace=False,
+        )
+
+        return [self._images[i] for i in image_indices]

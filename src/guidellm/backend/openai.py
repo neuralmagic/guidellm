@@ -1,3 +1,5 @@
+import base64
+import io
 from typing import AsyncGenerator, Dict, List, Optional
 
 from loguru import logger
@@ -92,6 +94,9 @@ class OpenAIBackend(Backend):
                 {
                     "max_tokens": request.output_token_count,
                     "stop": None,
+                    "extra_body": {
+                        "ignore_eos": True,
+                    }
                 }
             )
         elif settings.openai.max_gen_tokens and settings.openai.max_gen_tokens > 0:
@@ -103,11 +108,11 @@ class OpenAIBackend(Backend):
 
         request_args.update(self._request_args)
 
+        messages = self._build_messages(request)
+
         stream = await self._async_client.chat.completions.create(
             model=self.model,
-            messages=[
-                {"role": "user", "content": request.prompt},
-            ],
+            messages=messages,
             stream=True,
             **request_args,
         )
@@ -167,3 +172,21 @@ class OpenAIBackend(Backend):
         except Exception as error:
             logger.error("Failed to validate OpenAI connection: {}", error)
             raise error
+
+    def _build_messages(self, request: TextGenerationRequest) -> Dict:
+        if request.number_images == 0:
+            messages = [{"role": "user", "content": request.prompt}]
+        else:
+            content = []
+            for image in request.images:
+                stream = io.BytesIO()
+                im_format = image.image.format or "PNG"
+                image.image.save(stream, format=im_format)
+                im_b64 = base64.b64encode(stream.getvalue()).decode("utf-8")
+                image_url = {"url": f"data:image/{im_format.lower()};base64,{im_b64}"}
+                content.append({"type": "image_url", "image_url": image_url})
+
+            content.append({"type": "text", "text": request.prompt})
+            messages = [{"role": "user", "content": content}]
+
+        return messages

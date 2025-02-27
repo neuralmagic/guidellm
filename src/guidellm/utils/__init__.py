@@ -1,3 +1,4 @@
+from .images import ImageDescriptor, load_images
 from .injector import create_report, inject_data
 from .progress import BenchmarkReportProgress
 from .text import (
@@ -37,4 +38,6 @@ __all__ = [
     "resolve_transformers_dataset_split",
     "split_lines_by_punctuation",
     "split_text",
+    "ImageDescriptor",
+    "load_images",
 ]
