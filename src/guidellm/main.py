@@ -132,6 +132,12 @@ __all__ = ["generate_benchmark_report"]
     ),
 )
 @click.option(
+    "--batch-size",
+    type=int,
+    default=None,
+    help="The batch size of inference requests.",
+)
+@click.option(
     "--output-path",
     type=str,
     default=None,
@@ -162,6 +168,7 @@ def generate_benchmark_report_cli(
     rate: Optional[float],
     max_seconds: Optional[int],
     max_requests: Union[Literal["dataset"], int, None],
+    batch_size: Optional[int],
     output_path: str,
     enable_continuous_refresh: bool,
 ):
@@ -179,6 +186,7 @@ def generate_benchmark_report_cli(
         rate=rate,
         max_seconds=max_seconds,
         max_requests=max_requests,
+        batch_size=batch_size,
         output_path=output_path,
         cont_refresh_table=enable_continuous_refresh,
     )
@@ -195,6 +203,7 @@ def generate_benchmark_report(
     rate: Optional[float],
     max_seconds: Optional[int],
     max_requests: Union[Literal["dataset"], int, None],
+    batch_size: Optional[int],
     output_path: str,
     cont_refresh_table: bool,
 ) -> GuidanceReport:
@@ -269,6 +278,7 @@ def generate_benchmark_report(
             len(request_generator) if max_requests == "dataset" else max_requests
         ),
         max_duration=max_seconds,
+        batch_size=batch_size,
     )
 
     # Run executor
@@ -281,6 +291,7 @@ def generate_benchmark_report(
             "rate": rate,
             "max_number": max_requests,
             "max_duration": max_seconds,
+            "batch_size": batch_size,
         },
     )
     report = asyncio.run(_run_executor_for_result(executor))
