@@ -14,6 +14,7 @@ def test_load_generator_mode():
         "constant",
         "poisson",
         "throughput",
+        "concurrent",
     }
 
 
@@ -25,6 +26,7 @@ def test_load_generator_mode():
         ("poisson", 5),
         ("throughput", None),
         ("synchronous", None),
+        ("concurrent", 3),
     ],
 )
 def test_load_generator_instantiation(mode, rate):
@@ -40,6 +42,8 @@ def test_load_generator_instantiation(mode, rate):
         ("invalid_mode", None, ValueError),
         ("constant", 0, ValueError),
         ("poisson", -1, ValueError),
+        ("concurrent", -1, ValueError),
+        ("concurrent", 0, ValueError),
     ],
 )
 def test_load_generator_invalid_instantiation(mode, rate, expected_error):

@@ -6,7 +6,9 @@ from loguru import logger
 
 __all__ = ["LoadGenerationMode", "LoadGenerator"]
 
-LoadGenerationMode = Literal["synchronous", "constant", "poisson", "throughput"]
+LoadGenerationMode = Literal[
+    "synchronous", "constant", "poisson", "throughput", "concurrent"
+]
 
 
 class LoadGenerator:
@@ -52,8 +54,9 @@ class LoadGenerator:
             logger.error(error)
             raise error
 
-        self._mode = mode
-        self._rate = rate
+        self._mode: LoadGenerationMode = mode
+        self._rate: Optional[float] = rate
+
         logger.debug(
             "Initialized LoadGenerator with mode: {mode}, rate: {rate}",
             mode=mode,
@@ -100,6 +103,8 @@ class LoadGenerator:
             yield from self.poisson_times()
         elif self._mode == "synchronous":
             yield from self.synchronous_times()
+        elif self._mode == "concurrent":
+            yield from self.throughput_times()
         else:
             logger.error(f"Invalid mode encountered: {self._mode}")
             raise ValueError(f"Invalid mode: {self._mode}")

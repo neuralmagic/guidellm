@@ -17,7 +17,7 @@ __all__ = [
 ]
 
 ProfileGenerationMode = Literal[
-    "sweep", "synchronous", "throughput", "constant", "poisson"
+    "sweep", "synchronous", "throughput", "constant", "poisson", "concurrent"
 ]
 
 
@@ -34,7 +34,7 @@ class Profile(Serializable):
     """
 
     load_gen_mode: LoadGenerationMode
-    load_gen_rate: Optional[float] = None
+    load_gen_rate: Optional[Union[float, int]] = None
     args: Dict[str, Any] = Field(default_factory=dict)
 
 
@@ -45,6 +45,7 @@ class ProfileGenerator:
     :param mode: The mode for profile generation (e.g., sweep, synchronous).
     :type mode: ProfileGenerationMode
     :param rate: The rate(s) for load generation; could be a float or list of floats.
+        In case ``mode`` is concurrent - integer which is the number of streams.
     :type rate: Optional[Union[float, Sequence[float]]]
     """
 
@@ -61,7 +62,7 @@ class ProfileGenerator:
             logger.error(err)
             raise err
 
-        self._mode = mode
+        self._mode: ProfileGenerationMode = mode
 
         if self._mode in ("sweep", "throughput", "synchronous"):
             if rate is not None:
@@ -74,6 +75,7 @@ class ProfileGenerator:
                 err = ValueError(f"Rates are required for {self._mode} mode")
                 logger.error(err)
                 raise err
+
             self._rates = rate if isinstance(rate, Sequence) else [rate]
 
             for rt in self._rates:
@@ -96,13 +98,13 @@ class ProfileGenerator:
         if self._mode == "sweep":
             return settings.num_sweep_profiles + 2
 
-        if self._mode in ("throughput", "synchronous"):
+        if self._mode in ("throughput", "synchronous", "concurrent"):
             return 1
 
-        if not self._rates:
+        if not self.rates:
             raise ValueError(f"Rates are required for {self._mode} mode")
 
-        return len(self._rates)
+        return len(self.rates)
 
     @property
     def mode(self) -> ProfileGenerationMode:
@@ -147,7 +149,7 @@ class ProfileGenerator:
                 settings.num_sweep_profiles
             )
 
-        if self._mode in ["throughput", "synchronous"]:
+        if self._mode in ["throughput", "synchronous", "concurrent"]:
             return [self._mode]
 
         if self._rates is None:
@@ -188,6 +190,19 @@ class ProfileGenerator:
             profile = self.create_synchronous_profile(self.generated_count)
         elif self.mode == "throughput":
             profile = self.create_throughput_profile(self.generated_count)
+        elif self.mode == "concurrent":
+            err = ValueError(
+                f"Can not create concurrent profile with rate {self.rates}"
+            )
+            try:
+                if not self.rates:
+                    raise err
+
+                _rate: int = int(self.rates[0])
+            except IndexError as error:
+                logger.error(err)
+                raise err from error
+            profile = self.create_concurrent_profile(self.generated_count, _rate)
         elif self.mode == "sweep":
             profile = self.create_sweep_profile(
                 self.generated_count,
@@ -211,6 +226,7 @@ class ProfileGenerator:
             profile,
             self._generated_count,
         )
+
         return profile
 
     @staticmethod
@@ -229,9 +245,11 @@ class ProfileGenerator:
         :return: The generated profile or None if index is out of range.
         :rtype: Optional[Profile]
         """
+
         modes_map: Dict[str, LoadGenerationMode] = {
             "constant": "constant",
             "poisson": "poisson",
+            "concurrent": "concurrent",
         }
 
         if mode not in modes_map:
@@ -348,3 +366,26 @@ class ProfileGenerator:
                 else 1.0  # the fallback value
             ),
         )
+
+    @staticmethod
+    def create_concurrent_profile(index: int, rate: int) -> Optional[Profile]:
+        """
+        Creates a profile with concurrent constant mode.
+
+        :param index: The index of the profile to create.
+        :type index: int
+        :return: The generated profile or None if index is out of range.
+        :rtype: Optional[Profile]
+        """
+
+        profile = (
+            Profile(
+                load_gen_mode="concurrent",
+                load_gen_rate=rate,
+            )
+            if index < 1
+            else None
+        )
+        logger.debug("Created concurrent profile: {}", profile)
+
+        return profile
