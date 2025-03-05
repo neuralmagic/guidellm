@@ -14,6 +14,7 @@ from guidellm.request import (
 )
 from guidellm.request.base import RequestGenerator
 from guidellm.utils import BenchmarkReportProgress, cli_params
+from guidellm.utils.generate_ui_data import generate_ui_api_data
 
 __all__ = ["generate_benchmark_report"]
 
@@ -183,7 +184,6 @@ def generate_benchmark_report_cli(
         cont_refresh_table=enable_continuous_refresh,
     )
 
-
 def generate_benchmark_report(
     target: str,
     backend: BackendEnginePublic,
@@ -284,6 +284,8 @@ def generate_benchmark_report(
         },
     )
     report = asyncio.run(_run_executor_for_result(executor))
+
+    generate_ui_api_data(report)
 
     # Save and print report
     guidance_report = GuidanceReport()
