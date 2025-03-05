@@ -72,6 +72,18 @@ def generate_run_info(report: TextGenerationBenchmarkReport) -> Dict[str, Any]:
         "timestamp": timestamp
     }
 
+def generate_request_over_time_data(benchmarks: List[TextGenerationBenchmark]) -> List[Dict[str, Any]]:
+    request_over_time_results = []
+    for benchmark in benchmarks:
+        # compare benchmark start time to text generation result end time
+        all_result_end_times = [result.end_time for result in benchmark.results if result.end_time is not None]
+        request_over_time_values = list(map(lambda time: time - benchmark.start_time, all_result_end_times))
+        request_distribution = Distribution(data=request_over_time_values)
+        result = generate_metric_report(request_distribution, "requestsOverTime")
+        request_over_time_results.append(result["requestsOverTime"])
+    return request_over_time_results
+
+
 def generate_workload_details(report: TextGenerationBenchmarkReport) -> Dict[str, Any]:
     all_prompt_token_data = [data for benchmark in report.benchmarks for data in benchmark.prompt_token_distribution.data]
     all_prompt_token_distribution = Distribution(data=all_prompt_token_data)
@@ -84,6 +96,9 @@ def generate_workload_details(report: TextGenerationBenchmarkReport) -> Dict[str
     output_token_data = generate_metric_report(all_output_token_distribution, "tokenDistributions")
     output_token_samples = [result.output for benchmark in report.benchmarks for result in benchmark.results]
     sample_outputs = random.sample(output_token_samples, min(5, len(output_token_samples)))
+
+    request_over_time_results = generate_request_over_time_data(report.benchmarks)
+
     return {
         "prompts": {
             "samples": sample_prompts,
@@ -93,6 +108,7 @@ def generate_workload_details(report: TextGenerationBenchmarkReport) -> Dict[str
             "samples": sample_outputs,
             **output_token_data
         },
+        "requestsOverTime": request_over_time_results,
         "server": {
             "target": report.args.get('target', 'N/A')
         }
