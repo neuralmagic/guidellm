@@ -404,6 +404,22 @@ class TextGenerationBenchmark(Serializable):
         return total_tokens / self.duration
 
     @property
+    def output_token_throughput_distribution(self) -> Distribution:
+        """
+        Get the distribution for output token throughput.
+
+        :return: The distribution of output token throughput.
+        :rtype: Distribution
+        """
+        throughputs = []
+        for r in self.results:
+            duration = (r.end_time or 0) - (r.start_time or 0)
+            if duration > 0:
+                throughputs.append(r.output_token_count / duration)
+
+        return Distribution(data=throughputs)
+
+    @property
     def prompt_token_distribution(self) -> Distribution:
         """
         Get the distribution of prompt token counts.
