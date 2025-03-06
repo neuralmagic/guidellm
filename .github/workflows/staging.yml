@@ -1,9 +1,7 @@
-name: Release
+name: Staging
 
 on:
   push:
-    tags:
-      - v*
     branches:
       - release/**
 
@@ -93,8 +91,8 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.8"
-      - name: Build and Publish Final Release
+      - name: Build and Publish a Candidate Release
         uses: neuralmagic/nm-actions/actions/publish_pypi@main
         with:
-          publish_pypi: true
+          publish_pypi: false
           publish_pypi_internal: true
