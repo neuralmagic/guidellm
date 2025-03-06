@@ -31,7 +31,6 @@ dependencies = [
     "httpx[http2]<1.0.0",
     "loguru",
     "numpy",
-    "openai",
     "pillow",
     "pydantic>=2.0.0",
     "pydantic-settings>=2.0.0",

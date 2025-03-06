@@ -135,9 +135,9 @@ def _create_benchmark_report_data_tokens_summary(
     table = Table(
         "Benchmark",
         "Prompt",
-        "Prompt (1%, 5%, 50%, 95%, 99%)",
+        "Prompt (1%, 5%, 10%, 50%, 90%, 95%, 99%)",
         "Output",
-        "Output (1%, 5%, 50%, 95%, 99%)",
+        "Output (1%, 5%, 10%, 50%, 90%, 95%, 99%)",
         title="[magenta]Tokens Data by Benchmark[/magenta]",
         title_style="bold",
         title_justify="left",
@@ -149,11 +149,13 @@ def _create_benchmark_report_data_tokens_summary(
             _benchmark_rate_id(benchmark),
             f"{benchmark.prompt_token:.2f}",
             ", ".join(
-                f"{percentile:.1f}" for percentile in benchmark.prompt_token_percentiles
+                f"{percentile:.1f}"
+                for percentile in benchmark.prompt_token_percentiles.values()
             ),
             f"{benchmark.output_token:.2f}",
             ", ".join(
-                f"{percentile:.1f}" for percentile in benchmark.output_token_percentiles
+                f"{percentile:.1f}"
+                for percentile in benchmark.output_token_percentiles.values()
             ),
         )
     logger.debug("Created data tokens summary table for the report.")
@@ -187,15 +189,15 @@ def _create_benchmark_report_dist_perf_summary(
             _benchmark_rate_id(benchmark),
             ", ".join(
                 f"{percentile:.2f}"
-                for percentile in benchmark.request_latency_percentiles
+                for percentile in benchmark.request_latency_percentiles.values()
             ),
             ", ".join(
                 f"{percentile * 1000:.1f}"
-                for percentile in benchmark.time_to_first_token_percentiles
+                for percentile in benchmark.time_to_first_token_percentiles.values()
             ),
             ", ".join(
                 f"{percentile * 1000:.1f}"
-                for percentile in benchmark.inter_token_latency_percentiles
+                for percentile in benchmark.inter_token_latency_percentiles.values()
             ),
         )
     logger.debug("Created distribution performance summary table for the report.")
