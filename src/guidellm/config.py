@@ -1,6 +1,6 @@
 import json
 from enum import Enum
-from typing import Dict, List, Optional, Sequence
+from typing import Dict, List, Literal, Optional, Sequence
 
 from pydantic import BaseModel, Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -98,18 +98,13 @@ class OpenAISettings(BaseModel):
     for OpenAI server based pathways
     """
 
-    # OpenAI API key.
-    api_key: str = "invalid_token"
+    api_key: Optional[str] = None
+    bearer_token: Optional[str] = None
+    organization: Optional[str] = None
+    project: Optional[str] = None
+    base_url: str = "http://localhost:8000"
+    max_output_tokens: int = 16384
 
-    # OpenAI-compatible server URL
-    # NOTE: The default value is default address of llama.cpp web server
-    base_url: str = "http://localhost:8000/v1"
-
-    max_gen_tokens: int = 4096
-
-
-class AiohttpSettings(OpenAISettings):
-    pass
 
 class ReportGenerationSettings(BaseModel):
     """
@@ -144,7 +139,8 @@ class Settings(BaseSettings):
 
     # general settings
     env: Environment = Environment.PROD
-    request_timeout: int = 30
+    request_timeout: int = 60 * 5  # 5 minutes
+    request_http2: bool = True
     max_concurrency: int = 512
     num_sweep_profiles: int = 9
     logging: LoggingSettings = LoggingSettings()
@@ -153,9 +149,11 @@ class Settings(BaseSettings):
     dataset: DatasetSettings = DatasetSettings()
     emulated_data: EmulatedDataSettings = EmulatedDataSettings()
 
-    # Request settings
+    # Request/stats settings
+    preferred_prompt_tokens_source: Optional[Literal["backend", "local"]] = None
+    preferred_output_tokens_source: Optional[Literal["backend", "local"]] = None
+    preferred_backend: Literal["openai"] = "openai"
     openai: OpenAISettings = OpenAISettings()
-    aiohttp: AiohttpSettings = AiohttpSettings()
 
     # Report settings
     report_generation: ReportGenerationSettings = ReportGenerationSettings()

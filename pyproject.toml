@@ -28,9 +28,11 @@ dependencies = [
     "click",
     "datasets",
     "ftfy>=6.0.0",
+    "httpx[http2]<1.0.0",
     "loguru",
     "numpy",
     "openai",
+    "pillow",
     "pydantic>=2.0.0",
     "pydantic-settings>=2.0.0",
     "pyyaml>=6.0.0",
@@ -82,10 +84,6 @@ guidellm-config = "guidellm.config:print_config"
 # ********** Code Quality Tools **********
 # ************************************************
 
-[tool.black]
-line-length = 88
-target-version = ['py38']
-
 
 [tool.isort]
 profile = "black"
@@ -127,8 +125,8 @@ ignore = [
     "TCH002",
     "PLW1514", # allow Path.open without encoding
     "RET505", # allow `else` blocks
-    "RET506" # allow `else` blocks
-
+    "RET506", # allow `else` blocks
+    "PD011", # ignore .values usage since ruff assumes it's a Pandas DataFrame
 ]
 select = [
     # Rules reference: https://docs.astral.sh/ruff/rules/

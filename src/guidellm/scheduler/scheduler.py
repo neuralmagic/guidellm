@@ -6,7 +6,7 @@ from typing import AsyncGenerator, Literal, Optional, Union, get_args
 
 from loguru import logger
 
-from guidellm.backend import Backend
+from guidellm.backend import Backend, StreamingResponse
 from guidellm.config import settings
 from guidellm.core import (
     TextGenerationBenchmark,
@@ -50,8 +50,8 @@ class Scheduler:
 
     :param generator: The request generator that produces text generation requests.
     :type generator: RequestGenerator
-    :param worker: The backend worker that processes the requests.
-    :type worker: Backend
+    :param backend: The backend that processes the requests.
+    :type backend: Backend
     :param mode: The mode of load generation (e.g., synchronous, asynchronous).
     :type mode: LoadGenerationMode
     :param rate: The rate at which requests are generated, if applicable.
@@ -69,17 +69,17 @@ class Scheduler:
     def __init__(
         self,
         generator: RequestGenerator,
-        worker: Backend,
+        backend: Backend,
         mode: LoadGenerationMode = "synchronous",
         rate: Optional[float] = None,
         max_number: Optional[int] = None,
         max_duration: Optional[float] = None,
     ):
         logger.info(
-            "Scheduler initialized with params: generator={}, worker={}, mode={}, "
+            "Scheduler initialized with params: generator={}, backend={}, mode={}, "
             "rate={}, max_number={}, max_duration={}",
             generator,
-            worker,
+            backend,
             mode,
             rate,
             max_number,
@@ -115,7 +115,7 @@ class Scheduler:
             raise err
 
         self._generator = generator
-        self._worker = worker
+        self._backend = backend
         self._mode = mode
         self._rate = rate
         self._max_number = max_number
@@ -134,14 +134,14 @@ class Scheduler:
         return self._generator
 
     @property
-    def worker(self) -> Backend:
+    def backend(self) -> Backend:
         """
-        The backend worker that processes the requests.
+        The backend that processes the requests.
 
-        :return: The backend worker instance.
+        :return: The backend instance.
         :rtype: Backend
         """
-        return self._worker
+        return self._backend
 
     @property
     def mode(self) -> LoadGenerationMode:
@@ -289,7 +289,7 @@ class Scheduler:
                 submit_at,
             )
             benchmark.request_started()
-            result = await self._submit_task_coroutine(request, submit_at, end_time)
+            result = await self._make_request(request, submit_at, end_time)
             if result is not None:
                 benchmark.request_completed(result)
                 logger.debug("Request completed with output: {}", result)
@@ -327,9 +327,7 @@ class Scheduler:
                     logger.debug("Request completed: {}", _res)
 
             benchmark.request_started()
-            task = asyncio.create_task(
-                self._submit_task_coroutine(request, submit_at, end_time)
-            )
+            task = asyncio.create_task(self._make_request(request, submit_at, end_time))
             task.add_done_callback(_completed)
             tasks.append(task)
 
@@ -341,17 +339,11 @@ class Scheduler:
             if task_res is not None:
                 yield task_res
 
-    async def _submit_task_coroutine(
+    async def _make_request(
         self, request: TextGenerationRequest, submit_at: float, end_time: float
     ) -> Optional[Union[TextGenerationResult, TextGenerationError]]:
         try:
             if submit_at > end_time:
-                logger.info(
-                    "Request {} submission time {} is greater than end time {}",
-                    request,
-                    submit_at,
-                    end_time,
-                )
                 raise asyncio.TimeoutError(
                     f"Request submission time {submit_at} "
                     f"is greater than end time {end_time}"
@@ -364,12 +356,51 @@ class Scheduler:
                 end_time - time.time() if end_time and end_time < math.inf else None
             )
 
-            return await asyncio.wait_for(self._worker.submit(request), timeout=timeout)
-        except asyncio.TimeoutError as exc:
-            logger.info("Request {} timed out: {}", request, exc)
-
-            return None
+            return await asyncio.wait_for(
+                self._resolve_backend_request(request), timeout=timeout
+            )
         except Exception as exc:  # noqa: BLE001
-            logger.warning("Request {} failed: {}", request, exc)
+            if not isinstance(exc, asyncio.TimeoutError):
+                logger.warning("Request {} failed: {}", request, exc)
 
             return TextGenerationError(request=request, message=str(exc))
+
+    async def _resolve_backend_request(
+        self, request: TextGenerationRequest
+    ) -> TextGenerationResult:
+        if request.type_ == "text":
+            iter_func = await self._backend.text_completions(
+                prompt=request.prompt,
+                id_=request.id,
+                prompt_token_count=request.prompt_token_count,
+                output_token_count=request.output_token_count,
+            )
+        elif request.type_ == "chat":
+            iter_func = await self._backend.chat_completions(
+                content=request.prompt,
+                id_=request.id,
+                prompt_token_count=request.prompt_token_count,
+                output_token_count=request.output_token_count,
+            )
+
+        resp: StreamingResponse
+        async for resp in iter_func:
+            if resp.type_ != "final":
+                continue
+
+            return TextGenerationResult(
+                request=request,
+                prompt_word_count=len(request.prompt.split()),
+                prompt_token_count=resp.stats.prompt_tokens_count,
+                output=resp.content,
+                output_word_count=len(resp.content.split()),
+                output_token_count=resp.stats.output_tokens_count,
+                start_time=resp.timings.request_start,
+                end_time=resp.timings.request_end,
+                first_token_time=resp.timings.values[0],
+                last_token_time=resp.timings.values[-1],
+            )
+
+        raise ValueError(
+            f"No final response for request: {request} and backend: {self._backend}"
+        )

@@ -149,13 +149,11 @@ def _create_benchmark_report_data_tokens_summary(
             _benchmark_rate_id(benchmark),
             f"{benchmark.prompt_token:.2f}",
             ", ".join(
-                f"{percentile:.1f}"
-                for percentile in benchmark.prompt_token_percentiles
+                f"{percentile:.1f}" for percentile in benchmark.prompt_token_percentiles
             ),
             f"{benchmark.output_token:.2f}",
             ", ".join(
-                f"{percentile:.1f}"
-                for percentile in benchmark.output_token_percentiles
+                f"{percentile:.1f}" for percentile in benchmark.output_token_percentiles
             ),
         )
     logger.debug("Created data tokens summary table for the report.")

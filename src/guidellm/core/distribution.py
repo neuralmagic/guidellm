@@ -1,4 +1,4 @@
-from typing import List, Sequence
+from typing import List, Sequence, Union
 
 import numpy as np
 from loguru import logger
@@ -96,7 +96,7 @@ class Distribution(Serializable):
         logger.debug(f"Calculated {percentile}th percentile: {percentile_value}")
         return percentile_value
 
-    def percentiles(self, percentiles: List[float]) -> List[float]:
+    def percentiles(self, percentiles: Union[List[int], List[float]]) -> List[float]:
         """
         Calculate and return the specified percentiles of the distribution.
         :param percentiles: A list of desired percentiles to calculate (0-100).

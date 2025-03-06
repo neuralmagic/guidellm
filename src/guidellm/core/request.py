@@ -1,5 +1,5 @@
 import uuid
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Literal, Optional
 
 from pydantic import Field
 
@@ -14,6 +14,10 @@ class TextGenerationRequest(Serializable):
     id: str = Field(
         default_factory=lambda: str(uuid.uuid4()),
         description="The unique identifier for the request.",
+    )
+    type_: Literal["text", "chat"] = Field(
+        default="text",
+        description="The type of text generation request (e.g., text, chat).",
     )
     prompt: str = Field(description="The input prompt for the text generation.")
     prompt_token_count: Optional[int] = Field(
@@ -38,6 +42,7 @@ class TextGenerationRequest(Serializable):
 
         return (
             f"TextGenerationRequest(id={self.id}, "
+            f"type_={self.type_}"
             f"prompt={prompt_short}, prompt_token_count={self.prompt_token_count}, "
             f"output_token_count={self.output_token_count}, "
             f"params={self.params})"
