@@ -183,7 +183,7 @@ class TextGenerationBenchmark(Serializable):
         """
         return iter(self.results)
 
-    @computed_field  # type: ignore
+    @computed_field  # type: ignore[misc]
     @property
     def request_count(self) -> int:
         """
