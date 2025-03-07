@@ -68,7 +68,9 @@ def generate_run_info(report: TextGenerationBenchmarkReport) -> Dict[str, Any]:
             "size": 0
         },
         "task": "N/A",
-        "dataset": "N/A",
+        "dataset": {
+            "name": "N/A"
+        },
         "timestamp": timestamp
     }
 
@@ -93,9 +95,12 @@ def generate_workload_details(report: TextGenerationBenchmarkReport) -> Dict[str
     prompt_token_data = generate_metric_report(all_prompt_token_distribution, "tokenDistributions")
     prompt_token_samples = [result.prompt for benchmark in report.benchmarks for result in benchmark.results]
     sample_prompts = random.sample(prompt_token_samples, min(5, len(prompt_token_samples)))
+    sample_prompts = list(map(lambda prompt: prompt.replace("\n", " ").replace("\"", "'"), sample_prompts))
     output_token_data = generate_metric_report(all_output_token_distribution, "tokenDistributions")
     output_token_samples = [result.output for benchmark in report.benchmarks for result in benchmark.results]
     sample_outputs = random.sample(output_token_samples, min(5, len(output_token_samples)))
+
+    sample_outputs = list(map(lambda output: output.replace("\n", " ").replace("\"", "'"), sample_outputs))
 
     request_over_time_results = generate_request_over_time_data(report.benchmarks)
 
@@ -104,7 +109,7 @@ def generate_workload_details(report: TextGenerationBenchmarkReport) -> Dict[str
             "samples": sample_prompts,
             **prompt_token_data
         },
-        "generation": {
+        "generations": {
             "samples": sample_outputs,
             **output_token_data
         },
@@ -138,17 +143,25 @@ def generate_benchmarks_json(benchmarks: List[TextGenerationBenchmark]):
         benchmark_report_json.append(benchmarks_report)
     return benchmark_report_json
 
+def generate_js_variable(variable_name: str, data: dict) -> str:
+    json_data = json.dumps(data, indent=2)
+    return f'`window.{variable_name} = {json_data};`'  # Wrap in quotes
+
 def generate_ui_api_data(report: TextGenerationBenchmarkReport):
-    run_info_json = generate_run_info(report)
-    workload_details_json = generate_workload_details(report)
-    benchmarks_json = generate_benchmarks_json(report.benchmarks)
+    run_info_data = generate_run_info(report)
+    workload_details_data = generate_workload_details(report)
+    benchmarks_data = generate_benchmarks_json(report.benchmarks)
+    run_info_script = generate_js_variable("run_info", run_info_data)
+    workload_details_script = generate_js_variable("workload_details", workload_details_data)
+    benchmarks_script = generate_js_variable("benchmarks", benchmarks_data)
+
     os.makedirs("ben_test", exist_ok=True)
     # generate json files based off of api specs, https://codepen.io/dalthecow/pen/bNGVQbq, for consumption by UI
-    with open("ben_test/run_info.json", "w") as f:
-        json.dump(run_info_json, f, indent=2)
-    with open("ben_test/workload_details.json", "w") as f:
-        json.dump(workload_details_json, f, indent=2)
-    with open("ben_test/benchmarks.json", "w") as f:
-        json.dump(benchmarks_json, f, indent=2)
+    with open("ben_test/run_info.js", "w") as f:
+        f.write(run_info_script)
+    with open("ben_test/workload_details.js", "w") as f:
+        f.write(workload_details_script)
+    with open("ben_test/benchmarks.js", "w") as f:
+        f.write(benchmarks_script)
 
     print("Reports saved to run_info.json, workload_details.json, benchmarks.json")
