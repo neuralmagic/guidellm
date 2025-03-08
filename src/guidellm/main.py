@@ -191,14 +191,14 @@ def generate_benchmark_report(
     data_type: Literal["emulated", "file", "transformers"],
     backend: BackendType = "openai_http",
     backend_kwargs: Optional[Mapping[str, Any]] = None,
-    model: Optional[str]=None,
-    tokenizer: Optional[str]=None,
-    rate_type: ProfileGenerationMode="sweep",
-    rate: Optional[float]=None,
-    max_seconds: Optional[int]=120,
-    max_requests: Union[Literal["dataset"], int, None]=None,
-    output_path: str=None,
-    cont_refresh_table: bool=False,
+    model: Optional[str] = None,
+    tokenizer: Optional[str] = None,
+    rate_type: ProfileGenerationMode = "sweep",
+    rate: Optional[float] = None,
+    max_seconds: Optional[int] = 120,
+    max_requests: Union[Literal["dataset"], int, None] = None,
+    output_path: Optional[str] = None,
+    cont_refresh_table: bool = False,
 ) -> GuidanceReport:
     """
     Generate a benchmark report for a specified backend and dataset.
