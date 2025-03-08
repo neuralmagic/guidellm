@@ -1,6 +1,5 @@
 import time
 
-import httpx
 import pytest
 
 from guidellm.backend import OpenAIHTTPBackend, ResponseSummary, StreamingTextResponse
