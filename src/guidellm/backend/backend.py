@@ -5,171 +5,16 @@ from typing import Any, AsyncGenerator, Dict, List, Literal, Optional, Type, Uni
 
 from loguru import logger
 from PIL import Image
-from pydantic import BaseModel, Field, computed_field
 
-from guidellm.config import settings
+from guidellm.backend.response import ResponseSummary, StreamingTextResponse
 
 __all__ = [
     "Backend",
     "BackendType",
-    "StreamingResponseType",
-    "StreamingRequestArgs",
-    "StreamingResponseTimings",
-    "StreamingTextResponseStats",
-    "StreamingResponse",
 ]
 
 
 BackendType = Literal["openai_http"]
-
-StreamingResponseType = Literal["start", "iter", "final"]
-
-
-class StreamingRequestArgs(BaseModel):
-    """
-    A model representing the arguments for a streaming request to a backend.
-    Biases towards an HTTP request, but can be used for other types of backends.
-
-    :param target: The target URL or function for the request.
-    :param headers: The headers, if any, included in the request such as authorization.
-    :param payload: The payload / arguments for the request including the prompt /
-        content and other configurations.
-    :param timeout: The timeout for the request in seconds, if any.
-    :param http2: Whether HTTP/2 was used for the request, if applicable.
-    """
-
-    target: str
-    headers: Dict[str, str]
-    payload: Dict[str, Any]
-    timeout: Optional[float] = None
-    http2: Optional[bool] = None
-
-
-class StreamingResponseTimings(BaseModel):
-    """
-    A model representing the performance timings for a streaming response
-    from a backend. Includes the start time of the request, the end time of
-    the request if completed, the delta time for the latest iteration,
-    and the list of timing values for each iteration.
-
-    :param request_start: The absolute start time of the request in seconds.
-    :param values: The list of absolute timing values for each iteration in seconds,
-        if any have occurred so far.
-        The first value is the time the first token was received.
-        The last value is the time the last token was received.
-        All values in between are the times each iteration was received, which
-        may or may not correspond to a token depending on the backend's implementation.
-    :param request_end: The absolute end time of the request in seconds, if completed.
-    :param delta: The time in seconds for the latest iteration, if any.
-    """
-
-    request_start: Optional[float] = None
-    values: List[float] = Field(default_factory=list)
-    request_end: Optional[float] = None
-    delta: Optional[float] = None
-
-
-class StreamingTextResponseStats(BaseModel):
-    """
-    A model representing the statistics for a streaming text response from a backend.
-    request_* values are the numbers passed in to the backend's request implementation,
-    including any measured prompt_tokens along with the number of output_tokens that
-    were requested. response_* values are the numbers returned from the backend's
-    response implementation, if any, including any measured prompt_tokens along with
-    the number of output_tokens that were returned.
-
-    :param request_prompt_tokens: The number of prompt tokens requested for the request.
-    :param request_output_tokens: The number of output tokens requested for the request.
-    :param response_prompt_tokens: The number of prompt tokens returned in the response.
-    :param response_output_tokens: The number of output tokens returned in the response.
-    :param response_stream_iterations: The number of iterations that have been returned
-        from the backend so far, or if at the end, the total number of iterations that
-        were returned.
-    """
-
-    request_prompt_tokens: Optional[int] = None
-    request_output_tokens: Optional[int] = None
-    response_prompt_tokens: Optional[int] = None
-    response_output_tokens: Optional[int] = None
-    response_stream_iterations: int = 0
-
-    @computed_field  # type: ignore[misc]
-    @property
-    def prompt_tokens_count(self) -> Optional[int]:
-        if settings.preferred_prompt_tokens_source == "backend":
-            if not self.response_prompt_tokens:
-                logger.warning(
-                    "preferred_prompt_tokens_source is set to 'backend', "
-                    " but no prompt tokens were returned by the backend. "
-                    "Falling back to local, if available."
-                )
-            return self.response_prompt_tokens or self.request_prompt_tokens
-
-        if settings.preferred_prompt_tokens_source == "local":
-            if not self.request_prompt_tokens:
-                logger.warning(
-                    "preferred_prompt_tokens_source is set to 'local', "
-                    "but no prompt tokens were provided in the request. "
-                    "Falling back to backend, if available."
-                )
-            return self.request_prompt_tokens or self.response_prompt_tokens
-
-        return self.response_prompt_tokens or self.request_prompt_tokens
-
-    @computed_field  # type: ignore[misc]
-    @property
-    def output_tokens_count(self) -> Optional[int]:
-        if settings.preferred_output_tokens_source == "backend":
-            if not self.response_output_tokens:
-                logger.warning(
-                    "preferred_output_tokens_source is set to 'backend', "
-                    "but no output tokens were returned by the backend. "
-                    "Falling back to local, if available."
-                )
-            return self.response_output_tokens or self.request_output_tokens
-
-        if settings.preferred_output_tokens_source == "local":
-            if not self.request_output_tokens:
-                logger.warning(
-                    "preferred_output_tokens_source is set to 'local', "
-                    "but no output tokens were provided in the request. "
-                    "Falling back to backend, if available."
-                )
-            return self.request_output_tokens or self.response_output_tokens
-
-        return self.response_output_tokens or self.request_output_tokens
-
-
-class StreamingResponse(BaseModel):
-    """
-    A model representing a response from a streaming request to a backend.
-    Includes the type of response, the request arguments, the performance timings,
-    the statistics, the delta time for the latest iteration,
-    and the content of the response.
-
-    :param type_: The type of response, either 'start' for the initial response,
-        'iter' for intermediate streaming output, or 'final' for the final result.
-        The response cycle from a backend will always start with a 'start' response,
-        followed by zero or more 'iter' responses, and ending with a 'final' response.
-    :param id_: The unique identifier for the request, if any.
-        Used for tracking purposes.
-    :param request_args: The arguments for the request that generated this response.
-    :param timings: The performance timings for the response.
-    :param stats: The statistics for the response.
-    :param delta: The delta content for the latest iteration, if any.
-    :param content: The returned content for the response, continuously appended to for
-        each iteration.
-    """
-
-    type_: StreamingResponseType = "start"
-    id_: Optional[str] = None
-    request_args: StreamingRequestArgs
-    timings: StreamingResponseTimings = Field(default_factory=StreamingResponseTimings)
-    stats: StreamingTextResponseStats = Field(
-        default_factory=StreamingTextResponseStats
-    )
-    delta: Any = None
-    content: Any = ""
 
 
 class Backend(ABC):
@@ -196,6 +41,11 @@ class Backend(ABC):
         :return: The decorated backend class.
         :rtype: Type[Backend]
         """
+        if backend_type in cls._registry:
+            raise ValueError(f"Backend type already registered: {backend_type}")
+
+        if not issubclass(cls, Backend):
+            raise TypeError("Only subclasses of Backend can be registered")
 
         def inner_wrapper(wrapped_class: Type["Backend"]):
             cls._registry[backend_type] = wrapped_class
@@ -295,11 +145,11 @@ class Backend(ABC):
     async def text_completions(
         self,
         prompt: Union[str, List[str]],
-        id_: Optional[str] = None,
+        request_id: Optional[str] = None,
         prompt_token_count: Optional[int] = None,
         output_token_count: Optional[int] = None,
         **kwargs,
-    ) -> AsyncGenerator[StreamingResponse, None]:
+    ) -> AsyncGenerator[Union[StreamingTextResponse, ResponseSummary], None]:
         """
         Generate text only completions for the given prompt.
         Does not support multiple modalities, complicated chat interfaces,
@@ -308,16 +158,16 @@ class Backend(ABC):
         :param prompt: The prompt (or list of prompts) to generate a completion for.
             If a list is supplied, these are concatenated and run through the model
             for a single prompt.
-        :param id_: The unique identifier for the request, if any.
+        :param request_id: The unique identifier for the request, if any.
             Added to logging statements and the response for tracking purposes.
         :param prompt_token_count: The number of tokens measured in the prompt, if any.
             Returned in the response stats for later analysis, if applicable.
         :param output_token_count: If supplied, the number of tokens to enforce
             generation of for the output for this request.
         :param kwargs: Additional keyword arguments to pass with the request.
-        :return: An async generator that yields StreamingResponse objects containing the
-            response content. Will always start with a 'start' response,
-            followed by 0 or more 'iter' responses, and ending with a 'final' response.
+        :return: An async generator that yields a StreamingTextResponse for start,
+            a StreamingTextResponse for each received iteration,
+            and a ResponseSummary for the final response.
         """
         ...
 
@@ -329,12 +179,12 @@ class Backend(ABC):
             List[Union[str, Dict[str, Union[str, Dict[str, str]]], Path, Image.Image]],
             Any,
         ],
-        id_: Optional[str] = None,
+        request_id: Optional[str] = None,
         prompt_token_count: Optional[int] = None,
         output_token_count: Optional[int] = None,
         raw_content: bool = False,
         **kwargs,
-    ) -> AsyncGenerator[StreamingResponse, None]:
+    ) -> AsyncGenerator[Union[StreamingTextResponse, ResponseSummary], None]:
         """
         Generate chat completions for the given content.
         Supports multiple modalities, complicated chat interfaces, and chat templates.
@@ -359,15 +209,15 @@ class Backend(ABC):
                 "input_audio": {"data": f"{base64_bytes}", "format": "wav}].
             Additionally, if raw_content=True then the content is passed directly to the
             backend without any processing.
-        :param id_: The unique identifier for the request, if any.
+        :param request_id: The unique identifier for the request, if any.
             Added to logging statements and the response for tracking purposes.
         :param prompt_token_count: The number of tokens measured in the prompt, if any.
             Returned in the response stats for later analysis, if applicable.
         :param output_token_count: If supplied, the number of tokens to enforce
             generation of for the output for this request.
         :param kwargs: Additional keyword arguments to pass with the request.
-        :return: An async generator that yields StreamingResponse objects containing the
-            response content. Will always start with a 'start' response,
-            followed by 0 or more 'iter' responses, and ending with a 'final' response.
+        :return: An async generator that yields a StreamingTextResponse for start,
+            a StreamingTextResponse for each received iteration,
+            and a ResponseSummary for the final response.
         """
         ...

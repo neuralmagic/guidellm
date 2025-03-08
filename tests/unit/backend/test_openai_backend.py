@@ -1,161 +1,199 @@
-from unittest.mock import AsyncMock, Mock, patch
+import time
 
-import httpx
 import pytest
 
-from guidellm.backend import (
-    OpenAIHTTPBackend,
-)
+from guidellm.backend import OpenAIHTTPBackend, ResponseSummary, StreamingTextResponse
 from guidellm.config import settings
 
 
-@pytest.fixture()
-def mock_httpx_client():
-    with patch.object(
-        httpx, "AsyncClient", new_callable=AsyncMock
-    ) as mock_async_client, patch.object(
-        httpx, "Client", new_callable=Mock
-    ) as mock_client:
-        async_mock_instance = mock_async_client.return_value
-        sync_mock_instance = mock_client.return_value
-
-        # Mock synchronous GET response for available models
-        sync_mock_instance.get.return_value.json.return_value = {
-            "data": [{"id": "test-model"}]
-        }
-
-        # Mock asynchronous stream response
-        async def mock_stream(*args, **kwargs):
-            async def stream_gen():
-                for idx in range(3):
-                    yield f'data: {{"choices": [{{"text": "token{idx}"}}]}}\n'
-                yield "data: [DONE]\n"
-
-            return stream_gen()
-
-        async_mock_instance.stream.side_effect = mock_stream
-
-        yield async_mock_instance, sync_mock_instance
+@pytest.mark.smoke()
+def test_openai_http_backend_default_initialization():
+    backend = OpenAIHTTPBackend()
+    assert backend.target == settings.openai.base_url
+    assert backend.model is None
+    assert backend.authorization == settings.openai.bearer_token
+    assert backend.organization == settings.openai.organization
+    assert backend.project == settings.openai.project
+    assert backend.timeout == settings.request_timeout
+    assert backend.http2 is True
+    assert backend.max_output_tokens == settings.openai.max_output_tokens
 
 
 @pytest.mark.smoke()
-def test_openai_http_backend_creation():
+def test_openai_http_backend_intialization():
     backend = OpenAIHTTPBackend(
-        target="http://test-target", model="test-model", api_key="test_key"
+        target="http://test-target",
+        model="test-model",
+        api_key="test-key",
+        organization="test-org",
+        project="test-proj",
+        timeout=10,
+        http2=False,
+        max_output_tokens=100,
     )
     assert backend.target == "http://test-target"
     assert backend.model == "test-model"
-    assert backend.http2 is True
-    assert backend.timeout == settings.request_timeout
-    assert backend.authorization.startswith("Bearer")
+    assert backend.authorization == "Bearer test-key"
+    assert backend.organization == "test-org"
+    assert backend.project == "test-proj"
+    assert backend.timeout == 10
+    assert backend.http2 is False
+    assert backend.max_output_tokens == 100
 
 
 @pytest.mark.smoke()
-def test_openai_http_backend_check_setup(mock_httpx_client):
-    async_mock_client, sync_mock_client = mock_httpx_client
-    backend = OpenAIHTTPBackend(target="http://test-target")
-
-    with patch.object(httpx, "Client", return_value=sync_mock_client):
-        backend.check_setup()
-
-    assert backend.model == "test-model"
+def test_openai_http_backend_available_models(httpx_openai_mock):
+    backend = OpenAIHTTPBackend(target="http://target.mock")
+    models = backend.available_models()
+    assert models == ["mock-model"]
 
 
 @pytest.mark.smoke()
-def test_openai_http_backend_available_models(mock_httpx_client):
-    async_mock_client, sync_mock_client = mock_httpx_client
-    backend = OpenAIHTTPBackend(target="http://test-target")
+def test_openai_http_backend_validate(httpx_openai_mock):
+    backend = OpenAIHTTPBackend(target="http://target.mock", model="mock-model")
+    backend.validate()
 
-    with patch.object(httpx, "Client", return_value=sync_mock_client):
-        models = backend.available_models()
+    backend = OpenAIHTTPBackend(target="http://target.mock")
+    backend.validate()
+    assert backend.model == "mock-model"
 
-    assert models == ["test-model"]
-
-
-@pytest.mark.smoke()
-@pytest.mark.asyncio()
-async def test_openai_http_backend_text_completions(mock_httpx_client):
-    async_mock_client, _ = mock_httpx_client
-    backend = OpenAIHTTPBackend(target="http://test-target")
-
-    with patch.object(httpx, "AsyncClient", return_value=async_mock_client):
-        index = 0
-        async for response in backend.text_completions("Test Prompt"):
-            if index == 0:
-                assert response.type_ == "start"
-            elif index in [1, 2]:
-                assert response.type_ == "iter"
-                assert response.delta.startswith("token")
-            else:
-                assert response.type_ == "final"
-            index += 1
+    backend = OpenAIHTTPBackend(target="http://target.mock", model="invalid-model")
+    with pytest.raises(ValueError):
+        backend.validate()
 
 
 @pytest.mark.smoke()
 @pytest.mark.asyncio()
-async def test_openai_http_backend_chat_completions(mock_httpx_client):
-    async_mock_client, _ = mock_httpx_client
-    backend = OpenAIHTTPBackend(target="http://test-target")
+async def test_openai_http_backend_text_completions(httpx_openai_mock):
+    backend = OpenAIHTTPBackend(target="http://target.mock", model="mock-model")
 
-    with patch.object(httpx, "AsyncClient", return_value=async_mock_client):
-        index = 0
-        async for response in backend.chat_completions("Test Chat Content"):
-            if index == 0:
-                assert response.type_ == "start"
-            elif index in [1, 2]:
-                assert response.type_ == "iter"
-                assert response.delta.startswith("token")
-            else:
-                assert response.type_ == "final"
-            index += 1
+    index = 0
+    final_resp = None
+    async for response in backend.text_completions("Test Prompt", request_id="test-id"):
+        assert isinstance(response, (StreamingTextResponse, ResponseSummary))
+
+        if index == 0:
+            assert isinstance(response, StreamingTextResponse)
+            assert response.type_ == "start"
+            assert response.iter_count == 0
+            assert response.delta == ""
+            assert response.time == pytest.approx(time.time(), abs=0.01)
+            assert response.request_id == "test-id"
+        elif not isinstance(response, ResponseSummary):
+            assert response.type_ == "iter"
+            assert response.iter_count == index
+            assert len(response.delta) > 0
+            assert response.time == pytest.approx(time.time(), abs=0.01)
+            assert response.request_id == "test-id"
+        else:
+            assert not final_resp
+            final_resp = response
+            assert isinstance(response, ResponseSummary)
+            assert len(response.value) > 0
+            assert response.request_args is not None
+            assert response.iterations > 0
+            assert response.start_time > 0
+            assert response.end_time == pytest.approx(time.time(), abs=0.01)
+            assert response.request_prompt_tokens is None
+            assert response.request_output_tokens is None
+            assert response.response_prompt_tokens == 3
+            assert response.response_output_tokens > 0  # type: ignore
+            assert response.request_id == "test-id"
+
+        index += 1
+    assert final_resp
 
 
 @pytest.mark.smoke()
-def test_openai_http_backend_headers():
+@pytest.mark.asyncio()
+async def test_openai_http_backend_text_completions_counts(httpx_openai_mock):
     backend = OpenAIHTTPBackend(
-        api_key="test_key", orginization="test_org", project="test_proj"
+        target="http://target.mock",
+        model="mock-model",
+        max_output_tokens=100,
     )
-    headers = backend._headers()
-    assert headers["Authorization"] == "Bearer test_key"
-    assert headers["OpenAI-Organization"] == "test_org"
-    assert headers["OpenAI-Project"] == "test_proj"
-    assert headers["Content-Type"] == "application/json"
+    final_resp = None
+
+    async for response in backend.text_completions(
+        "Test Prompt", request_id="test-id", prompt_token_count=3, output_token_count=10
+    ):
+        final_resp = response
+
+    assert final_resp
+    assert isinstance(final_resp, ResponseSummary)
+    assert len(final_resp.value) > 0
+    assert final_resp.request_args is not None
+    assert final_resp.request_prompt_tokens == 3
+    assert final_resp.request_output_tokens == 10
+    assert final_resp.response_prompt_tokens == 3
+    assert final_resp.response_output_tokens == 10
+    assert final_resp.request_id == "test-id"
 
 
 @pytest.mark.smoke()
-def test_openai_http_backend_create_chat_messages():
-    messages = OpenAIHTTPBackend._create_chat_messages("Test Message")
-    assert messages == [{"role": "user", "content": "Test Message"}]
+@pytest.mark.asyncio()
+async def test_openai_http_backend_chat_completions(httpx_openai_mock):
+    backend = OpenAIHTTPBackend(target="http://target.mock", model="mock-model")
 
-    messages = OpenAIHTTPBackend._create_chat_messages(["Message 1", "Message 2"])
-    assert messages == [
-        {
-            "role": "user",
-            "content": [
-                {"type": "text", "text": "Message 1"},
-                {"type": "text", "text": "Message 2"},
-            ],
-        }
-    ]
+    index = 0
+    final_resp = None
+    async for response in backend.chat_completions("Test Prompt", request_id="test-id"):
+        assert isinstance(response, (StreamingTextResponse, ResponseSummary))
+
+        if index == 0:
+            assert isinstance(response, StreamingTextResponse)
+            assert response.type_ == "start"
+            assert response.iter_count == 0
+            assert response.delta == ""
+            assert response.time == pytest.approx(time.time(), abs=0.01)
+            assert response.request_id == "test-id"
+        elif not isinstance(response, ResponseSummary):
+            assert response.type_ == "iter"
+            assert response.iter_count == index
+            assert len(response.delta) > 0
+            assert response.time == pytest.approx(time.time(), abs=0.01)
+            assert response.request_id == "test-id"
+        else:
+            assert not final_resp
+            final_resp = response
+            assert isinstance(response, ResponseSummary)
+            assert len(response.value) > 0
+            assert response.request_args is not None
+            assert response.iterations > 0
+            assert response.start_time > 0
+            assert response.end_time == pytest.approx(time.time(), abs=0.01)
+            assert response.request_prompt_tokens is None
+            assert response.request_output_tokens is None
+            assert response.response_prompt_tokens == 3
+            assert response.response_output_tokens > 0  # type: ignore
+            assert response.request_id == "test-id"
+
+        index += 1
+
+    assert final_resp
 
 
 @pytest.mark.smoke()
-def test_openai_http_backend_extract_completions_delta_content():
-    data = {"choices": [{"text": "Sample Output"}]}
-    assert (
-        OpenAIHTTPBackend._extract_completions_delta_content("text", data)
-        == "Sample Output"
+@pytest.mark.asyncio()
+async def test_openai_http_backend_chat_completions_counts(httpx_openai_mock):
+    backend = OpenAIHTTPBackend(
+        target="http://target.mock",
+        model="mock-model",
+        max_output_tokens=100,
     )
+    final_resp = None
 
-    data = {"choices": [{"delta": {"content": "Chat Output"}}]}
-    assert (
-        OpenAIHTTPBackend._extract_completions_delta_content("chat", data)
-        == "Chat Output"
-    )
+    async for response in backend.chat_completions(
+        "Test Prompt", request_id="test-id", prompt_token_count=3, output_token_count=10
+    ):
+        final_resp = response
 
-
-@pytest.mark.smoke()
-def test_openai_http_backend_extract_completions_usage():
-    data = {"usage": {"prompt_tokens": 5, "completion_tokens": 10}}
-    usage = OpenAIHTTPBackend._extract_completions_usage(data)
-    assert usage == {"prompt": 5, "output": 10}
+    assert final_resp
+    assert isinstance(final_resp, ResponseSummary)
+    assert len(final_resp.value) > 0
+    assert final_resp.request_args is not None
+    assert final_resp.request_prompt_tokens == 3
+    assert final_resp.request_output_tokens == 10
+    assert final_resp.response_prompt_tokens == 3
+    assert final_resp.response_output_tokens == 10
+    assert final_resp.request_id == "test-id"

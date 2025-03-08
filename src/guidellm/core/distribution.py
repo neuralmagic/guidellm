@@ -33,7 +33,7 @@ class Distribution(Serializable):
         :return: The mean of the distribution.
         """
         if not self.data:
-            logger.warning("No data points available to calculate mean.")
+            logger.info("No data points available to calculate mean.")
             return 0.0
 
         mean_value = np.mean(self.data).item()
@@ -47,7 +47,7 @@ class Distribution(Serializable):
         :return: The median of the distribution.
         """
         if not self.data:
-            logger.warning("No data points available to calculate median.")
+            logger.info("No data points available to calculate median.")
             return 0.0
 
         median_value = np.median(self.data).item()
@@ -61,7 +61,7 @@ class Distribution(Serializable):
         :return: The variance of the distribution.
         """
         if not self.data:
-            logger.warning("No data points available to calculate variance.")
+            logger.info("No data points available to calculate variance.")
             return 0.0
 
         variance_value = np.var(self.data).item()
@@ -75,7 +75,7 @@ class Distribution(Serializable):
         :return: The standard deviation of the distribution.
         """
         if not self.data:
-            logger.warning("No data points available to calculate standard deviation.")
+            logger.info("No data points available to calculate standard deviation.")
             return 0.0
 
         std_deviation_value = np.std(self.data).item()
@@ -89,7 +89,7 @@ class Distribution(Serializable):
         :return: The specified percentile of the distribution.
         """
         if not self.data:
-            logger.warning("No data points available to calculate percentile.")
+            logger.info("No data points available to calculate percentile.")
             return 0.0
 
         percentile_value = np.percentile(self.data, percentile).item()
@@ -103,7 +103,7 @@ class Distribution(Serializable):
         :return: A list of the specified percentiles of the distribution.
         """
         if not self.data:
-            logger.warning("No data points available to calculate percentiles.")
+            logger.info("No data points available to calculate percentiles.")
             return [0.0] * len(percentiles)
 
         percentiles_values: List[float] = np.percentile(self.data, percentiles).tolist()  # type: ignore  # noqa: PGH003
@@ -117,7 +117,7 @@ class Distribution(Serializable):
         :return: The minimum value of the distribution.
         """
         if not self.data:
-            logger.warning("No data points available to calculate minimum.")
+            logger.info("No data points available to calculate minimum.")
             return 0.0
 
         min_value: float = np.min(self.data).item()  # type: ignore  # noqa: PGH003
@@ -131,7 +131,7 @@ class Distribution(Serializable):
         :return: The maximum value of the distribution.
         """
         if not self.data:
-            logger.warning("No data points available to calculate maximum.")
+            logger.info("No data points available to calculate maximum.")
             return 0.0
 
         max_value: float = np.max(self.data).item()  # type: ignore  # noqa: PGH003
@@ -145,7 +145,7 @@ class Distribution(Serializable):
         :return: The range of the distribution.
         """
         if not self.data:
-            logger.warning("No data points available to calculate range.")
+            logger.info("No data points available to calculate range.")
             return 0.0
 
         range_value = self.max - self.min

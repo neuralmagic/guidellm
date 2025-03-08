@@ -49,12 +49,14 @@ dev = [
     "tox~=4.16.0",
 
     # testing
+    "lorem~=0.1.1",
     "pytest~=8.2.2",
     "pytest-asyncio~=0.23.8",
     "pytest-cov~=5.0.0",
     "pytest-mock~=3.14.0",
     "pytest-rerunfailures~=14.0",
     "requests-mock~=1.12.1",
+    "respx~=0.22.0",
 
     # code quality
     "mypy~=1.10.1",

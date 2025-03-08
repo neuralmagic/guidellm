@@ -8,11 +8,11 @@ import httpx
 from loguru import logger
 from PIL import Image
 
-from guidellm.backend.backend import (
-    Backend,
-    StreamingRequestArgs,
-    StreamingResponse,
-    StreamingTextResponseStats,
+from guidellm.backend.backend import Backend
+from guidellm.backend.response import (
+    RequestArgs,
+    ResponseSummary,
+    StreamingTextResponse,
 )
 from guidellm.config import settings
 
@@ -32,7 +32,7 @@ class OpenAIHTTPBackend(Backend):
         If provided, adds an Authorization header with the value
         "Authorization: Bearer {api_key}".
         If not provided, no Authorization header is added.
-    :param orginization: The organization to use for requests to the OpenAI server.
+    :param organization: The organization to use for requests to the OpenAI server.
         For example, if set to "org_123", adds an OpenAI-Organization header with the
         value "OpenAI-Organization: org_123".
         If not provided, no OpenAI-Organization header is added.
@@ -53,7 +53,7 @@ class OpenAIHTTPBackend(Backend):
         target: Optional[str] = None,
         model: Optional[str] = None,
         api_key: Optional[str] = None,
-        orginization: Optional[str] = None,
+        organization: Optional[str] = None,
         project: Optional[str] = None,
         timeout: Optional[float] = None,
         http2: Optional[bool] = True,
@@ -68,7 +68,7 @@ class OpenAIHTTPBackend(Backend):
             f"Bearer {api_key}" if api_key else settings.openai.bearer_token
         )
 
-        self.orginization = orginization or settings.openai.organization
+        self.organization = organization or settings.openai.organization
         self.project = project or settings.openai.project
         self.timeout = timeout if timeout is not None else settings.request_timeout
         self.http2 = http2 if http2 is not None else settings.request_http2
@@ -137,11 +137,11 @@ class OpenAIHTTPBackend(Backend):
     async def text_completions(  # type: ignore[override]
         self,
         prompt: Union[str, List[str]],
-        id_: Optional[str] = None,
+        request_id: Optional[str] = None,
         prompt_token_count: Optional[int] = None,
         output_token_count: Optional[int] = None,
         **kwargs,
-    ) -> AsyncGenerator[StreamingResponse, None]:
+    ) -> AsyncGenerator[Union[StreamingTextResponse, ResponseSummary], None]:
         """
         Generate text completions for the given prompt using the OpenAI
         completions endpoint: /v1/completions.
@@ -149,16 +149,16 @@ class OpenAIHTTPBackend(Backend):
         :param prompt: The prompt (or list of prompts) to generate a completion for.
             If a list is supplied, these are concatenated and run through the model
             for a single prompt.
-        :param id_: The unique identifier for the request, if any.
+        :param request_id: The unique identifier for the request, if any.
             Added to logging statements and the response for tracking purposes.
         :param prompt_token_count: The number of tokens measured in the prompt, if any.
             Returned in the response stats for later analysis, if applicable.
         :param output_token_count: If supplied, the number of tokens to enforce
             generation of for the output for this request.
         :param kwargs: Additional keyword arguments to pass with the request.
-        :return: An async generator that yields StreamingResponse objects containing the
-            response content. Will always start with a 'start' response,
-            followed by 0 or more 'iter' responses, and ending with a 'final' response.
+        :return: An async generator that yields a StreamingTextResponse for start,
+            a StreamingTextResponse for each received iteration,
+            and a ResponseSummary for the final response.
         """
 
         logger.debug("{} invocation with args: {}", self.__class__.__name__, locals())
@@ -172,13 +172,11 @@ class OpenAIHTTPBackend(Backend):
         try:
             async for resp in self._iterative_completions_request(
                 type_="text",
-                id_=id_,
+                request_id=request_id,
+                request_prompt_tokens=prompt_token_count,
+                request_output_tokens=output_token_count,
                 headers=headers,
                 payload=payload,
-                stats=StreamingTextResponseStats(
-                    request_prompt_tokens=prompt_token_count,
-                    request_output_tokens=output_token_count,
-                ),
             ):
                 yield resp
         except Exception as ex:
@@ -198,12 +196,12 @@ class OpenAIHTTPBackend(Backend):
             List[Union[str, Dict[str, Union[str, Dict[str, str]]], Path, Image.Image]],
             Any,
         ],
-        id_: Optional[str] = None,
+        request_id: Optional[str] = None,
         prompt_token_count: Optional[int] = None,
         output_token_count: Optional[int] = None,
         raw_content: bool = False,
         **kwargs,
-    ) -> AsyncGenerator[StreamingResponse, None]:
+    ) -> AsyncGenerator[Union[StreamingTextResponse, ResponseSummary], None]:
         """
         Generate chat completions for the given content using the OpenAI
         chat completions endpoint: /v1/chat/completions.
@@ -224,21 +222,21 @@ class OpenAIHTTPBackend(Backend):
                 "input_audio": {"data": f"{base64_bytes}", "format": "wav}].
             Additionally, if raw_content=True then the content is passed directly to the
             backend without any processing.
-        :param id_: The unique identifier for the request, if any.
+        :param request_id: The unique identifier for the request, if any.
             Added to logging statements and the response for tracking purposes.
         :param prompt_token_count: The number of tokens measured in the prompt, if any.
             Returned in the response stats for later analysis, if applicable.
         :param output_token_count: If supplied, the number of tokens to enforce
             generation of for the output for this request.
         :param kwargs: Additional keyword arguments to pass with the request.
-        :return: An async generator that yields StreamingResponse objects containing the
-            response content. Will always start with a 'start' response,
-            followed by 0 or more 'iter' responses, and ending with a 'final' response.
+        :return: An async generator that yields a StreamingTextResponse for start,
+            a StreamingTextResponse for each received iteration,
+            and a ResponseSummary for the final response.
         """
         logger.debug("{} invocation with args: {}", self.__class__.__name__, locals())
         headers = self._headers()
         messages = (
-            content if raw_content else OpenAIHTTPBackend._create_chat_messages(content)
+            content if raw_content else self._create_chat_messages(content=content)
         )
         payload = self._completions_payload(
             orig_kwargs=kwargs,
@@ -249,13 +247,11 @@ class OpenAIHTTPBackend(Backend):
         try:
             async for resp in self._iterative_completions_request(
                 type_="chat",
-                id_=id_,
+                request_id=request_id,
+                request_prompt_tokens=prompt_token_count,
+                request_output_tokens=output_token_count,
                 headers=headers,
                 payload=payload,
-                stats=StreamingTextResponseStats(
-                    request_prompt_tokens=prompt_token_count,
-                    request_output_tokens=output_token_count,
-                ),
             ):
                 yield resp
         except Exception as ex:
@@ -276,8 +272,8 @@ class OpenAIHTTPBackend(Backend):
         if self.authorization:
             headers["Authorization"] = self.authorization
 
-        if self.orginization:
-            headers["OpenAI-Organization"] = self.orginization
+        if self.organization:
+            headers["OpenAI-Organization"] = self.organization
 
         if self.project:
             headers["OpenAI-Project"] = self.project
@@ -302,7 +298,7 @@ class OpenAIHTTPBackend(Backend):
                 max_output_tokens or self.max_output_tokens,
             )
             payload["max_tokens"] = max_output_tokens or self.max_output_tokens
-            payload["max_completion_tokens"] = max_output_tokens
+            payload["max_completion_tokens"] = payload["max_tokens"]
 
             if max_output_tokens:
                 # only set stop and ignore_eos if max_output_tokens set at request level
@@ -311,108 +307,6 @@ class OpenAIHTTPBackend(Backend):
                 payload["ignore_eos"] = True
 
         return payload
-
-    async def _iterative_completions_request(
-        self,
-        type_: Literal["text", "chat"],
-        id_: Optional[str],
-        headers: Dict,
-        payload: Dict,
-        stats: StreamingTextResponseStats,
-    ) -> AsyncGenerator[StreamingResponse, None]:
-        target = f"{self.target}/v1/"
-
-        if type_ == "text":
-            target += "completions"
-        elif type_ == "chat":
-            target += "chat/completions"
-        else:
-            raise ValueError(f"Unsupported type: {type_}")
-
-        response = StreamingResponse(
-            request_args=StreamingRequestArgs(
-                target=target,
-                headers=headers,
-                payload=payload,
-                timeout=self.timeout,
-                http2=self.http2,
-            ),
-            stats=stats,
-        )
-
-        logger.info(
-            "{} making request {} to OpenAI backend {} using http2: {} for "
-            "timeout: {} with headers: {} and payload: {}",
-            self.__class__.__name__,
-            id_,
-            target,
-            self.http2,
-            self.timeout,
-            headers,
-            payload,
-        )
-        yield response
-
-        async with httpx.AsyncClient(http2=self.http2, timeout=self.timeout) as client:
-            response.timings.request_start = time.time()
-
-            async with client.stream(
-                "POST", target, headers=headers, json=payload
-            ) as stream:
-                stream.raise_for_status()
-
-                async for line in stream.aiter_lines():
-                    logger.debug(
-                        "{} request {} recieved iter response line: {}",
-                        self.__class__.__name__,
-                        id_,
-                        line,
-                    )
-
-                    if not line or not line.startswith("data:"):
-                        continue
-
-                    iter_time = time.time()
-
-                    if line.strip() == "data: [DONE]":
-                        response.timings.request_end = iter_time
-                        break
-
-                    data = json.loads(line.strip()[len("data: ") :])
-                    delta = OpenAIHTTPBackend._extract_completions_delta_content(
-                        type_, data
-                    )
-
-                    if delta:
-                        response.type_ = "iter"
-                        response.timings.values.append(iter_time)
-                        last_time = (
-                            response.timings.values[-1]
-                            if response.timings.values
-                            else response.timings.request_start
-                        )
-                        response.timings.delta = iter_time - last_time
-                        response.stats.response_stream_iterations += 1
-                        response.delta = delta
-                        response.content += delta
-                        yield response
-
-                    usage = OpenAIHTTPBackend._extract_completions_usage(data)
-                    if usage:
-                        response.stats.response_prompt_tokens = usage["prompt"]
-                        response.stats.response_output_tokens = usage["output"]
-
-        logger.info(
-            "{} request {} with headers: {} and payload: {} completed with content: {}",
-            self.__class__.__name__,
-            id_,
-            headers,
-            payload,
-            response.content,
-        )
-        response.type_ = "final"
-        response.delta = None
-        yield response
 
     @staticmethod
     def _create_chat_messages(
@@ -475,6 +369,117 @@ class OpenAIHTTPBackend(Backend):
             ]
 
         raise ValueError(f"Unsupported content type: {content}")
+
+    async def _iterative_completions_request(
+        self,
+        type_: Literal["text", "chat"],
+        request_id: Optional[str],
+        request_prompt_tokens: Optional[int],
+        request_output_tokens: Optional[int],
+        headers: Dict,
+        payload: Dict,
+    ) -> AsyncGenerator[Union[StreamingTextResponse, ResponseSummary], None]:
+        target = f"{self.target}/v1/"
+
+        if type_ == "text":
+            target += "completions"
+        elif type_ == "chat":
+            target += "chat/completions"
+        else:
+            raise ValueError(f"Unsupported type: {type_}")
+
+        logger.info(
+            "{} making request: {} to target: {} using http2: {} for "
+            "timeout: {} with headers: {} and payload: {}",
+            self.__class__.__name__,
+            request_id,
+            target,
+            self.http2,
+            self.timeout,
+            headers,
+            payload,
+        )
+
+        async with httpx.AsyncClient(http2=self.http2, timeout=self.timeout) as client:
+            response_value = ""
+            response_prompt_count: Optional[int] = None
+            response_output_count: Optional[int] = None
+            iter_count = 0
+            start_time = time.time()
+            iter_time = start_time
+
+            yield StreamingTextResponse(
+                type_="start",
+                iter_count=iter_count,
+                delta="",
+                time=start_time,
+                request_id=request_id,
+            )
+
+            async with client.stream(
+                "POST", target, headers=headers, json=payload
+            ) as stream:
+                stream.raise_for_status()
+
+                async for line in stream.aiter_lines():
+                    iter_time = time.time()
+                    logger.debug(
+                        "{} request: {} recieved iter response line: {}",
+                        self.__class__.__name__,
+                        request_id,
+                        line,
+                    )
+
+                    if not line or not line.strip().startswith("data:"):
+                        continue
+
+                    if line.strip() == "data: [DONE]":
+                        break
+
+                    data = json.loads(line.strip()[len("data: ") :])
+                    if delta := self._extract_completions_delta_content(type_, data):
+                        iter_count += 1
+                        response_value += delta
+
+                        yield StreamingTextResponse(
+                            type_="iter",
+                            iter_count=iter_count,
+                            delta=delta,
+                            time=iter_time,
+                            request_id=request_id,
+                        )
+
+                    if usage := self._extract_completions_usage(data):
+                        response_prompt_count = usage["prompt"]
+                        response_output_count = usage["output"]
+
+        logger.info(
+            "{} request: {} with headers: {} and payload: {} completed with: {}",
+            self.__class__.__name__,
+            request_id,
+            headers,
+            payload,
+            response_value,
+        )
+
+        yield ResponseSummary(
+            value=response_value,
+            request_args=RequestArgs(
+                target=target,
+                headers=headers,
+                payload=payload,
+                timeout=self.timeout,
+                http2=self.http2,
+            ),
+            start_time=start_time,
+            end_time=iter_time,
+            iterations=iter_count,
+            request_prompt_tokens=request_prompt_tokens,
+            request_output_tokens=request_output_tokens,
+            response_prompt_tokens=response_prompt_count,
+            response_output_tokens=response_output_count,
+            request_id=request_id,
+        )
 
     @staticmethod
     def _extract_completions_delta_content(

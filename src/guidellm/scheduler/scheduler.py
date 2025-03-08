@@ -6,7 +6,7 @@ from typing import AsyncGenerator, Literal, Optional, Union, get_args
 
 from loguru import logger
 
-from guidellm.backend import Backend, StreamingResponse
+from guidellm.backend import Backend, ResponseSummary, StreamingTextResponse
 from guidellm.config import settings
 from guidellm.core import (
     TextGenerationBenchmark,
@@ -289,7 +289,7 @@ class Scheduler:
                 submit_at,
             )
             benchmark.request_started()
-            result = await self._make_request(request, submit_at, end_time)
+            result = await self._scheduled_request(request, submit_at, end_time)
             if result is not None:
                 benchmark.request_completed(result)
                 logger.debug("Request completed with output: {}", result)
@@ -327,7 +327,9 @@ class Scheduler:
                     logger.debug("Request completed: {}", _res)
 
             benchmark.request_started()
-            task = asyncio.create_task(self._make_request(request, submit_at, end_time))
+            task = asyncio.create_task(
+                self._scheduled_request(request, submit_at, end_time)
+            )
             task.add_done_callback(_completed)
             tasks.append(task)
 
@@ -339,7 +341,7 @@ class Scheduler:
             if task_res is not None:
                 yield task_res
 
-    async def _make_request(
+    async def _scheduled_request(
         self, request: TextGenerationRequest, submit_at: float, end_time: float
     ) -> Optional[Union[TextGenerationResult, TextGenerationError]]:
         try:
@@ -357,7 +359,7 @@ class Scheduler:
             )
 
             return await asyncio.wait_for(
-                self._resolve_backend_request(request), timeout=timeout
+                self._resolve_text_request(request), timeout=timeout
             )
         except Exception as exc:  # noqa: BLE001
             if not isinstance(exc, asyncio.TimeoutError):
@@ -365,42 +367,51 @@ class Scheduler:
 
             return TextGenerationError(request=request, message=str(exc))
 
-    async def _resolve_backend_request(
+    async def _resolve_text_request(
         self, request: TextGenerationRequest
     ) -> TextGenerationResult:
+        final_resp = None
+        first_token_time = None
+        last_token_time = None
+
         if request.type_ == "text":
-            iter_func = await self._backend.text_completions(
+            async for resp in self._backend.text_completions(  # type: ignore[attr-defined]
                 prompt=request.prompt,
                 id_=request.id,
                 prompt_token_count=request.prompt_token_count,
                 output_token_count=request.output_token_count,
-            )
+            ):
+                if isinstance(resp, StreamingTextResponse) and resp.type_ == "iter":
+                    first_token_time = first_token_time or resp.time
+                    last_token_time = resp.time
+
+                final_resp = resp
         elif request.type_ == "chat":
-            iter_func = await self._backend.chat_completions(
+            async for resp in self._backend.chat_completions(  # type: ignore[attr-defined]
                 content=request.prompt,
                 id_=request.id,
                 prompt_token_count=request.prompt_token_count,
                 output_token_count=request.output_token_count,
+            ):
+                if isinstance(resp, StreamingTextResponse) and resp.type_ == "iter":
+                    first_token_time = first_token_time or resp.time
+                    last_token_time = resp.time
+
+                final_resp = resp
+
+        if not final_resp or not isinstance(final_resp, ResponseSummary):
+            raise ValueError(
+                f"Invalid final response for request: {request} "
+                f"and backend: {self._backend}, recieved: {final_resp}"
             )
 
-        resp: StreamingResponse
-        async for resp in iter_func:
-            if resp.type_ != "final":
-                continue
-
-            return TextGenerationResult(
-                request=request,
-                prompt_word_count=len(request.prompt.split()),
-                prompt_token_count=resp.stats.prompt_tokens_count,
-                output=resp.content,
-                output_word_count=len(resp.content.split()),
-                output_token_count=resp.stats.output_tokens_count,
-                start_time=resp.timings.request_start,
-                end_time=resp.timings.request_end,
-                first_token_time=resp.timings.values[0],
-                last_token_time=resp.timings.values[-1],
-            )
-
-        raise ValueError(
-            f"No final response for request: {request} and backend: {self._backend}"
+        return TextGenerationResult(
+            request=request,
+            prompt_token_count=final_resp.prompt_tokens,
+            output=final_resp.value,
+            output_token_count=resp.output_tokens,
+            start_time=resp.start_time,
+            end_time=resp.end_time,
+            first_token_time=first_token_time,
+            last_token_time=last_token_time,
         )

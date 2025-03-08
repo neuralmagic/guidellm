@@ -241,7 +241,7 @@ def generate_benchmark_report(
     tokenizer_inst = tokenizer
     if not tokenizer_inst:
         try:
-            tokenizer_inst = AutoTokenizer.from_pretrained(model)
+            tokenizer_inst = AutoTokenizer.from_pretrained(backend_inst.model)
         except Exception as err:
             raise ValueError(
                 "Could not load model's tokenizer, "

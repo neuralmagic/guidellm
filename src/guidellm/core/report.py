@@ -192,11 +192,11 @@ def _create_benchmark_report_dist_perf_summary(
                 for percentile in benchmark.request_latency_percentiles.values()
             ),
             ", ".join(
-                f"{percentile * 1000:.1f}"
+                f"{percentile:.1f}"
                 for percentile in benchmark.time_to_first_token_percentiles.values()
             ),
             ", ".join(
-                f"{percentile * 1000:.1f}"
+                f"{percentile:.1f}"
                 for percentile in benchmark.inter_token_latency_percentiles.values()
             ),
         )
