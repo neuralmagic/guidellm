@@ -21,6 +21,8 @@ class StreamingTextResponse(BaseModel):
     A model representing the response content for a streaming text request.
 
     :param type_: The type of the response; either 'start' or 'iter'.
+    :param value: The value of the response up to this iteration.
+    :param start_time: The time.time() the request started.
     :param iter_count: The iteration count for the response. For 'start' this is 0
         and for the first 'iter' it is 1.
     :param delta: The text delta added to the response for this stream iteration.
@@ -30,6 +32,8 @@ class StreamingTextResponse(BaseModel):
     """
 
     type_: StreamingResponseType
+    value: str
+    start_time: float
     iter_count: int
     delta: str
     time: float
@@ -69,6 +73,7 @@ class ResponseSummary(BaseModel):
     :param prompt_tokens: The number of tokens in the prompt, if any usage was returned.
     :param output_tokens: The number of tokens in the output, if any usage was returned.
     :param request_id: The unique identifier for the request, if any.
+    :param error: The error message, if any, returned from making the request.
     """
 
     value: str
@@ -81,6 +86,7 @@ class ResponseSummary(BaseModel):
     response_prompt_tokens: Optional[int] = None
     response_output_tokens: Optional[int] = None
     request_id: Optional[str] = None
+    error: Optional[str] = None
 
     @computed_field  # type: ignore[misc]
     @property

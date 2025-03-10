@@ -142,6 +142,7 @@ class Settings(BaseSettings):
     request_timeout: int = 60 * 5  # 5 minutes
     request_http2: bool = True
     max_concurrency: int = 512
+    max_worker_processes: int = 10
     num_sweep_profiles: int = 9
     logging: LoggingSettings = LoggingSettings()
 

@@ -11,7 +11,7 @@ from guidellm.executor.profile_generator import (
     ProfileGenerator,
 )
 from guidellm.request import RequestGenerator
-from guidellm.scheduler import Scheduler, SchedulerResult
+from guidellm.scheduler import Scheduler
 
 __all__ = ["Executor", "ExecutorResult"]
 
@@ -38,7 +38,7 @@ class ExecutorResult:
     count_completed: int
     generation_modes: Sequence[ProfileGenerationMode]
     report: TextGenerationBenchmarkReport
-    scheduler_result: Optional[SchedulerResult] = None
+    scheduler_result = None
     current_index: Optional[int] = None
     current_profile: Optional[Profile] = None
 
