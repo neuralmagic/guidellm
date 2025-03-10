@@ -23,9 +23,6 @@ from pydantic import BaseModel
 
 from guidellm.config import settings
 from guidellm.scheduler.strategy import (
-    AsyncConstantStrategy,
-    AsyncPoissonStrategy,
-    ConcurrentStrategy,
     SchedulingStrategy,
     SynchronousStrategy,
     ThroughputStrategy,
@@ -398,55 +395,29 @@ class Scheduler:
         multiprocessing.Queue,
         multiprocessing.Queue,
     ]:
-        cpu_cores = os.cpu_count() or 1
+        processing_mode = self._scheduling_strategy.processing_mode
 
-        worker_type: Literal["sync", "async"]
-        requests_queue_limit: Optional[int]
-        max_concurrency: int
-        num_processes: int
+        num_processes = self._scheduling_strategy.processes_limit
+        if num_processes is None:
+            cpu_cores = os.cpu_count() or 1
+            num_processes = min(max(1, cpu_cores - 1), settings.max_worker_processes)
 
-        if isinstance(self._scheduling_strategy, SynchronousStrategy):
-            worker_type = "sync"
-            requests_queue_limit = 2
-            num_processes = 1
-            max_concurrency = -1
-        elif isinstance(self._scheduling_strategy, ConcurrentStrategy):
-            worker_type = "sync"
-            num_processes = self._scheduling_strategy.streams
-            requests_queue_limit = (
-                num_processes * 2
-            )  # add 2 per process to ensure no idling
-            max_concurrency = -1
-        elif isinstance(
-            self._scheduling_strategy,
-            (ThroughputStrategy, AsyncConstantStrategy, AsyncPoissonStrategy),
-        ):
-            worker_type = "async"
-            num_processes = self._num_processes or min(
-                max(1, cpu_cores - 1), settings.max_worker_processes
-            )
-            max_concurrency = (
-                self._scheduling_strategy.max_concurrency
-                if isinstance(self._scheduling_strategy, ThroughputStrategy)
-                else None
-            ) or settings.max_concurrency
-            requests_queue_limit = (
-                max_concurrency
-                + num_processes  # add 1 extra per process to ensure no idling
-            )
-            max_concurrency = max_concurrency // num_processes  # convert to per process
-        else:
-            raise ValueError(
-                f"Invalid scheduling strategy: {self._scheduling_strategy}"
-            )
+        num_processing_requests = self._scheduling_strategy.processing_requests_limit
+        if num_processing_requests is None:
+            num_processing_requests = settings.max_concurrency
+        num_processing_requests_per_process = num_processing_requests // num_processes
 
-        requests_queue = manager.Queue(maxsize=requests_queue_limit)
+        num_queued_requests = self._scheduling_strategy.queued_requests_limit
+        if num_queued_requests is None:
+            num_queued_requests = num_processing_requests + num_processes
+
+        requests_queue = manager.Queue(maxsize=num_queued_requests)
         responses_queue = manager.Queue()
 
         futures = []
         loop = asyncio.get_event_loop()
         for process_id in range(num_processes):
-            if worker_type == "sync":
+            if processing_mode == "sync":
                 futures.append(
                     loop.run_in_executor(
                         executor,
@@ -456,19 +427,22 @@ class Scheduler:
                         process_id,
                     )
                 )
-            elif worker_type == "async":
+            elif processing_mode == "async":
                 futures.append(
                     loop.run_in_executor(
                         executor,
                         self._worker_process_async,
                         requests_queue,
                         responses_queue,
-                        max_concurrency,
+                        num_processing_requests_per_process,
                         process_id,
                     )
                 )
             else:
-                raise ValueError(f"Invalid worker type: {worker_type}")
+                raise ValueError(
+                    f"Invalid processing mode: {processing_mode} "
+                    f"for strategy: {self._scheduling_strategy}"
+                )
 
         await asyncio.sleep(0.1)  # give time for processes to start
 
