@@ -1,4 +1,5 @@
 from .injector import create_report, inject_data
+from .generate_ui_data import generate_ui_api_data
 from .progress import BenchmarkReportProgress
 from .text import (
     clean_text,
@@ -24,6 +25,7 @@ __all__ = [
     "clean_text",
     "create_report",
     "filter_text",
+    "generate_ui_api_data",
     "inject_data",
     "is_path",
     "is_path_like",
