@@ -114,7 +114,7 @@ def test_transformers_dataset_request_generator_lifecycle(
             create_sample_dataset_dict(splits=["test"], column="output"),
         ),
         (create_sample_dataset_dict(splits=["val", "train"], column="custom"), None),
-        (create_sample_dataset(), None)
+        (create_sample_dataset(), None),
     ],
 )
 def test_transformers_dataset_request_generator_len(

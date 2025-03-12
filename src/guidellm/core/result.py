@@ -2,7 +2,7 @@ from time import time
 from typing import Any, Dict, List, Literal, Optional, Union
 
 from loguru import logger
-from pydantic import Field
+from pydantic import Field, computed_field
 
 from guidellm.core.distribution import Distribution
 from guidellm.core.request import TextGenerationRequest
@@ -17,6 +17,9 @@ __all__ = [
 ]
 
 
+DEFAULT_PERCENTILES = [1, 5, 10, 50, 90, 95, 99]
+
+
 class TextGenerationResult(Serializable):
     """
     A class to represent the result of a text generation request
@@ -26,139 +29,98 @@ class TextGenerationResult(Serializable):
     request: TextGenerationRequest = Field(
         description="The text generation request used to generate the result.",
     )
-    prompt: str = Field(
-        default_factory=str,
-        description="The input prompt for the text generation.",
-    )
-    prompt_word_count: int = Field(
-        default=0,
-        description="The number of words in the input prompt.",
-    )
-    prompt_token_count: int = Field(
-        default=0,
+    prompt_token_count: Optional[int] = Field(
+        default=None,
         description="The number of tokens in the input prompt.",
     )
     output: str = Field(
         default_factory=str,
         description="The generated output for the text generation.",
     )
-    output_word_count: int = Field(
-        default=0,
-        description="The number of words in the output.",
-    )
-    output_token_count: int = Field(
-        default=0,
-        description="The number of tokens in the output.",
-    )
-    last_time: Optional[float] = Field(
+    output_token_count: Optional[int] = Field(
         default=None,
-        description="The last time recorded.",
-    )
-    first_token_set: bool = Field(
-        default=False,
-        description="Whether the first token time is set.",
+        description="The number of tokens in the output.",
     )
     start_time: Optional[float] = Field(
         default=None,
-        description="The start time of the text generation.",
+        description="The absolute start time, in seconds, of the text generation.",
     )
     end_time: Optional[float] = Field(
         default=None,
-        description="The end time of the text generation.",
+        description="The absolute end time, in seconds, of the text generation.",
     )
     first_token_time: Optional[float] = Field(
         default=None,
-        description="The time taken to decode the first token.",
+        description="The absolute time, in seconds, the first token was received.",
     )
-    decode_times: Distribution = Field(
-        default_factory=Distribution,
-        description="The distribution of decode times.",
+    last_token_time: Optional[float] = Field(
+        default=None,
+        description="The absolute time, in seconds, the last token was received.",
     )
 
-    def start(self, prompt: str):
+    @computed_field  # type: ignore[misc]
+    @property
+    def request_latency(self) -> Optional[float]:
         """
-        Start the text generation by recording the prompt and start time.
+        Get the request latency in seconds.
 
-        :param prompt: The input prompt for the text generation.
-        :type prompt: str
+        :return: The request latency in seconds.
         """
-        self.prompt = prompt
-        self.prompt_word_count = len(prompt.split())
-        self.prompt_token_count = len(prompt)  # Token count placeholder
-        self.start_time = time()
-        self.last_time = time()
-        self.first_token_set = False
+        if not self.end_time or not self.start_time:
+            return None
 
-        logger.info("Text generation started with prompt: '{}'", prompt)
+        return self.end_time - self.start_time
 
-    def output_token(self, token: str):
+    @computed_field  # type: ignore[misc]
+    @property
+    def time_to_first_token(self) -> Optional[float]:
         """
-        Add a token to the output and record the decode time.
+        Get the time taken to decode the first token in milliseconds.
 
-        :param token: The decoded token.
-        :type token: str
+        :return: The time taken to decode the first token in milliseconds.
         """
-        self._check_recording_started()
+        if not self.first_token_time or not self.start_time:
+            return None
 
-        if self.last_time is None:
-            raise ValueError(
-                "last time is not specified. "
-                "Did you call `text_generation_benchmark.start()`?"
-            )
+        return 1000 * (self.first_token_time - self.start_time)
 
-        current_counter = time()
-
-        if not self.first_token_set:
-            self.first_token_time = current_counter - self.last_time
-            self.first_token_set = True
-            logger.debug(f"First token decode time: {self.first_token_time}")
-        else:
-            decode_time = current_counter - self.last_time
-            self.decode_times.add_data([decode_time])
-            logger.debug(f"Token '{token}' decoded in {decode_time} seconds")
-
-        self.last_time = current_counter
-        self.output += token
-        logger.debug("Added token {} to output", token)
-
-    def end(
-        self,
-        output: Optional[str] = None,
-        prompt_token_count: Optional[int] = None,
-        output_token_count: Optional[int] = None,
-    ):
+    @computed_field  # type: ignore[misc]
+    @property
+    def inter_token_latency(self) -> Optional[float]:
         """
-        End the text generation by recording the output and end time.
+        Get the average time between tokens in milliseconds.
 
-        :param output: The generated output for the text generation.
-        :type output: str
-        :param prompt_token_count: Optional token count for the prompt,
-            defaults to word count.
-        :type prompt_token_count: Optional[int]
-        :param output_token_count: Optional token count for the output,
-            defaults to word count.
-        :type output_token_count: Optional[int]
+        :return: The average time between tokens.
         """
-        self._check_recording_started()
-        self.end_time = time()
+        if (
+            not self.last_token_time
+            or not self.first_token_time
+            or not self.output_token_count
+            or self.output_token_count < 2  # noqa: PLR2004
+        ):
+            return None
 
-        if output:
-            self.output = output
+        return (
+            1000
+            * (self.last_token_time - self.first_token_time)
+            / (self.output_token_count - 1)  # ignore first token
+        )
 
-        self.output_word_count = len(self.output.split())
-        self.output_token_count = output_token_count or self.output_word_count
-        self.prompt_token_count = prompt_token_count or self.prompt_word_count
+    @computed_field  # type: ignore[misc]
+    @property
+    def output_tokens_per_second(self) -> Optional[float]:
+        """
+        Get the average token throughput in tokens per second for the entire request.
+        Note, does not account for the time taken to decode the first token.
 
-        logger.info(f"Text generation ended with output: '{self.output}'")
+        :return: The average token throughput.
+        """
+        itl = self.inter_token_latency
 
-    def _check_recording_started(
-        self,
-    ):
-        if self.start_time is None:
-            raise ValueError(
-                "start time is not specified. "
-                "Did you make the `text_generation_benchmark.start()`?",
-            )
+        if itl is None:
+            return None
+
+        return 1000.0 / itl
 
 
 class TextGenerationError(Serializable):
@@ -221,88 +183,96 @@ class TextGenerationBenchmark(Serializable):
         """
         return iter(self.results)
 
+    @computed_field  # type: ignore[misc]
     @property
     def request_count(self) -> int:
         """
         Get the number of requests in the result.
 
         :return: The number of requests.
-        :rtype: int
         """
         return len(self.results)
 
+    @computed_field  # type: ignore[misc]
     @property
     def error_count(self) -> int:
         """
         Get the number of errors in the result.
 
         :return: The number of errors.
-        :rtype: int
         """
         return len(self.errors)
 
+    @computed_field  # type: ignore[misc]
     @property
     def total_count(self) -> int:
         """
         Get the total number of requests in the result.
 
         :return: The total number of requests.
-        :rtype: int
         """
         return self.request_count + self.error_count
 
+    @computed_field  # type: ignore[misc]
     @property
     def start_time(self) -> Optional[float]:
         """
         Get the start time of the first request in the result.
 
         :return: The start time of the first request.
-        :rtype: Optional[float]
         """
-        if not self.results:
-            return None
+        return self.results[0].start_time if self.results else None
 
-        return self.results[0].start_time
-
+    @computed_field  # type: ignore[misc]
     @property
     def end_time(self) -> Optional[float]:
         """
         Get the end time of the last request in the result.
 
         :return: The end time of the last request.
-        :rtype: Optional[float]
         """
-        if not self.results:
-            return None
+        return self.results[-1].end_time if self.results else None
 
-        return self.results[-1].end_time
-
+    @computed_field  # type: ignore[misc]
     @property
     def duration(self) -> float:
         """
         Get the duration of the result in seconds.
 
         :return: The duration of the result.
-        :rtype: float
         """
-        if not self.results or not self.start_time or not self.end_time:
-            return 0.0
+        return (
+            self.end_time - self.start_time
+            if self.end_time and self.start_time
+            else 0.0
+        )
 
-        return self.end_time - self.start_time
-
+    @computed_field  # type: ignore[misc]
     @property
     def completed_request_rate(self) -> float:
         """
         Get the rate of requests per second in the result.
 
         :return: The rate of requests per second.
-        :rtype: float
         """
-        if not self.results or not self.duration:
-            return 0.0
+        return self.request_count / self.duration if self.duration else 0.0
 
-        return len(self.results) / self.duration
+    @property
+    def request_latency_distribution(self) -> Distribution:
+        """
+        Get the distribution of request latencies in seconds.
 
+        :return: The distribution of request latencies.
+        """
+        return Distribution(
+            data=[
+                result.request_latency
+                for result in self.results
+                if result.request_latency
+            ]
+        )
+
+    @computed_field  # type: ignore[misc]
     @property
     def request_latency(self) -> float:
         """
@@ -311,39 +281,22 @@ class TextGenerationBenchmark(Serializable):
         :return: The average request latency in seconds.
         :rtype: float
         """
-        if not self.results:
-            return 0.0
-
         return self.request_latency_distribution.mean
 
+    @computed_field  # type: ignore[misc]
     @property
-    def request_latency_distribution(self) -> Distribution:
+    def request_latency_percentiles(self) -> Dict[str, float]:
         """
-        Get the distribution of request latencies.
+        Get standard percentiles of request latency in seconds.
 
-        :return: The distribution of request latencies.
-        :rtype: Distribution
-        """
-        return Distribution(
-            data=[
-                result.end_time - result.start_time
-                for result in self.results
-                if result.end_time is not None and result.start_time is not None
-            ]
-        )
-
-    @property
-    def time_to_first_token(self) -> float:
-        """
-        Get the time taken to decode the first token in milliseconds.
-
-        :return: The time taken to decode the first token in milliseconds.
-        :rtype: float
+        :return: A dictionary mapping percentile to request latency in seconds.
         """
         if not self.results:
-            return 0.0
+            return {}
 
-        return 1000 * self.ttft_distribution.mean
+        values = self.request_latency_distribution.percentiles(DEFAULT_PERCENTILES)
+
+        return dict(zip(map(str, DEFAULT_PERCENTILES), values))
 
     @property
     def ttft_distribution(self) -> Distribution:
@@ -351,57 +304,101 @@ class TextGenerationBenchmark(Serializable):
         Get the distribution of time taken to decode the first token.
 
         :return: The distribution of time taken to decode the first token.
-        :rtype: Distribution
         """
         return Distribution(
             data=[
-                result.first_token_time
+                result.time_to_first_token
                 for result in self.results
-                if result.first_token_time is not None
+                if result.time_to_first_token
             ]
         )
 
+    @computed_field  # type: ignore[misc]
+    @property
+    def time_to_first_token(self) -> float:
+        """
+        Get the time taken to decode the first token in milliseconds.
+
+        :return: The time taken to decode the first token in milliseconds.
+        """
+        return self.ttft_distribution.mean
+
+    @computed_field  # type: ignore[misc]
+    @property
+    def time_to_first_token_percentiles(self) -> Dict[str, float]:
+        """
+        Get standard percentiles for time taken to decode the first token
+        in milliseconds.
+
+        :return: A dictionary mapping percentile to time taken for the first token.
+        """
+        if not self.results:
+            return {}
+
+        values = self.ttft_distribution.percentiles(DEFAULT_PERCENTILES)
+
+        return dict(zip(map(str, DEFAULT_PERCENTILES), values))
+
+    @property
+    def itl_distribution(self) -> Distribution:
+        """
+        Get the distribution of time between tokens in milliseconds.
+
+        :return: The distribution of time between tokens.
+        """
+        return Distribution(
+            data=[
+                result.inter_token_latency
+                for result in self.results
+                for _ in range(
+                    result.output_token_count - 1
+                    if result.output_token_count and result.output_token_count > 1
+                    else 0
+                )
+                if (result.inter_token_latency)
+            ]
+        )
+
+    @computed_field  # type: ignore[misc]
     @property
     def inter_token_latency(self) -> float:
         """
         Get the average time between tokens in milliseconds.
 
         :return: The average time between tokens.
-        :rtype: float
+        """
+        return self.itl_distribution.mean
+
+    @computed_field  # type: ignore[misc]
+    @property
+    def inter_token_latency_percentiles(self) -> Dict[str, float]:
+        """
+        Get standard percentiles for the time between tokens in milliseconds.
+
+        :return: A dictionary mapping percentile to time between tokens.
         """
         if not self.results:
-            return 0.0
+            return {}
 
-        return 1000 * self.itl_distribution.mean
+        values = self.itl_distribution.percentiles(DEFAULT_PERCENTILES)
 
-    @property
-    def itl_distribution(self) -> Distribution:
-        """
-        Get the distribution of time between tokens.
+        return dict(zip(map(str, DEFAULT_PERCENTILES), values))
 
-        :return: The distribution of time between tokens.
-        :rtype: Distribution
-        """
-        return Distribution(
-            data=[
-                decode for result in self.results for decode in result.decode_times.data
-            ]
-        )
-
+    @computed_field  # type: ignore[misc]
     @property
     def output_token_throughput(self) -> float:
         """
         Get the average token throughput in tokens per second.
 
         :return: The average token throughput.
-        :rtype: float
         """
-        if not self.results or not self.duration:
-            return 0.0
+        output_tokens = sum(
+            result.output_token_count
+            for result in self.results
+            if result.output_token_count and result.output_token_count > 0
+        )
 
-        total_tokens = sum(result.output_token_count for result in self.results)
-
-        return total_tokens / self.duration
+        return output_tokens / self.duration if self.duration else 0.0
 
     @property
     def prompt_token_distribution(self) -> Distribution:
@@ -409,9 +406,39 @@ class TextGenerationBenchmark(Serializable):
         Get the distribution of prompt token counts.
 
         :return: The distribution of prompt token counts.
-        :rtype: Distribution
         """
-        return Distribution(data=[result.prompt_token_count for result in self.results])
+        return Distribution(
+            data=[
+                result.prompt_token_count
+                for result in self.results
+                if result.prompt_token_count
+            ]
+        )
+
+    @computed_field  # type: ignore[misc]
+    @property
+    def prompt_token(self) -> float:
+        """
+        Get the average number of prompt tokens.
+
+        :return: The average number of prompt tokens.
+        """
+        return self.prompt_token_distribution.mean
+
+    @computed_field  # type: ignore[misc]
+    @property
+    def prompt_token_percentiles(self) -> Dict[str, float]:
+        """
+        Get standard percentiles for number of prompt tokens.
+
+        :return: A dictionary mapping percentile to number of prompt tokens.
+        """
+        if not self.results:
+            return {}
+
+        values = self.prompt_token_distribution.percentiles(DEFAULT_PERCENTILES)
+
+        return dict(zip(map(str, DEFAULT_PERCENTILES), values))
 
     @property
     def output_token_distribution(self) -> Distribution:
@@ -419,26 +446,39 @@ class TextGenerationBenchmark(Serializable):
         Get the distribution of output token counts.
 
         :return: The distribution of output token counts.
-        :rtype: Distribution
         """
-        return Distribution(data=[result.output_token_count for result in self.results])
+        return Distribution(
+            data=[
+                result.output_token_count
+                for result in self.results
+                if result.output_token_count
+            ]
+        )
 
+    @computed_field  # type: ignore[misc]
     @property
-    def overloaded(self) -> bool:
-        if (
-            self.rate is None
-            or not self.results
-            or not self.concurrencies
-            or len(self.concurrencies) < 2  # noqa: PLR2004
-        ):
-            # if rate was not set, sync mode is assumed,
-            # or we have less than 2 data points,
-            # then we cannot be overloaded by definition
-            return False
+    def output_token(self) -> float:
+        """
+        Get the average number of output tokens.
 
-        # if the calculated rate is less than 75% of the requested rate,
-        # safe to assume the system is overloaded
-        return self.completed_request_rate < 0.75 * self.rate
+        :return: The average number of output tokens.
+        """
+        return self.output_token_distribution.mean
+
+    @computed_field  # type: ignore[misc]
+    @property
+    def output_token_percentiles(self) -> Dict[str, float]:
+        """
+        Get standard percentiles for number of output tokens.
+
+        :return: List of percentiles of number of output tokens.
+        """
+        if not self.results:
+            return {}
+
+        values = self.output_token_distribution.percentiles(DEFAULT_PERCENTILES)
+
+        return dict(zip(map(str, DEFAULT_PERCENTILES), values))
 
     def request_started(self):
         """

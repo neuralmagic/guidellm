@@ -1,169 +1,509 @@
-from typing import AsyncGenerator, Dict, List, Optional
+import base64
+import json
+import time
+from pathlib import Path
+from typing import Any, AsyncGenerator, Dict, List, Literal, Optional, Union
 
+import httpx
 from loguru import logger
-from openai import AsyncOpenAI, OpenAI
+from PIL import Image
 
-from guidellm.backend.base import Backend, GenerativeResponse
+from guidellm.backend.backend import Backend
+from guidellm.backend.response import (
+    RequestArgs,
+    ResponseSummary,
+    StreamingTextResponse,
+)
 from guidellm.config import settings
-from guidellm.core import TextGenerationRequest
 
-__all__ = ["OpenAIBackend"]
+__all__ = ["OpenAIHTTPBackend"]
 
 
-@Backend.register("openai_server")
-class OpenAIBackend(Backend):
+@Backend.register("openai_http")
+class OpenAIHTTPBackend(Backend):
     """
-    An OpenAI backend implementation for generative AI results.
+    A HTTP-based backend implementation for requests to an OpenAI compatible server.
+    For example, a vLLM server instance or requests to OpenAI's API.
 
-    This class provides an interface to communicate with the
-    OpenAI server for generating responses based on given prompts.
-
-    :param openai_api_key: The API key for OpenAI.
-        If not provided, it will default to the key from settings.
-    :type openai_api_key: Optional[str]
-    :param target: The target URL string for the OpenAI server.
-    :type target: Optional[str]
-    :param model: The OpenAI model to use, defaults to the first available model.
-    :type model: Optional[str]
-    :param request_args: Additional arguments for the OpenAI request.
-    :type request_args: Dict[str, Any]
+    :param target: The target URL string for the OpenAI server. ex: http://0.0.0.0:8000
+    :param model: The model to use for all requests on the target server.
+        If none is provided, the first available model will be used.
+    :param api_key: The API key to use for requests to the OpenAI server.
+        If provided, adds an Authorization header with the value
+        "Authorization: Bearer {api_key}".
+        If not provided, no Authorization header is added.
+    :param organization: The organization to use for requests to the OpenAI server.
+        For example, if set to "org_123", adds an OpenAI-Organization header with the
+        value "OpenAI-Organization: org_123".
+        If not provided, no OpenAI-Organization header is added.
+    :param project: The project to use for requests to the OpenAI server.
+        For example, if set to "project_123", adds an OpenAI-Project header with the
+        value "OpenAI-Project: project_123".
+        If not provided, no OpenAI-Project header is added.
+    :param timeout: The timeout to use for requests to the OpenAI server.
+        If not provided, the default timeout provided from settings is used.
+    :param http2: If True, uses HTTP/2 for requests to the OpenAI server.
+        Defaults to True.
+    :param max_output_tokens: The maximum number of tokens to request for completions.
+        If not provided, the default maximum tokens provided from settings is used.
     """
 
     def __init__(
         self,
-        openai_api_key: Optional[str] = None,
         target: Optional[str] = None,
         model: Optional[str] = None,
-        **request_args,
+        api_key: Optional[str] = None,
+        organization: Optional[str] = None,
+        project: Optional[str] = None,
+        timeout: Optional[float] = None,
+        http2: Optional[bool] = True,
+        max_output_tokens: Optional[int] = None,
     ):
-        self._request_args: Dict = request_args
-        api_key: str = openai_api_key or settings.openai.api_key
+        super().__init__(type_="openai_http")
+        self._target = target or settings.openai.base_url
+        self._model = model
 
-        if not api_key:
-            err = ValueError(
-                "`GUIDELLM__OPENAI__API_KEY` environment variable or "
-                "--openai-api-key CLI parameter must be specified for the "
-                "OpenAI backend."
-            )
-            logger.error("{}", err)
-            raise err
-
-        base_url = target or settings.openai.base_url
-
-        if not base_url:
-            err = ValueError(
-                "`GUIDELLM__OPENAI__BASE_URL` environment variable or "
-                "target parameter must be specified for the OpenAI backend."
-            )
-            logger.error("{}", err)
-            raise err
-
-        self._async_client = AsyncOpenAI(api_key=api_key, base_url=base_url)
-        self._client = OpenAI(api_key=api_key, base_url=base_url)
-        self._model = model or self.default_model
-
-        super().__init__(type_="openai_server", target=base_url, model=self._model)
-        logger.info("OpenAI {} Backend listening on {}", self._model, base_url)
-
-    async def make_request(
-        self,
-        request: TextGenerationRequest,
-    ) -> AsyncGenerator[GenerativeResponse, None]:
-        """
-        Make a request to the OpenAI backend.
-
-        This method sends a prompt to the OpenAI backend and streams
-        the response tokens back.
-
-        :param request: The text generation request to submit.
-        :type request: TextGenerationRequest
-        :yield: A stream of GenerativeResponse objects.
-        :rtype: AsyncGenerator[GenerativeResponse, None]
-        """
-
-        logger.debug("Making request to OpenAI backend with prompt: {}", request.prompt)
-
-        request_args: Dict = {
-            "n": 1,  # Number of completions for each prompt
-        }
-
-        if request.output_token_count is not None:
-            request_args.update(
-                {
-                    "max_tokens": request.output_token_count,
-                    "stop": None,
-                }
-            )
-        elif settings.openai.max_gen_tokens and settings.openai.max_gen_tokens > 0:
-            request_args.update(
-                {
-                    "max_tokens": settings.openai.max_gen_tokens,
-                }
-            )
-
-        request_args.update(self._request_args)
-
-        stream = await self._async_client.chat.completions.create(
-            model=self.model,
-            messages=[
-                {"role": "user", "content": request.prompt},
-            ],
-            stream=True,
-            **request_args,
+        api_key = api_key or settings.openai.api_key
+        self.authorization = (
+            f"Bearer {api_key}" if api_key else settings.openai.bearer_token
         )
 
-        token_count = 0
-        async for chunk in stream:
-            choice = chunk.choices[0]
-            token = choice.delta.content or ""
+        self.organization = organization or settings.openai.organization
+        self.project = project or settings.openai.project
+        self.timeout = timeout if timeout is not None else settings.request_timeout
+        self.http2 = http2 if http2 is not None else settings.request_http2
+        self.max_output_tokens = (
+            max_output_tokens
+            if max_output_tokens is not None
+            else settings.openai.max_output_tokens
+        )
 
-            if choice.finish_reason is not None:
-                yield GenerativeResponse(
-                    type_="final",
-                    prompt=request.prompt,
-                    prompt_token_count=request.prompt_token_count,
-                    output_token_count=token_count,
-                )
-                break
+    @property
+    def target(self) -> str:
+        """
+        :return: The target URL string for the OpenAI server.
+        """
+        return self._target
 
-            token_count += 1
-            yield GenerativeResponse(
-                type_="token_iter",
-                add_token=token,
-                prompt=request.prompt,
-                prompt_token_count=request.prompt_token_count,
-                output_token_count=token_count,
+    @property
+    def model(self) -> Optional[str]:
+        """
+        :return: The model to use for all requests on the target server.
+            If validate hasn't been called yet and no model was passed in,
+            this will be None until validate is called to set the default.
+        """
+        return self._model
+
+    def check_setup(self):
+        """
+        Check if the backend is setup correctly and can be used for requests.
+        Specifically, if a model is not provided, it grabs the first available model.
+        If no models are available, raises a ValueError.
+        If a model is provided and not available, raises a ValueError.
+
+        :raises ValueError: If no models or the provided model is not available.
+        """
+        models = self.available_models()
+        if not models:
+            raise ValueError(f"No models available for target: {self.target}")
+
+        if not self.model:
+            self._model = models[0]
+        elif self.model not in models:
+            raise ValueError(
+                f"Model {self.model} not found in available models:"
+                "{models} for target: {self.target}"
             )
 
     def available_models(self) -> List[str]:
         """
-        Get the available models for the backend.
-
-        This method queries the OpenAI API to retrieve a list of available models.
-
-        :return: A list of available models.
-        :rtype: List[str]
-        :raises openai.OpenAIError: If an error occurs while retrieving models.
+        Get the available models for the target server using the OpenAI models endpoint:
+        /v1/models
         """
+        target = f"{self.target}/v1/models"
+        headers = self._headers()
+
+        with httpx.Client(http2=self.http2, timeout=self.timeout) as client:
+            response = client.get(target, headers=headers)
+            response.raise_for_status()
+
+            models = []
+
+            for item in response.json()["data"]:
+                models.append(item["id"])
+
+            return models
+
+    async def text_completions(  # type: ignore[override]
+        self,
+        prompt: Union[str, List[str]],
+        request_id: Optional[str] = None,
+        prompt_token_count: Optional[int] = None,
+        output_token_count: Optional[int] = None,
+        **kwargs,
+    ) -> AsyncGenerator[Union[StreamingTextResponse, ResponseSummary], None]:
+        """
+        Generate text completions for the given prompt using the OpenAI
+        completions endpoint: /v1/completions.
+
+        :param prompt: The prompt (or list of prompts) to generate a completion for.
+            If a list is supplied, these are concatenated and run through the model
+            for a single prompt.
+        :param request_id: The unique identifier for the request, if any.
+            Added to logging statements and the response for tracking purposes.
+        :param prompt_token_count: The number of tokens measured in the prompt, if any.
+            Returned in the response stats for later analysis, if applicable.
+        :param output_token_count: If supplied, the number of tokens to enforce
+            generation of for the output for this request.
+        :param kwargs: Additional keyword arguments to pass with the request.
+        :return: An async generator that yields a StreamingTextResponse for start,
+            a StreamingTextResponse for each received iteration,
+            and a ResponseSummary for the final response.
+        """
+
+        logger.debug("{} invocation with args: {}", self.__class__.__name__, locals())
+        headers = self._headers()
+        payload = self._completions_payload(
+            orig_kwargs=kwargs,
+            max_output_tokens=output_token_count,
+            prompt=prompt,
+        )
 
         try:
-            return [model.id for model in self._client.models.list().data]
-        except Exception as error:
-            logger.error("Failed to retrieve available models: {}", error)
-            raise error
+            async for resp in self._iterative_completions_request(
+                type_="text",
+                request_id=request_id,
+                request_prompt_tokens=prompt_token_count,
+                request_output_tokens=output_token_count,
+                headers=headers,
+                payload=payload,
+            ):
+                yield resp
+        except Exception as ex:
+            logger.error(
+                "{} request with headers: {} and payload: {} failed: {}",
+                self.__class__.__name__,
+                headers,
+                payload,
+                ex,
+            )
+            raise ex
 
-    def validate_connection(self):
+    async def chat_completions(  # type: ignore[override]
+        self,
+        content: Union[
+            str,
+            List[Union[str, Dict[str, Union[str, Dict[str, str]]], Path, Image.Image]],
+            Any,
+        ],
+        request_id: Optional[str] = None,
+        prompt_token_count: Optional[int] = None,
+        output_token_count: Optional[int] = None,
+        raw_content: bool = False,
+        **kwargs,
+    ) -> AsyncGenerator[Union[StreamingTextResponse, ResponseSummary], None]:
         """
-        Validate the connection to the OpenAI backend.
+        Generate chat completions for the given content using the OpenAI
+        chat completions endpoint: /v1/chat/completions.
 
-        This method checks that the OpenAI backend is reachable and
-        the API key is valid.
-
-        :raises openai.OpenAIError: If the connection is invalid.
+        :param content: The content (or list of content) to generate a completion for.
+            This supports any combination of text, images, and audio (model dependent).
+            Supported text only request examples:
+                content="Sample prompt", content=["Sample prompt", "Second prompt"],
+                content=[{"type": "text", "value": "Sample prompt"}.
+            Supported text and image request examples:
+                content=["Describe the image", PIL.Image.open("image.jpg")],
+                content=["Describe the image", Path("image.jpg")],
+                content=["Describe the image", {"type": "image_url",
+                    "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}].
+            Supported text and audio request examples:
+                content=["Transcribe the audio", Path("audio.wav")],
+                content=["Transcribe the audio", {"type": "input_audio",
+                "input_audio": {"data": f"{base64_bytes}", "format": "wav}].
+            Additionally, if raw_content=True then the content is passed directly to the
+            backend without any processing.
+        :param request_id: The unique identifier for the request, if any.
+            Added to logging statements and the response for tracking purposes.
+        :param prompt_token_count: The number of tokens measured in the prompt, if any.
+            Returned in the response stats for later analysis, if applicable.
+        :param output_token_count: If supplied, the number of tokens to enforce
+            generation of for the output for this request.
+        :param kwargs: Additional keyword arguments to pass with the request.
+        :return: An async generator that yields a StreamingTextResponse for start,
+            a StreamingTextResponse for each received iteration,
+            and a ResponseSummary for the final response.
         """
+        logger.debug("{} invocation with args: {}", self.__class__.__name__, locals())
+        headers = self._headers()
+        messages = (
+            content if raw_content else self._create_chat_messages(content=content)
+        )
+        payload = self._completions_payload(
+            orig_kwargs=kwargs,
+            max_output_tokens=output_token_count,
+            messages=messages,
+        )
 
         try:
-            self._client.models.list()
-        except Exception as error:
-            logger.error("Failed to validate OpenAI connection: {}", error)
-            raise error
+            async for resp in self._iterative_completions_request(
+                type_="chat",
+                request_id=request_id,
+                request_prompt_tokens=prompt_token_count,
+                request_output_tokens=output_token_count,
+                headers=headers,
+                payload=payload,
+            ):
+                yield resp
+        except Exception as ex:
+            logger.error(
+                "{} request with headers: {} and payload: {} failed: {}",
+                self.__class__.__name__,
+                headers,
+                payload,
+                ex,
+            )
+            raise ex
+
+    def _headers(self) -> Dict[str, str]:
+        headers = {
+            "Content-Type": "application/json",
+        }
+
+        if self.authorization:
+            headers["Authorization"] = self.authorization
+
+        if self.organization:
+            headers["OpenAI-Organization"] = self.organization
+
+        if self.project:
+            headers["OpenAI-Project"] = self.project
+
+        return headers
+
+    def _completions_payload(
+        self, orig_kwargs: Optional[Dict], max_output_tokens: Optional[int], **kwargs
+    ) -> Dict:
+        payload = orig_kwargs or {}
+        payload.update(kwargs)
+        payload["model"] = self.model
+        payload["stream"] = True
+        payload["stream_options"] = {
+            "include_usage": True,
+        }
+
+        if max_output_tokens or self.max_output_tokens:
+            logger.debug(
+                "{} adding payload args for setting output_token_count: {}",
+                self.__class__.__name__,
+                max_output_tokens or self.max_output_tokens,
+            )
+            payload["max_tokens"] = max_output_tokens or self.max_output_tokens
+            payload["max_completion_tokens"] = payload["max_tokens"]
+
+            if max_output_tokens:
+                # only set stop and ignore_eos if max_output_tokens set at request level
+                # otherwise the instance value is just the max to enforce we stay below
+                payload["stop"] = None
+                payload["ignore_eos"] = True
+
+        return payload
+
+    @staticmethod
+    def _create_chat_messages(
+        content: Union[
+            str,
+            List[Union[str, Dict[str, Union[str, Dict[str, str]]], Path, Image.Image]],
+            Any,
+        ],
+    ) -> List[Dict]:
+        if isinstance(content, str):
+            return [
+                {
+                    "role": "user",
+                    "content": content,
+                }
+            ]
+
+        if isinstance(content, list):
+            resolved_content = []
+
+            for item in content:
+                if isinstance(item, Dict):
+                    resolved_content.append(item)
+                elif isinstance(item, str):
+                    resolved_content.append({"type": "text", "text": item})
+                elif isinstance(item, Image.Image) or (
+                    isinstance(item, Path) and item.suffix.lower() in [".jpg", ".jpeg"]
+                ):
+                    image = item if isinstance(item, Image.Image) else Image.open(item)
+                    encoded = base64.b64encode(image.tobytes()).decode("utf-8")
+                    resolved_content.append(
+                        {
+                            "type": "image",
+                            "image": {
+                                "url": f"data:image/jpeg;base64,{encoded}",
+                            },
+                        }
+                    )
+                elif isinstance(item, Path) and item.suffix.lower() in [".wav"]:
+                    encoded = base64.b64encode(item.read_bytes()).decode("utf-8")
+                    resolved_content.append(
+                        {
+                            "type": "input_audio",
+                            "input_audio": {
+                                "data": f"{encoded}",
+                                "format": "wav",
+                            },
+                        }
+                    )
+                else:
+                    raise ValueError(
+                        f"Unsupported content item type: {item} in list: {content}"
+                    )
+
+            return [
+                {
+                    "role": "user",
+                    "content": resolved_content,
+                }
+            ]
+
+        raise ValueError(f"Unsupported content type: {content}")
+
+    async def _iterative_completions_request(
+        self,
+        type_: Literal["text", "chat"],
+        request_id: Optional[str],
+        request_prompt_tokens: Optional[int],
+        request_output_tokens: Optional[int],
+        headers: Dict,
+        payload: Dict,
+    ) -> AsyncGenerator[Union[StreamingTextResponse, ResponseSummary], None]:
+        target = f"{self.target}/v1/"
+
+        if type_ == "text":
+            target += "completions"
+        elif type_ == "chat":
+            target += "chat/completions"
+        else:
+            raise ValueError(f"Unsupported type: {type_}")
+
+        logger.info(
+            "{} making request: {} to target: {} using http2: {} for "
+            "timeout: {} with headers: {} and payload: {}",
+            self.__class__.__name__,
+            request_id,
+            target,
+            self.http2,
+            self.timeout,
+            headers,
+            payload,
+        )
+
+        async with httpx.AsyncClient(http2=self.http2, timeout=self.timeout) as client:
+            response_value = ""
+            response_prompt_count: Optional[int] = None
+            response_output_count: Optional[int] = None
+            iter_count = 0
+            start_time = time.time()
+            iter_time = start_time
+
+            yield StreamingTextResponse(
+                type_="start",
+                iter_count=iter_count,
+                delta="",
+                time=start_time,
+                request_id=request_id,
+            )
+
+            async with client.stream(
+                "POST", target, headers=headers, json=payload
+            ) as stream:
+                stream.raise_for_status()
+
+                async for line in stream.aiter_lines():
+                    iter_time = time.time()
+                    logger.debug(
+                        "{} request: {} recieved iter response line: {}",
+                        self.__class__.__name__,
+                        request_id,
+                        line,
+                    )
+
+                    if not line or not line.strip().startswith("data:"):
+                        continue
+
+                    if line.strip() == "data: [DONE]":
+                        break
+
+                    data = json.loads(line.strip()[len("data: ") :])
+                    if delta := self._extract_completions_delta_content(type_, data):
+                        iter_count += 1
+                        response_value += delta
+
+                        yield StreamingTextResponse(
+                            type_="iter",
+                            iter_count=iter_count,
+                            delta=delta,
+                            time=iter_time,
+                            request_id=request_id,
+                        )
+
+                    if usage := self._extract_completions_usage(data):
+                        response_prompt_count = usage["prompt"]
+                        response_output_count = usage["output"]
+
+        logger.info(
+            "{} request: {} with headers: {} and payload: {} completed with: {}",
+            self.__class__.__name__,
+            request_id,
+            headers,
+            payload,
+            response_value,
+        )
+
+        yield ResponseSummary(
+            value=response_value,
+            request_args=RequestArgs(
+                target=target,
+                headers=headers,
+                payload=payload,
+                timeout=self.timeout,
+                http2=self.http2,
+            ),
+            start_time=start_time,
+            end_time=iter_time,
+            iterations=iter_count,
+            request_prompt_tokens=request_prompt_tokens,
+            request_output_tokens=request_output_tokens,
+            response_prompt_tokens=response_prompt_count,
+            response_output_tokens=response_output_count,
+            request_id=request_id,
+        )
+
+    @staticmethod
+    def _extract_completions_delta_content(
+        type_: Literal["text", "chat"], data: Dict
+    ) -> Optional[str]:
+        if "choices" not in data or not data["choices"]:
+            return None
+
+        if type_ == "text":
+            return data["choices"][0]["text"]
+
+        if type_ == "chat":
+            return data["choices"][0]["delta"]["content"]
+
+        raise ValueError(f"Unsupported type: {type_}")
+
+    @staticmethod
+    def _extract_completions_usage(
+        data: Dict,
+    ) -> Optional[Dict[Literal["prompt", "output"], int]]:
+        if "usage" not in data or not data["usage"]:
+            return None
+
+        return {
+            "prompt": data["usage"]["prompt_tokens"],
+            "output": data["usage"]["completion_tokens"],
+        }

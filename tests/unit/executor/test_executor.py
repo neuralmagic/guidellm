@@ -21,7 +21,7 @@ from guidellm.scheduler import Scheduler, SchedulerResult
 
 @pytest.fixture()
 def mock_scheduler():
-    with patch("guidellm.executor.base.Scheduler") as mock_scheduler:
+    with patch("guidellm.executor.executor.Scheduler") as mock_scheduler:
 
         def scheduler_constructor(*args, **kwargs):
             mock_instance = create_autospec(Scheduler, instance=True)
