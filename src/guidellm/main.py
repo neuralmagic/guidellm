@@ -1,5 +1,5 @@
 import asyncio
-from typing import Any, Literal, Mapping, Optional, Union, get_args
+from typing import Any, IO, Literal, Mapping, Optional, Union, get_args
 
 import click
 from loguru import logger
@@ -18,6 +18,8 @@ from guidellm.utils import BenchmarkReportProgress, cli_params
 
 __all__ = ["generate_benchmark_report"]
 
+# FIXME: Remove
+SCENARIOS = Literal["rag", "short"]
 
 @click.command()
 @click.option(
@@ -27,6 +29,14 @@ __all__ = ["generate_benchmark_report"]
     help=(
         "The target path or url for the backend to evaluate. "
         "Ex: 'http://localhost:8000'"
+    ),
+)
+@click.option(
+    "--scenario",
+    type=cli_params.Union(click.File(mode='r'), click.Choice(get_args(SCENARIOS))),
+    default=None,
+    help=(
+        "TODO: A scenario or path to config"
     ),
 )
 @click.option(
@@ -154,6 +164,7 @@ __all__ = ["generate_benchmark_report"]
 )
 def generate_benchmark_report_cli(
     target: str,
+    scenario: Optional[Union[IO[Any], SCENARIOS]],
     backend: BackendType,
     model: Optional[str],
     data: Optional[str],
@@ -171,6 +182,7 @@ def generate_benchmark_report_cli(
     """
     generate_benchmark_report(
         target=target,
+        scenario=scenario,
         backend=backend,
         model=model,
         data=data,
@@ -189,6 +201,7 @@ def generate_benchmark_report(
     target: str,
     data: Optional[str],
     data_type: Literal["emulated", "file", "transformers"],
+    scenario: Optional[Union[IO[Any], SCENARIOS]],
     backend: BackendType = "openai_http",
     backend_kwargs: Optional[Mapping[str, Any]] = None,
     model: Optional[str] = None,
