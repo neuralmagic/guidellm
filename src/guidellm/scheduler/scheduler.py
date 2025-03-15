@@ -492,7 +492,9 @@ class Scheduler:
         async def _process_runner():
             while True:
                 try:
-                    process_request: Optional[_WorkerProcessRequest] = requests_queue.get_nowait()
+                    process_request: Optional[_WorkerProcessRequest] = (
+                        requests_queue.get_nowait()
+                    )
                 except multiprocessing.queues.Empty:
                     # yield control to the event loop
                     await asyncio.sleep(settings.default_async_loop_sleep)
@@ -515,7 +517,7 @@ class Scheduler:
 
         try:
             asyncio.run(_process_runner())
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             logger.error(
                 f"Error in worker process {process_id}: {exc}",
                 exc_info=True,
@@ -534,7 +536,9 @@ class Scheduler:
 
             while True:
                 try:
-                    process_request: Optional[_WorkerProcessRequest] = requests_queue.get_nowait()
+                    process_request: Optional[_WorkerProcessRequest] = (
+                        requests_queue.get_nowait()
+                    )
                 except multiprocessing.queues.Empty:
                     # yield control to event loop
                     await asyncio.sleep(settings.default_async_loop_sleep)
@@ -568,7 +572,7 @@ class Scheduler:
 
         try:
             asyncio.run(_process_runner())
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             logger.error(
                 f"Error in worker process {process_id}: {exc}",
                 exc_info=True,
