@@ -112,7 +112,6 @@ class BackendRequestsWorker(RequestsWorker):
     async def resolve(
         self,
         request: GenerationRequest,
-        start_time: float,
         timeout_time: float,
     ) -> ResponseSummary:
         """
@@ -121,7 +120,6 @@ class BackendRequestsWorker(RequestsWorker):
         and handles any errors that may occur during the process.
 
         :param request: The request to resolve.
-        :param start_time: The time to start the request.
         :param timeout_time: The time to wait for a response before timing out.
             If timeout_time is math.inf, the request will not timeout.
         :return: A ResponseSummary object containing the response from the backend.
@@ -140,10 +138,6 @@ class BackendRequestsWorker(RequestsWorker):
                     nonlocal response
                     response = resp
 
-            if (wait_time := start_time - time.time()) > 0:
-                await asyncio.sleep(wait_time)
-
-            start_time = time.time()
             await asyncio.wait_for(
                 _runner(),
                 timeout=timeout_time - time.time() if timeout_time < math.inf else None,
@@ -164,7 +158,7 @@ class BackendRequestsWorker(RequestsWorker):
         except Exception as exc:  # noqa: BLE001
             error = str(exc)
 
-        return self._handle_response(request, response, error, start_time)
+        return self._handle_response(request, response, error)
 
     def _create_request_func_kwargs(
         self,
@@ -208,7 +202,6 @@ class BackendRequestsWorker(RequestsWorker):
         request: GenerationRequest,
         response: Any,
         error: Optional[str],
-        start_time: float,
     ) -> ResponseSummary:
         if response is None or not isinstance(
             response, (ResponseSummary, StreamingTextResponse)
@@ -228,8 +221,8 @@ class BackendRequestsWorker(RequestsWorker):
                     headers={},
                     payload={},
                 ),
-                start_time=start_time,
-                end_time=time.time(),
+                start_time=None,
+                end_time=None,
                 request_id=request.request_id,
                 error=error or "Unknown error",
             )
@@ -243,7 +236,7 @@ class BackendRequestsWorker(RequestsWorker):
                     payload={},
                 ),
                 start_time=response.start_time,
-                end_time=time.time(),
+                end_time=None,
                 request_prompt_tokens=request.stats.get("prompt_tokens", None),
                 request_output_tokens=None,
                 response_prompt_tokens=None,

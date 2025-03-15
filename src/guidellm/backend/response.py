@@ -79,8 +79,8 @@ class ResponseSummary(BaseModel):
     value: str
     request_args: RequestArgs
     iterations: int = 0
-    start_time: float
-    end_time: float
+    start_time: Optional[float]
+    end_time: Optional[float]
     request_prompt_tokens: Optional[int] = None
     request_output_tokens: Optional[int] = None
     response_prompt_tokens: Optional[int] = None

@@ -25,9 +25,9 @@ def test_scheduler(strategy_type: StrategyType, output_tokens: int = 256):
         num_requests = 1000
         strategy = "throughput"
     elif strategy_type == "constant":
-        num_requests = 100
+        num_requests = 1000
         strategy = AsyncConstantStrategy(
-            rate=5.5,
+            rate=0.1,
         )
     elif strategy_type == "poisson":
         num_requests = 100
@@ -60,11 +60,11 @@ def test_scheduler(strategy_type: StrategyType, output_tokens: int = 256):
     async def _run_scheduler():
         async for result in scheduler.run():
             print(
-                f"<processes>: {result.run_info.processes} <queued>: {result.run_info.queued_requests} <pending>: {result.run_info.pending_requests} <completed>: {result.run_info.completed_requests}"
+                f"<processes>: {result.run_info.processes} <queued>: {result.run_info.queued_requests} <scheduled>: {result.run_info.scheduled_requests} <processing> {result.run_info.processing_requests} <completed>: {result.run_info.completed_requests}"
             )
 
     asyncio.run(_run_scheduler())
 
 
 if __name__ == "__main__":
-    test_scheduler("poisson")
+    test_scheduler("throughput")

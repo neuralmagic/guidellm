@@ -143,8 +143,9 @@ class Settings(BaseSettings):
     request_http2: bool = True
     max_concurrency: int = 512
     max_worker_processes: int = 10
-    num_sweep_profiles: int = 9
+    default_async_loop_sleep: float = 0.0001
     logging: LoggingSettings = LoggingSettings()
+    num_sweep_profiles: int = 9
 
     # Data settings
     dataset: DatasetSettings = DatasetSettings()
