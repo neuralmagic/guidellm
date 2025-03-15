@@ -8,7 +8,6 @@ from pydantic import Field
 from guidellm.config import settings
 from guidellm.core import TextGenerationBenchmark, TextGenerationBenchmarkReport
 from guidellm.core.serializable import Serializable
-from guidellm.scheduler import LoadGenerationMode
 
 __all__ = [
     "Profile",
@@ -33,7 +32,7 @@ class Profile(Serializable):
     :type args: Optional[Dict[str, Any]]
     """
 
-    load_gen_mode: LoadGenerationMode
+    load_gen_mode: Any
     load_gen_rate: Optional[float] = None
     args: Dict[str, Any] = Field(default_factory=dict)
 
@@ -229,7 +228,7 @@ class ProfileGenerator:
         :return: The generated profile or None if index is out of range.
         :rtype: Optional[Profile]
         """
-        modes_map: Dict[str, LoadGenerationMode] = {
+        modes_map: Dict[str, Any] = {
             "constant": "constant",
             "poisson": "poisson",
         }

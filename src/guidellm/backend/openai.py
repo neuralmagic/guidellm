@@ -410,6 +410,8 @@ class OpenAIHTTPBackend(Backend):
 
             yield StreamingTextResponse(
                 type_="start",
+                value="",
+                start_time=start_time,
                 iter_count=iter_count,
                 delta="",
                 time=start_time,
@@ -443,6 +445,8 @@ class OpenAIHTTPBackend(Backend):
 
                         yield StreamingTextResponse(
                             type_="iter",
+                            value=response_value,
+                            start_time=start_time,
                             iter_count=iter_count,
                             delta=delta,
                             time=iter_time,
