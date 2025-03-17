@@ -65,7 +65,7 @@ class Benchmarker(Generic[AGG, BENCH, REQ, RES], ABC):
         cooldown_duration_per_strategy: Optional[float],
     ) -> AsyncGenerator[BenchmarkerResult[AGG, BENCH, REQ, RES], None]:
         start_time = time.time()
-        end_number = len(profile)
+        end_number = len(profile.strategy_types)
         current_index = -1
 
         yield BenchmarkerResult(

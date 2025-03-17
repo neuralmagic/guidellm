@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import List, Literal, Optional, Sequence, Union
 
 import numpy as np
-from pydantic import Field
+from pydantic import Field, computed_field
 
 from guidellm.objects import Serializable
 from guidellm.scheduler import (
@@ -53,6 +53,8 @@ class Profile(ABC, Serializable):
         self.measured_concurrencies.append(average_concurrency)
         self.completed_strategies += 1
 
+    @computed_field
+    @property
     @abstractmethod
     def strategy_types(self) -> List[StrategyType]: ...
 
@@ -63,6 +65,7 @@ class Profile(ABC, Serializable):
 class SynchronousProfile(Profile):
     type_: Literal["synchronous"] = "synchronous"
 
+    @property
     def strategy_types(self) -> List[StrategyType]:
         return [self.type_]
 
@@ -100,6 +103,7 @@ class ConcurrentProfile(Profile):
         description="The number of concurrent streams to use.",
     )
 
+    @property
     def strategy_types(self) -> List[StrategyType]:
         num_strategies = len(self.streams) if isinstance(self.streams, Sequence) else 1
 
@@ -150,6 +154,7 @@ class ThroughputProfile(Profile):
         description="The maximum number of concurrent requests that can be scheduled.",
     )
 
+    @property
     def strategy_types(self) -> List[StrategyType]:
         return [self.type_]
 
@@ -194,6 +199,7 @@ class AsyncProfile(ThroughputProfile):
         ),
     )
 
+    @property
     def strategy_types(self) -> List[StrategyType]:
         num_strategies = len(self.rate) if isinstance(self.rate, Sequence) else 1
 
@@ -259,13 +265,12 @@ class SweepProfile(AsyncProfile):
         description="The number of strategies to generate for the sweep.",
     )
     rate: float = -1
-    strategy_type: Literal["constant", "poisson"] = "constant"
+    rate_type: Literal["constant", "poisson"] = "constant"
 
+    @property
     def strategy_types(self) -> List[StrategyType]:
         return (
-            ["synchronous"]
-            + [self.strategy_type] * (self.sweep_size - 2)
-            + ["throughput"]
+            ["synchronous"] + [self.rate_type] * (self.sweep_size - 2) + ["throughput"]
         )
 
     def next_strategy(self) -> Optional[SchedulingStrategy]:
@@ -284,20 +289,20 @@ class SweepProfile(AsyncProfile):
         max_rate = self.measured_rates[1]
         rates = np.linspace(min_rate, max_rate, self.sweep_size)[1:-1]
 
-        if self.strategy_type == "constant":
+        if self.rate_type == "constant":
             return AsyncConstantStrategy(
                 rate=rates[self.completed_strategies - 2],
                 initial_burst=self.initial_burst,
                 max_concurrency=self.max_concurrency,
             )
-        elif self.strategy_type == "poisson":
+        elif self.rate_type == "poisson":
             return AsyncPoissonStrategy(
                 rate=rates[self.completed_strategies - 2],
                 initial_burst=self.initial_burst,
                 max_concurrency=self.max_concurrency,
             )
         else:
-            raise ValueError(f"Invalid strategy type: {self.strategy_type}")
+            raise ValueError(f"Invalid strategy type: {self.rate_type}")
 
     @staticmethod
     def from_standard_args(
@@ -308,19 +313,20 @@ class SweepProfile(AsyncProfile):
         if rate_type != "sweep":
             raise ValueError("Rate type must be 'sweep' for sweep profile.")
 
-        if rate:
-            raise ValueError("Rate does not apply to sweep profile, it must be None.")
+        if "sweep_size" in kwargs:
+            raise ValueError("Sweep size must not be provided, use rate instead.")
 
-        if "sweep_size" not in kwargs:
-            raise ValueError("Sweep size must be provided for sweep profile.")
-
-        if not isinstance(kwargs["sweep_size"], int) or kwargs["sweep_size"] <= 2:
+        if not rate:
             raise ValueError(
-                "Sweep size must be a positive integer > 2, "
-                f"received {kwargs['sweep_size']}"
+                "Rate (sweep_size) must be provided for concurrent profile."
             )
 
-        return SweepProfile(**kwargs)
+        if not isinstance(rate, float) or not rate.is_integer() or rate <= 1:
+            raise ValueError(
+                f"Rate (sweep_size) must be a positive integer > 1, received {rate}"
+            )
+
+        return SweepProfile(sweep_size=rate, **kwargs)
 
 
 def create_profile(
