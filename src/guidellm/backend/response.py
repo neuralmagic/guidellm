@@ -67,11 +67,19 @@ class ResponseSummary(BaseModel):
 
     :param value: The final value returned from the request.
     :param request_args: The arguments used to make the request.
+    :param iterations: The number of iterations in the request.
     :param start_time: The time the request started.
     :param end_time: The time the request ended.
-    :param iterations: The number of iterations in the request.
-    :param prompt_tokens: The number of tokens in the prompt, if any usage was returned.
-    :param output_tokens: The number of tokens in the output, if any usage was returned.
+    :param first_iter_time: The time the first iteration was received.
+    :param last_iter_time: The time the last iteration was received.
+    :param request_prompt_tokens: The number of tokens measured in the prompt
+        for the request, if any.
+    :param request_output_tokens: The number of tokens enforced for the output
+        for the request, if any.
+    :param response_prompt_tokens: The number of tokens measured in the prompt
+        for the response, if any.
+    :param response_output_tokens: The number of tokens measured in the output
+        for the response, if any.
     :param request_id: The unique identifier for the request, if any.
     :param error: The error message, if any, returned from making the request.
     """
@@ -81,6 +89,8 @@ class ResponseSummary(BaseModel):
     iterations: int = 0
     start_time: Optional[float]
     end_time: Optional[float]
+    first_iter_time: Optional[float]
+    last_iter_time: Optional[float]
     request_prompt_tokens: Optional[int] = None
     request_output_tokens: Optional[int] = None
     response_prompt_tokens: Optional[int] = None

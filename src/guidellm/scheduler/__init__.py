@@ -1,11 +1,5 @@
-from .backend_worker import BackendRequestsWorker, GenerationRequest
-from .scheduler import (
-    RequestsWorker,
-    Scheduler,
-    SchedulerRequestInfo,
-    SchedulerResult,
-    SchedulerRunInfo,
-)
+from .result import SchedulerRequestInfo, SchedulerResult, SchedulerRunInfo
+from .scheduler import Scheduler
 from .strategy import (
     AsyncConstantStrategy,
     AsyncPoissonStrategy,
@@ -15,20 +9,30 @@ from .strategy import (
     SynchronousStrategy,
     ThroughputStrategy,
 )
+from .types import REQ, RES
+from .worker import (
+    GenerativeRequestsWorker,
+    RequestsWorker,
+    WorkerProcessRequest,
+    WorkerProcessResult,
+)
 
 __all__ = [
-    "GenerationRequest",
-    "BackendRequestsWorker",
-    "Scheduler",
+    "SchedulerRequestInfo",
     "SchedulerResult",
     "SchedulerRunInfo",
-    "SchedulerRequestInfo",
-    "RequestsWorker",
-    "StrategyType",
-    "SchedulingStrategy",
-    "SynchronousStrategy",
-    "ThroughputStrategy",
-    "ConcurrentStrategy",
+    "Scheduler",
     "AsyncConstantStrategy",
     "AsyncPoissonStrategy",
+    "ConcurrentStrategy",
+    "SchedulingStrategy",
+    "StrategyType",
+    "SynchronousStrategy",
+    "ThroughputStrategy",
+    "REQ",
+    "RES",
+    "GenerativeRequestsWorker",
+    "RequestsWorker",
+    "WorkerProcessRequest",
+    "WorkerProcessResult",
 ]

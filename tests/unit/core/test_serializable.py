@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from guidellm.core.serializable import Serializable
+from guidellm.objects.serializable import Serializable
 
 
 class ExampleModel(Serializable):

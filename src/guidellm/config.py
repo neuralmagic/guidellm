@@ -139,13 +139,18 @@ class Settings(BaseSettings):
 
     # general settings
     env: Environment = Environment.PROD
-    request_timeout: int = 60 * 5  # 5 minutes
-    request_http2: bool = True
-    max_concurrency: int = 512
-    max_worker_processes: int = 10
-    default_async_loop_sleep: float = 0.0001
+    default_async_loop_sleep: float = 10e-5
     logging: LoggingSettings = LoggingSettings()
     num_sweep_profiles: int = 9
+
+    # HTTP settings
+    request_timeout: int = 60 * 5  # 5 minutes
+    request_http2: bool = True
+
+    # Scheduler settings
+    max_concurrency: int = 512
+    max_worker_processes: int = 10
+    max_add_requests_per_loop: int = 20
 
     # Data settings
     dataset: DatasetSettings = DatasetSettings()

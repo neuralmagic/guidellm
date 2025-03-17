@@ -1,4 +1,5 @@
 import math
+import os
 import random
 import time
 from abc import ABC, abstractmethod
@@ -8,7 +9,10 @@ from typing import (
     Optional,
 )
 
-from pydantic import BaseModel, Field
+from pydantic import Field
+
+from guidellm.config import settings
+from guidellm.objects import Serializable
 
 __all__ = [
     "StrategyType",
@@ -24,7 +28,7 @@ __all__ = [
 StrategyType = Literal["synchronous", "concurrent", "throughput", "constant", "poisson"]
 
 
-class SchedulingStrategy(ABC, BaseModel):
+class SchedulingStrategy(ABC, Serializable):
     """
     An abstract base class for scheduling strategies.
     This class defines the interface for scheduling requests and provides
@@ -39,6 +43,38 @@ class SchedulingStrategy(ABC, BaseModel):
     type_: StrategyType = Field(
         description="The type of scheduling strategy schedule requests with.",
     )
+
+    @property
+    def default_processes_limit(self) -> int:
+        """
+        The default limit on the number of worker processes for the scheduling strategy.
+
+        :return: The minimum between the number of CPU cores minus one
+            and the maximum number of worker processes allowed by settings.
+        """
+        cpu_cores = os.cpu_count() or 1
+
+        return min(max(1, cpu_cores - 1), settings.max_worker_processes)
+
+    @property
+    def default_queued_requests_limit(self) -> int:
+        """
+        The default limit on the number of queued requests for the scheduling strategy.
+
+        :return: The max concurrency value from settings, ensuring there are enough
+            requests even for the worst case scenario where the max concurrent requests
+            are pulled at once for processing.
+        """
+        return settings.max_concurrency
+
+    @property
+    def default_processing_requests_limit(self) -> int:
+        """
+        The default limit on the number of active requests for the scheduling strategy.
+
+        :return: The max concurrency value from settings.
+        """
+        return settings.max_concurrency
 
     @property
     @abstractmethod
@@ -57,16 +93,13 @@ class SchedulingStrategy(ABC, BaseModel):
 
     @property
     @abstractmethod
-    def processes_limit(self) -> Optional[int]:
+    def processes_limit(self) -> int:
         """
-        The limit on the number of worker processes for the scheduling strategy
-        or None if the strategy does not restrict the number of processes.
-        This property determines how many worker processes are created
-        for the scheduling strategy. This property should be implemented
-        by subclasses to return the appropriate number of processes.
+        The limit on the number of worker processes for the scheduling strategy.
+        It determines how many worker processes are created
+        for the scheduling strategy and must be implemented by subclasses.
 
-        :return: The number of processes for the scheduling strategy
-            or None if the strategy does not restrict the number of processes.
+        :return: The number of processes for the scheduling strategy.
         """
         ...
 
@@ -74,14 +107,11 @@ class SchedulingStrategy(ABC, BaseModel):
     @abstractmethod
     def queued_requests_limit(self) -> Optional[int]:
         """
-        The maximum number of queued requests for the scheduling strategy or None
-        if the strategy does not restrict the number of queued requests.
-        This property determines how many requests can be queued at one time
-        for the scheduling strategy. This property should be implemented
-        by subclasses to return the appropriate number of queued requests.
+        The maximum number of queued requests for the scheduling strategy.
+        It determines how many requests can be queued at one time
+        for the scheduling strategy and must be implemented by subclasses.
 
-        :return: The maximum number of queued requests for the scheduling strategy
-            or None if the strategy does not restrict the number of queued requests.
+        :return: The maximum number of queued requests for the scheduling strategy.
         """
         ...
 
@@ -89,14 +119,11 @@ class SchedulingStrategy(ABC, BaseModel):
     @abstractmethod
     def processing_requests_limit(self) -> Optional[int]:
         """
-        The maximum number of processing requests for the scheduling strategy
-        or None if the strategy does not restrict the number of processing requests.
-        This property determines how many requests can be processed at one time
-        for the scheduling strategy. This property should be implemented
-        by subclasses to return the appropriate number of processing requests.
+        The maximum number of processing requests for the scheduling strategy.
+        It determines how many requests can be processed at one time
+        for the scheduling strategy and must be implemented by subclasses.
 
-        :return: The maximum number of processing requests for the scheduling strategy
-            or None if the strategy does not restrict the number of processing requests.
+        :return: The maximum number of processing requests for the scheduling strategy.
         """
         ...
 
@@ -140,12 +167,11 @@ class SynchronousStrategy(SchedulingStrategy):
         return "sync"
 
     @property
-    def processes_limit(self) -> Optional[int]:
+    def processes_limit(self) -> int:
         """
-        The limit on the number of worker processes for the scheduling strategy
-        or None if the strategy does not restrict the number of processes.
-        This property determines how many worker processes are created
-        for the scheduling strategy.
+        The limit on the number of worker processes for the scheduling strategy.
+        It determines how many worker processes are created
+        for the scheduling strategy and must be implemented by subclasses.
 
         :return: 1 for the synchronous scheduling strategy to limit
             the worker processes to one.
@@ -153,12 +179,11 @@ class SynchronousStrategy(SchedulingStrategy):
         return 1
 
     @property
-    def queued_requests_limit(self) -> Optional[int]:
+    def queued_requests_limit(self) -> int:
         """
-        The maximum number of queued requests for the scheduling strategy or None
-        if the strategy does not restrict the number of queued requests.
-        This property determines how many requests can be queued at one time
-        for the scheduling strategy.
+        The maximum number of queued requests for the scheduling strategy.
+        It determines how many requests can be queued at one time
+        for the scheduling strategy and must be implemented by subclasses.
 
         :return: 1 for the synchronous scheduling strategy to limit
             the queued requests to one that is ready to be processed.
@@ -166,12 +191,11 @@ class SynchronousStrategy(SchedulingStrategy):
         return 1
 
     @property
-    def processing_requests_limit(self) -> Optional[int]:
+    def processing_requests_limit(self) -> int:
         """
-        The maximum number of processing requests for the scheduling strategy
-        or None if the strategy does not restrict the number of processing requests.
-        This property determines how many requests can be processed at one time
-        for the scheduling strategy.
+        The maximum number of processing requests for the scheduling strategy.
+        It determines how many requests can be processed at one time
+        for the scheduling strategy and must be implemented by subclasses.
 
         :return: 1 for the synchronous scheduling strategy to limit
             the processing requests to one that is ready to be processed.
@@ -227,12 +251,11 @@ class ConcurrentStrategy(SchedulingStrategy):
         return "sync"
 
     @property
-    def processes_limit(self) -> Optional[int]:
+    def processes_limit(self) -> int:
         """
-        The limit on the number of worker processes for the scheduling strategy
-        or None if the strategy does not restrict the number of processes.
-        This property determines how many worker processes are created
-        for the scheduling strategy.
+        The limit on the number of worker processes for the scheduling strategy.
+        It determines how many worker processes are created
+        for the scheduling strategy and must be implemented by subclasses.
 
         :return: {self.streams} for the concurrent scheduling strategy to limit
             the worker processes to the number of streams.
@@ -240,12 +263,11 @@ class ConcurrentStrategy(SchedulingStrategy):
         return self.streams
 
     @property
-    def queued_requests_limit(self) -> Optional[int]:
+    def queued_requests_limit(self) -> int:
         """
-        The maximum number of queued requests for the scheduling strategy or None
-        if the strategy does not restrict the number of queued requests.
-        This property determines how many requests can be queued at one time
-        for the scheduling strategy.
+        The maximum number of queued requests for the scheduling strategy.
+        It determines how many requests can be queued at one time
+        for the scheduling strategy and must be implemented by subclasses.
 
         :return: {self.streams} for the concurrent scheduling strategy to limit
             the queued requests to the number of streams that are ready to be processed.
@@ -253,12 +275,11 @@ class ConcurrentStrategy(SchedulingStrategy):
         return self.streams
 
     @property
-    def processing_requests_limit(self) -> Optional[int]:
+    def processing_requests_limit(self) -> int:
         """
-        The maximum number of processing requests for the scheduling strategy
-        or None if the strategy does not restrict the number of processing requests.
-        This property determines how many requests can be processed at one time
-        for the scheduling strategy.
+        The maximum number of processing requests for the scheduling strategy.
+        It determines how many requests can be processed at one time
+        for the scheduling strategy and must be implemented by subclasses.
 
         :return: {self.streams} for the concurrent scheduling strategy to limit
             the processing requests to the number of streams that ready to be processed.
@@ -313,44 +334,43 @@ class ThroughputStrategy(SchedulingStrategy):
         return "async"
 
     @property
-    def processes_limit(self) -> Optional[int]:
+    def processes_limit(self) -> int:
         """
-        The limit on the number of worker processes for the scheduling strategy
-        or None if the strategy does not restrict the number of processes.
-        This property determines how many worker processes are created
-        for the scheduling strategy.
+        The limit on the number of worker processes for the scheduling strategy.
+        It determines how many worker processes are created
+        for the scheduling strategy and must be implemented by subclasses.
 
-        :return: None for the throughput scheduling strategy to apply
-            no limit on the number of processes.
+        :return: The default processes limit since none is enforced for
+            asynchronous strategies.
         """
-        return None
-
-    @property
-    def queued_requests_limit(self) -> Optional[int]:
-        """
-        The maximum number of queued requests for the scheduling strategy or None
-        if the strategy does not restrict the number of queued requests.
-        This property determines how many requests can be queued at one time
-        for the scheduling strategy.
-
-        :return: None for the throughput scheduling strategy to apply
-            no limit on the number of queued requests.
-        """
-        return None
+        return self.default_processes_limit
 
     @property
-    def processing_requests_limit(self) -> Optional[int]:
+    def queued_requests_limit(self) -> int:
         """
-        The maximum number of processing requests for the scheduling strategy
-        or None if the strategy does not restrict the number of processing requests.
-        This property determines how many requests can be processed at one time
-        for the scheduling strategy.
+        The maximum number of queued requests for the scheduling strategy.
+        It determines how many requests can be queued at one time
+        for the scheduling strategy and must be implemented by subclasses.
+
+        :return: The processing requests limit to ensure that there are enough
+            requests even for the worst case scenario where the max concurrent
+            requests are pulled at once for processing.
+        """
+        return self.processing_requests_limit
+
+    @property
+    def processing_requests_limit(self) -> int:
+        """
+        The maximum number of processing requests for the scheduling strategy.
+        It determines how many requests can be processed at one time
+        for the scheduling strategy and must be implemented by subclasses.
 
         :return: {self.max_concurrency} for the throughput scheduling strategy to limit
             the processing requests to the maximum concurrency.
-            If max_concurrency is None, this will be set to None.
+            If max_concurrency is None, then the default processing requests limit
+            will be used.
         """
-        return self.max_concurrency
+        return self.max_concurrency or self.default_processing_requests_limit
 
     def request_times(self) -> Generator[float, None, None]:
         """
@@ -366,7 +386,7 @@ class ThroughputStrategy(SchedulingStrategy):
             yield start_time
 
 
-class AsyncConstantStrategy(SchedulingStrategy):
+class AsyncConstantStrategy(ThroughputStrategy):
     """
     A class representing an asynchronous constant scheduling strategy.
     This strategy schedules requests asynchronously at a constant request rate
@@ -403,57 +423,6 @@ class AsyncConstantStrategy(SchedulingStrategy):
         ),
     )
 
-    @property
-    def processing_mode(self) -> Literal["async"]:
-        """
-        The processing mode for the scheduling strategy, either 'sync' or 'async'.
-        This property determines how the worker processes are setup:
-        either to run synchronously with one request at a time or asynchronously.
-
-        :return: 'async' for asynchronous scheduling strategy
-            for the multiple worker processes handling requests.
-        """
-        return "async"
-
-    @property
-    def processes_limit(self) -> Optional[int]:
-        """
-        The limit on the number of worker processes for the scheduling strategy
-        or None if the strategy does not restrict the number of processes.
-        This property determines how many worker processes are created
-        for the scheduling strategy.
-
-        :return: None for the async constant scheduling strategy to apply
-            no limit on the number of processes.
-        """
-        return None
-
-    @property
-    def queued_requests_limit(self) -> Optional[int]:
-        """
-        The maximum number of queued requests for the scheduling strategy or None
-        if the strategy does not restrict the number of queued requests.
-        This property determines how many requests can be queued at one time
-        for the scheduling strategy.
-
-        :return: None for the async constant scheduling strategy to apply
-            no limit on the number of queued requests.
-        """
-        return None
-
-    @property
-    def processing_requests_limit(self) -> Optional[int]:
-        """
-        The maximum number of processing requests for the scheduling strategy
-        or None if the strategy does not restrict the number of processing requests.
-        This property determines how many requests can be processed at one time
-        for the scheduling strategy.
-
-        :return: None for the async constant scheduling strategy to apply
-            no limit on the number of processing requests.
-        """
-        return None
-
     def request_times(self) -> Generator[float, None, None]:
         """
         A generator that yields timestamps for when requests should be sent.
@@ -487,7 +456,7 @@ class AsyncConstantStrategy(SchedulingStrategy):
             counter += 1
 
 
-class AsyncPoissonStrategy(SchedulingStrategy):
+class AsyncPoissonStrategy(ThroughputStrategy):
     """
     A class representing an asynchronous Poisson scheduling strategy.
     This strategy schedules requests asynchronously at a Poisson request rate
@@ -521,57 +490,6 @@ class AsyncPoissonStrategy(SchedulingStrategy):
             "to reach target rate. False to not send an initial burst."
         ),
     )
-
-    @property
-    def processing_mode(self) -> Literal["async"]:
-        """
-        The processing mode for the scheduling strategy, either 'sync' or 'async'.
-        This property determines how the worker processes are setup:
-        either to run synchronously with one request at a time or asynchronously.
-
-        :return: 'async' for asynchronous scheduling strategy
-            for the multiple worker processes handling requests.
-        """
-        return "async"
-
-    @property
-    def processes_limit(self) -> Optional[int]:
-        """
-        The limit on the number of worker processes for the scheduling strategy
-        or None if the strategy does not restrict the number of processes.
-        This property determines how many worker processes are created
-        for the scheduling strategy.
-
-        :return: None for the async poisson scheduling strategy to apply
-            no limit on the number of processes.
-        """
-        return None
-
-    @property
-    def queued_requests_limit(self) -> Optional[int]:
-        """
-        The maximum number of queued requests for the scheduling strategy or None
-        if the strategy does not restrict the number of queued requests.
-        This property determines how many requests can be queued at one time
-        for the scheduling strategy.
-
-        :return: None for the async poisson scheduling strategy to apply
-            no limit on the number of queued requests.
-        """
-        return None
-
-    @property
-    def processing_requests_limit(self) -> Optional[int]:
-        """
-        The maximum number of processing requests for the scheduling strategy
-        or None if the strategy does not restrict the number of processing requests.
-        This property determines how many requests can be processed at one time
-        for the scheduling strategy.
-
-        :return: None for the async poisson scheduling strategy to apply
-            no limit on the number of processing requests.
-        """
-        return None
 
     def request_times(self) -> Generator[float, None, None]:
         """

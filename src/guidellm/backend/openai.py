@@ -19,6 +19,10 @@ from guidellm.config import settings
 __all__ = ["OpenAIHTTPBackend"]
 
 
+TEXT_COMPLETIONS_PATH = "/v1/completions"
+CHAT_COMPLETIONS_PATH = "/v1/chat/completions"
+
+
 @Backend.register("openai_http")
 class OpenAIHTTPBackend(Backend):
     """
@@ -61,6 +65,17 @@ class OpenAIHTTPBackend(Backend):
     ):
         super().__init__(type_="openai_http")
         self._target = target or settings.openai.base_url
+
+        if not self._target:
+            raise ValueError("Target URL must be provided for OpenAI HTTP backend.")
+
+        if self._target.endswith("/v1") or self._target.endswith("/v1/"):
+            # backwards compatability, strip v1 off
+            self._target = self._target[:-3]
+
+        if self._target.endswith("/"):
+            self._target = self._target[:-1]
+
         self._model = model
 
         api_key = api_key or settings.openai.api_key
@@ -93,6 +108,22 @@ class OpenAIHTTPBackend(Backend):
             this will be None until validate is called to set the default.
         """
         return self._model
+
+    @property
+    def info(self) -> Dict[str, Any]:
+        """
+        :return: The information about the backend.
+        """
+        return {
+            "max_output_tokens": self.max_output_tokens,
+            "timeout": self.timeout,
+            "http2": self.http2,
+            "authorization": bool(self.authorization),
+            "organization": self.organization,
+            "project": self.project,
+            "text_completions_path": TEXT_COMPLETIONS_PATH,
+            "chat_completions_path": CHAT_COMPLETIONS_PATH,
+        }
 
     def check_setup(self):
         """
@@ -379,12 +410,10 @@ class OpenAIHTTPBackend(Backend):
         headers: Dict,
         payload: Dict,
     ) -> AsyncGenerator[Union[StreamingTextResponse, ResponseSummary], None]:
-        target = f"{self.target}/v1/"
-
         if type_ == "text":
-            target += "completions"
+            target = f"{self.target}{TEXT_COMPLETIONS_PATH}"
         elif type_ == "chat":
-            target += "chat/completions"
+            target = f"{self.target}{CHAT_COMPLETIONS_PATH}"
         else:
             raise ValueError(f"Unsupported type: {type_}")
 
@@ -407,6 +436,8 @@ class OpenAIHTTPBackend(Backend):
             iter_count = 0
             start_time = time.time()
             iter_time = start_time
+            first_iter_time: Optional[float] = None
+            last_iter_time: Optional[float] = None
 
             yield StreamingTextResponse(
                 type_="start",
@@ -440,14 +471,19 @@ class OpenAIHTTPBackend(Backend):
 
                     data = json.loads(line.strip()[len("data: ") :])
                     if delta := self._extract_completions_delta_content(type_, data):
+                        if first_iter_time is None:
+                            first_iter_time = iter_time
+                        last_iter_time = iter_time
+
                         iter_count += 1
                         response_value += delta
 
                         yield StreamingTextResponse(
                             type_="iter",
                             value=response_value,
-                            start_time=start_time,
                             iter_count=iter_count,
+                            start_time=start_time,
+                            first_iter_time=first_iter_time,
                             delta=delta,
                             time=iter_time,
                             request_id=request_id,
@@ -477,6 +513,8 @@ class OpenAIHTTPBackend(Backend):
             ),
             start_time=start_time,
             end_time=iter_time,
+            first_iter_time=first_iter_time,
+            last_iter_time=last_iter_time,
             iterations=iter_count,
             request_prompt_tokens=request_prompt_tokens,
             request_output_tokens=request_output_tokens,
