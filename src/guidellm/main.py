@@ -1,4 +1,5 @@
 import asyncio
+from io import TextIOWrapper
 from typing import Literal, Optional, Sequence, TextIO, Union, get_args
 
 import click
@@ -184,7 +185,7 @@ def generate_benchmark_report_cli(
 
     if isinstance(scenario, str):
         defaults = SCENARIOS[scenario]
-    elif isinstance(scenario, TextIO):
+    elif isinstance(scenario, TextIOWrapper):
         defaults = Scenario.from_json(scenario.read())
     elif scenario is None:
         defaults = Scenario()
