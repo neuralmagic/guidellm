@@ -24,7 +24,7 @@ class Scenario(Serializable):
     max_seconds: int = 120
     max_requests: Optional[Union[int, Literal["dataset"]]] = None
 
-    def _update(self, **fields: Mapping[str, Any]) -> Self:
+    def _update(self, **fields: Any) -> Self:
         for k, v in fields.items():
             if not hasattr(self, k):
                 raise ValueError(f"Invalid field {k}")
@@ -32,7 +32,7 @@ class Scenario(Serializable):
 
         return self
 
-    def update(self, **fields: Mapping[str, Any]) -> Self:
+    def update(self, **fields: Any) -> Self:
         return self._update(**{k: v for k, v in fields.items() if v is not None})
 
 
