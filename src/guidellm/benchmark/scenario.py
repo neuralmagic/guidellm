@@ -1,7 +1,8 @@
 from pathlib import Path
-from typing import Any, Dict, Literal, Optional, Self, Union
+from typing import Any, Dict, Literal, Optional, Union
 
 from pydantic import Field
+from typing_extensions import Self
 
 from guidellm.backend import BackendType
 from guidellm.core import Serializable
@@ -17,7 +18,7 @@ class Scenario(Serializable):
     backend_kwargs: Optional[Dict[str, Any]] = None
     model: Optional[str] = None
     tokenizer: Optional[str] = None
-    data: Union[str, Dict[str, Any]] = Field(default_factory=dict)
+    data: Union[str, Dict[str, Any]] = Field(default_factory=dict)  # type: ignore[arg-type]
     data_type: Literal["emulated", "file", "transformers"] = "emulated"
     rate_type: ProfileGenerationMode = "sweep"
     rate: Optional[float] = None

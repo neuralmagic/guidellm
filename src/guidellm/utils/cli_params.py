@@ -43,7 +43,7 @@ class Union(ParamType):
         self.types = types
         self.name = "".join(t.name for t in types)
 
-    def convert(self, value, param, ctx):
+    def convert(self, value, param, ctx) -> Any:
         fails = []
         for t in self.types:
             try:
