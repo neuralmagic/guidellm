@@ -1,11 +1,13 @@
 import asyncio
-from typing import Any, Literal, Mapping, Optional, Union, get_args
+from io import TextIOWrapper
+from typing import Literal, Optional, Sequence, TextIO, Union, get_args
 
 import click
 from loguru import logger
 from transformers import AutoTokenizer  # type: ignore[import-untyped]
 
 from guidellm.backend import Backend, BackendType
+from guidellm.benchmark.scenario import Scenario, ScenarioManager
 from guidellm.core import GuidanceReport, TextGenerationBenchmarkReport
 from guidellm.executor import Executor, ProfileGenerationMode
 from guidellm.request import (
@@ -18,6 +20,8 @@ from guidellm.utils import BenchmarkReportProgress, cli_params
 
 __all__ = ["generate_benchmark_report"]
 
+# FIXME: Remove
+SCENARIOS = ScenarioManager()
 
 @click.command()
 @click.option(
@@ -30,9 +34,17 @@ __all__ = ["generate_benchmark_report"]
     ),
 )
 @click.option(
+    "--scenario",
+    type=cli_params.Union(click.File(mode="r"), click.Choice(SCENARIOS.list())),
+    default=None,
+    help=(
+        "TODO: A scenario or path to config"
+    ),
+)
+@click.option(
     "--backend",
     type=click.Choice(get_args(BackendType)),
-    default="openai_http",
+    default=None,
     help=(
         "The backend to use for benchmarking. "
         "The default is OpenAI Server enabling compatability with any server that "
@@ -51,7 +63,7 @@ __all__ = ["generate_benchmark_report"]
 @click.option(
     "--data",
     type=str,
-    required=True,
+    default=None,
     help=(
         "The data source to use for benchmarking. "
         "Depending on the data-type, it should be a "
@@ -64,7 +76,7 @@ __all__ = ["generate_benchmark_report"]
 @click.option(
     "--data-type",
     type=click.Choice(["emulated", "file", "transformers"]),
-    required=True,
+    default=None,
     help=(
         "The type of data to use for benchmarking. "
         "Use 'emulated' for synthetic data, 'file' for a file, or 'transformers' "
@@ -86,7 +98,7 @@ __all__ = ["generate_benchmark_report"]
 @click.option(
     "--rate-type",
     type=click.Choice(get_args(ProfileGenerationMode)),
-    default="sweep",
+    default=None,
     help=(
         "The type of request rate to use for benchmarking. "
         "Use sweep to run a full range from synchronous to throughput (default), "
@@ -109,7 +121,7 @@ __all__ = ["generate_benchmark_report"]
 @click.option(
     "--max-seconds",
     type=int,
-    default=120,
+    default=None,
     help=(
         "The maximum number of seconds for each benchmark run. "
         "Either max-seconds, max-requests, or both must be set. "
@@ -154,23 +166,34 @@ __all__ = ["generate_benchmark_report"]
 )
 def generate_benchmark_report_cli(
     target: str,
-    backend: BackendType,
+    scenario: Optional[Union[TextIO, str]],
+    backend: Optional[BackendType],
     model: Optional[str],
     data: Optional[str],
-    data_type: Literal["emulated", "file", "transformers"],
+    data_type: Optional[Literal["emulated", "file", "transformers"]],
     tokenizer: Optional[str],
-    rate_type: ProfileGenerationMode,
-    rate: Optional[float],
+    rate_type: Optional[ProfileGenerationMode],
+    rate: Optional[Union[float, Sequence[float]]],
     max_seconds: Optional[int],
     max_requests: Union[Literal["dataset"], int, None],
-    output_path: str,
+    output_path: Optional[str],
     enable_continuous_refresh: bool,
 ):
     """
     Generate a benchmark report for a specified backend and dataset.
     """
-    generate_benchmark_report(
-        target=target,
+
+    if isinstance(scenario, str):
+        defaults = SCENARIOS[scenario]
+    elif isinstance(scenario, TextIOWrapper):
+        defaults = Scenario.from_json(scenario.read())
+    elif scenario is None:
+        defaults = Scenario()
+    else:
+        raise ValueError("Invalid scenario type")
+
+    # Update defaults with CLI args
+    defaults.update(
         backend=backend,
         model=model,
         data=data,
@@ -179,7 +202,12 @@ def generate_benchmark_report_cli(
         rate_type=rate_type,
         rate=rate,
         max_seconds=max_seconds,
-        max_requests=max_requests,
+        max_requests=max_requests
+    )
+
+    generate_benchmark_report(
+        target=target,
+        scenario=defaults,
         output_path=output_path,
         cont_refresh_table=enable_continuous_refresh,
     )
@@ -187,16 +215,7 @@ def generate_benchmark_report_cli(
 
 def generate_benchmark_report(
     target: str,
-    data: Optional[str],
-    data_type: Literal["emulated", "file", "transformers"],
-    backend: BackendType = "openai_http",
-    backend_kwargs: Optional[Mapping[str, Any]] = None,
-    model: Optional[str] = None,
-    tokenizer: Optional[str] = None,
-    rate_type: ProfileGenerationMode = "sweep",
-    rate: Optional[float] = None,
-    max_seconds: Optional[int] = 120,
-    max_requests: Union[Literal["dataset"], int, None] = None,
+    scenario: Scenario,
     output_path: Optional[str] = None,
     cont_refresh_table: bool = False,
 ) -> GuidanceReport:
@@ -223,22 +242,22 @@ def generate_benchmark_report(
     :param backend_kwargs: Additional keyword arguments for the backend.
     """
     logger.info(
-        "Generating benchmark report with target: {}, backend: {}", target, backend
+        "Generating benchmark report with target: {}, backend: {}", target, scenario.backend
     )
 
     # Create backend
     backend_inst = Backend.create(
-        type_=backend,
+        type_=scenario.backend,
         target=target,
-        model=model,
-        **(backend_kwargs or {}),
+        model=scenario.model,
+        **(scenario.backend_kwargs or {}),
     )
     backend_inst.validate()
 
     request_generator: RequestGenerator
 
     # Create tokenizer and request generator
-    tokenizer_inst = tokenizer
+    tokenizer_inst = scenario.tokenizer
     if not tokenizer_inst:
         try:
             tokenizer_inst = AutoTokenizer.from_pretrained(backend_inst.model)
@@ -248,44 +267,44 @@ def generate_benchmark_report(
                 "--tokenizer must be provided for request generation"
             ) from err
 
-    if data_type == "emulated":
+    if scenario.data_type == "emulated":
         request_generator = EmulatedRequestGenerator(
-            config=data, tokenizer=tokenizer_inst
+            config=scenario.data, tokenizer=tokenizer_inst
         )
-    elif data_type == "file":
-        request_generator = FileRequestGenerator(path=data, tokenizer=tokenizer_inst)
-    elif data_type == "transformers":
+    elif scenario.data_type == "file":
+        request_generator = FileRequestGenerator(path=scenario.data, tokenizer=tokenizer_inst)
+    elif scenario.data_type == "transformers":
         request_generator = TransformersDatasetRequestGenerator(
-            dataset=data, tokenizer=tokenizer_inst
+            dataset=scenario.data, tokenizer=tokenizer_inst
         )
     else:
-        raise ValueError(f"Unknown data type: {data_type}")
+        raise ValueError(f"Unknown data type: {scenario.data_type}")
 
-    if data_type == "emulated" and max_requests == "dataset":
+    if scenario.data_type == "emulated" and scenario.max_requests == "dataset":
         raise ValueError("Cannot use 'dataset' for emulated data")
 
     # Create executor
     executor = Executor(
         backend=backend_inst,
         request_generator=request_generator,
-        mode=rate_type,
-        rate=rate if rate_type in ("constant", "poisson") else None,
+        mode=scenario.rate_type,
+        rate=scenario.rate if scenario.rate_type in ("constant", "poisson") else None,
         max_number=(
-            len(request_generator) if max_requests == "dataset" else max_requests
+            len(request_generator) if scenario.max_requests == "dataset" else scenario.max_requests
         ),
-        max_duration=max_seconds,
+        max_duration=scenario.max_seconds,
     )
 
     # Run executor
     logger.debug(
         "Running executor with args: {}",
         {
-            "backend": backend,
+            "backend": scenario.backend,
             "request_generator": request_generator,
-            "mode": rate_type,
-            "rate": rate,
-            "max_number": max_requests,
-            "max_duration": max_seconds,
+            "mode": scenario.rate_type,
+            "rate": scenario.rate,
+            "max_number": scenario.max_requests,
+            "max_duration": scenario.max_seconds,
         },
     )
     report = asyncio.run(_run_executor_for_result(executor))
