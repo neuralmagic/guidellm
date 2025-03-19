@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, Dict, Literal, Optional, Union
+from typing import Any, Dict, Literal, Optional, Sequence, Union
 
 from pydantic import Field
 from typing_extensions import Self
@@ -21,7 +21,7 @@ class Scenario(Serializable):
     data: Union[str, Dict[str, Any]] = Field(default_factory=dict)  # type: ignore[arg-type]
     data_type: Literal["emulated", "file", "transformers"] = "emulated"
     rate_type: ProfileGenerationMode = "sweep"
-    rate: Optional[float] = None
+    rate: Optional[Union[float, Sequence[float]]] = None
     max_seconds: int = 120
     max_requests: Optional[Union[int, Literal["dataset"]]] = None
 

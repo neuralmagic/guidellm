@@ -1,5 +1,5 @@
 import asyncio
-from typing import IO, Any, Literal, Optional, Union, get_args
+from typing import Literal, Optional, Sequence, TextIO, Union, get_args
 
 import click
 from loguru import logger
@@ -165,14 +165,14 @@ SCENARIOS = ScenarioManager()
 )
 def generate_benchmark_report_cli(
     target: str,
-    scenario: Optional[Union[IO[Any], str]],
+    scenario: Optional[Union[TextIO, str]],
     backend: Optional[BackendType],
     model: Optional[str],
     data: Optional[str],
     data_type: Optional[Literal["emulated", "file", "transformers"]],
     tokenizer: Optional[str],
     rate_type: Optional[ProfileGenerationMode],
-    rate: Optional[float],
+    rate: Optional[Union[float, Sequence[float]]],
     max_seconds: Optional[int],
     max_requests: Union[Literal["dataset"], int, None],
     output_path: Optional[str],
@@ -184,9 +184,8 @@ def generate_benchmark_report_cli(
 
     if isinstance(scenario, str):
         defaults = SCENARIOS[scenario]
-    elif isinstance(scenario, IO):
+    elif isinstance(scenario, TextIO):
         defaults = Scenario.from_json(scenario.read())
-        SCENARIOS["custom"] = defaults
     elif scenario is None:
         defaults = Scenario()
     else:
