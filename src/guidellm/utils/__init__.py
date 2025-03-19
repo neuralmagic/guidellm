@@ -1,5 +1,6 @@
-from .injector import create_report, inject_data
 from .generate_ui_data import generate_ui_api_data
+from .interpolation import linear_interpolate, interpolate_measurements, interpolate_data_points, stretch_list
+from .injector import create_report, inject_data
 from .progress import BenchmarkReportProgress
 from .text import (
     clean_text,
@@ -27,9 +28,12 @@ __all__ = [
     "filter_text",
     "generate_ui_api_data",
     "inject_data",
+    "interpolate_data_points",
+    "interpolate_measurements",
     "is_path",
     "is_path_like",
     "is_url",
+    "linear_interpolate",
     "load_text",
     "load_text_lines",
     "load_transformers_dataset",
@@ -39,4 +43,5 @@ __all__ = [
     "resolve_transformers_dataset_split",
     "split_lines_by_punctuation",
     "split_text",
+    "stretch_list",
 ]

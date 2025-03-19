@@ -5,6 +5,7 @@ import math
 from typing import Any, Dict, List
 from guidellm.core.distribution import Distribution
 from guidellm.core import TextGenerationBenchmarkReport, TextGenerationBenchmark
+from guidellm.utils.interpolation import interpolate_data_points
 
 def generate_metric_report(dist: Distribution, metric_label: str, n_buckets: int = 18):
     total = dist.__len__()
@@ -61,8 +62,8 @@ def generate_metric_report(dist: Distribution, metric_label: str, n_buckets: int
         }
     }
 
-def generate_run_info(report: TextGenerationBenchmarkReport) -> Dict[str, Any]:
-    timestamp = max(map(lambda bm: bm.end_time, report.benchmarks))
+def generate_run_info(report: TextGenerationBenchmarkReport, benchmarks: List[TextGenerationBenchmark]) -> Dict[str, Any]:
+    timestamp = max(bm.start_time for bm in benchmarks if bm.start_time is not None)
     return {
         "model": {
             "name": report.args.get('model', 'N/A'),
@@ -80,91 +81,109 @@ def linearly_interpolate_value(target_input, lower_input, lower_output, upperInp
     return lower_output + fraction * (upper_output - lower_output)
 
 def generate_request_over_time_data(benchmarks: List[TextGenerationBenchmark]) -> List[Dict[str, Any]]:
+    filtered_benchmarks = filter(lambda bm: bm.start_time is not None, benchmarks)
+    sorted_benchmarks = list(sorted(filtered_benchmarks, key=lambda bm: bm.start_time))
+    min_start_time = sorted_benchmarks[0].start_time
 
-    request_over_time_results = []
-    for benchmark in benchmarks:
-        # compare benchmark start time to text generation result end time
-        all_result_end_times = [result.end_time for result in benchmark.results if result.end_time is not None]
-        request_over_time_values = list(map(lambda time: time - benchmark.start_time, all_result_end_times))
-        request_distribution = Distribution(data=request_over_time_values)
-        result = generate_metric_report(request_distribution, "requestsOverTime")
-        result["requestsPerSecond"] = benchmark.completed_request_rate
-        request_over_time_results.append(result)
+    all_request_times = [
+        result.start_time - min_start_time
+        for benchmark in sorted_benchmarks
+        for result in benchmark.results
+        if result.start_time is not None
+    ]
 
-    if len(benchmarks) == 1:
-        return request_over_time_results
+    request_distribution = Distribution(data=all_request_times)
+    final_result = generate_metric_report(request_distribution, "requestsOverTime")
+    return { "numBenchmarks": len(sorted_benchmarks), **final_result }
+
+# def generate_request_over_time_data_per_benchmark(benchmarks: List[TextGenerationBenchmark]) -> List[Dict[str, Any]]:
+
+#     request_over_time_results = []
+#     for benchmark in benchmarks:
+#         # compare benchmark start time to text generation result end time
+#         all_result_end_times = [result.end_time for result in benchmark.results if result.end_time is not None]
+#         request_over_time_values = list(map(lambda time: time - benchmark.start_time, all_result_end_times))
+#         request_distribution = Distribution(data=request_over_time_values)
+#         result = generate_metric_report(request_distribution, "requestsOverTime")
+#         result["requestsPerSecond"] = benchmark.completed_request_rate
+#         request_over_time_results.append(result)
+
+#     if len(benchmarks) == 1:
+#         return request_over_time_results
     
-    request_over_time_raw = []
-    sorted_bm = sorted(benchmarks, key=lambda bm: bm.completed_request_rate)
-    for benchmark in sorted_bm:
-        # compare benchmark start time to text generation result end time
-        all_result_end_times = [result.end_time for result in benchmark.results if result.end_time is not None]
-        request_over_time_values = list(map(lambda time: time - benchmark.start_time, all_result_end_times))
-        request_at_rps = { "rps": benchmark.completed_request_rate, "requests_over_time": request_over_time_values }
-        request_over_time_raw.append(request_at_rps)
+#     request_over_time_raw = []
+#     sorted_bm = sorted(benchmarks, key=lambda bm: bm.completed_request_rate)
+#     for benchmark in sorted_bm:
+#         # compare benchmark start time to text generation result end time
+#         all_result_end_times = [result.end_time for result in benchmark.results if result.end_time is not None]
+#         request_over_time_values = list(map(lambda time: time - benchmark.start_time, all_result_end_times))
+#         request_at_rps = { "rps": benchmark.completed_request_rate, "requests_over_time": request_over_time_values }
+#         request_over_time_raw.append(request_at_rps)
 
-    rps_values = [request_obj["rps"] for request_obj in request_over_time_raw]
-    rps_range = list(range(math.ceil(min(rps_values)), math.ceil(max(rps_values))))
-    interpolated_request_values = []
-    lower_rps_index = 0
-    for rps in rps_range:
-        if rps > rps_values[lower_rps_index + 1]: lower_rps_index += 1
-        if rps == rps_values[lower_rps_index]:
-            interpolated_request_values.append({
-                "requests_per_second": rps,
-                "requests_over_time": request_over_time_raw[lower_rps_index]["requests_over_time"][:]
-            })
-            lower_rps_index += 1
-        elif rps < rps_values[lower_rps_index + 1]:
-            interpolated_requests_at_new_rps = []
-            for i in range(len(request_over_time_raw[lower_rps_index]["requests_over_time"])):
-                lower_request = request_over_time_raw[lower_rps_index]["requests_over_time"][i]
-                upper_request = request_over_time_raw[lower_rps_index + 1]["requests_over_time"][i]
-                new_value = linearly_interpolate_value(rps, rps_values[lower_rps_index], lower_request, rps_values[lower_rps_index + 1], upper_request)
-                interpolated_requests_at_new_rps.append(new_value)
-            interpolated_request_values.append({ "requests_per_second": rps, "requests_over_time": interpolated_requests_at_new_rps })
-        elif rps > rps_values[lower_rps_index + 1]:
-            while rps > rps_values[lower_rps_index + 1]:
-                lower_rps_index += 1
-            interpolated_requests_at_new_rps = []
-            for i in range(len(request_over_time_raw[lower_rps_index]["requests_over_time"])):
-                lower_request = request_over_time_raw[lower_rps_index]["requests_over_time"][i]
-                upper_request = request_over_time_raw[lower_rps_index + 1]["requests_over_time"][i]
-                new_value = linearly_interpolate_value(rps, rps_values[lower_rps_index], lower_request, rps_values[lower_rps_index + 1], upper_request)
-                interpolated_requests_at_new_rps.append(new_value)
-            interpolated_request_values.append({ "requests_per_second": rps, "requests_over_time": interpolated_requests_at_new_rps })
-    interpolated_request_over_time_results = []            
-    for request_value in interpolated_request_values:
-        request_distribution = Distribution(data=request_value["requests_over_time"])
-        result = generate_metric_report(request_distribution, "requestsOverTime")
-        result["requestsPerSecond"] = request_value["requests_per_second"]
-        interpolated_request_over_time_results.append(result)
+#     rps_values = [request_obj["rps"] for request_obj in request_over_time_raw]
+#     rps_range = list(range(math.ceil(min(rps_values)), math.ceil(max(rps_values))))
+#     interpolated_request_values = []
+#     lower_rps_index = 0
+#     for rps in rps_range:
+#         if rps > rps_values[lower_rps_index + 1]: lower_rps_index += 1
+#         if rps == rps_values[lower_rps_index]:
+#             interpolated_request_values.append({
+#                 "requests_per_second": rps,
+#                 "requests_over_time": request_over_time_raw[lower_rps_index]["requests_over_time"][:]
+#             })
+#             lower_rps_index += 1
+#         elif rps < rps_values[lower_rps_index + 1]:
+#             interpolated_requests_at_new_rps = []
+#             for i in range(len(request_over_time_raw[lower_rps_index]["requests_over_time"])):
+#                 lower_request = request_over_time_raw[lower_rps_index]["requests_over_time"][i]
+#                 upper_request = request_over_time_raw[lower_rps_index + 1]["requests_over_time"][i]
+#                 new_value = linearly_interpolate_value(rps, rps_values[lower_rps_index], lower_request, rps_values[lower_rps_index + 1], upper_request)
+#                 interpolated_requests_at_new_rps.append(new_value)
+#             interpolated_request_values.append({ "requests_per_second": rps, "requests_over_time": interpolated_requests_at_new_rps })
+#         elif rps > rps_values[lower_rps_index + 1]:
+#             while rps > rps_values[lower_rps_index + 1]:
+#                 lower_rps_index += 1
+#             interpolated_requests_at_new_rps = []
+#             for i in range(len(request_over_time_raw[lower_rps_index]["requests_over_time"])):
+#                 lower_request = request_over_time_raw[lower_rps_index]["requests_over_time"][i]
+#                 upper_request = request_over_time_raw[lower_rps_index + 1]["requests_over_time"][i]
+#                 new_value = linearly_interpolate_value(rps, rps_values[lower_rps_index], lower_request, rps_values[lower_rps_index + 1], upper_request)
+#                 interpolated_requests_at_new_rps.append(new_value)
+#             interpolated_request_values.append({ "requests_per_second": rps, "requests_over_time": interpolated_requests_at_new_rps })
+#     interpolated_request_over_time_results = []            
+#     for request_value in interpolated_request_values:
+#         request_distribution = Distribution(data=request_value["requests_over_time"])
+#         result = generate_metric_report(request_distribution, "requestsOverTime")
+#         result["requestsPerSecond"] = request_value["requests_per_second"]
+#         interpolated_request_over_time_results.append(result)
+#     return { "rawData": request_over_time_results, "interpolatedData": interpolated_request_over_time_results }
 
-    return interpolated_request_over_time_results
 
-
-def generate_workload_details(report: TextGenerationBenchmarkReport) -> Dict[str, Any]:
-    all_prompt_token_data = [data for benchmark in report.benchmarks for data in benchmark.prompt_token_distribution.data]
+def generate_workload_details(report: TextGenerationBenchmarkReport, benchmarks: List[TextGenerationBenchmark]) -> Dict[str, Any]:
+    all_prompt_token_data = [data for benchmark in benchmarks for data in benchmark.prompt_token_distribution.data]
     all_prompt_token_distribution = Distribution(data=all_prompt_token_data)
-    all_output_token_data = [data for benchmark in report.benchmarks for data in benchmark.output_token_distribution.data]
+    all_output_token_data = [data for benchmark in benchmarks for data in benchmark.output_token_distribution.data]
     all_output_token_distribution = Distribution(data=all_output_token_data)
 
     prompt_token_data = generate_metric_report(all_prompt_token_distribution, "tokenDistributions")
     output_token_data = generate_metric_report(all_output_token_distribution, "tokenDistributions")
 
-    prompt_token_samples = [result.prompt for benchmark in report.benchmarks for result in benchmark.results]
-    output_token_samples = [result.output for benchmark in report.benchmarks for result in benchmark.results]
+    prompt_token_samples = [result.prompt for benchmark in benchmarks for result in benchmark.results]
+    output_token_samples = [result.output for benchmark in benchmarks for result in benchmark.results]
 
     num_samples = min(5, len(prompt_token_samples), len(output_token_samples))
     sample_indices = random.sample(range(len(prompt_token_samples)), num_samples)
 
     sample_prompts = [prompt_token_samples[i] for i in sample_indices]
+    """
+    Need a wholistic approach to parsing out characters in the prompt that don't covert well into the format we need
+    """
     sample_prompts = list(map(lambda prompt: prompt.replace("\n", " ").replace("\"", "'"), sample_prompts))
 
     sample_outputs = [output_token_samples[i] for i in sample_indices]
     sample_outputs = list(map(lambda output: output.replace("\n", " ").replace("\"", "'"), sample_outputs))
 
-    request_over_time_results = generate_request_over_time_data(report.benchmarks)
+    request_over_time_results = generate_request_over_time_data(benchmarks)
 
     return {
         "prompts": {
@@ -184,35 +203,92 @@ def generate_workload_details(report: TextGenerationBenchmarkReport) -> Dict[str
 def generate_benchmark_json(bm: TextGenerationBenchmark) -> Dict[str, Any]:
     ttft_dist_ms = Distribution(data=[val * 1000 for val in bm.ttft_distribution.data])
     ttft_data = generate_metric_report(ttft_dist_ms, 'ttft')
-    tpot_dist_ms = Distribution(data=[val * 1000 for val in bm.itl_distribution.data])
-    tpot_data = generate_metric_report(tpot_dist_ms, 'tpot')
-    throughput_dist_ms = Distribution(data=[val * 1000 for val in bm.output_token_throughput_distribution.data])
+    itl_dist_ms = Distribution(data=[val * 1000 for val in bm.itl_distribution.data])
+    itl_data = generate_metric_report(itl_dist_ms, 'tpot')
+    throughput_dist_ms = Distribution(data=bm.output_token_throughput_distribution.data)
     throughput_data = generate_metric_report(throughput_dist_ms, 'throughput')
     latency_dist_ms = Distribution(data=[val * 1000 for val in bm.request_latency_distribution.data])
-    time_per_request_data = generate_metric_report(latency_dist_ms, 'timePerRequest')
+    latency__data = generate_metric_report(latency_dist_ms, 'timePerRequest')
     return {
         "requestsPerSecond": bm.completed_request_rate,
+        **itl_data,
         **ttft_data,
-        **tpot_data,
         **throughput_data,
-        **time_per_request_data,
+        **latency__data,
     }
 
+def generate_interpolated_benchmarks(benchmarks: List[TextGenerationBenchmark]):
+    """
+    Should we only use constant rate benchmarks here since synchronous and throughput runs might not be appropriate to lump in for interoplation across all rps?
+
+    Other edge-case, what if rps doesn't span more than 1 whole rps even with multiple benchmarks
+    ex: 1.1, 1.3, 1.5, 2.1, 2.5, can interpolate at 2rps
+    or worse, 1.1, 1.4, 1.6, can't interpolate
+    """
+    if len(benchmarks) == 1:
+        return []
+    
+    sorted_benchmarks = sorted(benchmarks[:], key=lambda bm: bm.completed_request_rate)
+    rps_values = [bm.completed_request_rate for bm in sorted_benchmarks]
+    rps_range = list(range(math.ceil(min(rps_values)), math.ceil(max(rps_values))))
+
+    ttft_data_by_rps = list(map(lambda bm: (bm.completed_request_rate, bm.ttft_distribution.data), sorted_benchmarks))
+    interpolated_ttft_data_by_rps = interpolate_data_points(ttft_data_by_rps, rps_range)
+
+    itl_data_by_rps = list(map(lambda bm: (bm.completed_request_rate, bm.itl_distribution.data), sorted_benchmarks))
+    interpolated_itl_data_by_rps = interpolate_data_points(itl_data_by_rps, rps_range)
+
+    throughput_data_by_rps = list(map(lambda bm: (bm.completed_request_rate, bm.output_token_throughput_distribution.data), sorted_benchmarks))
+    interpolated_throughput_data_by_rps = interpolate_data_points(throughput_data_by_rps, rps_range)
+
+    latency_data_by_rps = list(map(lambda bm: (bm.completed_request_rate, bm.request_latency_distribution.data), sorted_benchmarks))
+    interpolated_latency_data_by_rps = interpolate_data_points(latency_data_by_rps, rps_range)
+
+    benchmark_json = []
+    for i in range(len(interpolated_ttft_data_by_rps)):
+        rps, interpolated_ttft_data = interpolated_ttft_data_by_rps[i]
+        ttft_dist_ms = Distribution(data=[val * 1000 for val in interpolated_ttft_data])
+        final_ttft_data = generate_metric_report(ttft_dist_ms, 'ttft')
+        
+        _, interpolated_itl_data = interpolated_itl_data_by_rps[i]
+        itl_dist_ms = Distribution(data=[val * 1000 for val in interpolated_itl_data])
+        final_itl_data = generate_metric_report(itl_dist_ms, 'tpot')
+
+        _, interpolated_throughput_data = interpolated_throughput_data_by_rps[i]
+        throughput_dist_ms = Distribution(data=interpolated_throughput_data)
+        final_throughput_data = generate_metric_report(throughput_dist_ms, 'throughput')
+
+        _, interpolated_latency_data = interpolated_latency_data_by_rps[i]
+        latency_dist_ms = Distribution(data=[val * 1000 for val in interpolated_latency_data])
+        final_latency_data = generate_metric_report(latency_dist_ms, 'timePerRequest')
+
+        benchmark_json.append({
+            "requestsPerSecond": rps,
+            **final_itl_data,
+            **final_ttft_data,
+            **final_throughput_data,
+            **final_latency_data,
+        })
+    return benchmark_json
+
 def generate_benchmarks_json(benchmarks: List[TextGenerationBenchmark]):
-    benchmark_report_json = []
+    raw_benchmark_json = []
     for benchmark in benchmarks:
         benchmarks_report = generate_benchmark_json(benchmark)
-        benchmark_report_json.append(benchmarks_report)
-    return benchmark_report_json
+        raw_benchmark_json.append(benchmarks_report)
+    interpolated_benchmark_json = generate_interpolated_benchmarks(benchmarks)
+
+    return { "raw": raw_benchmark_json, "interpolated_by_rps": interpolated_benchmark_json }
 
 def generate_js_variable(variable_name: str, data: dict) -> str:
     json_data = json.dumps(data, indent=2)
     return f'`window.{variable_name} = {json_data};`'  # Wrap in quotes
 
 def generate_ui_api_data(report: TextGenerationBenchmarkReport):
-    run_info_data = generate_run_info(report)
-    workload_details_data = generate_workload_details(report)
-    benchmarks_data = generate_benchmarks_json(report.benchmarks)
+    filtered_benchmarks = list(filter(lambda bm: bm.completed_request_rate > 0, report.benchmarks))
+    run_info_data = generate_run_info(report, filtered_benchmarks)
+    workload_details_data = generate_workload_details(report, filtered_benchmarks)
+    benchmarks_data = generate_benchmarks_json(filtered_benchmarks)
     run_info_script = generate_js_variable("run_info", run_info_data)
     workload_details_script = generate_js_variable("workload_details", workload_details_data)
     benchmarks_script = generate_js_variable("benchmarks", benchmarks_data)
