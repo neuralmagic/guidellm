@@ -216,7 +216,7 @@ def generate_benchmarks_json(benchmarks: List[TextGenerationBenchmark]):
         raw_benchmark_json.append(benchmarks_report)
     interpolated_benchmark_json = generate_interpolated_benchmarks(benchmarks)
 
-    return { "raw": raw_benchmark_json, "interpolated_by_rps": interpolated_benchmark_json }
+    return { "raw": raw_benchmark_json, "interpolatedByRps": interpolated_benchmark_json }
 
 def generate_js_variable(variable_name: str, data: dict) -> str:
     json_data = json.dumps(data, indent=2)
