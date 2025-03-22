@@ -1,83 +1,88 @@
 from pathlib import Path
-from typing import Optional, Union
+from typing import Any, Dict, Optional, Union
 
-from loguru import logger
-from transformers import PreTrainedTokenizer  # type: ignore  # noqa: PGH003
+import pandas as pd
+from datasets import (
+    Dataset,
+    DatasetDict,
+    IterableDataset,
+    IterableDatasetDict,
+    load_dataset,
+)
+from transformers import PreTrainedTokenizerBase
 
-from guidellm.config import settings
-from guidellm.core.request import TextGenerationRequest
-from guidellm.request.base import GenerationMode, RequestGenerator
-from guidellm.utils import load_text_lines
+from guidellm.dataset.creator import DatasetCreator
 
-__all__ = ["FileRequestGenerator"]
+__all__ = ["FileDatasetCreator"]
 
 
-class FileRequestGenerator(RequestGenerator):
-    """
-    A request generator implementation for files.
+class FileDatasetCreator(DatasetCreator):
+    SUPPORTED_TYPES = {
+        ".txt",
+        ".text",
+        ".csv",
+        ".json",
+        ".jsonl",
+        ".parquet",
+        ".arrow",
+        ".hdf5",
+        ".tar",
+    }
 
-    :param path: The path to the file containing the data.
-    :type path: Optional[Union[str, Path]]
-    :param tokenizer: The tokenizer instance or the name/config to use
-        for tokenizing prompts.
-    :type tokenizer: Union[str, PreTrainedTokenizer]
-    :param mode: The generation mode, either 'async' or 'sync'.
-    :type mode: str
-    :param async_queue_size: The size of the request queue.
-    :type async_queue_size: int
-    """
+    @classmethod
+    def is_supported(cls, data: Any, data_args: Optional[Dict[str, Any]]) -> bool:
+        if isinstance(data, (str, Path)) and (path := Path(data)).exists():
+            # local folder or py file, assume supported
+            return path.suffix.lower() in cls.SUPPORTED_TYPES
 
-    def __init__(
-        self,
-        path: Optional[Union[str, Path]],
-        tokenizer: Optional[Union[str, PreTrainedTokenizer]] = None,
-        mode: GenerationMode = "async",
-        async_queue_size: int = 50,
-    ):
-        if not path:
-            raise ValueError("File path must be provided for FileRequestGenerator")
+        return False
 
-        self._path = path
-        self._data = load_text_lines(
-            path,
-            filters=settings.dataset.preferred_data_columns,
-        )
-        self._iterator = iter(self._data)
+    @classmethod
+    def handle_create(
+        cls,
+        data: Any,
+        data_args: Optional[Dict[str, Any]],
+        processor: PreTrainedTokenizerBase,
+    ) -> Union[Dataset, DatasetDict, IterableDataset, IterableDatasetDict]:
+        if not isinstance(data, (str, Path)):
+            raise ValueError(f"Unsupported data type: {type(data)} given for {data}. ")
 
-        # NOTE: Must be after all the parameters since the queue population
-        #       function requires attributes above
-        super().__init__(
-            type_="file",
-            source=str(path),
-            tokenizer=tokenizer,
-            mode=mode,
-            async_queue_size=async_queue_size,
-        )
+        path = Path(data)
+        if not path.exists():
+            raise FileNotFoundError(f"File not found: {path}")
 
-    def __len__(self) -> int:
-        """
-        Return the number of text lines.
-        """
+        if not path.is_file():
+            raise ValueError(f"Unsupported data type: {path} given for {path}. ")
 
-        return len(self._data)
+        if path.suffix.lower() not in cls.SUPPORTED_TYPES:
+            raise ValueError(f"Unsupported file type: {path.suffix} given for {path}. ")
 
-    def create_item(self) -> TextGenerationRequest:
-        """
-        Create a new result request item from the data.
+        return cls.load_dataset(path, data_args)
 
-        :return: A new result request.
-        :rtype: TextGenerationRequest
-        """
-        logger.debug("Creating new request item from file data")
+    @classmethod
+    def load_dataset(
+        cls, path: Path, data_args: Optional[Dict[str, Any]]
+    ) -> Union[Dataset, IterableDataset]:
+        if path.suffix.lower() in {".txt", ".text"}:
+            with path.open("r") as file:
+                items = file.readlines()
 
-        try:
-            data = next(self._iterator)
-        except StopIteration:
-            self._iterator = iter(self._data)
-            data = next(self._iterator)
+            dataset = Dataset.from_dict({"text": items}, **(data_args or {}))
+        elif path.suffix.lower() == ".csv":
+            dataset = load_dataset("csv", data_files=path, **(data_args or {}))
+        elif path.suffix.lower() in {".json", ".jsonl"}:
+            dataset = load_dataset("json", data_files=path, **(data_args or {}))
+        elif path.suffix.lower() == ".parquet":
+            dataset = load_dataset("parquet", data_files=path, **(data_args or {}))
+        elif path.suffix.lower() == ".arrow":
+            dataset = load_dataset("arrow", data_files=path, **(data_args or {}))
+        elif path.suffix.lower() == ".hdf5":
+            dataset = Dataset.from_pandas(pd.read_hdf(path), **(data_args or {}))
+        elif path.suffix.lower() == ".db":
+            dataset = Dataset.from_sql(con=path, **(data_args or {}))
+        elif path.suffix.lower() == ".tar":
+            dataset = load_dataset("webdataset", data_files=path, **(data_args or {}))
+        else:
+            raise ValueError(f"Unsupported file type: {path.suffix} given for {path}. ")
 
-        token_count = len(self.tokenizer.tokenize(data))
-        request = TextGenerationRequest(prompt=data, prompt_token_count=token_count)
-        logger.debug("Created new TextGenerationRequest: {}", request)
-
-        return request
+        return dataset

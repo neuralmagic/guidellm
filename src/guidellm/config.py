@@ -157,8 +157,8 @@ class Settings(BaseSettings):
     emulated_data: EmulatedDataSettings = EmulatedDataSettings()
 
     # Request/stats settings
-    preferred_prompt_tokens_source: Optional[Literal["backend", "local"]] = None
-    preferred_output_tokens_source: Optional[Literal["backend", "local"]] = None
+    preferred_prompt_tokens_source: Optional[Literal["request", "response"]] = None
+    preferred_output_tokens_source: Optional[Literal["request", "response"]] = None
     preferred_backend: Literal["openai"] = "openai"
     openai: OpenAISettings = OpenAISettings()
 

@@ -1,6 +1,5 @@
 from typing import Any, Dict, Literal, Optional
 
-from loguru import logger
 from pydantic import BaseModel, computed_field
 
 from guidellm.config import settings
@@ -107,21 +106,7 @@ class ResponseSummary(BaseModel):
 
         :return: The number of tokens in the prompt, if any.
         """
-        if settings.preferred_prompt_tokens_source == "backend":
-            if self.response_prompt_tokens is None:
-                logger.warning(
-                    "Preferred prompt tokens source is backend, but no prompt token "
-                    f"values were returned with the response for {self}. "
-                    "Defulating to request_prompt_tokens (if available)."
-                )
-            return self.response_prompt_tokens or self.request_prompt_tokens
-        elif settings.preferred_prompt_tokens_source == "request":
-            if self.request_prompt_tokens is None:
-                logger.warning(
-                    "Preferred prompt tokens source is request, but no prompt token "
-                    f"values were returned with the request for {self}. "
-                    "Defulating to response_prompt_tokens (if available)."
-                )
+        if settings.preferred_prompt_tokens_source == "request":
             return self.request_prompt_tokens or self.response_prompt_tokens
 
         return self.response_prompt_tokens or self.request_prompt_tokens
@@ -135,21 +120,7 @@ class ResponseSummary(BaseModel):
 
         :return: The number of tokens in the output, if any.
         """
-        if settings.preferred_output_tokens_source == "backend":
-            if self.response_output_tokens is None:
-                logger.warning(
-                    "Preferred output tokens source is backend, but no output token "
-                    f"values were returned with the response for {self}. "
-                    "Defulating to request_output_tokens (if available)."
-                )
-            return self.response_output_tokens or self.request_output_tokens
-        elif settings.preferred_output_tokens_source == "request":
-            if self.request_output_tokens is None:
-                logger.warning(
-                    "Preferred output tokens source is request, but no output token "
-                    f"values were returned with the request for {self}. "
-                    "Defulating to response_output_tokens (if available)."
-                )
+        if settings.preferred_output_tokens_source == "request":
             return self.request_output_tokens or self.response_output_tokens
 
         return self.response_output_tokens or self.request_output_tokens

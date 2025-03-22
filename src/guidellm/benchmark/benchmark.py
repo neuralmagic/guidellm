@@ -6,7 +6,6 @@ from pydantic import Field, computed_field
 
 from guidellm.benchmark.profile import Profile
 from guidellm.objects import (
-    DistributionSummary,
     Serializable,
     StatusDistributionSummary,
 )
@@ -14,7 +13,11 @@ from guidellm.scheduler import SchedulingStrategy
 
 __all__ = [
     "BENCH",
+    "BenchmarkArgs",
+    "BenchmarkRunStats",
     "Benchmark",
+    "GenerativeTextResponseStats",
+    "GenerativeTextErrorStats",
     "GenerativeBenchmark",
 ]
 
@@ -177,7 +180,7 @@ class Benchmark(Serializable):
             "for this benchmark."
         )
     )
-    requests_loader: Optional[Serializable] = Field(
+    request_loader: Optional[Serializable] = Field(
         description=(
             "The description and specifics for the request loader used to create "
             "requests for this benchmark."
@@ -412,7 +415,7 @@ class GenerativeBenchmark(Benchmark):
         description="The end time of the last request for the benchmark.",
     )
 
-    requests_latency: DistributionSummary = Field(
+    requests_latency: StatusDistributionSummary = Field(
         description="The distribution of latencies for the completed requests.",
     )
     prompts_token_count: StatusDistributionSummary = Field(
@@ -557,7 +560,7 @@ class GenerativeBenchmark(Benchmark):
             args=args,
             run_stats=run_stats,
             worker=worker,
-            requests_loader=requests_loader,
+            request_loader=requests_loader,
             extras=extras or {},
             completed_total=len(completed),
             completed_requests=completed,
