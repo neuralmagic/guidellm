@@ -102,6 +102,14 @@ class Backend(ABC):
         """
         ...
 
+    @property
+    @abstractmethod
+    def info(self) -> Dict[str, Any]:
+        """
+        :return: The information about the backend.
+        """
+        ...
+
     def validate(self):
         """
         Handle final setup and validate the backend is ready for use.

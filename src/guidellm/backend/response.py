@@ -1,6 +1,5 @@
 from typing import Any, Dict, Literal, Optional
 
-from loguru import logger
 from pydantic import BaseModel, computed_field
 
 from guidellm.config import settings
@@ -21,6 +20,8 @@ class StreamingTextResponse(BaseModel):
     A model representing the response content for a streaming text request.
 
     :param type_: The type of the response; either 'start' or 'iter'.
+    :param value: The value of the response up to this iteration.
+    :param start_time: The time.time() the request started.
     :param iter_count: The iteration count for the response. For 'start' this is 0
         and for the first 'iter' it is 1.
     :param delta: The text delta added to the response for this stream iteration.
@@ -30,6 +31,8 @@ class StreamingTextResponse(BaseModel):
     """
 
     type_: StreamingResponseType
+    value: str
+    start_time: float
     iter_count: int
     delta: str
     time: float
@@ -63,24 +66,36 @@ class ResponseSummary(BaseModel):
 
     :param value: The final value returned from the request.
     :param request_args: The arguments used to make the request.
+    :param iterations: The number of iterations in the request.
     :param start_time: The time the request started.
     :param end_time: The time the request ended.
-    :param iterations: The number of iterations in the request.
-    :param prompt_tokens: The number of tokens in the prompt, if any usage was returned.
-    :param output_tokens: The number of tokens in the output, if any usage was returned.
+    :param first_iter_time: The time the first iteration was received.
+    :param last_iter_time: The time the last iteration was received.
+    :param request_prompt_tokens: The number of tokens measured in the prompt
+        for the request, if any.
+    :param request_output_tokens: The number of tokens enforced for the output
+        for the request, if any.
+    :param response_prompt_tokens: The number of tokens measured in the prompt
+        for the response, if any.
+    :param response_output_tokens: The number of tokens measured in the output
+        for the response, if any.
     :param request_id: The unique identifier for the request, if any.
+    :param error: The error message, if any, returned from making the request.
     """
 
     value: str
     request_args: RequestArgs
     iterations: int = 0
-    start_time: float
-    end_time: float
+    start_time: Optional[float]
+    end_time: Optional[float]
+    first_iter_time: Optional[float]
+    last_iter_time: Optional[float]
     request_prompt_tokens: Optional[int] = None
     request_output_tokens: Optional[int] = None
     response_prompt_tokens: Optional[int] = None
     response_output_tokens: Optional[int] = None
     request_id: Optional[str] = None
+    error: Optional[str] = None
 
     @computed_field  # type: ignore[misc]
     @property
@@ -91,21 +106,7 @@ class ResponseSummary(BaseModel):
 
         :return: The number of tokens in the prompt, if any.
         """
-        if settings.preferred_prompt_tokens_source == "backend":
-            if self.response_prompt_tokens is None:
-                logger.warning(
-                    "Preferred prompt tokens source is backend, but no prompt token "
-                    f"values were returned with the response for {self}. "
-                    "Defulating to request_prompt_tokens (if available)."
-                )
-            return self.response_prompt_tokens or self.request_prompt_tokens
-        elif settings.preferred_prompt_tokens_source == "request":
-            if self.request_prompt_tokens is None:
-                logger.warning(
-                    "Preferred prompt tokens source is request, but no prompt token "
-                    f"values were returned with the request for {self}. "
-                    "Defulating to response_prompt_tokens (if available)."
-                )
+        if settings.preferred_prompt_tokens_source == "request":
             return self.request_prompt_tokens or self.response_prompt_tokens
 
         return self.response_prompt_tokens or self.request_prompt_tokens
@@ -119,21 +120,7 @@ class ResponseSummary(BaseModel):
 
         :return: The number of tokens in the output, if any.
         """
-        if settings.preferred_output_tokens_source == "backend":
-            if self.response_output_tokens is None:
-                logger.warning(
-                    "Preferred output tokens source is backend, but no output token "
-                    f"values were returned with the response for {self}. "
-                    "Defulating to request_output_tokens (if available)."
-                )
-            return self.response_output_tokens or self.request_output_tokens
-        elif settings.preferred_output_tokens_source == "request":
-            if self.request_output_tokens is None:
-                logger.warning(
-                    "Preferred output tokens source is request, but no output token "
-                    f"values were returned with the request for {self}. "
-                    "Defulating to response_output_tokens (if available)."
-                )
+        if settings.preferred_output_tokens_source == "request":
             return self.request_output_tokens or self.response_output_tokens
 
         return self.response_output_tokens or self.request_output_tokens

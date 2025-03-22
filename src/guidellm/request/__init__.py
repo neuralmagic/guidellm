@@ -1,13 +1,7 @@
-from .base import GenerationMode, RequestGenerator
-from .emulated import EmulatedConfig, EmulatedRequestGenerator
-from .file import FileRequestGenerator
-from .transformers import TransformersDatasetRequestGenerator
+from .loader import RequestLoader
+from .request import GenerationRequest
 
 __all__ = [
-    "EmulatedConfig",
-    "EmulatedRequestGenerator",
-    "FileRequestGenerator",
-    "GenerationMode",
-    "RequestGenerator",
-    "TransformersDatasetRequestGenerator",
+    "GenerationRequest",
+    "RequestLoader",
 ]
