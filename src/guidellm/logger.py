@@ -78,6 +78,4 @@ def configure_logger(config: LoggingSettings = settings.logging):
         logger.add(log_file, level=log_file_level.upper(), serialize=True)
 
 
-# invoke logger setup on import with default values
-# enabling console logging with INFO and disabling file logging
 configure_logger()
