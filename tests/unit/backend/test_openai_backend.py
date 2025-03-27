@@ -1,282 +1,199 @@
-from unittest.mock import AsyncMock, Mock, patch
+import time
 
 import pytest
 
-from guidellm.backend import Backend, OpenAIBackend
-from guidellm.config import reload_settings, settings
-from guidellm.core import TextGenerationRequest
-
-
-@pytest.fixture()
-def mock_openai_client():
-    with patch("guidellm.backend.openai.AsyncOpenAI") as mock_async_const, patch(
-        "guidellm.backend.openai.OpenAI"
-    ) as mock_sync_const:
-        mock_model = Mock()
-        mock_model.id = "mock-model"
-        mock_model_2 = Mock()
-        mock_model_2.id = "mock-model-2"
-        mock_model_data = Mock()
-        mock_model_data.data = [mock_model, mock_model_2]
-
-        def create_async_create(inst):
-            async def stream():
-                for ind in range(3):
-                    choice = Mock()
-                    choice.delta.content = f"token{ind}" if ind % 2 == 0 else " "
-                    choice.finish_reason = None
-                    chunk = Mock()
-                    chunk.choices = [choice]
-
-                    yield chunk
-
-                choice = Mock()
-                choice.finish_reason = "stop"
-                chunk = Mock()
-                chunk.choices = [choice]
-                yield chunk
-
-            async def create(*args, **kwargs):
-                inst.create_args = args
-                inst.create_kwargs = kwargs
-                return stream()
-
-            return create
-
-        def async_constructor(*args, **kwargs):
-            mock_async_instance = AsyncMock()
-            mock_async_instance.models.list.return_value = mock_model_data
-            mock_async_instance.args = args
-            mock_async_instance.kwargs = kwargs
-            mock_async_instance.chat.completions.create.side_effect = (
-                create_async_create(mock_async_instance)
-            )
-
-            return mock_async_instance
-
-        def sync_constructor(*args, **kwargs):
-            mock_sync_instance = Mock()
-            mock_sync_instance.models.list.return_value = mock_model_data
-            mock_sync_instance.args = args
-            mock_sync_instance.kwargs = kwargs
-            return mock_sync_instance
-
-        mock_async_const.side_effect = async_constructor
-        mock_sync_const.side_effect = sync_constructor
-        yield mock_async_const, mock_sync_const
+from guidellm.backend import OpenAIHTTPBackend, ResponseSummary, StreamingTextResponse
+from guidellm.config import settings
 
 
 @pytest.mark.smoke()
-@pytest.mark.parametrize(
-    (
-        "openai_api_key",
-        "target",
-        "model",
-        "request_args",
-        "expected_base_url",
-    ),
-    [
-        (
-            "test_key",
-            "http://test-target",
-            "test-model",
-            {"arg1": "value1"},
-            "http://test-target",
-        ),
-        (None, None, None, {}, settings.openai.base_url),
-    ],
-)
-def test_openai_backend_create(
-    openai_api_key,
-    target,
-    model,
-    request_args,
-    expected_base_url,
-    mock_openai_client,
-):
-    backends = [
-        Backend.create(
-            "openai_server",
-            openai_api_key=openai_api_key,
-            target=target,
-            model=model,
-            **request_args,
-        ),
-        OpenAIBackend(
-            openai_api_key=openai_api_key,
-            target=target,
-            model=model,
-            **request_args,
-        ),
-    ]
-
-    for backend in backends:
-        assert backend._async_client.kwargs["api_key"] == (  # type: ignore
-            openai_api_key or settings.openai.api_key
-        )
-        assert backend._async_client.kwargs["base_url"] == expected_base_url  # type: ignore
-        assert backend._client.kwargs["api_key"] == (  # type: ignore
-            openai_api_key or settings.openai.api_key
-        )
-        assert backend._client.kwargs["base_url"] == expected_base_url  # type: ignore
-        if model:
-            assert backend._model == model  # type: ignore
+def test_openai_http_backend_default_initialization():
+    backend = OpenAIHTTPBackend()
+    assert backend.target == settings.openai.base_url
+    assert backend.model is None
+    assert backend.authorization == settings.openai.bearer_token
+    assert backend.organization == settings.openai.organization
+    assert backend.project == settings.openai.project
+    assert backend.timeout == settings.request_timeout
+    assert backend.http2 is True
+    assert backend.max_output_tokens == settings.openai.max_output_tokens
 
 
 @pytest.mark.smoke()
-def test_openai_backend_models(mock_openai_client):
-    backend = OpenAIBackend()
-    assert backend.available_models() == ["mock-model", "mock-model-2"]
-    assert backend.default_model == "mock-model"
+def test_openai_http_backend_intialization():
+    backend = OpenAIHTTPBackend(
+        target="http://test-target",
+        model="test-model",
+        api_key="test-key",
+        organization="test-org",
+        project="test-proj",
+        timeout=10,
+        http2=False,
+        max_output_tokens=100,
+    )
+    assert backend.target == "http://test-target"
+    assert backend.model == "test-model"
+    assert backend.authorization == "Bearer test-key"
+    assert backend.organization == "test-org"
+    assert backend.project == "test-proj"
+    assert backend.timeout == 10
+    assert backend.http2 is False
+    assert backend.max_output_tokens == 100
+
+
+@pytest.mark.smoke()
+def test_openai_http_backend_available_models(httpx_openai_mock):
+    backend = OpenAIHTTPBackend(target="http://target.mock")
+    models = backend.available_models()
+    assert models == ["mock-model"]
+
+
+@pytest.mark.smoke()
+def test_openai_http_backend_validate(httpx_openai_mock):
+    backend = OpenAIHTTPBackend(target="http://target.mock", model="mock-model")
+    backend.validate()
+
+    backend = OpenAIHTTPBackend(target="http://target.mock")
+    backend.validate()
     assert backend.model == "mock-model"
 
+    backend = OpenAIHTTPBackend(target="http://target.mock", model="invalid-model")
+    with pytest.raises(ValueError):
+        backend.validate()
+
 
 @pytest.mark.smoke()
-@pytest.mark.parametrize(
-    ("req", "request_args"),
-    [
-        (TextGenerationRequest(prompt="Test"), None),
-        (
-            TextGenerationRequest(prompt="Test", params={"generated_tokens": 10}),
-            None,
-        ),
-        (
-            TextGenerationRequest(prompt="Test", params={"generated_tokens": 10}),
-            {"max_tokens": 10},
-        ),
-        (
-            TextGenerationRequest(prompt="Test"),
-            {"max_tokens": 10, "stop": "stop"},
-        ),
-    ],
-)
 @pytest.mark.asyncio()
-async def test_openai_backend_make_request(req, request_args, mock_openai_client):
-    backend = OpenAIBackend(**(request_args or {}))
-    counter = 0
+async def test_openai_http_backend_text_completions(httpx_openai_mock):
+    backend = OpenAIHTTPBackend(target="http://target.mock", model="mock-model")
 
-    async for response in backend.make_request(req):
-        if counter < 3:
-            assert response.type_ == "token_iter"
-            assert response.add_token == f"token{counter}" if counter % 2 == 0 else " "
-        elif counter == 3:
-            assert response.type_ == "final"
+    index = 0
+    final_resp = None
+    async for response in backend.text_completions("Test Prompt", request_id="test-id"):
+        assert isinstance(response, (StreamingTextResponse, ResponseSummary))
+
+        if index == 0:
+            assert isinstance(response, StreamingTextResponse)
+            assert response.type_ == "start"
+            assert response.iter_count == 0
+            assert response.delta == ""
+            assert response.time == pytest.approx(time.time(), abs=0.01)
+            assert response.request_id == "test-id"
+        elif not isinstance(response, ResponseSummary):
+            assert response.type_ == "iter"
+            assert response.iter_count == index
+            assert len(response.delta) > 0
+            assert response.time == pytest.approx(time.time(), abs=0.01)
+            assert response.request_id == "test-id"
         else:
-            raise ValueError("Too many responses received from the backend")
+            assert not final_resp
+            final_resp = response
+            assert isinstance(response, ResponseSummary)
+            assert len(response.value) > 0
+            assert response.request_args is not None
+            assert response.iterations > 0
+            assert response.start_time > 0
+            assert response.end_time == pytest.approx(time.time(), abs=0.01)
+            assert response.request_prompt_tokens is None
+            assert response.request_output_tokens is None
+            assert response.response_prompt_tokens == 3
+            assert response.response_output_tokens > 0  # type: ignore
+            assert response.request_id == "test-id"
 
-        counter += 1
-
-    # check the kwargs passed to the openai client
-    # now that the generator has been consumed
-    assert backend._async_client.create_args == ()  # type: ignore
-    assert backend._async_client.create_kwargs["model"] == "mock-model"  # type: ignore
-    assert backend._async_client.create_kwargs["messages"] == [  # type: ignore
-        {"role": "user", "content": req.prompt}
-    ]
-    assert backend._async_client.create_kwargs["stream"]  # type: ignore
-    assert backend._async_client.create_kwargs["n"] == 1  # type: ignore
-
-    if req.output_token_count is not None:
-        assert (
-            backend._async_client.create_kwargs["max_tokens"] == req.output_token_count  # type: ignore
-        )
-        assert backend._async_client.create_kwargs["stop"] is None  # type: ignore
-    elif request_args is not None and "max_tokens" not in request_args:
-        assert (
-            backend._async_client.create_kwargs["max_tokens"]  # type: ignore
-            == settings.openai.max_gen_tokens
-        )
-
-    if request_args:
-        for key, value in request_args.items():
-            assert backend._async_client.create_kwargs[key] == value  # type: ignore
+        index += 1
+    assert final_resp
 
 
-@pytest.mark.sanity()
+@pytest.mark.smoke()
 @pytest.mark.asyncio()
-async def test_openai_backend_submit(mock_openai_client):
-    backend = OpenAIBackend()
-    request = TextGenerationRequest(prompt="Test", prompt_token_count=1)
-    result = await backend.submit(request)
-
-    assert result.request == request
-    assert result.prompt == request.prompt
-    assert result.prompt_token_count == 1
-    assert result.output == "token0 token2"
-    assert result.output_token_count == 3
-    assert result.last_time is not None
-    assert result.first_token_set
-    assert result.start_time is not None
-    assert result.first_token_time is not None
-    assert result.end_time is not None
-    assert len(result.decode_times) == 2
-
-
-@pytest.mark.sanity()
-def test_openai_backend_api_key(mock_openai_client):
-    backend = OpenAIBackend()
-    assert backend._async_client.kwargs["api_key"] == settings.openai.api_key  # type: ignore
-    assert backend._client.kwargs["api_key"] == settings.openai.api_key  # type: ignore
-
-    backend = OpenAIBackend(openai_api_key="test_key")
-    assert backend._async_client.kwargs["api_key"] == "test_key"  # type: ignore
-    assert backend._client.kwargs["api_key"] == "test_key"  # type: ignore
-
-
-@pytest.mark.sanity()
-def test_openai_backend_api_key_env(mock_openai_client, mocker):
-    mocker.patch.dict(
-        "os.environ",
-        {
-            "GUIDELLM__OPENAI__API_KEY": "test_key",
-        },
+async def test_openai_http_backend_text_completions_counts(httpx_openai_mock):
+    backend = OpenAIHTTPBackend(
+        target="http://target.mock",
+        model="mock-model",
+        max_output_tokens=100,
     )
-    reload_settings()
+    final_resp = None
 
-    backend = OpenAIBackend()
-    assert backend._async_client.kwargs["api_key"] == "test_key"  # type: ignore
-    assert backend._client.kwargs["api_key"] == "test_key"  # type: ignore
+    async for response in backend.text_completions(
+        "Test Prompt", request_id="test-id", prompt_token_count=3, output_token_count=10
+    ):
+        final_resp = response
 
-
-@pytest.mark.sanity()
-def test_openai_backend_target(mock_openai_client):
-    backend = OpenAIBackend(target="http://test-target")
-    assert backend._async_client.kwargs["base_url"] == "http://test-target"  # type: ignore
-    assert backend._client.kwargs["base_url"] == "http://test-target"  # type: ignore
-
-    backend = OpenAIBackend()
-    assert backend._async_client.kwargs["base_url"] == "http://localhost:8000/v1"  # type: ignore
-    assert backend._client.kwargs["base_url"] == "http://localhost:8000/v1"  # type: ignore
-
-    backend = OpenAIBackend()
-    assert backend._async_client.kwargs["base_url"] == settings.openai.base_url  # type: ignore
-    assert backend._client.kwargs["base_url"] == settings.openai.base_url  # type: ignore
+    assert final_resp
+    assert isinstance(final_resp, ResponseSummary)
+    assert len(final_resp.value) > 0
+    assert final_resp.request_args is not None
+    assert final_resp.request_prompt_tokens == 3
+    assert final_resp.request_output_tokens == 10
+    assert final_resp.response_prompt_tokens == 3
+    assert final_resp.response_output_tokens == 10
+    assert final_resp.request_id == "test-id"
 
 
-@pytest.mark.sanity()
-def test_openai_backend_target_env(mock_openai_client, mocker):
-    mocker.patch.dict(
-        "os.environ",
-        {
-            "GUIDELLM__OPENAI__BASE_URL": "http://test-target",
-        },
+@pytest.mark.smoke()
+@pytest.mark.asyncio()
+async def test_openai_http_backend_chat_completions(httpx_openai_mock):
+    backend = OpenAIHTTPBackend(target="http://target.mock", model="mock-model")
+
+    index = 0
+    final_resp = None
+    async for response in backend.chat_completions("Test Prompt", request_id="test-id"):
+        assert isinstance(response, (StreamingTextResponse, ResponseSummary))
+
+        if index == 0:
+            assert isinstance(response, StreamingTextResponse)
+            assert response.type_ == "start"
+            assert response.iter_count == 0
+            assert response.delta == ""
+            assert response.time == pytest.approx(time.time(), abs=0.01)
+            assert response.request_id == "test-id"
+        elif not isinstance(response, ResponseSummary):
+            assert response.type_ == "iter"
+            assert response.iter_count == index
+            assert len(response.delta) > 0
+            assert response.time == pytest.approx(time.time(), abs=0.01)
+            assert response.request_id == "test-id"
+        else:
+            assert not final_resp
+            final_resp = response
+            assert isinstance(response, ResponseSummary)
+            assert len(response.value) > 0
+            assert response.request_args is not None
+            assert response.iterations > 0
+            assert response.start_time > 0
+            assert response.end_time == pytest.approx(time.time(), abs=0.01)
+            assert response.request_prompt_tokens is None
+            assert response.request_output_tokens is None
+            assert response.response_prompt_tokens == 3
+            assert response.response_output_tokens > 0  # type: ignore
+            assert response.request_id == "test-id"
+
+        index += 1
+
+    assert final_resp
+
+
+@pytest.mark.smoke()
+@pytest.mark.asyncio()
+async def test_openai_http_backend_chat_completions_counts(httpx_openai_mock):
+    backend = OpenAIHTTPBackend(
+        target="http://target.mock",
+        model="mock-model",
+        max_output_tokens=100,
     )
-    reload_settings()
+    final_resp = None
 
-    backend = OpenAIBackend()
-    assert backend._async_client.kwargs["base_url"] == "http://test-target"  # type: ignore
-    assert backend._client.kwargs["base_url"] == "http://test-target"  # type: ignore
+    async for response in backend.chat_completions(
+        "Test Prompt", request_id="test-id", prompt_token_count=3, output_token_count=10
+    ):
+        final_resp = response
 
-
-@pytest.mark.regression()
-def test_openai_backend_target_none_error(mock_openai_client, mocker):
-    mocker.patch.dict(
-        "os.environ",
-        {
-            "GUIDELLM__OPENAI__BASE_URL": "",
-        },
-    )
-    reload_settings()
-
-    with pytest.raises(ValueError):
-        OpenAIBackend(target=None)
+    assert final_resp
+    assert isinstance(final_resp, ResponseSummary)
+    assert len(final_resp.value) > 0
+    assert final_resp.request_args is not None
+    assert final_resp.request_prompt_tokens == 3
+    assert final_resp.request_output_tokens == 10
+    assert final_resp.response_prompt_tokens == 3
+    assert final_resp.response_output_tokens == 10
+    assert final_resp.request_id == "test-id"

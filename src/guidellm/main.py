@@ -1,10 +1,11 @@
 import asyncio
-from typing import Literal, Optional, Union, get_args
+from typing import Any, Literal, Mapping, Optional, Union, get_args
 
 import click
 from loguru import logger
+from transformers import AutoTokenizer  # type: ignore[import-untyped]
 
-from guidellm.backend import Backend, BackendEnginePublic
+from guidellm.backend import Backend, BackendType
 from guidellm.core import GuidanceReport, TextGenerationBenchmarkReport
 from guidellm.executor import Executor, ProfileGenerationMode
 from guidellm.request import (
@@ -26,13 +27,13 @@ __all__ = ["generate_benchmark_report"]
     required=True,
     help=(
         "The target path or url for the backend to evaluate. "
-        "Ex: 'http://localhost:8000/v1'"
+        "Ex: 'http://localhost:8000'"
     ),
 )
 @click.option(
     "--backend",
-    type=click.Choice(get_args(BackendEnginePublic)),
-    default="openai_server",
+    type=click.Choice(get_args(BackendType)),
+    default="openai_http",
     help=(
         "The backend to use for benchmarking. "
         "The default is OpenAI Server enabling compatability with any server that "
@@ -154,7 +155,7 @@ __all__ = ["generate_benchmark_report"]
 )
 def generate_benchmark_report_cli(
     target: str,
-    backend: BackendEnginePublic,
+    backend: BackendType,
     model: Optional[str],
     data: Optional[str],
     data_type: Literal["emulated", "file", "transformers"],
@@ -186,17 +187,18 @@ def generate_benchmark_report_cli(
 
 def generate_benchmark_report(
     target: str,
-    backend: BackendEnginePublic,
-    model: Optional[str],
     data: Optional[str],
     data_type: Literal["emulated", "file", "transformers"],
-    tokenizer: Optional[str],
-    rate_type: ProfileGenerationMode,
-    rate: Optional[float],
-    max_seconds: Optional[int],
-    max_requests: Union[Literal["dataset"], int, None],
-    output_path: str,
-    cont_refresh_table: bool,
+    backend: BackendType = "openai_http",
+    backend_kwargs: Optional[Mapping[str, Any]] = None,
+    model: Optional[str] = None,
+    tokenizer: Optional[str] = None,
+    rate_type: ProfileGenerationMode = "sweep",
+    rate: Optional[float] = None,
+    max_seconds: Optional[int] = 120,
+    max_requests: Union[Literal["dataset"], int, None] = None,
+    output_path: Optional[str] = None,
+    cont_refresh_table: bool = False,
 ) -> GuidanceReport:
     """
     Generate a benchmark report for a specified backend and dataset.
@@ -218,6 +220,7 @@ def generate_benchmark_report(
     :param output_path: Path to save the output report file.
     :param cont_refresh_table: Continually refresh the table in the CLI
         until the user exits.
+    :param backend_kwargs: Additional keyword arguments for the backend.
     """
     logger.info(
         "Generating benchmark report with target: {}, backend: {}", target, backend
@@ -225,10 +228,12 @@ def generate_benchmark_report(
 
     # Create backend
     backend_inst = Backend.create(
-        backend_type=backend,
+        type_=backend,
         target=target,
         model=model,
+        **(backend_kwargs or {}),
     )
+    backend_inst.validate()
 
     request_generator: RequestGenerator
 
@@ -236,7 +241,7 @@ def generate_benchmark_report(
     tokenizer_inst = tokenizer
     if not tokenizer_inst:
         try:
-            tokenizer_inst = backend_inst.model_tokenizer()
+            tokenizer_inst = AutoTokenizer.from_pretrained(backend_inst.model)
         except Exception as err:
             raise ValueError(
                 "Could not load model's tokenizer, "

@@ -170,7 +170,7 @@ class Executor:
             logger.debug("Generated profile: {}", profile)
             scheduler = Scheduler(
                 generator=self.request_generator,
-                worker=self.backend,
+                backend=self.backend,
                 mode=profile.load_gen_mode,
                 rate=profile.load_gen_rate,
                 max_number=self.max_number or profile.args.get("max_number", None),

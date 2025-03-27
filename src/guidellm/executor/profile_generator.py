@@ -324,9 +324,6 @@ class ProfileGenerator:
 
         if index == 1:
             throughput_profile: Profile = ProfileGenerator.create_throughput_profile(0)  # type: ignore  # noqa: PGH003
-            # set the max number of requests to 5 times the number of requests
-            # incase it is not set for the sweep to limit the number of requests
-            throughput_profile.args = {"max_number": sync_benchmark.request_count * 5}
             return throughput_profile
 
         if not throughput_benchmark:

@@ -4,7 +4,6 @@ from pathlib import Path
 import pytest
 
 from guidellm.core import (
-    Distribution,
     GuidanceReport,
     TextGenerationBenchmark,
     TextGenerationBenchmarkReport,
@@ -16,21 +15,15 @@ from guidellm.core import (
 @pytest.fixture()
 def sample_benchmark_report() -> TextGenerationBenchmarkReport:
     sample_request = TextGenerationRequest(prompt="sample prompt")
-    sample_distribution = Distribution()
     sample_result = TextGenerationResult(
         request=sample_request,
-        prompt="sample prompt",
-        prompt_word_count=2,
         prompt_token_count=2,
         output="sample output",
-        output_word_count=2,
         output_token_count=2,
-        last_time=None,
-        first_token_set=False,
         start_time=None,
         end_time=None,
         first_token_time=None,
-        decode_times=sample_distribution,
+        last_token_time=None,
     )
     sample_benchmark = TextGenerationBenchmark(
         mode="asynchronous",
