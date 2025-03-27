@@ -133,6 +133,7 @@ def generate_workload_details(report: TextGenerationBenchmarkReport, benchmarks:
             **output_token_data
         },
         "requestsOverTime": request_over_time_results,
+        "rateType": report.args["mode"],
         "server": {
             "target": report.args.get('target', 'N/A')
         }
@@ -223,7 +224,7 @@ def generate_js_variable(variable_name: str, data: dict) -> str:
     return f'`window.{variable_name} = {json_data};`'  # Wrap in quotes
 
 def generate_ui_api_data(report: TextGenerationBenchmarkReport):
-    filtered_benchmarks = list(filter(lambda bm: bm.completed_request_rate > 0, report.benchmarks))
+    filtered_benchmarks = list(filter(lambda bm: (bm.completed_request_rate > 0) and bm.mode != 'throughput', report.benchmarks))
     run_info_data = generate_run_info(report, filtered_benchmarks)
     workload_details_data = generate_workload_details(report, filtered_benchmarks)
     benchmarks_data = generate_benchmarks_json(filtered_benchmarks)
