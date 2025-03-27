@@ -1,0 +1,93 @@
+# GNU GENERAL PUBLIC LICENSE
+# Version 3, 29 June 2007
+#
+# Copyright (C) 2025 authors
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+---
+name: PullHero Cleanup Branches with -pullhero-improvements Suffix
+on:
+  schedule:
+    - cron: '0 0 * * *'  # Runs daily at midnight UTC
+  workflow_dispatch:
+
+jobs:
+  pullhero-cleanup:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Cleanup branches with -pullhero-improvements suffix
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const { data: branches } = await github.repos.listBranches({
+              owner: context.repo.owner,
+              repo: context.repo.repo
+            });
+
+            const targetBranches = branches.filter(branch => branch.name.endsWith("-pullhero-improvements"));
+            
+            for (const branch of targetBranches) {
+              const branchName = branch.name;
+              console.log(`Checking branch: ${branchName}`);
+
+              // List open pull requests that use the branch as head.
+              const { data: prs } = await github.pulls.list({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                state: "open",
+                head: `${context.repo.owner}:${branchName}`
+              });
+
+              if (prs.length === 0) {
+                console.log(`No open PR found for branch '${branchName}'. Deleting branch.`);
+                await github.git.deleteRef({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  ref: `heads/${branchName}`
+                });
+                continue;
+              }
+
+              // If a PR exists, check its age.
+              const now = new Date();
+              let shouldDelete = false;
+              for (const pr of prs) {
+                const createdAt = new Date(pr.created_at);
+                const diffDays = (now - createdAt) / (1000 * 60 * 60 * 24);
+                console.log(`PR #${pr.number} is ${diffDays.toFixed(1)} days old.`);
+                if (diffDays > 15) {
+                  shouldDelete = true;
+                  break;
+                }
+              }
+
+              if (shouldDelete) {
+                console.log(`Branch '${branchName}' has an open PR older than 15 days. Deleting branch.`);
+                await github.git.deleteRef({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  ref: `heads/${branchName}`
+                });
+              } else {
+                console.log(`Branch '${branchName}' has an open PR less than 15 days old. No deletion performed.`);
+              }
+            }

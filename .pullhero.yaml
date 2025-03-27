@@ -1,0 +1,20 @@
+---
+extensions:
+  - py
+  - go
+
+skip:
+  - .pullhero.yaml
+
+# task_prompt: |
+# Code Improvement Task
+# 
+# Repository Context:
+# {code_context}
+# 
+# Current Code:
+# ```
+# {current_code}
+# ```
+# 
+# <YOUR PROMPT>

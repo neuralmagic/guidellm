@@ -1,0 +1,96 @@
+# GNU GENERAL PUBLIC LICENSE
+# Version 3, 29 June 2007
+#
+# Copyright (C) 2025 authors
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+---
+name: PullHero Auto Merge Approved PRs
+
+on:
+  schedule:
+    - cron: '0 */2 * * *'  # Runs every 2 hours
+  workflow_dispatch:
+
+jobs:
+  pullhero-automerge:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: write
+      issues: write
+      statuses: write
+
+    steps:
+      - name: Auto Merge Eligible PRs
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            // Fetch all open pull requests
+            const prs = await github.rest.pulls.list({
+              owner,
+              repo,
+              state: "open"
+            });
+            console.log(`Found ${prs.data.length} open PR(s).`);
+
+            for (const pr of prs.data) {
+              // Get all comments for the current PR
+              const comments = await github.rest.issues.listComments({
+                owner,
+                repo,
+                issue_number: pr.number
+              });
+
+              // Filter comments made by the GitHub Action bot
+              const botComments = comments.data.filter(comment => comment.user.type === 'Bot');
+
+              // Track votes based on bot comments
+              let approves = 0;
+              let changesRequested = 0;
+
+              for (const comment of botComments) {
+                if (comment.body.includes("Vote: +1")) {
+                  approves++;
+                } else if (comment.body.includes("Vote: -1")) {
+                  changesRequested++;
+                }
+              }
+
+              const totalReviews = approves + changesRequested;
+              console.log(`PR #${pr.number} review stats -> Approvals: ${approves}, Changes Requested: ${changesRequested}, Total: ${totalReviews}`);
+
+              // Check if there are at least 3 reviews and a majority of approvals
+              if (totalReviews >= 3 && approves > totalReviews / 2) {
+                console.log(`PR #${pr.number} meets the conditions. Attempting merge...`);
+                try {
+                  await github.rest.pulls.merge({
+                    owner,
+                    repo,
+                    pull_number: pr.number,
+                    commit_title: `Auto-merged PR #${pr.number}`,
+                    merge_method: "merge"
+                  });
+                  console.log(`PR #${pr.number} merged successfully.`);
+                } catch (error) {
+                  console.log(`Failed to merge PR #${pr.number}: ${error.message}`);
+                }
+              } else {
+                console.log(`PR #${pr.number} does not meet the merge criteria. Skipping.`);
+              }
+            }

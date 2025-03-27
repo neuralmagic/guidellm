@@ -1,0 +1,73 @@
+# GNU GENERAL PUBLIC LICENSE
+# Version 3, 29 June 2007
+#
+# Copyright (C) 2025 authors
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+---
+name: PullHero Assisted Documentation workflow
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to use for the documentation update'
+        required: false
+        default: 'main'
+
+jobs:
+  pullhero-document:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        #with:
+        #  persist-credentials: false
+        #  ref: ${{ github.event.issue.pull_request.head.ref }}
+        #  repository: ${{ github.repository }}
+
+      - name: Show Repository and Branch Info
+        run: |
+          echo "Repository: ${{ github.repository }}"
+          echo "Branch: ${{ github.event.inputs.branch || 'main' }}"
+
+      - name: Debug Secret Variables
+        run: |
+          echo "Verifying Secret Variables..."
+          if [[ -z "${{ secrets.OPENAI_API_KEY }}" ]]; then
+            echo "ERROR: OPENAI_API_KEY is missing!"
+          else
+            echo "OPENAI_API_KEY is set. (Length: ${#OPENAI_API_KEY})"
+          fi
+          if [[ -z "${{ secrets.GITHUB_TOKEN }}" ]]; then
+            echo "ERROR: GITHUB_TOKEN is missing!"
+          else
+            echo "GITHUB_TOKEN is set. (Length: ${#GITHUB_TOKEN})"
+          fi
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run PullHero documentation agent
+        uses: pullhero/document@main
+        with:
+          github-token: "${{ secrets.GITHUB_TOKEN }}"
+          api-key: "${{ secrets.OPENAI_API_KEY }}"
+          api-host: "api.openai.com"
+          api-model: "gpt-4o-mini"
