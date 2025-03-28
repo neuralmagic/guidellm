@@ -1,0 +1,516 @@
+import math
+import time as timer
+from collections import defaultdict
+from typing import List, Literal, Optional, Tuple
+
+import numpy as np
+from pydantic import Field, computed_field
+
+from guidellm.objects import Serializable
+
+__all__ = [
+    "Percentiles",
+    "DistributionSummary",
+    "StatusDistributionSummary",
+    "RunningStats",
+]
+
+
+class Percentiles(Serializable):
+    """
+    A serializable model representing percentiles of a distribution.
+    """
+
+    p001: float = Field(
+        description="The 0.1th percentile of the distribution.",
+    )
+    p01: float = Field(
+        description="The 1st percentile of the distribution.",
+    )
+    p05: float = Field(
+        description="The 5th percentile of the distribution.",
+    )
+    p10: float = Field(
+        description="The 10th percentile of the distribution.",
+    )
+    p25: float = Field(
+        description="The 25th percentile of the distribution.",
+    )
+    p75: float = Field(
+        description="The 75th percentile of the distribution.",
+    )
+    p90: float = Field(
+        description="The 90th percentile of the distribution.",
+    )
+    p95: float = Field(
+        description="The 95th percentile of the distribution.",
+    )
+    p99: float = Field(
+        description="The 99th percentile of the distribution.",
+    )
+    p999: float = Field(
+        description="The 99.9th percentile of the distribution.",
+    )
+
+
+class DistributionSummary(Serializable):
+    """
+    A serializable model representing a statistical summary for a given
+    distribution of numerical values.
+    """
+
+    mean: float = Field(
+        description="The mean/average of the distribution.",
+    )
+    median: float = Field(
+        description="The median of the distribution.",
+    )
+    mode: float = Field(
+        description="The mode of the distribution.",
+    )
+    variance: float = Field(
+        description="The variance of the distribution.",
+    )
+    std_dev: float = Field(
+        description="The standard deviation of the distribution.",
+    )
+    min: float = Field(
+        description="The minimum value of the distribution.",
+    )
+    max: float = Field(
+        description="The maximum value of the distribution.",
+    )
+    count: int = Field(
+        description="The number of values in the distribution.",
+    )
+    percentiles: Percentiles = Field(
+        description="The percentiles of the distribution.",
+    )
+    cumulative_distribution_function: Optional[List[Tuple[float, float]]] = Field(
+        description=("The cumulative distribution function (CDF) of the distribution."),
+        default=None,
+    )
+
+    @staticmethod
+    def from_distribution_function(
+        distribution: List[Tuple[float, float]],
+        include_cdf: bool = False,
+    ) -> "DistributionSummary":
+        """
+        Calculate a distribution summary from a values or
+        probability distribution function (PDF).
+        For a PDF, it is expected to be a list of tuples where each tuple
+        contains a value and its probability.
+        The probabilities across all elements should be normalized (sum to 1).
+        If the PDF is not normalized, it will be normalized.
+        The values distribution function is a list of tuples where each tuple
+        contains a value and some weighting for that value.
+        The weightings will be normalized to a probability distribution function.
+
+        :param pdf: A list of tuples representing the PDF.
+            Each tuple contains a value and its probability.
+        :param include_cdf: Whether to include the cumulative distribution function
+            in the output DistributionSummary.
+        :return: An instance of DistributionSummary with calculated values.
+        """
+        values, weights = zip(*distribution) if distribution else ([], [])
+        values = np.array(values)
+        weights = np.array(weights)
+
+        # create the PDF
+        probabilities = weights / np.sum(weights)
+        pdf = np.column_stack((values, probabilities))
+        pdf = pdf[np.argsort(pdf[:, 0])]
+        values = pdf[:, 0]
+        probabilities = pdf[:, 1]
+
+        # calculate the CDF
+        cumulative_probabilities = np.cumsum(probabilities)
+        cdf = np.column_stack((values, cumulative_probabilities))
+
+        # calculate statistics
+        mean = np.sum(values * probabilities).item()
+        median = cdf[np.argmax(cdf[:, 1] >= 0.5), 0].item() if len(cdf) > 0 else 0
+        mode = values[np.argmax(probabilities)].item() if len(values) > 0 else 0
+        variance = np.sum((values - mean) ** 2 * probabilities).item()
+        std_dev = math.sqrt(variance)
+        minimum = values[0].item() if len(values) > 0 else 0
+        maximum = values[-1].item() if len(values) > 0 else 0
+        count = len(values)
+
+        return DistributionSummary(
+            mean=mean,
+            median=median,
+            mode=mode,
+            variance=variance,
+            std_dev=std_dev,
+            min=minimum,
+            max=maximum,
+            count=count,
+            percentiles=(
+                Percentiles(
+                    p001=cdf[np.argmax(cdf[:, 1] >= 0.001), 0].item(),  # noqa: PLR2004
+                    p01=cdf[np.argmax(cdf[:, 1] >= 0.01), 0].item(),  # noqa: PLR2004
+                    p05=cdf[np.argmax(cdf[:, 1] >= 0.05), 0].item(),  # noqa: PLR2004
+                    p10=cdf[np.argmax(cdf[:, 1] >= 0.1), 0].item(),  # noqa: PLR2004
+                    p25=cdf[np.argmax(cdf[:, 1] >= 0.25), 0].item(),  # noqa: PLR2004
+                    p75=cdf[np.argmax(cdf[:, 1] >= 0.75), 0].item(),  # noqa: PLR2004
+                    p90=cdf[np.argmax(cdf[:, 1] >= 0.9), 0].item(),  # noqa: PLR2004
+                    p95=cdf[np.argmax(cdf[:, 1] >= 0.95), 0].item(),  # noqa: PLR2004
+                    p99=cdf[np.argmax(cdf[:, 1] >= 0.99), 0].item(),  # noqa: PLR2004
+                    p999=cdf[np.argmax(cdf[:, 1] >= 0.999), 0].item(),  # noqa: PLR2004
+                )
+                if len(cdf) > 0
+                else Percentiles(
+                    p001=0,
+                    p01=0,
+                    p05=0,
+                    p10=0,
+                    p25=0,
+                    p75=0,
+                    p90=0,
+                    p95=0,
+                    p99=0,
+                    p999=0,
+                )
+            ),
+            cumulative_distribution_function=cdf.tolist() if include_cdf else None,
+        )
+
+    @staticmethod
+    def from_values(
+        values: List[float],
+        weights: Optional[List[float]] = None,
+        include_cdf: bool = False,
+    ) -> "DistributionSummary":
+        """
+        Calculate a distribution summary from a list of values.
+        If the list is empty, all stats are set to 0.
+        If weights are provided, they are used to weight the values
+        so that the probabilities are shifted accordingly and larger
+        weights are given more importance / weight in the distribution.
+        If the weights are not provided, all values are treated equally.
+
+        :param values: A list of numerical values.
+        :param weights: A list of weights for each value.
+            If None, all values are treated equally.
+        :param include_cdf: Whether to include the cumulative distribution function
+            in the output DistributionSummary.
+        :return: An instance of DistributionSummary with calculated values.
+        """
+        if weights is None:
+            weights = [1.0] * len(values)
+
+        if len(values) != len(weights):
+            raise ValueError(
+                "The length of values and weights must be the same.",
+            )
+
+        return DistributionSummary.from_distribution_function(
+            distribution=list(zip(values, weights)),
+            include_cdf=include_cdf,
+        )
+
+    @staticmethod
+    def from_request_times(
+        requests: List[Tuple[float, float]],
+        distribution_type: Literal["concurrency", "rate"],
+        include_cdf: bool = False,
+        epsilon: float = 1e-6,
+    ) -> "DistributionSummary":
+        if distribution_type == "concurrency":
+            # convert to delta changes based on when requests were running
+            time_deltas = defaultdict(int)
+            for start, end in requests:
+                time_deltas[start] += 1
+                time_deltas[end] -= 1
+
+            # convert to the events over time measuring concurrency changes
+            events = []
+            active = 0
+
+            for time, delta in sorted(time_deltas.items()):
+                active += delta
+                events.append((time, active))
+        elif distribution_type == "rate":
+            # convert to events for when requests finished
+            global_start = min(start for start, _ in requests) if requests else 0
+            events = [(global_start, 1)] + [(end, 1) for _, end in requests]
+
+        # combine any events that are very close together
+        flattened_events = []
+        for time, val in sorted(events):
+            last_time, last_val = (
+                flattened_events[-1] if flattened_events else (None, None)
+            )
+
+            if last_time is not None and abs(last_time - time) <= epsilon:
+                flattened_events[-1] = (last_time, last_val + val)
+            else:
+                flattened_events.append((time, val))
+
+        # convert to value distribution function
+        distribution = defaultdict(float)
+
+        for ind in range(len(flattened_events) - 1):
+            start_time, value = flattened_events[ind]
+            end_time, _ = flattened_events[ind + 1]
+            duration = end_time - start_time
+
+            if distribution_type == "concurrency":
+                # weight the concurrency value by the duration
+                distribution[value] += duration
+            elif distribution_type == "rate":
+                # weight the rate value by the duration
+                rate = value / duration
+                distribution[rate] += duration
+
+        distribution = sorted(distribution.items())
+
+        return DistributionSummary.from_distribution_function(
+            distribution=distribution,
+            include_cdf=include_cdf,
+        )
+
+    @staticmethod
+    def from_iterable_request_times(
+        requests: List[Tuple[float, float]],
+        first_iter_times: List[float],
+        iter_counts: List[int],
+        first_iter_counts: Optional[List[int]] = None,
+        include_cdf: bool = False,
+        epsilon: float = 1e-6,
+    ) -> "DistributionSummary":
+        if first_iter_counts is None:
+            first_iter_counts = [1] * len(requests)
+
+        if (
+            len(requests) != len(first_iter_times)
+            or len(requests) != len(iter_counts)
+            or len(requests) != len(first_iter_counts)
+        ):
+            raise ValueError(
+                "requests, first_iter_times, iter_counts, and first_iter_counts must"
+                "be the same length."
+                f"Given {len(requests)}, {len(first_iter_times)}, {len(iter_counts)}, "
+                f"{len(first_iter_counts)}",
+            )
+
+        # first break up the requests into individual iterable events
+        events = defaultdict(int)
+        global_start = min(start for start, _ in requests) if requests else 0
+        global_end = max(end for _, end in requests) if requests else 0
+        events[global_start] = 0
+        events[global_end] = 0
+
+        for (_, end), first_iter, first_iter_count, total_count in zip(
+            requests, first_iter_times, first_iter_counts, iter_counts
+        ):
+            events[first_iter] += first_iter_count
+
+            if total_count > 1:
+                iter_latency = (end - first_iter) / (total_count - 1)
+                for ind in range(1, total_count):
+                    events[first_iter + ind * iter_latency] += 1
+
+        # combine any events that are very close together
+        flattened_events = []
+
+        for time, count in sorted(events.items()):
+            last_time, last_count = (
+                flattened_events[-1] if flattened_events else (None, None)
+            )
+
+            if last_time is not None and abs(last_time - time) <= epsilon:
+                flattened_events[-1] = (last_time, last_count + count)
+            else:
+                flattened_events.append((time, count))
+
+        # convert to value distribution function
+        distribution = defaultdict(float)
+
+        for ind in range(len(flattened_events) - 1):
+            start_time, count = flattened_events[ind]
+            end_time, _ = flattened_events[ind + 1]
+            duration = end_time - start_time
+            rate = count / duration
+            distribution[rate] += duration
+
+        distribution = sorted(distribution.items())
+
+        return DistributionSummary.from_distribution_function(
+            distribution=distribution,
+            include_cdf=include_cdf,
+        )
+
+
+class StatusDistributionSummary(Serializable):
+    """
+    A serializable model representing distribution summary statistics
+    based on groupings of status (e.g., completed, errored) for a given
+    distribution of numerical values.
+    Handles the total, completed, and errored distributions where the total
+    is the combination of the completed and errored distributions.
+    """
+
+    total: DistributionSummary = Field(
+        description="The distribution summary for all statuses (errored, completed).",
+    )
+    completed: DistributionSummary = Field(
+        description=(
+            "The distribution summary for completed statuses "
+            "(e.g., successful requests)."
+        )
+    )
+    errored: DistributionSummary = Field(
+        description=(
+            "The distribution summary for errored statuses " "(e.g., failed requests)."
+        )
+    )
+
+    @staticmethod
+    def from_values(
+        completed_values: List[float],
+        errored_values: List[float],
+        completed_weights: Optional[List[float]] = None,
+        errored_weights: Optional[List[float]] = None,
+        include_cdf: bool = False,
+    ) -> "StatusDistributionSummary":
+        if completed_weights is None:
+            completed_weights = [1.0] * len(completed_values)
+
+        if errored_weights is None:
+            errored_weights = [1.0] * len(errored_values)
+
+        return StatusDistributionSummary(
+            total=DistributionSummary.from_values(
+                values=[*completed_values, *errored_values],
+                weights=[*completed_weights, *errored_weights],
+                include_cdf=include_cdf,
+            ),
+            completed=DistributionSummary.from_values(
+                values=completed_values,
+                weights=completed_weights,
+                include_cdf=include_cdf,
+            ),
+            errored=DistributionSummary.from_values(
+                values=errored_values,
+                weights=errored_weights,
+                include_cdf=include_cdf,
+            ),
+        )
+
+    @staticmethod
+    def from_request_times(
+        completed_requests: List[Tuple[float, float]],
+        errored_requests: List[Tuple[float, float]],
+        distribution_type: Literal["concurrency", "rate"],
+        include_cdf: bool = False,
+        epsilon: float = 1e-6,
+    ) -> "StatusDistributionSummary":
+        return StatusDistributionSummary(
+            total=DistributionSummary.from_request_times(
+                requests=[*completed_requests, *errored_requests],
+                distribution_type=distribution_type,
+                include_cdf=include_cdf,
+                epsilon=epsilon,
+            ),
+            completed=DistributionSummary.from_request_times(
+                requests=completed_requests,
+                distribution_type=distribution_type,
+                include_cdf=include_cdf,
+                epsilon=epsilon,
+            ),
+            errored=DistributionSummary.from_request_times(
+                requests=errored_requests,
+                distribution_type=distribution_type,
+                include_cdf=include_cdf,
+                epsilon=epsilon,
+            ),
+        )
+
+    @staticmethod
+    def from_iterable_request_times(
+        completed_requests: List[Tuple[float, float]],
+        errored_requests: List[Tuple[float, float]],
+        completed_first_iter_times: List[float],
+        errored_first_iter_times: List[float],
+        completed_iter_counts: List[int],
+        errored_iter_counts: List[int],
+        completed_first_iter_counts: Optional[List[int]] = None,
+        errored_first_iter_counts: Optional[List[int]] = None,
+        include_cdf: bool = False,
+        epsilon: float = 1e-6,
+    ) -> "StatusDistributionSummary":
+        if completed_first_iter_counts is None:
+            completed_first_iter_counts = [1] * len(completed_requests)
+
+        if errored_first_iter_counts is None:
+            errored_first_iter_counts = [1] * len(errored_requests)
+
+        return StatusDistributionSummary(
+            total=DistributionSummary.from_iterable_request_times(
+                requests=[*completed_requests, *errored_requests],
+                first_iter_times=[
+                    *completed_first_iter_times,
+                    *errored_first_iter_times,
+                ],
+                iter_counts=[*completed_iter_counts, *errored_iter_counts],
+                first_iter_counts=[
+                    *completed_first_iter_counts,
+                    *errored_first_iter_counts,
+                ],
+                include_cdf=include_cdf,
+                epsilon=epsilon,
+            ),
+            completed=DistributionSummary.from_iterable_request_times(
+                requests=completed_requests,
+                first_iter_times=completed_first_iter_times,
+                iter_counts=completed_iter_counts,
+                first_iter_counts=completed_first_iter_counts,
+                include_cdf=include_cdf,
+                epsilon=epsilon,
+            ),
+            errored=DistributionSummary.from_iterable_request_times(
+                requests=errored_requests,
+                first_iter_times=errored_first_iter_times,
+                iter_counts=errored_iter_counts,
+                first_iter_counts=errored_first_iter_counts,
+                include_cdf=include_cdf,
+                epsilon=epsilon,
+            ),
+        )
+
+
+class RunningStats(Serializable):
+    count: int = Field(
+        default=0,
+    )
+    total: float = Field(
+        default=0.0,
+    )
+    start_time: float = Field(
+        default=timer.time,
+    )
+
+    @computed_field
+    @property
+    def mean(self) -> float:
+        if self.count == 0:
+            return 0.0
+        return self.total / self.count
+
+    @computed_field
+    @property
+    def rate(self) -> float:
+        if self.count == 0:
+            return 0.0
+        return self.total / (timer.time() - self.start_time)
+
+    def update(self, value: float, count: int = 1) -> None:
+        """
+        Update the running statistics with a new value.
+        :param value: The new value to add to the running statistics.
+        """
+        self.count += count
+        self.total += value

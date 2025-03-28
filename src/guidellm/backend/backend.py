@@ -1,4 +1,3 @@
-import asyncio
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, AsyncGenerator, Dict, List, Literal, Optional, Type, Union
@@ -102,7 +101,15 @@ class Backend(ABC):
         """
         ...
 
-    def validate(self):
+    @property
+    @abstractmethod
+    def info(self) -> Dict[str, Any]:
+        """
+        :return: The information about the backend.
+        """
+        ...
+
+    async def validate(self):
         """
         Handle final setup and validate the backend is ready for use.
         If not successful, raises the appropriate exception.
@@ -113,13 +120,10 @@ class Backend(ABC):
         if not models:
             raise ValueError("No models available for the backend")
 
-        async def _test_request():
-            async for _ in self.text_completions(
-                prompt="Test connection", output_token_count=1
-            ):  # type: ignore[attr-defined]
-                pass
-
-        asyncio.run(_test_request())
+        async for _ in self.text_completions(
+            prompt="Test connection", output_token_count=1
+        ):  # type: ignore[attr-defined]
+            pass
 
     @abstractmethod
     def check_setup(self):

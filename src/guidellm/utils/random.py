@@ -1,0 +1,42 @@
+import random
+from typing import Iterator, Optional
+
+__all__ = ["IntegerRangeSampler"]
+
+
+class IntegerRangeSampler:
+    def __init__(
+        self,
+        average: int,
+        variance: Optional[int],
+        min_value: Optional[int],
+        max_value: Optional[int],
+        random_seed: int,
+    ):
+        self.average = average
+        self.variance = variance
+        self.min_value = min_value
+        self.max_value = max_value
+        self.seed = random_seed
+        self.rng = random.Random(random_seed)
+
+    def __iter__(self) -> Iterator[int]:
+        calc_min = self.min_value
+        if not calc_min:
+            calc_min = max(
+                0, self.average - 5 * self.variance if self.variance else self.average
+            )
+        calc_max = self.max_value
+        if not calc_max:
+            calc_max = (
+                self.average + 5 * self.variance if self.variance else self.average
+            )
+
+        while True:
+            if calc_min == calc_max:
+                yield calc_min
+            elif not self.variance:
+                yield self.rng.randint(calc_min, calc_max + 1)
+            else:
+                rand = self.rng.gauss(self.average, self.variance)
+                yield round(max(calc_min, min(calc_max, rand)))

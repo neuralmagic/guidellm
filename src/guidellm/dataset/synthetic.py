@@ -1,0 +1,231 @@
+import json
+import random
+from pathlib import Path
+from typing import Any, Dict, Iterable, Iterator, Optional, Tuple, Union
+
+import yaml
+from datasets import (
+    Dataset,
+    DatasetDict,
+    IterableDataset,
+    IterableDatasetDict,
+)
+from pydantic import Field
+from transformers import PreTrainedTokenizerBase
+
+from guidellm.config import settings
+from guidellm.dataset.creator import ColumnInputTypes, DatasetCreator
+from guidellm.objects import Serializable
+from guidellm.utils import EndlessTextCreator, IntegerRangeSampler, check_load_processor
+
+__all__ = ["SyntheticDatasetCreator"]
+
+
+class SyntheticDatasetConfig(Serializable):
+    prompt_tokens: int = Field(
+        description="The average number of text tokens generated for prompts."
+    )
+    prompt_tokens_variance: Optional[int] = Field(
+        description="The variance of the number of text tokens generated for prompts.",
+        default=None,
+    )
+    prompt_tokens_min: Optional[int] = Field(
+        description="The minimum number of text tokens generated for prompts.",
+        default=None,
+    )
+    prompt_tokens_max: Optional[int] = Field(
+        description="The maximum number of text tokens generated for prompts.",
+        default=None,
+    )
+    output_tokens: int = Field(
+        description="The average number of text tokens generated for outputs.",
+    )
+    output_tokens_variance: Optional[int] = Field(
+        description="The variance of the number of text tokens generated for outputs.",
+        default=None,
+    )
+    output_tokens_min: Optional[int] = Field(
+        description="The minimum number of text tokens generated for outputs.",
+        default=None,
+    )
+    output_tokens_max: Optional[int] = Field(
+        description="The maximum number of text tokens generated for outputs.",
+        default=None,
+    )
+    samples: int = Field(
+        description="The number of samples to generate for the dataset.",
+        default=1000,
+    )
+
+    @staticmethod
+    def parse_str(data: Union[str, Path]) -> "SyntheticDatasetConfig":
+        if (
+            isinstance(data, Path)
+            or data.strip().endswith(".config")
+            or data.strip().endswith(".yaml")
+        ):
+            return SyntheticDatasetConfig.parse_config_file(data)
+
+        if data.strip().startswith("{"):
+            return SyntheticDatasetConfig.parse_json(data)
+
+        if data.count("=") > 1:
+            return SyntheticDatasetConfig.parse_key_value_pairs(data)
+
+        raise ValueError(
+            f"Unsupported data format. Expected JSON or key-value pairs, got {data}"
+        )
+
+    @staticmethod
+    def parse_json(data: str) -> "SyntheticDatasetConfig":
+        config_dict = json.loads(data.strip())
+
+        return SyntheticDatasetConfig(**config_dict)
+
+    @staticmethod
+    def parse_key_value_pairs(data: str) -> "SyntheticDatasetConfig":
+        config_dict = {}
+        items = data.strip().split(",")
+        for item in items:
+            key, value = item.split("=")
+            config_dict[key.strip()] = (
+                int(value.strip()) if value.strip().isnumeric() else value.strip()
+            )
+
+        return SyntheticDatasetConfig(**config_dict)
+
+    @staticmethod
+    def parse_config_file(data: Union[str, Path]) -> "SyntheticDatasetConfig":
+        with Path(data).open("r") as file:
+            config_dict = yaml.safe_load(file)
+
+        return SyntheticDatasetConfig(**config_dict)
+
+
+class SyntheticTextItemsGenerator(Iterable[Dict[str, Union[str, int]]]):
+    def __init__(
+        self,
+        config: SyntheticDatasetConfig,
+        processor: PreTrainedTokenizerBase,
+        random_seed: int,
+    ):
+        self.config = config
+        self.processor = processor
+        self.random_seed = random_seed
+        self.tokens = []
+        self.text_creator = EndlessTextCreator(
+            data=settings.emulated_data.source,
+            filter_start=settings.emulated_data.filter_start,
+            filter_end=settings.emulated_data.filter_end,
+        )
+
+    def __iter__(self) -> Iterator[Tuple[str, int, int]]:
+        prompt_tokens_sampler = IntegerRangeSampler(
+            average=self.config.prompt_tokens,
+            variance=self.config.prompt_tokens_variance,
+            min_value=self.config.prompt_tokens_min,
+            max_value=self.config.prompt_tokens_max,
+            random_seed=self.random_seed,
+        )
+        output_tokens_sampler = IntegerRangeSampler(
+            average=self.config.output_tokens,
+            variance=self.config.output_tokens_variance,
+            min_value=self.config.output_tokens_min,
+            max_value=self.config.output_tokens_max,
+            random_seed=self.random_seed,
+        )
+        rand = random.Random(self.random_seed)
+
+        for _, prompt_tokens, output_tokens in zip(
+            range(self.config.samples),
+            prompt_tokens_sampler,
+            output_tokens_sampler,
+        ):
+            start_index = rand.randint(0, len(self.text_creator.words))
+            yield {
+                "prompt": self._create_prompt(prompt_tokens, start_index),
+                "prompt_tokens_count": prompt_tokens,
+                "output_tokens_count": output_tokens,
+            }
+
+    def _create_prompt(self, prompt_tokens: int, start_index: int) -> str:
+        left = max(1, start_index - 2 * prompt_tokens)
+        right = start_index + 2 * prompt_tokens
+
+        while left < right:
+            mid = (left + right) // 2
+            test_prompt = self.text_creator.create_text(start_index, mid)
+            test_tokens = len(self.processor.tokenize(test_prompt))
+
+            if test_tokens == prompt_tokens:
+                return test_prompt
+            elif test_tokens < prompt_tokens:
+                left = mid + 1
+            else:
+                right = mid
+
+        return self.text_creator.create_text(start_index, left)
+
+
+class SyntheticDatasetCreator(DatasetCreator):
+    @classmethod
+    def is_supported(cls, data: Any, data_args: Optional[Dict[str, Any]]) -> bool:
+        if (
+            isinstance(data, Path)
+            and data.exists()
+            and data.suffix in {".config", ".yaml"}
+        ):
+            return True
+
+        if isinstance(data, str):
+            data_str: str = data.strip()
+            if (
+                data_str.startswith("{")
+                or data_str.count("=") > 1
+                or data_str.endswith((".config", ".yaml"))
+            ):
+                return True
+
+        return False
+
+    @classmethod
+    def handle_create(
+        cls,
+        data: Any,
+        data_args: Optional[Dict[str, Any]],
+        processor: Optional[Union[str, Path, PreTrainedTokenizerBase]],
+        processor_args: Optional[Dict[str, Any]],
+        random_seed: int,
+    ) -> Union[Dataset, DatasetDict, IterableDataset, IterableDatasetDict]:
+        processor = check_load_processor(
+            processor,
+            processor_args,
+            error_msg=(
+                "Processor/tokenizer required for synthetic dataset generation."
+            ),
+        )
+
+        config = SyntheticDatasetConfig.parse_str(data)
+        generator = SyntheticTextItemsGenerator(config, processor, random_seed)
+        items = list(generator)
+
+        return Dataset.from_list(items, **(data_args or {}))
+
+    @classmethod
+    def extract_args_column_mappings(
+        cls,
+        data_args: Optional[Dict[str, Any]],
+    ) -> Dict[ColumnInputTypes, str]:
+        data_args_columns = super().extract_args_column_mappings(data_args)
+
+        if data_args_columns:
+            raise ValueError(
+                f"Column mappings are not supported for synthetic datasets. "
+                f"Got {data_args_columns}"
+            )
+
+        return {
+            "prompt_column": "prompt",
+            "prompt_tokens_count_column": "prompt_tokens_count",
+            "output_tokens_count_column": "output_tokens_count",
+        }

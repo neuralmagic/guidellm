@@ -14,6 +14,6 @@ transformers.logging.set_verbosity_error()  # Silence warnings for transformers
 
 from .config import settings
 from .logger import configure_logger, logger
-from .main import generate_benchmark_report
+# from .main import generate_benchmark_report
 
 __all__ = ["configure_logger", "logger", "settings", "generate_benchmark_report"]

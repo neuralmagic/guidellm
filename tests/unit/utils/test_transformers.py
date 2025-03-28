@@ -8,7 +8,7 @@ from datasets import (  # type: ignore
     IterableDatasetDict,
 )
 
-from guidellm.utils.transformers import (
+from guidellm.utils.hf_transformers import (
     load_transformers_dataset,
     resolve_transformers_dataset,
     resolve_transformers_dataset_column,

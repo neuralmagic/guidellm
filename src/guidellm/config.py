@@ -139,19 +139,26 @@ class Settings(BaseSettings):
 
     # general settings
     env: Environment = Environment.PROD
+    default_async_loop_sleep: float = 10e-5
+    logging: LoggingSettings = LoggingSettings()
+    num_sweep_profiles: int = 9
+
+    # HTTP settings
     request_timeout: int = 60 * 5  # 5 minutes
     request_http2: bool = True
+
+    # Scheduler settings
     max_concurrency: int = 512
-    num_sweep_profiles: int = 9
-    logging: LoggingSettings = LoggingSettings()
+    max_worker_processes: int = 10
+    max_add_requests_per_loop: int = 20
 
     # Data settings
     dataset: DatasetSettings = DatasetSettings()
     emulated_data: EmulatedDataSettings = EmulatedDataSettings()
 
     # Request/stats settings
-    preferred_prompt_tokens_source: Optional[Literal["backend", "local"]] = None
-    preferred_output_tokens_source: Optional[Literal["backend", "local"]] = None
+    preferred_prompt_tokens_source: Optional[Literal["request", "response"]] = None
+    preferred_output_tokens_source: Optional[Literal["request", "response"]] = None
     preferred_backend: Literal["openai"] = "openai"
     openai: OpenAISettings = OpenAISettings()
 
