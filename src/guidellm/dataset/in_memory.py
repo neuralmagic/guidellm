@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Any, Dict, Iterable, Optional, Union
 
 from datasets import (
@@ -23,7 +24,9 @@ class InMemoryDatasetCreator(DatasetCreator):
         cls,
         data: Any,
         data_args: Optional[Dict[str, Any]],
-        processor: PreTrainedTokenizerBase,
+        processor: Optional[Union[str, Path, PreTrainedTokenizerBase]],
+        processor_args: Optional[Dict[str, Any]],
+        random_seed: int,
     ) -> Union[Dataset, DatasetDict, IterableDataset, IterableDatasetDict]:
         if not isinstance(data, Iterable):
             raise TypeError(

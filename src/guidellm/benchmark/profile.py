@@ -198,6 +198,13 @@ class AsyncProfile(ThroughputProfile):
             "to reach target rate. False to not send an initial burst."
         ),
     )
+    random_seed: int = Field(
+        default=42,
+        description=(
+            "The random seed to use for the asynchronous strategy. "
+            "This is used to generate random numbers for the Poisson strategy."
+        ),
+    )
 
     @property
     def strategy_types(self) -> List[StrategyType]:
@@ -222,6 +229,7 @@ class AsyncProfile(ThroughputProfile):
                 rate=rate[self.completed_strategies],
                 initial_burst=self.initial_burst,
                 max_concurrency=self.max_concurrency,
+                random_seed=self.random_seed,
             )
         else:
             raise ValueError(f"Invalid strategy type: {self.strategy_type}")
@@ -230,6 +238,7 @@ class AsyncProfile(ThroughputProfile):
     def from_standard_args(
         rate_type: Union[StrategyType, ProfileType],
         rate: Optional[Union[float, Sequence[float]]],
+        random_seed: int,
         **kwargs,
     ) -> "AsyncProfile":
         if rate_type not in ("async", "constant", "poisson"):
@@ -255,6 +264,7 @@ class AsyncProfile(ThroughputProfile):
         return AsyncProfile(
             strategy_type=rate_type,
             rate=rate,
+            random_seed=random_seed,
             **kwargs,
         )
 
@@ -270,7 +280,7 @@ class SweepProfile(AsyncProfile):
     @property
     def strategy_types(self) -> List[StrategyType]:
         return (
-            ["synchronous"] + [self.rate_type] * (self.sweep_size - 2) + ["throughput"]
+            ["synchronous"] + ["throughput"] + [self.rate_type] * (self.sweep_size - 2)
         )
 
     def next_strategy(self) -> Optional[SchedulingStrategy]:
@@ -287,7 +297,7 @@ class SweepProfile(AsyncProfile):
 
         min_rate = self.measured_rates[0]
         max_rate = self.measured_rates[1]
-        rates = np.linspace(min_rate, max_rate, self.sweep_size)[1:-1]
+        rates = np.linspace(min_rate, max_rate, self.sweep_size - 1)[1:]
 
         if self.rate_type == "constant":
             return AsyncConstantStrategy(
@@ -308,6 +318,7 @@ class SweepProfile(AsyncProfile):
     def from_standard_args(
         rate_type: Union[StrategyType, ProfileType],
         rate: Optional[Union[float, Sequence[float]]],
+        random_seed: int,
         **kwargs,
     ) -> "SweepProfile":
         if rate_type != "sweep":
@@ -321,17 +332,28 @@ class SweepProfile(AsyncProfile):
                 "Rate (sweep_size) must be provided for concurrent profile."
             )
 
-        if not isinstance(rate, float) or not rate.is_integer() or rate <= 1:
+        if (
+            not isinstance(rate, (int, float))
+            or (isinstance(rate, float) and not rate.is_integer())
+            or rate <= 1
+        ):
             raise ValueError(
                 f"Rate (sweep_size) must be a positive integer > 1, received {rate}"
             )
 
-        return SweepProfile(sweep_size=rate, **kwargs)
+        if not kwargs:
+            kwargs = {}
+
+        if "strategy_type" not in kwargs:
+            kwargs["strategy_type"] = "constant"
+
+        return SweepProfile(sweep_size=rate, random_seed=random_seed, **kwargs)
 
 
 def create_profile(
     rate_type: Union[StrategyType, ProfileType],
     rate: Optional[Union[float, Sequence[float]]],
+    random_seed: int = 42,
     **kwargs,
 ) -> "Profile":
     if rate_type == "synchronous":
@@ -359,6 +381,7 @@ def create_profile(
         return AsyncProfile.from_standard_args(
             rate_type=rate_type,
             rate=rate,
+            random_seed=random_seed,
             **kwargs,
         )
 
@@ -366,6 +389,7 @@ def create_profile(
         return SweepProfile.from_standard_args(
             rate_type=rate_type,
             rate=rate,
+            random_seed=random_seed,
             **kwargs,
         )
 

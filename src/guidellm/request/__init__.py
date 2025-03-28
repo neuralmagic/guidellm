@@ -1,7 +1,13 @@
-from .loader import RequestLoader
+from .loader import (
+    GenerativeRequestLoader,
+    GenerativeRequestLoaderDescription,
+    RequestLoader,
+)
 from .request import GenerationRequest
 
 __all__ = [
-    "GenerationRequest",
     "RequestLoader",
+    "GenerativeRequestLoaderDescription",
+    "GenerativeRequestLoader",
+    "GenerationRequest",
 ]

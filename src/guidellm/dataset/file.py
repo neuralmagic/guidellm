@@ -42,7 +42,9 @@ class FileDatasetCreator(DatasetCreator):
         cls,
         data: Any,
         data_args: Optional[Dict[str, Any]],
-        processor: PreTrainedTokenizerBase,
+        processor: Optional[Union[str, Path, PreTrainedTokenizerBase]],
+        processor_args: Optional[Dict[str, Any]],
+        random_seed: int,
     ) -> Union[Dataset, DatasetDict, IterableDataset, IterableDatasetDict]:
         if not isinstance(data, (str, Path)):
             raise ValueError(f"Unsupported data type: {type(data)} given for {data}. ")

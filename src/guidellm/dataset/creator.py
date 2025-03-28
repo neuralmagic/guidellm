@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 from datasets import Dataset, DatasetDict, IterableDataset, IterableDatasetDict
@@ -77,15 +78,19 @@ class DatasetCreator(ABC):
         cls,
         data: Any,
         data_args: Optional[Dict[str, Any]],
-        processor: PreTrainedTokenizerBase,
+        processor: Optional[Union[str, Path, PreTrainedTokenizerBase]],
+        processor_args: Optional[Dict[str, Any]],
+        random_seed: int = 42,
         split_pref_order: Optional[List[str]] = None,
     ) -> Tuple[Union[Dataset, IterableDataset], Dict[ColumnInputTypes, str]]:
-        if not cls.is_supported(data):
+        if not cls.is_supported(data, data_args):
             raise ValueError(f"Unsupported data type: {type(data)} given for {data}. ")
 
         split = cls.extract_args_split(data_args)
-        column_mappings = cls.extract_args_column_mappings(data_args, processor)
-        dataset = cls.handle_create(data, data_args, processor)
+        column_mappings = cls.extract_args_column_mappings(data_args)
+        dataset = cls.handle_create(
+            data, data_args, processor, processor_args, random_seed
+        )
 
         if isinstance(dataset, (DatasetDict, IterableDatasetDict)):
             dataset = cls.extract_dataset_split(dataset, split, split_pref_order)
@@ -98,10 +103,10 @@ class DatasetCreator(ABC):
         return dataset, column_mappings
 
     @classmethod
-    def extract_args_split(cls, data_args: Dict[str, Any]) -> str:
+    def extract_args_split(cls, data_args: Optional[Dict[str, Any]]) -> str:
         split = "auto"
 
-        if "split" in data_args:
+        if data_args and "split" in data_args:
             split = data_args["split"]
             del data_args["split"]
 
@@ -110,26 +115,26 @@ class DatasetCreator(ABC):
     @classmethod
     def extract_args_column_mappings(
         cls,
-        data_args: Dict[str, Any],
-        processor: PreTrainedTokenizerBase,
+        data_args: Optional[Dict[str, Any]],
     ) -> Dict[ColumnInputTypes, str]:
         columns = {}
 
-        if "prompt_column" in data_args:
-            columns["prompt_column"] = data_args["prompt_column"]
-            del data_args["prompt_column"]
+        if data_args:
+            if "prompt_column" in data_args:
+                columns["prompt_column"] = data_args["prompt_column"]
+                del data_args["prompt_column"]
 
-        if "prompt_tokens_count_column" in data_args:
-            columns["prompt_tokens_count_column"] = data_args[
-                "prompt_tokens_count_column"
-            ]
-            del data_args["prompt_tokens_count_column"]
+            if "prompt_tokens_count_column" in data_args:
+                columns["prompt_tokens_count_column"] = data_args[
+                    "prompt_tokens_count_column"
+                ]
+                del data_args["prompt_tokens_count_column"]
 
-        if "output_tokens_count_column" in data_args:
-            columns["output_tokens_count_column"] = data_args[
-                "output_tokens_count_column"
-            ]
-            del data_args["output_tokens_count_column"]
+            if "output_tokens_count_column" in data_args:
+                columns["output_tokens_count_column"] = data_args[
+                    "output_tokens_count_column"
+                ]
+                del data_args["output_tokens_count_column"]
 
         return columns
 
@@ -199,5 +204,7 @@ class DatasetCreator(ABC):
         cls,
         data: Any,
         data_args: Optional[Dict[str, Any]],
-        processor: PreTrainedTokenizerBase,
+        processor: Optional[Union[str, Path, PreTrainedTokenizerBase]],
+        processor_args: Optional[Dict[str, Any]],
+        random_seed: int,
     ) -> Union[Dataset, DatasetDict, IterableDataset, IterableDatasetDict]: ...

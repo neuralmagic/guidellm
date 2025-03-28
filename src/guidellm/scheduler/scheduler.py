@@ -1,9 +1,9 @@
 import asyncio
-import concurrent.futures
 import math
 import multiprocessing
 import multiprocessing.queues
 import time
+from concurrent.futures import ProcessPoolExecutor
 from typing import (
     Any,
     AsyncGenerator,
@@ -113,10 +113,7 @@ class Scheduler(Generic[REQ, RES]):
         if max_duration is not None and max_duration < 0:
             raise ValueError(f"Invalid max_duration: {max_duration}")
 
-        with (
-            multiprocessing.Manager() as manager,
-            concurrent.futures.ProcessPoolExecutor() as executor,
-        ):
+        with multiprocessing.Manager() as manager, ProcessPoolExecutor() as executor:
             futures, requests_queue, responses_queue = await self._start_processes(
                 manager, executor, scheduling_strategy
             )
@@ -131,32 +128,41 @@ class Scheduler(Generic[REQ, RES]):
                 run_info=run_info,
             )
 
-            while True:
-                if (
-                    requests_iter is None
-                    and run_info.completed_requests >= run_info.created_requests
-                ):
-                    # we've exhausted all requests we've wanted to run
-                    # and yielded all responses
-                    break
+            try:
+                while True:
+                    # check errors and raise them
+                    for future in futures:
+                        if future.done() and (err := future.exception()) is not None:
+                            raise err
 
-                requests_iter = self._add_requests(
-                    requests_iter,
-                    times_iter,
-                    requests_queue,
-                    run_info,
-                )
-                await asyncio.sleep(0)  # enable requests to start
+                    if (
+                        requests_iter is None
+                        and run_info.completed_requests >= run_info.created_requests
+                    ):
+                        # we've exhausted all requests we've wanted to run
+                        # and yielded all responses
+                        break
 
-                iter_result = self._check_result_ready(
-                    responses_queue,
-                    run_info,
-                )
-                if iter_result is not None:
-                    yield iter_result
+                    requests_iter = self._add_requests(
+                        requests_iter,
+                        times_iter,
+                        requests_queue,
+                        run_info,
+                    )
+                    await asyncio.sleep(0)  # enable requests to start
 
-                # yield control to the event loop
-                await asyncio.sleep(settings.default_async_loop_sleep)
+                    iter_result = self._check_result_ready(
+                        responses_queue,
+                        run_info,
+                    )
+                    if iter_result is not None:
+                        yield iter_result
+
+                    # yield control to the event loop
+                    await asyncio.sleep(settings.default_async_loop_sleep)
+            except Exception as err:
+                print(err)
+                raise RuntimeError(f"Scheduler run failed: {err}") from err
 
             yield SchedulerResult(
                 type_="run_complete",
@@ -171,7 +177,7 @@ class Scheduler(Generic[REQ, RES]):
     async def _start_processes(
         self,
         manager,
-        executor: concurrent.futures.ProcessPoolExecutor,
+        executor: ProcessPoolExecutor,
         scheduling_strategy: SchedulingStrategy,
     ) -> Tuple[
         List[asyncio.Future],
@@ -183,12 +189,12 @@ class Scheduler(Generic[REQ, RES]):
         )
         responses_queue = manager.Queue()
         per_process_requests_limit = scheduling_strategy.processing_requests_limit // (
-            scheduling_strategy.num_processes
+            scheduling_strategy.processes_limit
         )
 
         futures = []
         loop = asyncio.get_event_loop()
-        for process_id in range(scheduling_strategy.num_processes):
+        for process_id in range(scheduling_strategy.processes_limit):
             if scheduling_strategy.processing_mode == "sync":
                 futures.append(
                     loop.run_in_executor(
@@ -238,7 +244,7 @@ class Scheduler(Generic[REQ, RES]):
             iter_length = len(self.request_loader)
             if 0 < iter_length < end_number:
                 end_number = iter_length
-        except TypeError:
+        except Exception:
             pass
 
         if end_number == math.inf and end_time is None:
@@ -272,10 +278,10 @@ class Scheduler(Generic[REQ, RES]):
                     not requests_queue.full()
                     and added_count < settings.max_add_requests_per_loop
                 ):
-                    if run_info.queued_requests >= run_info.end_number:
+                    if run_info.created_requests >= run_info.end_number:
                         raise StopIteration
 
-                    if request_time := next(times_iter) >= run_info.end_time:
+                    if (request_time := next(times_iter)) >= run_info.end_time:
                         raise StopIteration
 
                     request = next(requests_iter)
@@ -283,6 +289,7 @@ class Scheduler(Generic[REQ, RES]):
                         request=request,
                         start_time=request_time,
                         timeout_time=run_info.end_time,
+                        queued_time=time.time(),
                     )
                     requests_queue.put(work_req)
 

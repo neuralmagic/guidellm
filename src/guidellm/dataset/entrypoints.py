@@ -1,8 +1,9 @@
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from datasets import Dataset, IterableDataset
 from transformers import PreTrainedTokenizerBase
 
+from guidellm.dataset.creator import ColumnInputTypes, DatasetCreator
 from guidellm.dataset.datasets import HFDatasetsCreator
 from guidellm.dataset.file import FileDatasetCreator
 from guidellm.dataset.in_memory import InMemoryDatasetCreator
@@ -15,9 +16,11 @@ def load_dataset(
     data: Any,
     data_args: Optional[Dict[str, Any]],
     processor: PreTrainedTokenizerBase,
+    processor_args: Optional[Dict[str, Any]],
+    random_seed: int = 42,
     split_pref_order: Optional[List[str]] = None,
-) -> Union[Dataset, IterableDataset]:
-    creators = [
+) -> Tuple[Union[Dataset, IterableDataset], Dict[ColumnInputTypes, str]]:
+    creators: List[DatasetCreator] = [
         InMemoryDatasetCreator,
         SyntheticDatasetCreator,
         FileDatasetCreator,
@@ -26,6 +29,13 @@ def load_dataset(
 
     for creator in creators:
         if creator.is_supported(data, data_args):
-            return creator.create(data, data_args, processor, split_pref_order)
+            return creator.create(
+                data,
+                data_args,
+                processor,
+                processor_args,
+                random_seed,
+                split_pref_order,
+            )
 
     raise ValueError(f"Unsupported data type: {type(data)} given for {data}. ")

@@ -43,7 +43,9 @@ class HFDatasetsCreator(DatasetCreator):
         cls,
         data: Any,
         data_args: Optional[Dict[str, Any]],
-        processor: PreTrainedTokenizerBase,
+        processor: Optional[Union[str, Path, PreTrainedTokenizerBase]],
+        processor_args: Optional[Dict[str, Any]],
+        random_seed: int,
     ) -> Union[Dataset, DatasetDict, IterableDataset, IterableDatasetDict]:
         if isinstance(data, (str, Path)):
             data = load_dataset(data, **(data_args or {}))

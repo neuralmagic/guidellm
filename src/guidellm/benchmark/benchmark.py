@@ -134,12 +134,6 @@ class BenchmarkRunStats(Serializable):
             "and when it was resolved/requested by the worker in the benchmark run."
         )
     )
-    process_idle_time_avg: float = Field(
-        description=(
-            "The average time spent in the idle state for each process in the "
-            "benchmark run where it wasn't actively running a request."
-        )
-    )
 
 
 class Benchmark(Serializable):
@@ -259,6 +253,20 @@ class GenerativeTextResponseStats(Serializable):
 
     @computed_field
     @property
+    def time_per_output_token_ms(self) -> float:
+        """
+        :return: The average time in milliseconds per output token generated.
+            This includes the time to generate the first token and all other tokens.
+        """
+        if self.output_tokens == 0:
+            return 0.0
+
+        return (
+            1000 * (self.last_token_time - self.first_token_time) / self.output_tokens
+        )
+
+    @computed_field
+    @property
     def inter_token_latency_ms(self) -> float:
         """
         :return: The average time in milliseconds between generating tokens in the
@@ -275,15 +283,26 @@ class GenerativeTextResponseStats(Serializable):
 
     @computed_field
     @property
-    def output_tokens_per_second(self) -> float:
+    def tokens_per_second(self) -> float:
         """
-        :return: The average number of tokens generated per second in the output text.
-            Note, does not include the time to generate the first token.
+        :return: The average number of tokens generated per second in the prompt and
+            output text.
         """
-        if (itl_ms := self.inter_token_latency_ms) == 0.0:
+        if (latency := self.request_latency) == 0.0:
             return 0.0
 
-        return 1000.0 / itl_ms
+        return (self.prompt_tokens + self.output_tokens) / latency
+
+    @computed_field
+    @property
+    def output_tokens_per_second(self) -> float:
+        """
+        :return: The average number of output tokens generated per second.
+        """
+        if (latency := self.request_latency) == 0.0:
+            return 0.0
+
+        return self.output_tokens / latency
 
 
 class GenerativeTextErrorStats(GenerativeTextResponseStats):
@@ -337,6 +356,19 @@ class GenerativeTextErrorStats(GenerativeTextResponseStats):
             return None
 
         return super().time_to_first_token_ms
+
+    @computed_field
+    @property
+    def time_per_output_token_ms(self) -> Optional[float]:
+        """
+        :return: The average time in milliseconds per output token generated.
+            This includes the time to generate the first token and all other tokens.
+            None if the output_tokens is None or 0.
+        """
+        if self.output_tokens is None or self.output_tokens == 0:
+            return None
+
+        return super().time_per_output_token
 
     @computed_field
     @property
@@ -436,6 +468,13 @@ class GenerativeBenchmark(Benchmark):
             "milliseconds for completed, errored, and all requests."
         ),
     )
+    times_per_output_tokens_ms: StatusDistributionSummary = Field(
+        description=(
+            "The distribution of latencies per output token in milliseconds for "
+            "completed, errored, and all requests. "
+            "This includes the time to generate the first token and all other tokens."
+        ),
+    )
     inter_token_latencies_ms: StatusDistributionSummary = Field(
         description=(
             "The distribution of latencies between tokens in milliseconds for "
@@ -446,6 +485,12 @@ class GenerativeBenchmark(Benchmark):
         description=(
             "The distribution of output tokens per second for completed, "
             "errored, and all requests."
+        ),
+    )
+    tokens_per_second: StatusDistributionSummary = Field(
+        description=(
+            "The distribution of tokens per second, including prompt and output tokens "
+            "for completed, errored, and all requests."
         ),
     )
 
@@ -568,22 +613,19 @@ class GenerativeBenchmark(Benchmark):
             errored_requests=errored,
             start_time=start_time,
             end_time=max(req.end_time for req in completed) if completed else 0.0,
-            requests_per_second=StatusDistributionSummary.from_timestamped_values_per_frequency(
-                completed_values=(
-                    [(start_time, 0.0)]  # start time to cover full time range
-                    + [(req.end_time, 1.0) for req in completed]
+            requests_per_second=StatusDistributionSummary.from_request_times(
+                completed_requests=(
+                    [(req.start_time, req.end_time) for req in completed]
                 ),
-                errored_values=(
-                    [(start_time, 0.0)]  # start time to cover full time range
-                    + [(req.end_time, 1.0) for req in errored if req.end_time]
-                ),
-                frequency=1.0,  # 1 second
+                errored_requests=[(req.start_time, req.end_time) for req in errored],
+                distribution_type="rate",
             ),
-            requests_concurrency=StatusDistributionSummary.from_timestamped_interval_values(
-                completed_values=(
-                    [(req.start_time, req.end_time, 1) for req in completed]
+            requests_concurrency=StatusDistributionSummary.from_request_times(
+                completed_requests=(
+                    [(req.start_time, req.end_time) for req in completed]
                 ),
-                errored_values=([(req.start_time, req.end_time, 1) for req in errored]),
+                errored_requests=[(req.start_time, req.end_time) for req in errored],
+                distribution_type="concurrency",
             ),
             requests_latency=StatusDistributionSummary.from_values(
                 completed_values=[req.request_latency for req in completed],
@@ -601,32 +643,134 @@ class GenerativeBenchmark(Benchmark):
                 completed_values=[req.time_to_first_token_ms for req in completed],
                 errored_values=[req.time_to_first_token_ms for req in errored],
             ),
-            inter_token_latencies_ms=StatusDistributionSummary.from_values(
-                completed_values=[
-                    req.inter_token_latency_ms
-                    for req in completed
-                    for _ in range(req.output_tokens - 1)
-                    if req.output_tokens > 1 and req.inter_token_latency_ms
-                ],
-                errored_values=[
-                    req.inter_token_latency_ms
-                    for req in errored
-                    for _ in range(req.output_tokens - 1)
-                    if req.output_tokens > 1 and req.inter_token_latency_ms
-                ],
+            times_per_output_tokens_ms=StatusDistributionSummary.from_values(
+                completed_values=(
+                    [
+                        req.time_per_output_token_ms
+                        for req in completed
+                        if req.output_tokens > 0
+                    ]
+                ),
+                errored_values=(
+                    [
+                        req.time_per_output_token_ms
+                        for req in errored
+                        if req.output_tokens > 0
+                    ]
+                ),
+                completed_weights=(
+                    [req.output_tokens for req in completed if req.output_tokens > 0]
+                ),
+                errored_weights=(
+                    [req.output_tokens for req in errored if req.output_tokens > 0]
+                ),
             ),
-            outputs_tokens_per_second=StatusDistributionSummary.from_values(
-                completed_values=[
-                    req.output_tokens_per_second
-                    for req in completed
-                    for _ in range(req.output_tokens - 1)
-                    if req.output_tokens > 1 and req.output_tokens_per_second
-                ],
-                errored_values=[
-                    req.output_tokens_per_second
-                    for req in errored
-                    for _ in range(req.output_tokens - 1)
-                    if req.output_tokens > 1 and req.output_tokens_per_second
-                ],
+            inter_token_latencies_ms=StatusDistributionSummary.from_values(
+                completed_values=(
+                    [
+                        req.inter_token_latency_ms
+                        for req in completed
+                        if req.output_tokens > 1
+                    ]
+                ),
+                errored_values=(
+                    [
+                        req.inter_token_latency_ms
+                        for req in errored
+                        if req.output_tokens > 1
+                    ]
+                ),
+                completed_weights=(
+                    [
+                        req.output_tokens - 1
+                        for req in completed
+                        if req.output_tokens > 1
+                    ]
+                ),
+                errored_weights=(
+                    [req.output_tokens - 1 for req in errored if req.output_tokens > 1]
+                ),
+            ),
+            outputs_tokens_per_second=StatusDistributionSummary.from_iterable_request_times(
+                completed_requests=(
+                    [
+                        (req.start_time, req.end_time)
+                        for req in completed
+                        if req.output_tokens > 0
+                    ]
+                ),
+                errored_requests=(
+                    [
+                        (req.start_time, req.end_time)
+                        for req in errored
+                        if req.output_tokens > 0
+                    ]
+                ),
+                completed_first_iter_times=(
+                    [req.first_token_time for req in completed if req.output_tokens > 0]
+                ),
+                errored_first_iter_times=(
+                    [req.first_token_time for req in errored if req.output_tokens > 0]
+                ),
+                completed_iter_counts=(
+                    [req.output_tokens for req in completed if req.output_tokens > 0]
+                ),
+                errored_iter_counts=(
+                    [req.output_tokens for req in errored if req.output_tokens > 0]
+                ),
+            ),
+            tokens_per_second=StatusDistributionSummary.from_iterable_request_times(
+                completed_requests=(
+                    [
+                        (req.start_time, req.end_time)
+                        for req in completed
+                        if req.prompt_tokens + req.output_tokens > 0
+                    ]
+                ),
+                errored_requests=(
+                    [
+                        (req.start_time, req.end_time)
+                        for req in errored
+                        if req.prompt_tokens + req.output_tokens > 0
+                    ]
+                ),
+                completed_first_iter_times=(
+                    [
+                        req.first_token_time
+                        for req in completed
+                        if req.prompt_tokens + req.output_tokens > 0
+                    ]
+                ),
+                errored_first_iter_times=(
+                    [
+                        req.first_token_time
+                        for req in errored
+                        if req.prompt_tokens + req.output_tokens > 0
+                    ]
+                ),
+                completed_iter_counts=(
+                    [
+                        req.prompt_tokens + req.output_tokens
+                        for req in completed
+                        if req.prompt_tokens + req.output_tokens > 0
+                    ]
+                ),
+                errored_iter_counts=(
+                    [
+                        req.prompt_tokens + req.output_tokens
+                        for req in errored
+                        if req.prompt_tokens + req.output_tokens > 0
+                    ]
+                ),
+                completed_first_iter_counts=(
+                    [
+                        req.prompt_tokens or 1
+                        for req in completed
+                        if req.output_tokens > 0
+                    ]
+                ),
+                errored_first_iter_counts=(
+                    [req.prompt_tokens or 1 for req in errored if req.output_tokens > 0]
+                ),
             ),
         )

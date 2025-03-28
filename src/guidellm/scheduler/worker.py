@@ -56,7 +56,7 @@ class WorkerProcessResult(Generic[REQ, RES]):
     info: SchedulerRequestInfo
 
 
-class RequestsWorker(Generic[REQ, RES], ABC):
+class RequestsWorker(ABC, Generic[REQ, RES]):
     """
     An abstract base class for a worker that processes requests.
     This class defines the interface for a worker that can resolve requests
@@ -256,7 +256,6 @@ class GenerativeRequestsWorker(RequestsWorker[GenerationRequest, ResponseSummary
 
     def __init__(self, backend: Backend):
         self.backend = backend
-        self.backend.validate()
 
     @property
     def description(self) -> Serializable:
@@ -334,7 +333,7 @@ class GenerativeRequestsWorker(RequestsWorker[GenerationRequest, ResponseSummary
         ]
         request_kwargs: Dict[str, Any]
 
-        if request.request_type == "text":
+        if request.request_type == "text_completions":
             request_func = self.backend.text_completions
             request_kwargs = {
                 "prompt": request.content,
@@ -343,7 +342,7 @@ class GenerativeRequestsWorker(RequestsWorker[GenerationRequest, ResponseSummary
                 "output_token_count": request.constraints.get("output_tokens", None),
                 **request.params,
             }
-        elif request.request_type == "chat":
+        elif request.request_type == "chat_completions":
             request_func = self.backend.chat_completions
             request_kwargs = {
                 "content": request.content,

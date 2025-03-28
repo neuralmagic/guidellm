@@ -37,12 +37,12 @@ class GenerationRequest(Serializable):
         default_factory=lambda: str(uuid.uuid4()),
         description="The unique identifier for the request.",
     )
-    request_type: Literal["text", "chat"] = Field(
-        default="text",
+    request_type: Literal["text_completions", "chat_completions"] = Field(
+        default="text_completions",
         description=(
             "The type of request (e.g., text, chat). "
-            "If request_type is 'text', resolved by backend.text_completions. "
-            "If request_type is 'chat', resolved by backend.chat_completions."
+            "If request_type='text_completions', resolved by backend.text_completions. "
+            "If request_typ='chat_completions', resolved by backend.chat_completions."
         ),
     )
     content: Any = Field(

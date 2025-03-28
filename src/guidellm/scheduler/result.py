@@ -77,7 +77,7 @@ class SchedulerRequestInfo(Serializable):
     process_id: int = -1
 
 
-class SchedulerResult(Generic[REQ, RES], Serializable):
+class SchedulerResult(Serializable, Generic[REQ, RES]):
     """
     The yielded, iterative result for a scheduler run.
     These are triggered on the start and end of the run,

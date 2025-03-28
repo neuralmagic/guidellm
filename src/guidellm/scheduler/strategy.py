@@ -440,8 +440,8 @@ class AsyncConstantStrategy(ThroughputStrategy):
 
         # handle bursts first to get to the desired rate
         if self.initial_burst is not None:
-            # calcualte total burst count based on sending initial at rate
-            # plus any within the time to ramp up
+            # send an initial burst equal to the rate
+            # to reach the target rate
             burst_count = math.floor(self.rate)
             for _ in range(burst_count):
                 yield start_time
@@ -490,6 +490,10 @@ class AsyncPoissonStrategy(ThroughputStrategy):
             "to reach target rate. False to not send an initial burst."
         ),
     )
+    random_seed: int = Field(
+        default=42,
+        description=("The random seed to use for the Poisson distribution. "),
+    )
 
     def request_times(self) -> Generator[float, None, None]:
         """
@@ -504,15 +508,18 @@ class AsyncPoissonStrategy(ThroughputStrategy):
         start_time = time.time()
 
         if self.initial_burst is not None:
-            # calcualte total burst count based on sending initial at rate
-            # plus any within the time to ramp up
+            # send an initial burst equal to the rate
+            # to reach the target rate
             burst_count = math.floor(self.rate)
             for _ in range(burst_count):
                 yield start_time
         else:
             yield start_time
 
+        # set the random seed for reproducibility
+        rand = random.Random(self.random_seed)
+
         while True:
-            inter_arrival_time = random.expovariate(self.rate)
+            inter_arrival_time = rand.expovariate(self.rate)
             start_time += inter_arrival_time
             yield start_time

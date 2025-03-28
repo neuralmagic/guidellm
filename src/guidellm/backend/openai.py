@@ -202,7 +202,7 @@ class OpenAIHTTPBackend(Backend):
 
         try:
             async for resp in self._iterative_completions_request(
-                type_="text",
+                type_="text_completions",
                 request_id=request_id,
                 request_prompt_tokens=prompt_token_count,
                 request_output_tokens=output_token_count,
@@ -277,7 +277,7 @@ class OpenAIHTTPBackend(Backend):
 
         try:
             async for resp in self._iterative_completions_request(
-                type_="chat",
+                type_="chat_completions",
                 request_id=request_id,
                 request_prompt_tokens=prompt_token_count,
                 request_output_tokens=output_token_count,
@@ -403,16 +403,16 @@ class OpenAIHTTPBackend(Backend):
 
     async def _iterative_completions_request(
         self,
-        type_: Literal["text", "chat"],
+        type_: Literal["text_completions", "chat_completions"],
         request_id: Optional[str],
         request_prompt_tokens: Optional[int],
         request_output_tokens: Optional[int],
         headers: Dict,
         payload: Dict,
     ) -> AsyncGenerator[Union[StreamingTextResponse, ResponseSummary], None]:
-        if type_ == "text":
+        if type_ == "text_completions":
             target = f"{self.target}{TEXT_COMPLETIONS_PATH}"
-        elif type_ == "chat":
+        elif type_ == "chat_completions":
             target = f"{self.target}{CHAT_COMPLETIONS_PATH}"
         else:
             raise ValueError(f"Unsupported type: {type_}")
@@ -525,15 +525,15 @@ class OpenAIHTTPBackend(Backend):
 
     @staticmethod
     def _extract_completions_delta_content(
-        type_: Literal["text", "chat"], data: Dict
+        type_: Literal["text_completions", "chat_completions"], data: Dict
     ) -> Optional[str]:
         if "choices" not in data or not data["choices"]:
             return None
 
-        if type_ == "text":
+        if type_ == "text_completions":
             return data["choices"][0]["text"]
 
-        if type_ == "chat":
+        if type_ == "chat_completions":
             return data["choices"][0]["delta"]["content"]
 
         raise ValueError(f"Unsupported type: {type_}")

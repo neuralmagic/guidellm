@@ -16,6 +16,7 @@ from transformers import PreTrainedTokenizerBase
 from guidellm.config import settings
 from guidellm.dataset.creator import ColumnInputTypes, DatasetCreator
 from guidellm.objects import Serializable
+from guidellm.utils import EndlessTextCreator, IntegerRangeSampler, check_load_processor
 
 __all__ = ["SyntheticDatasetCreator"]
 
@@ -53,11 +54,7 @@ class SyntheticDatasetConfig(Serializable):
     )
     samples: int = Field(
         description="The number of samples to generate for the dataset.",
-        default=10000,
-    )
-    seed: int = Field(
-        description="The seed to use for random number generation.",
-        default=42,
+        default=1000,
     )
 
     @staticmethod
@@ -105,89 +102,16 @@ class SyntheticDatasetConfig(Serializable):
         return SyntheticDatasetConfig(**config_dict)
 
 
-class IntegerRangeSampler:
-    def __init__(
-        self,
-        average: int,
-        variance: Optional[int],
-        min_value: Optional[int],
-        max_value: Optional[int],
-        seed: int,
-    ):
-        self.average = average
-        self.variance = variance
-        self.min_value = min_value
-        self.max_value = max_value
-        self.seed = seed
-        self.rng = random.Random(seed)
-
-    def __iter__(self) -> Iterator[int]:
-        calc_min = self.min_value
-        if not calc_min:
-            calc_min = max(
-                0, self.average - 5 * self.variance if self.variance else self.average
-            )
-        calc_max = self.max_value
-        if not calc_max:
-            calc_max = (
-                self.average + 5 * self.variance if self.variance else self.average
-            )
-
-        while True:
-            if calc_min == calc_max:
-                yield calc_min
-            elif not self.variance:
-                yield self.rng.randint(calc_min, calc_max + 1)
-            else:
-                rand = self.rng.gauss(self.average, self.variance)
-                yield round(max(calc_min, min(calc_max, rand)))
-
-
-class EndlessTextCreator:
-    """
-    A list subclass that allows for endless data generation.
-    """
-
-    def __init__(
-        self,
-        data: Union[str, Path],
-        filter_start: Optional[Union[str, int]] = None,
-        filter_end: Optional[Union[str, int]] = None,
-    ):
-        self.data = data
-        text = load_text(data)
-        text = filter_text(data, filter_start, filter_end)
-        self.words = split_text(text)
-
-    def create_text(self, start: int, length: int) -> str:
-        """
-        Create a text snippet from the specified range.
-
-        :param start: Start index.
-        :type start: int
-        :param length: Length of the snippet.
-        :type length: int
-        :return: Text snippet.
-        :rtype: str
-        """
-        start = start % len(self)
-        text = ""
-
-        for counter in range(length):
-            index = (start + counter) % len(self.words)
-            if counter > 0:
-                text += " "
-            text += self.words[index]
-
-        return text
-
-
 class SyntheticTextItemsGenerator(Iterable[Dict[str, Union[str, int]]]):
     def __init__(
-        self, config: SyntheticDatasetConfig, processor: PreTrainedTokenizerBase
+        self,
+        config: SyntheticDatasetConfig,
+        processor: PreTrainedTokenizerBase,
+        random_seed: int,
     ):
         self.config = config
         self.processor = processor
+        self.random_seed = random_seed
         self.tokens = []
         self.text_creator = EndlessTextCreator(
             data=settings.emulated_data.source,
@@ -201,25 +125,23 @@ class SyntheticTextItemsGenerator(Iterable[Dict[str, Union[str, int]]]):
             variance=self.config.prompt_tokens_variance,
             min_value=self.config.prompt_tokens_min,
             max_value=self.config.prompt_tokens_max,
-            seed=self.config.seed,
+            random_seed=self.random_seed,
         )
         output_tokens_sampler = IntegerRangeSampler(
             average=self.config.output_tokens,
             variance=self.config.output_tokens_variance,
             min_value=self.config.output_tokens_min,
             max_value=self.config.output_tokens_max,
-            seed=self.config.seed,
+            random_seed=self.random_seed,
         )
-        start_index_sampler = random.Random(self.config.seed).randint(
-            0, len(self.text_creator.words)
-        )
+        rand = random.Random(self.random_seed)
 
-        for _, prompt_tokens, output_tokens, start_index in zip(
+        for _, prompt_tokens, output_tokens in zip(
             range(self.config.samples),
             prompt_tokens_sampler,
             output_tokens_sampler,
-            start_index_sampler,
         ):
+            start_index = rand.randint(0, len(self.text_creator.words))
             yield {
                 "prompt": self._create_prompt(prompt_tokens, start_index),
                 "prompt_tokens_count": prompt_tokens,
@@ -227,8 +149,8 @@ class SyntheticTextItemsGenerator(Iterable[Dict[str, Union[str, int]]]):
             }
 
     def _create_prompt(self, prompt_tokens: int, start_index: int) -> str:
-        left = start_index
-        right = start_index + 5 * prompt_tokens
+        left = max(1, start_index - 2 * prompt_tokens)
+        right = start_index + 2 * prompt_tokens
 
         while left < right:
             mid = (left + right) // 2
@@ -271,19 +193,36 @@ class SyntheticDatasetCreator(DatasetCreator):
         cls,
         data: Any,
         data_args: Optional[Dict[str, Any]],
-        processor: PreTrainedTokenizerBase,
+        processor: Optional[Union[str, Path, PreTrainedTokenizerBase]],
+        processor_args: Optional[Dict[str, Any]],
+        random_seed: int,
     ) -> Union[Dataset, DatasetDict, IterableDataset, IterableDatasetDict]:
+        processor = check_load_processor(
+            processor,
+            processor_args,
+            error_msg=(
+                "Processor/tokenizer required for synthetic dataset generation."
+            ),
+        )
+
         config = SyntheticDatasetConfig.parse_str(data)
-        generator = SyntheticTextItemsGenerator(config, processor)
+        generator = SyntheticTextItemsGenerator(config, processor, random_seed)
         items = list(generator)
 
-        return Dataset.from_list(items)
+        return Dataset.from_list(items, **(data_args or {}))
 
     @classmethod
     def extract_args_column_mappings(
-        cls, data_args: Dict[str, Any], processor: PreTrainedTokenizerBase
+        cls,
+        data_args: Optional[Dict[str, Any]],
     ) -> Dict[ColumnInputTypes, str]:
-        super().extract_args_column_mappings(data_args)
+        data_args_columns = super().extract_args_column_mappings(data_args)
+
+        if data_args_columns:
+            raise ValueError(
+                f"Column mappings are not supported for synthetic datasets. "
+                f"Got {data_args_columns}"
+            )
 
         return {
             "prompt_column": "prompt",
