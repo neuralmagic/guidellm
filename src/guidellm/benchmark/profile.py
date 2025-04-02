@@ -1,9 +1,9 @@
-from abc import ABC, abstractmethod
 from typing import List, Literal, Optional, Sequence, Union
 
 import numpy as np
 from pydantic import Field, computed_field
 
+from guidellm.config import settings
 from guidellm.objects import Serializable
 from guidellm.scheduler import (
     AsyncConstantStrategy,
@@ -29,7 +29,7 @@ __all__ = [
 ProfileType = Literal["synchronous", "concurrent", "throughput", "async", "sweep"]
 
 
-class Profile(ABC, Serializable):
+class Profile(Serializable):
     type_: ProfileType = Field(
         description="The type of benchmarking profile to use.",
     )
@@ -55,11 +55,11 @@ class Profile(ABC, Serializable):
 
     @computed_field
     @property
-    @abstractmethod
-    def strategy_types(self) -> List[StrategyType]: ...
+    def strategy_types(self) -> List[StrategyType]:
+        return []
 
-    @abstractmethod
-    def next_strategy(self) -> Optional[SchedulingStrategy]: ...
+    def next_strategy(self) -> Optional[SchedulingStrategy]:
+        return None
 
 
 class SynchronousProfile(Profile):
@@ -326,6 +326,9 @@ class SweepProfile(AsyncProfile):
 
         if "sweep_size" in kwargs:
             raise ValueError("Sweep size must not be provided, use rate instead.")
+
+        if not rate:
+            rate = settings.default_sweep_number
 
         if not rate:
             raise ValueError(

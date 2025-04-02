@@ -141,7 +141,7 @@ class Settings(BaseSettings):
     env: Environment = Environment.PROD
     default_async_loop_sleep: float = 10e-5
     logging: LoggingSettings = LoggingSettings()
-    num_sweep_profiles: int = 9
+    default_sweep_number: int = 10
 
     # HTTP settings
     request_timeout: int = 60 * 5  # 5 minutes

@@ -92,6 +92,7 @@ class OpenAIHTTPBackend(Backend):
             if max_output_tokens is not None
             else settings.openai.max_output_tokens
         )
+        self._async_client: Optional[httpx.Client] = None
 
     @property
     def target(self) -> str:
@@ -125,7 +126,7 @@ class OpenAIHTTPBackend(Backend):
             "chat_completions_path": CHAT_COMPLETIONS_PATH,
         }
 
-    def check_setup(self):
+    async def check_setup(self):
         """
         Check if the backend is setup correctly and can be used for requests.
         Specifically, if a model is not provided, it grabs the first available model.
@@ -134,7 +135,7 @@ class OpenAIHTTPBackend(Backend):
 
         :raises ValueError: If no models or the provided model is not available.
         """
-        models = self.available_models()
+        models = await self.available_models()
         if not models:
             raise ValueError(f"No models available for target: {self.target}")
 
@@ -146,24 +147,32 @@ class OpenAIHTTPBackend(Backend):
                 "{models} for target: {self.target}"
             )
 
-    def available_models(self) -> List[str]:
+    async def prepare_multiprocessing(self):
+        """
+        Prepare the backend for use in a multiprocessing environment.
+        Clears out the sync and async clients to ensure they are re-initialized
+        for each process.
+        """
+        if self._async_client is not None:
+            await self._async_client.aclose()
+            self._async_client = None
+
+    async def available_models(self) -> List[str]:
         """
         Get the available models for the target server using the OpenAI models endpoint:
         /v1/models
         """
         target = f"{self.target}/v1/models"
         headers = self._headers()
+        response = await self._get_async_client().get(target, headers=headers)
+        response.raise_for_status()
 
-        with httpx.Client(http2=self.http2, timeout=self.timeout) as client:
-            response = client.get(target, headers=headers)
-            response.raise_for_status()
+        models = []
 
-            models = []
+        for item in response.json()["data"]:
+            models.append(item["id"])
 
-            for item in response.json()["data"]:
-                models.append(item["id"])
-
-            return models
+        return models
 
     async def text_completions(  # type: ignore[override]
         self,
@@ -191,7 +200,6 @@ class OpenAIHTTPBackend(Backend):
             a StreamingTextResponse for each received iteration,
             and a ResponseSummary for the final response.
         """
-
         logger.debug("{} invocation with args: {}", self.__class__.__name__, locals())
         headers = self._headers()
         payload = self._completions_payload(
@@ -294,6 +302,20 @@ class OpenAIHTTPBackend(Backend):
                 ex,
             )
             raise ex
+
+    def _get_async_client(self) -> httpx.AsyncClient:
+        """
+        Get the async HTTP client for making requests.
+        If the client has not been created yet, it will create one.
+
+        :return: The async HTTP client.
+        """
+        if self._async_client is None:
+            self._async_client = httpx.AsyncClient(
+                http2=self.http2, timeout=self.timeout
+            )
+
+        return self._async_client
 
     def _headers(self) -> Dict[str, str]:
         headers = {
@@ -429,69 +451,72 @@ class OpenAIHTTPBackend(Backend):
             payload,
         )
 
-        async with httpx.AsyncClient(http2=self.http2, timeout=self.timeout) as client:
-            response_value = ""
-            response_prompt_count: Optional[int] = None
-            response_output_count: Optional[int] = None
-            iter_count = 0
-            start_time = time.time()
-            iter_time = start_time
-            first_iter_time: Optional[float] = None
-            last_iter_time: Optional[float] = None
+        response_value = ""
+        response_prompt_count: Optional[int] = None
+        response_output_count: Optional[int] = None
+        iter_count = 0
+        start_time = time.time()
+        iter_time = start_time
+        first_iter_time: Optional[float] = None
+        last_iter_time: Optional[float] = None
 
-            yield StreamingTextResponse(
-                type_="start",
-                value="",
-                start_time=start_time,
-                iter_count=iter_count,
-                delta="",
-                time=start_time,
-                request_id=request_id,
-            )
+        yield StreamingTextResponse(
+            type_="start",
+            value="",
+            start_time=start_time,
+            first_iter_time=None,
+            iter_count=iter_count,
+            delta="",
+            time=start_time,
+            request_id=request_id,
+        )
 
-            async with client.stream(
-                "POST", target, headers=headers, json=payload
-            ) as stream:
-                stream.raise_for_status()
+        # reset start time after yielding start response to ensure accurate timing
+        start_time = time.time()
 
-                async for line in stream.aiter_lines():
-                    iter_time = time.time()
-                    logger.debug(
-                        "{} request: {} recieved iter response line: {}",
-                        self.__class__.__name__,
-                        request_id,
-                        line,
+        async with self._get_async_client().stream(
+            "POST", target, headers=headers, json=payload
+        ) as stream:
+            stream.raise_for_status()
+
+            async for line in stream.aiter_lines():
+                iter_time = time.time()
+                logger.debug(
+                    "{} request: {} recieved iter response line: {}",
+                    self.__class__.__name__,
+                    request_id,
+                    line,
+                )
+
+                if not line or not line.strip().startswith("data:"):
+                    continue
+
+                if line.strip() == "data: [DONE]":
+                    break
+
+                data = json.loads(line.strip()[len("data: ") :])
+                if delta := self._extract_completions_delta_content(type_, data):
+                    if first_iter_time is None:
+                        first_iter_time = iter_time
+                    last_iter_time = iter_time
+
+                    iter_count += 1
+                    response_value += delta
+
+                    yield StreamingTextResponse(
+                        type_="iter",
+                        value=response_value,
+                        iter_count=iter_count,
+                        start_time=start_time,
+                        first_iter_time=first_iter_time,
+                        delta=delta,
+                        time=iter_time,
+                        request_id=request_id,
                     )
 
-                    if not line or not line.strip().startswith("data:"):
-                        continue
-
-                    if line.strip() == "data: [DONE]":
-                        break
-
-                    data = json.loads(line.strip()[len("data: ") :])
-                    if delta := self._extract_completions_delta_content(type_, data):
-                        if first_iter_time is None:
-                            first_iter_time = iter_time
-                        last_iter_time = iter_time
-
-                        iter_count += 1
-                        response_value += delta
-
-                        yield StreamingTextResponse(
-                            type_="iter",
-                            value=response_value,
-                            iter_count=iter_count,
-                            start_time=start_time,
-                            first_iter_time=first_iter_time,
-                            delta=delta,
-                            time=iter_time,
-                            request_id=request_id,
-                        )
-
-                    if usage := self._extract_completions_usage(data):
-                        response_prompt_count = usage["prompt"]
-                        response_output_count = usage["output"]
+                if usage := self._extract_completions_usage(data):
+                    response_prompt_count = usage["prompt"]
+                    response_output_count = usage["output"]
 
         logger.info(
             "{} request: {} with headers: {} and payload: {} completed with: {}",

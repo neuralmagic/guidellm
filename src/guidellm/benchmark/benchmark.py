@@ -108,30 +108,81 @@ class BenchmarkRunStats(Serializable):
 
     queued_time_avg: float = Field(
         description=(
-            "The average time spent in the queue for requests in the benchmark run."
+            "The average time spent in the queue for each request in the benchmark "
+            "run until it was dequeued by a worker."
         )
     )
-    scheduled_time_avg: float = Field(
+    scheduled_time_delay_avg: float = Field(
         description=(
-            "The average time spent in the scheduled state for requests in the "
-            "benchmark run."
+            "The average time delay between when a request was dequeued and when it "
+            "was scheduled to be processed by a worker in the benchmark run. "
+            "This should be as close to 0 as possible, any additional time is "
+            "overheads from the system or the worker."
+        )
+    )
+    scheduled_time_sleep_avg: float = Field(
+        description=(
+            "The average time spent sleeping til the desired start time was reached "
+            "after being scheduled by the worker in the benchmark run."
+        )
+    )
+    worker_start_delay_avg: float = Field(
+        description=(
+            "The average time delay between when a request was scheduled and when "
+            "the worker started processing it in the benchmark run. "
+            "This should be as close to 0 as possible, any additional time is "
+            "overheads from the system or the worker."
         )
     )
     worker_time_avg: float = Field(
         description=(
-            "The average time spent running each request in the benchmark run."
+            "The average time taken by the worker to process each request in the "
+            "benchmark run. This includes the time to generate the response and "
+            "any additional processing time."
         )
     )
-    worker_delay_avg: float = Field(
+    worker_start_time_targeted_delay_avg: float = Field(
         description=(
-            "The average delay between when a request was targeted to start at "
-            "and when it was started by the worker in the benchmark run."
+            "The average time delay between when a request was targeted to start "
+            "and when the worker actually started processing it in the benchmark "
+            "run. For async strategies, this represents delays from the ideal "
+            "system. For sync strategies, since those are doubled in queue, "
+            "this should be as close to the time for a request to be processed "
+            "as possible. Any additional time is overhead from the system or "
+            "the worker."
         )
     )
-    resolve_delay_avg: float = Field(
+    request_start_time_delay_avg: float = Field(
         description=(
-            "The average delay between when a request was targeted to start at "
-            "and when it was resolved/requested by the worker in the benchmark run."
+            "The average time delay between the actual request being made "
+            "and the time the worker started on the request for all requests "
+            "that completed within the benchmark run. This time should be as close "
+            "to 0 as possible, any additional time is overhead from the system or "
+            "the worker."
+        )
+    )
+    request_start_time_targeted_delay_avg: float = Field(
+        description=(
+            "The average time delay between when the targeted start time and "
+            "the actual start time for each request in the benchmark run. "
+            "For async strategies, this represents delays from the ideal "
+            "system. For sync strategies, this should be as close to the "
+            "time for a request to be processed as possible. Any additional "
+            "time is overhead from the system or the worker."
+        )
+    )
+    request_time_delay_avg: float = Field(
+        description=(
+            "The average time delay between the total request time and the "
+            "worker time. This should be as close to 0 as possible, any additional "
+            "time is overhead from the system or the worker. "
+        )
+    )
+    request_time_avg: float = Field(
+        description=(
+            "The average time spent processing all requests in the benchmark run. "
+            "This is the time from when the actual request was started to when "
+            "it was completed."
         )
     )
 
@@ -368,7 +419,7 @@ class GenerativeTextErrorStats(GenerativeTextResponseStats):
         if self.output_tokens is None or self.output_tokens == 0:
             return None
 
-        return super().time_per_output_token
+        return super().time_per_output_token_ms
 
     @computed_field
     @property
@@ -599,6 +650,11 @@ class GenerativeBenchmark(Benchmark):
             populated and calculated
         """
         start_time = min(req.start_time for req in completed) if completed else 0.0
+        errored_with_outputs = [
+            req
+            for req in errored
+            if req.output_tokens is not None and req.output_tokens > 1
+        ]
 
         return GenerativeBenchmark(
             run_id=run_id,
@@ -633,15 +689,17 @@ class GenerativeBenchmark(Benchmark):
             ),
             prompts_token_count=StatusDistributionSummary.from_values(
                 completed_values=[req.prompt_tokens for req in completed],
-                errored_values=[req.prompt_tokens for req in errored],
+                errored_values=[req.prompt_tokens or 0 for req in errored],
             ),
             outputs_token_count=StatusDistributionSummary.from_values(
                 completed_values=[req.output_tokens for req in completed],
-                errored_values=[req.output_tokens for req in errored],
+                errored_values=[req.output_tokens or 0 for req in errored],
             ),
             times_to_first_token_ms=StatusDistributionSummary.from_values(
                 completed_values=[req.time_to_first_token_ms for req in completed],
-                errored_values=[req.time_to_first_token_ms for req in errored],
+                errored_values=[
+                    req.time_to_first_token_ms for req in errored_with_outputs
+                ],
             ),
             times_per_output_tokens_ms=StatusDistributionSummary.from_values(
                 completed_values=(
@@ -652,18 +710,12 @@ class GenerativeBenchmark(Benchmark):
                     ]
                 ),
                 errored_values=(
-                    [
-                        req.time_per_output_token_ms
-                        for req in errored
-                        if req.output_tokens > 0
-                    ]
+                    [req.time_per_output_token_ms for req in errored_with_outputs]
                 ),
                 completed_weights=(
                     [req.output_tokens for req in completed if req.output_tokens > 0]
                 ),
-                errored_weights=(
-                    [req.output_tokens for req in errored if req.output_tokens > 0]
-                ),
+                errored_weights=([req.output_tokens for req in errored_with_outputs]),
             ),
             inter_token_latencies_ms=StatusDistributionSummary.from_values(
                 completed_values=(
@@ -674,11 +726,7 @@ class GenerativeBenchmark(Benchmark):
                     ]
                 ),
                 errored_values=(
-                    [
-                        req.inter_token_latency_ms
-                        for req in errored
-                        if req.output_tokens > 1
-                    ]
+                    [req.inter_token_latency_ms for req in errored_with_outputs]
                 ),
                 completed_weights=(
                     [
@@ -688,7 +736,7 @@ class GenerativeBenchmark(Benchmark):
                     ]
                 ),
                 errored_weights=(
-                    [req.output_tokens - 1 for req in errored if req.output_tokens > 1]
+                    [req.output_tokens - 1 for req in errored_with_outputs]
                 ),
             ),
             outputs_tokens_per_second=StatusDistributionSummary.from_iterable_request_times(
@@ -700,23 +748,19 @@ class GenerativeBenchmark(Benchmark):
                     ]
                 ),
                 errored_requests=(
-                    [
-                        (req.start_time, req.end_time)
-                        for req in errored
-                        if req.output_tokens > 0
-                    ]
+                    [(req.start_time, req.end_time) for req in errored_with_outputs]
                 ),
                 completed_first_iter_times=(
                     [req.first_token_time for req in completed if req.output_tokens > 0]
                 ),
                 errored_first_iter_times=(
-                    [req.first_token_time for req in errored if req.output_tokens > 0]
+                    [req.first_token_time for req in errored_with_outputs]
                 ),
                 completed_iter_counts=(
                     [req.output_tokens for req in completed if req.output_tokens > 0]
                 ),
                 errored_iter_counts=(
-                    [req.output_tokens for req in errored if req.output_tokens > 0]
+                    [req.output_tokens for req in errored_with_outputs]
                 ),
             ),
             tokens_per_second=StatusDistributionSummary.from_iterable_request_times(
@@ -728,11 +772,7 @@ class GenerativeBenchmark(Benchmark):
                     ]
                 ),
                 errored_requests=(
-                    [
-                        (req.start_time, req.end_time)
-                        for req in errored
-                        if req.prompt_tokens + req.output_tokens > 0
-                    ]
+                    [(req.start_time, req.end_time) for req in errored_with_outputs]
                 ),
                 completed_first_iter_times=(
                     [
@@ -742,11 +782,7 @@ class GenerativeBenchmark(Benchmark):
                     ]
                 ),
                 errored_first_iter_times=(
-                    [
-                        req.first_token_time
-                        for req in errored
-                        if req.prompt_tokens + req.output_tokens > 0
-                    ]
+                    [req.first_token_time for req in errored_with_outputs]
                 ),
                 completed_iter_counts=(
                     [
@@ -758,8 +794,7 @@ class GenerativeBenchmark(Benchmark):
                 errored_iter_counts=(
                     [
                         req.prompt_tokens + req.output_tokens
-                        for req in errored
-                        if req.prompt_tokens + req.output_tokens > 0
+                        for req in errored_with_outputs
                     ]
                 ),
                 completed_first_iter_counts=(
@@ -770,7 +805,7 @@ class GenerativeBenchmark(Benchmark):
                     ]
                 ),
                 errored_first_iter_counts=(
-                    [req.prompt_tokens or 1 for req in errored if req.output_tokens > 0]
+                    [req.prompt_tokens or 1 for req in errored_with_outputs]
                 ),
             ),
         )

@@ -18,7 +18,7 @@ class Serializable(BaseModel):
     """
 
     model_config = ConfigDict(
-        extra="ignore",
+        extra="allow",
         use_enum_values=True,
         validate_assignment=True,
         from_attributes=True,

@@ -1,9 +1,8 @@
 import math
 import time
-from abc import ABC
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Dict, List, Optional, Union
+from typing import Dict, Generic, List, Optional, TypeVar, Union
 
 from rich.console import Group
 from rich.live import Live
@@ -24,19 +23,14 @@ from guidellm.benchmark.benchmarker import BenchmarkerResult
 from guidellm.scheduler import (
     SchedulingStrategy,
     StrategyType,
+    strategy_display_str,
 )
-
-SCHEDULING_STRATEGY_DESCRIPTIONS: Dict[StrategyType, str] = {
-    "synchronous": "synchronous",
-    "concurrent": "concurrent@{RATE}",
-    "throughput": "throughput",
-    "constant": "constant@{RATE}",
-    "poisson": "poisson@{RATE}",
-}
 
 
 @dataclass
 class BenchmarkerTaskProgressState:
+    display_scheduler_stats: bool
+
     task_id: TaskID
     strategy: Union[StrategyType, SchedulingStrategy]
     started: bool = False
@@ -55,30 +49,14 @@ class BenchmarkerTaskProgressState:
     requests_completed: int = 0
     requests_errored: int = 0
 
-    output_tokens: float = 0
-    prompt_tokens: float = 0
-    output_tokens_rate: float = 0
-    total_tokens_rate: float = 0
-    tokens_ttft: float = 0
-    tokens_itl: float = 0
+    worker_overheads_time_ms: float = 0.0
+    backend_overheads_time_ms: float = 0.0
+    requests_sleep_time_ms: float = 0.0
+    requests_targeted_start_time_delay_ms: float = 0.0
 
     @property
     def description(self) -> str:
-        if self.strategy in StrategyType.__args__:
-            return SCHEDULING_STRATEGY_DESCRIPTIONS.get(
-                self.strategy, self.strategy
-            ).format(RATE="##" if self.strategy == "concurrent" else "#.##")
-
-        rate = ""
-
-        if hasattr(self.strategy, "streams"):
-            rate = f"{self.strategy.streams:>2}"
-        elif hasattr(self.strategy, "rate"):
-            rate = f"{self.strategy.rate:.2f}"
-
-        return SCHEDULING_STRATEGY_DESCRIPTIONS.get(
-            self.strategy.type_, self.strategy.type_
-        ).format(RATE=rate)
+        return strategy_display_str(self.strategy)
 
     @property
     def total(self) -> Optional[float]:
@@ -109,12 +87,16 @@ class BenchmarkerTaskProgressState:
 
     @property
     def fields(self) -> Dict[str, str]:
-        return {
+        fields = {
             "start_time": self.formatted_start_time,
             "progress_status": self.formatted_progress_status,
             "requests_summary": self.formatted_requests_summary,
-            "tokens_summary": self.formatted_tokens_summary,
         }
+
+        if self.display_scheduler_stats:
+            fields["scheduler_stats"] = self.formatted_scheduler_stats
+
+        return fields
 
     @property
     def formatted_start_time(self) -> str:
@@ -147,31 +129,32 @@ class BenchmarkerTaskProgressState:
 
         return (
             "Req: "
-            f"({self.requests_rate:.2f} / sec, "
-            f"{self.requests_latency:.2f}s Lat, "
+            f"{self.requests_rate:>4.1f} req/sec, "
+            f"{self.requests_latency:2>.2f}s Lat, "
             f"{self.requests_processing:>3.1f} Conc, "
-            f"{self.requests_completed:>3} Comp, "
-            f"{self.requests_errored:>3} Err)"
+            f"{self.requests_completed:>4.0f} Comp, "
+            f"{self.requests_errored:>2.0f} Err"
         )
 
     @property
-    def formatted_tokens_summary(self) -> str:
+    def formatted_scheduler_stats(self) -> str:
         if not self.started:
             return " "
 
         return (
-            "Tok: "
-            f"({self.output_tokens_rate:.1f} gen/sec, "
-            f"{self.total_tokens_rate:.1f} tot/sec, "
-            f"{self.tokens_ttft:.1f}ms TTFT, "
-            f"{self.tokens_itl:.1f}ms ITL, "
-            f"{self.prompt_tokens:.0f} Prompt, "
-            f"{self.output_tokens:.0f} Gen)"
+            f"Sys: "
+            f"{self.worker_overheads_time_ms:>3.1f}ms Worker OH, "
+            f"{self.backend_overheads_time_ms:>3.1f}ms Backend OH, "
+            f"{self.requests_sleep_time_ms:>5.0f}ms Req Sleep, "
+            f"{self.requests_targeted_start_time_delay_ms:>5.0f}ms Start Delay"
         )
 
 
-class BenchmarkerProgressDisplay(ABC):
-    def __init__(self):
+BTPS = TypeVar("BTPS", bound=BenchmarkerTaskProgressState)
+
+
+class BenchmarkerProgressDisplay(Generic[BTPS]):
+    def __init__(self, display_scheduler_stats: bool):
         """
         Progress display view:
         | Benchmarks -----------------------------------------------------------------|
@@ -181,6 +164,7 @@ class BenchmarkerProgressDisplay(ABC):
         | ----------------------------------------------------------------------------|
         SP Running... [BAR] (#/#) [ ELAPSED < ETA ]
         """
+        self.display_scheduler_stats = display_scheduler_stats
         self.started = False
         self.benchmarker_tasks_progress = Progress(*self.create_task_progress_columns())
         self.benchmarker_tasks_panel = Panel(
@@ -308,7 +292,9 @@ class BenchmarkerProgressDisplay(ABC):
 
         progress_state.strategy = result.current_strategy
         progress_state.started = True
-        progress_state.start_time = result.current_aggregator.start_time
+        progress_state.start_time = (
+            result.current_aggregator.scheduler_created_requests.start_time
+        )
         progress_state.max_number = result.current_aggregator.max_number
         progress_state.max_duration = result.current_aggregator.max_duration
 
@@ -323,23 +309,33 @@ class BenchmarkerProgressDisplay(ABC):
 
         progress_state.in_warmup = result.current_aggregator.in_warmup
         progress_state.in_cooldown = result.current_aggregator.in_cooldown
-        progress_state.requests_rate = result.current_aggregator.successful_requests / (
-            time.time() - progress_state.start_time
+        progress_state.requests_rate = (
+            result.current_aggregator.successful_requests.rate
         )
-        progress_state.requests_latency = result.current_aggregator.request_latency.mean
+        progress_state.requests_latency = result.current_aggregator.request_time.mean
         progress_state.requests_processing = (
-            result.current_aggregator.processing_requests
+            result.current_aggregator.scheduler_processing_requests.last
         )
         progress_state.requests_completed = (
-            result.current_aggregator.successful_requests
+            result.current_aggregator.successful_requests.total
         )
-        progress_state.requests_errored = result.current_aggregator.errored_requests
-        progress_state.output_tokens = result.current_aggregator.output_tokens.mean
-        progress_state.prompt_tokens = result.current_aggregator.prompt_tokens.mean
-        progress_state.output_tokens_rate = result.current_aggregator.output_tokens.rate
-        progress_state.total_tokens_rate = result.current_aggregator.total_tokens.rate
-        progress_state.tokens_ttft = result.current_aggregator.time_to_first_token.mean
-        progress_state.tokens_itl = result.current_aggregator.inter_token_latency.mean
+        progress_state.requests_errored = (
+            result.current_aggregator.errored_requests.total
+        )
+
+        progress_state.worker_overheads_time_ms = (
+            result.current_aggregator.scheduled_time_delay.mean_ms
+            + result.current_aggregator.worker_start_delay.mean_ms
+        )
+        progress_state.backend_overheads_time_ms = (
+            result.current_aggregator.request_time_delay.mean_ms
+        )
+        progress_state.requests_sleep_time_ms = (
+            result.current_aggregator.scheduled_time_sleep.mean_ms
+        )
+        progress_state.requests_targeted_start_time_delay_ms = (
+            result.current_aggregator.request_start_time_targeted_delay.mean_ms
+        )
 
     def handle_update_scheduler_complete(
         self, progress_state: BenchmarkerTaskProgressState, result: BenchmarkerResult
@@ -376,6 +372,103 @@ class BenchmarkerProgressDisplay(ABC):
         )
         progress_state.requests_completed = result.current_benchmark.completed_total
         progress_state.requests_errored = result.current_benchmark.errored_total
+
+    def handle_end(self, result: BenchmarkerResult):
+        self.benchmarker_progress.update(
+            self.progress_task,
+            completed=len(self.benchmarker_tasks) * 1000,
+            total=len(self.benchmarker_tasks) * 1000,
+            completed_benchmarks=len(self.benchmarker_tasks),
+            total_benchmarks=len(self.benchmarker_tasks),
+        )
+        self.benchmarker_progress.stop_task(self.progress_task)
+        self.benchmarker_live.stop()
+        self.active_task = None
+        self.benchmarker_tasks = []
+        self.progress_task = None
+
+    def create_task_progress_columns(self) -> List[ProgressColumn]:
+        columns = [
+            TextColumn("[{task.fields[start_time]}]"),
+            SpinnerColumn(),
+            TaskProgressColumn(),
+            TextColumn("{task.description}"),
+            TextColumn("({task.fields[progress_status]})"),
+            TextColumn(" "),
+        ]
+
+        if not self.display_scheduler_stats:
+            columns += [
+                TextColumn("{task.fields[requests_summary]}\n"),
+            ]
+        else:
+            columns += [
+                TextColumn(
+                    "{task.fields[requests_summary]}\n{task.fields[scheduler_stats]}\n"
+                ),
+            ]
+
+        return columns
+
+    def create_task_progress_state(
+        self,
+        task_id: TaskID,
+        index: int,
+        strategy_type: StrategyType,
+        result: BenchmarkerResult,
+    ) -> BenchmarkerTaskProgressState:
+        return BenchmarkerTaskProgressState(
+            display_scheduler_stats=self.display_scheduler_stats,
+            task_id=task_id,
+            strategy=strategy_type,
+        )
+
+
+class GenerativeTextBenchmarkerTaskProgressState(BenchmarkerTaskProgressState):
+    output_tokens: float = 0
+    prompt_tokens: float = 0
+    output_tokens_rate: float = 0
+    total_tokens_rate: float = 0
+    tokens_ttft: float = 0
+    tokens_itl: float = 0
+
+    @property
+    def fields(self) -> Dict[str, str]:
+        fields = super().fields
+        fields["tokens_summary"] = self.formatted_tokens_summary
+        return fields
+
+    @property
+    def formatted_tokens_summary(self) -> str:
+        if not self.started:
+            return " "
+
+        return (
+            "Tok: "
+            f"{self.output_tokens_rate:4>.1f} gen/sec, "
+            f"{self.total_tokens_rate:>4.1f} tot/sec, "
+            f"{self.tokens_ttft:>3.1f}ms TTFT, "
+            f"{self.tokens_itl:>3.1f}ms ITL, "
+            f"{self.prompt_tokens:>4.0f} Prompt, "
+            f"{self.output_tokens:>4.0f} Gen"
+        )
+
+
+class GenerativeTextBenchmarkerProgressDisplay(
+    BenchmarkerProgressDisplay[GenerativeTextBenchmarkerTaskProgressState]
+):
+    def handle_update_scheduler_update(self, progress_state, result):
+        super().handle_update_scheduler_update(progress_state, result)
+        progress_state.output_tokens = result.current_aggregator.output_tokens.mean
+        progress_state.prompt_tokens = result.current_aggregator.prompt_tokens.mean
+        progress_state.output_tokens_rate = result.current_aggregator.output_tokens.rate
+        progress_state.total_tokens_rate = result.current_aggregator.total_tokens.rate
+        progress_state.tokens_ttft = result.current_aggregator.time_to_first_token.mean
+        progress_state.tokens_itl = result.current_aggregator.inter_token_latency.mean
+
+    def handle_update_benchmark_compiled(self, progress_state, result):
+        super().handle_update_benchmark_compiled(progress_state, result)
+
         progress_state.output_tokens = (
             result.current_benchmark.outputs_token_count.completed.mean
         )
@@ -395,38 +488,34 @@ class BenchmarkerProgressDisplay(ABC):
             result.current_benchmark.inter_token_latencies_ms.completed.mean
         )
 
-    def handle_end(self, result: BenchmarkerResult):
-        self.benchmarker_progress.update(
-            self.progress_task,
-            completed=len(self.benchmarker_tasks) * 1000,
-            total=len(self.benchmarker_tasks) * 1000,
-            completed_benchmarks=len(self.benchmarker_tasks),
-            total_benchmarks=len(self.benchmarker_tasks),
-        )
-        self.benchmarker_progress.stop_task(self.progress_task)
-        self.benchmarker_live.stop()
-        self.active_task = None
-        self.benchmarker_tasks = []
-        self.progress_task = None
-
-    def create_task_progress_columns(self) -> List[ProgressColumn]:
-        return [
-            TextColumn("[{task.fields[start_time]}]"),
-            SpinnerColumn(),
-            TaskProgressColumn(),
-            TextColumn("{task.description}"),
-            TextColumn("({task.fields[progress_status]})"),
-            TextColumn(" "),
-            TextColumn("{task.fields[requests_summary]}"),
-            TextColumn(" "),
-            TextColumn("{task.fields[tokens_summary]}"),
-        ]
-
     def create_task_progress_state(
         self,
         task_id: TaskID,
         index: int,
         strategy_type: StrategyType,
         result: BenchmarkerResult,
-    ) -> BenchmarkerTaskProgressState:
-        return BenchmarkerTaskProgressState(task_id=task_id, strategy=strategy_type)
+    ) -> GenerativeTextBenchmarkerTaskProgressState:
+        return GenerativeTextBenchmarkerTaskProgressState(
+            display_scheduler_stats=self.display_scheduler_stats,
+            task_id=task_id,
+            strategy=strategy_type,
+        )
+
+    def create_task_progress_columns(self) -> List[ProgressColumn]:
+        columns = super().create_task_progress_columns()
+        columns = columns[:-1]  # remove the last display info column
+
+        if not self.display_scheduler_stats:
+            columns += [
+                TextColumn(
+                    "{task.fields[requests_summary]}\n{task.fields[tokens_summary]}\n"
+                ),
+            ]
+        else:
+            columns += [
+                TextColumn(
+                    "{task.fields[requests_summary]}\n{task.fields[tokens_summary]}\n{task.fields[scheduler_stats]}\n"
+                ),
+            ]
+
+        return columns

@@ -113,17 +113,7 @@ class GenerativeRequestLoader(RequestLoader):
 
     def __len__(self) -> int:
         if self.iter_type == "finite":
-            try:
-                return len(self.dataset)
-            except Exception:
-                pass
-
-            try:
-                dataset_size = self.dataset.info.dataset_size
-                if dataset_size is not None:
-                    return dataset_size
-            except Exception:
-                pass
+            return self.num_unique_items()
 
         raise ValueError(f"Unable to determine length of dataset: {self.data}")
 
@@ -135,6 +125,21 @@ class GenerativeRequestLoader(RequestLoader):
             processor=str(self.processor),
             processor_args=self.processor_args,
         )
+
+    def num_unique_items(self, raise_err: bool = True) -> int:
+        try:
+            return len(self.dataset)
+        except Exception:
+            pass
+
+        dataset_size = self.dataset.info.dataset_size
+        if dataset_size is not None:
+            return dataset_size
+
+        if raise_err:
+            raise ValueError("Unable to determine number of items in the dataset")
+
+        return -1
 
     def _create_column_mappings(
         self,

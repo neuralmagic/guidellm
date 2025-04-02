@@ -71,6 +71,7 @@ class SchedulerRequestInfo(Serializable):
 
     targeted_start_time: float = -1
     queued_time: float = -1
+    dequeued_time: float = -1
     scheduled_time: float = -1
     worker_start: float = -1
     worker_end: float = -1
@@ -110,6 +111,7 @@ class SchedulerResult(Serializable, Generic[REQ, RES]):
         "request_complete",
     ]
     request: REQ
-    response: RES
+    response: Optional[RES]
     request_info: Optional[SchedulerRequestInfo]
     run_info: SchedulerRunInfo
+    preempted: bool = False

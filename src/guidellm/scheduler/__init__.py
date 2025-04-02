@@ -8,6 +8,7 @@ from .strategy import (
     StrategyType,
     SynchronousStrategy,
     ThroughputStrategy,
+    strategy_display_str,
 )
 from .types import REQ, RES
 from .worker import (
@@ -29,6 +30,7 @@ __all__ = [
     "StrategyType",
     "SynchronousStrategy",
     "ThroughputStrategy",
+    "strategy_display_str",
     "REQ",
     "RES",
     "GenerativeRequestsWorker",

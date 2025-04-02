@@ -26,7 +26,6 @@ from guidellm.backend import (
     ResponseSummary,
     StreamingTextResponse,
 )
-from guidellm.config import settings
 from guidellm.objects import Serializable
 from guidellm.request import GenerationRequest
 from guidellm.scheduler.result import SchedulerRequestInfo
@@ -54,6 +53,7 @@ class WorkerProcessResult(Generic[REQ, RES]):
     request: REQ
     response: RES
     info: SchedulerRequestInfo
+    preempted: bool = False
 
 
 class RequestsWorker(ABC, Generic[REQ, RES]):
@@ -78,6 +78,16 @@ class RequestsWorker(ABC, Generic[REQ, RES]):
         ...
 
     @abstractmethod
+    async def prepare_multiprocessing(self):
+        """
+        An abstract method that must be implemented by subclasses.
+        This is useful for workers that have instance state that can not
+        be shared across processes and should be cleared out and re-initialized
+        for each new process.
+        """
+        ...
+
+    @abstractmethod
     async def resolve(
         self,
         request: REQ,
@@ -95,10 +105,23 @@ class RequestsWorker(ABC, Generic[REQ, RES]):
         """
         ...
 
+    async def get_request(
+        self, requests_queue: multiprocessing.Queue
+    ) -> Optional[WorkerProcessRequest[REQ]]:
+        return await asyncio.to_thread(requests_queue.get)
+
+    async def send_result(
+        self,
+        results_queue: multiprocessing.Queue,
+        result: WorkerProcessResult[REQ, RES],
+    ):
+        await asyncio.to_thread(results_queue.put, result)
+
     async def resolve_scheduler_request(
         self,
         request: Any,
         queued_time: float,
+        dequeued_time: float,
         start_time: float,
         timeout_time: float,
         results_queue: multiprocessing.Queue,
@@ -107,9 +130,8 @@ class RequestsWorker(ABC, Generic[REQ, RES]):
         info = SchedulerRequestInfo(
             targeted_start_time=start_time,
             queued_time=queued_time,
+            dequeued_time=dequeued_time,
             scheduled_time=time.time(),
-            worker_start=-1,
-            worker_end=-1,
             process_id=process_id,
         )
         result: WorkerProcessResult[REQ, RES] = WorkerProcessResult(
@@ -118,7 +140,7 @@ class RequestsWorker(ABC, Generic[REQ, RES]):
             response=None,
             info=info,
         )
-        results_queue.put(result)
+        asyncio.create_task(self.send_result(results_queue, result))
 
         if (wait_time := start_time - time.time()) > 0:
             await asyncio.sleep(wait_time)
@@ -130,18 +152,25 @@ class RequestsWorker(ABC, Generic[REQ, RES]):
             response=None,
             info=info,
         )
-        results_queue.put(result)
+        asyncio.create_task(self.send_result(results_queue, result))
+        time_til_timeout = timeout_time - time.time()
 
-        response = await self.resolve(request, timeout_time)
+        if time_til_timeout > 0:
+            response = await self.resolve(request, timeout_time)
+            preempted = False
+            info.worker_end = time.time()
+        else:
+            response = None
+            preempted = True
 
-        info.worker_end = time.time()
         result = WorkerProcessResult(
             type_="request_complete",
             request=request,
             response=response,
             info=info,
+            preempted=preempted,
         )
-        results_queue.put(result)
+        asyncio.create_task(self.send_result(results_queue, result))
 
     def process_loop_synchronous(
         self,
@@ -150,22 +179,15 @@ class RequestsWorker(ABC, Generic[REQ, RES]):
         process_id: int,
     ):
         async def _process_runner():
-            while True:
-                try:
-                    process_request: Optional[WorkerProcessRequest[REQ]] = (
-                        requests_queue.get_nowait()
-                    )
-                except multiprocessing.queues.Empty:
-                    # yield control to the event loop
-                    await asyncio.sleep(settings.default_async_loop_sleep)
-                    continue
-
-                if process_request is None:  # stop signal
-                    break
+            while (
+                process_request := await self.get_request(requests_queue)
+            ) is not None:
+                dequeued_time = time.time()
 
                 await self.resolve_scheduler_request(
                     request=process_request.request,
                     queued_time=process_request.queued_time,
+                    dequeued_time=dequeued_time,
                     start_time=process_request.start_time,
                     timeout_time=process_request.timeout_time,
                     results_queue=results_queue,
@@ -191,18 +213,10 @@ class RequestsWorker(ABC, Generic[REQ, RES]):
         async def _process_runner():
             pending = asyncio.Semaphore(max_concurrency) if max_concurrency else None
 
-            while True:
-                try:
-                    process_request: Optional[WorkerProcessRequest[REQ]] = (
-                        requests_queue.get_nowait()
-                    )
-                except multiprocessing.queues.Empty:
-                    # yield control to event loop
-                    await asyncio.sleep(settings.default_async_loop_sleep)
-                    continue
-
-                if process_request is None:  # stop signal
-                    break
+            while (
+                process_request := await self.get_request(requests_queue)
+            ) is not None:
+                dequeued_time = time.time()
 
                 if pending:
                     await pending.acquire()
@@ -216,6 +230,7 @@ class RequestsWorker(ABC, Generic[REQ, RES]):
                     self.resolve_scheduler_request(
                         request=process_request.request,
                         queued_time=process_request.queued_time,
+                        dequeued_time=dequeued_time,
                         start_time=process_request.start_time,
                         timeout_time=process_request.timeout_time,
                         results_queue=results_queue,
@@ -270,6 +285,43 @@ class GenerativeRequestsWorker(RequestsWorker[GenerationRequest, ResponseSummary
             backend_info=self.backend.info,
         )
 
+    async def prepare_multiprocessing(self):
+        """
+        Prepare the worker for multiprocessing.
+        This is useful for workers that have instance state that can not
+        be shared across processes and should be cleared out and re-initialized
+        for each new process.
+        """
+        await self.backend.prepare_multiprocessing()
+
+    def process_loop_synchronous(
+        self,
+        requests_queue: multiprocessing.Queue,
+        results_queue: multiprocessing.Queue,
+        process_id: int,
+    ):
+        asyncio.run(self.backend.validate())
+        super().process_loop_synchronous(
+            requests_queue=requests_queue,
+            results_queue=results_queue,
+            process_id=process_id,
+        )
+
+    def process_loop_asynchronous(
+        self,
+        requests_queue: multiprocessing.Queue,
+        results_queue: multiprocessing.Queue,
+        max_concurrency: Optional[int],
+        process_id: int,
+    ):
+        asyncio.run(self.backend.validate())
+        super().process_loop_asynchronous(
+            requests_queue=requests_queue,
+            results_queue=results_queue,
+            max_concurrency=max_concurrency,
+            process_id=process_id,
+        )
+
     async def resolve(
         self,
         request: GenerationRequest,
@@ -286,6 +338,7 @@ class GenerativeRequestsWorker(RequestsWorker[GenerationRequest, ResponseSummary
         :return: A ResponseSummary object containing the response from the backend.
             If an error occurs, the ResponseSummary will contain the error message.
         """
+        resolve_start_time = time.time()
         response = None
         error: Optional[str] = None
 
@@ -314,12 +367,17 @@ class GenerativeRequestsWorker(RequestsWorker[GenerationRequest, ResponseSummary
                     f"Received no ResponseSummary for request: {request} "
                     f"and backend: {self.backend}, received: {response}"
                 )
-        except asyncio.TimeoutError as texc:
-            error = str(texc)
+        except asyncio.TimeoutError:
+            error = "TimeoutError: The request timed out before completing."
         except Exception as exc:  # noqa: BLE001
             error = str(exc)
 
-        return self._handle_response(request, response, error)
+        return self._handle_response(
+            request=request,
+            response=response,
+            error=error,
+            resolve_start_time=resolve_start_time,
+        )
 
     def _create_request_func_kwargs(
         self,
@@ -363,6 +421,7 @@ class GenerativeRequestsWorker(RequestsWorker[GenerationRequest, ResponseSummary
         request: GenerationRequest,
         response: Any,
         error: Optional[str],
+        resolve_start_time: float,
     ) -> ResponseSummary:
         if response is None or not isinstance(
             response, (ResponseSummary, StreamingTextResponse)
@@ -382,8 +441,10 @@ class GenerativeRequestsWorker(RequestsWorker[GenerationRequest, ResponseSummary
                     headers={},
                     payload={},
                 ),
-                start_time=None,
-                end_time=None,
+                start_time=resolve_start_time,
+                end_time=time.time(),
+                first_iter_time=None,
+                last_iter_time=None,
                 request_id=request.request_id,
                 error=error or "Unknown error",
             )
@@ -397,9 +458,11 @@ class GenerativeRequestsWorker(RequestsWorker[GenerationRequest, ResponseSummary
                     payload={},
                 ),
                 start_time=response.start_time,
-                end_time=None,
+                end_time=time.time(),
+                first_iter_time=response.first_iter_time,
+                last_iter_time=response.time if response.iter_count > 0 else None,
                 request_prompt_tokens=request.stats.get("prompt_tokens", None),
-                request_output_tokens=None,
+                request_output_tokens=request.constraints.get("output_tokens", None),
                 response_prompt_tokens=None,
                 response_output_tokens=response.iter_count,
                 request_id=request.request_id,

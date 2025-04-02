@@ -291,6 +291,7 @@ class GenerativeBenchmarker(
         request_loader_description: Optional[Serializable] = None,
         benchmark_save_extras: Optional[Dict[str, Any]] = None,
         processor: Optional[Union[str, Path, PreTrainedTokenizer]] = None,
+        processor_args: Optional[Dict[str, Any]] = None,
     ):
         super().__init__(
             worker=GenerativeRequestsWorker(backend),
@@ -299,6 +300,7 @@ class GenerativeBenchmarker(
             benchmark_save_extras=benchmark_save_extras,
         )
         self.processor = processor
+        self.processor_args = processor_args
 
     def create_benchmark_aggregator(
         self,
@@ -315,6 +317,7 @@ class GenerativeBenchmarker(
     ) -> GenerativeBenchmarkAggregator:
         return GenerativeBenchmarkAggregator(
             processor=self.processor,
+            processor_args=self.processor_args,
             run_id=run_id,
             profile=profile,
             strategy_index=strategy_index,

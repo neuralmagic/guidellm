@@ -1,6 +1,7 @@
 from .aggregator import AGG, BenchmarkAggregator, GenerativeBenchmarkAggregator
 from .benchmark import BENCH, Benchmark, GenerativeBenchmark
 from .benchmarker import Benchmarker, BenchmarkerResult, GenerativeBenchmarker
+from .entrypoints import benchmark_generative_text
 from .profile import (
     AsyncProfile,
     ConcurrentProfile,
@@ -30,4 +31,5 @@ __all__ = [
     "SynchronousProfile",
     "ThroughputProfile",
     "create_profile",
+    "benchmark_generative_text",
 ]

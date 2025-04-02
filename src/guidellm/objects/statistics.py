@@ -1,7 +1,7 @@
 import math
 import time as timer
 from collections import defaultdict
-from typing import List, Literal, Optional, Tuple
+from typing import Any, List, Literal, Optional, Tuple
 
 import numpy as np
 from pydantic import Field, computed_field
@@ -13,6 +13,7 @@ __all__ = [
     "DistributionSummary",
     "StatusDistributionSummary",
     "RunningStats",
+    "TimeRunningStats",
 ]
 
 
@@ -83,6 +84,9 @@ class DistributionSummary(Serializable):
     count: int = Field(
         description="The number of values in the distribution.",
     )
+    total_sum: float = Field(
+        description="The total sum of the values in the distribution.",
+    )
     percentiles: Percentiles = Field(
         description="The percentiles of the distribution.",
     )
@@ -137,6 +141,7 @@ class DistributionSummary(Serializable):
         minimum = values[0].item() if len(values) > 0 else 0
         maximum = values[-1].item() if len(values) > 0 else 0
         count = len(values)
+        total_sum = np.sum(values).item()
 
         return DistributionSummary(
             mean=mean,
@@ -147,6 +152,7 @@ class DistributionSummary(Serializable):
             min=minimum,
             max=maximum,
             count=count,
+            total_sum=total_sum,
             percentiles=(
                 Percentiles(
                     p001=cdf[np.argmax(cdf[:, 1] >= 0.001), 0].item(),  # noqa: PLR2004
@@ -483,14 +489,18 @@ class StatusDistributionSummary(Serializable):
 
 
 class RunningStats(Serializable):
+    start_time: float = Field(
+        default_factory=timer.time,
+    )
     count: int = Field(
         default=0,
     )
     total: float = Field(
         default=0.0,
     )
-    start_time: float = Field(
-        default=timer.time,
+    last: float = Field(
+        default=0.0,
+        description="The last value added to the running statistics.",
     )
 
     @computed_field
@@ -507,6 +517,26 @@ class RunningStats(Serializable):
             return 0.0
         return self.total / (timer.time() - self.start_time)
 
+    def __add__(self, value: Any) -> float:
+        if not isinstance(value, (int, float)):
+            raise ValueError(
+                f"Value must be an int or float, got {type(value)} instead.",
+            )
+
+        self.update(value)
+
+        return self.mean
+
+    def __iadd__(self, value: Any) -> "RunningStats":
+        if not isinstance(value, (int, float)):
+            raise ValueError(
+                f"Value must be an int or float, got {type(value)} instead.",
+            )
+
+        self.update(value)
+
+        return self
+
     def update(self, value: float, count: int = 1) -> None:
         """
         Update the running statistics with a new value.
@@ -514,3 +544,26 @@ class RunningStats(Serializable):
         """
         self.count += count
         self.total += value
+        self.last = value
+
+
+class TimeRunningStats(RunningStats):
+    @computed_field
+    @property
+    def total_ms(self) -> float:
+        return self.total * 1000.0
+
+    @computed_field
+    @property
+    def last_ms(self) -> float:
+        return self.last * 1000.0
+
+    @computed_field
+    @property
+    def mean_ms(self) -> float:
+        return self.mean * 1000.0
+
+    @computed_field
+    @property
+    def rate_ms(self) -> float:
+        return self.rate * 1000.0

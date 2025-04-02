@@ -26,7 +26,7 @@ from guidellm.benchmark.benchmark import (
 )
 from guidellm.benchmark.profile import Profile
 from guidellm.config import settings
-from guidellm.objects import RunningStats, Serializable
+from guidellm.objects import RunningStats, Serializable, TimeRunningStats
 from guidellm.request import GenerationRequest
 from guidellm.scheduler import (
     REQ,
@@ -130,62 +130,6 @@ class BenchmarkAggregator(ABC, BaseModel, Generic[BENCH, REQ, RES]):
             "that were not within the warmup or cooldown periods."
         ),
     )
-
-    start_time: float = Field(
-        description=(
-            "The timestamp when the benchmark run started. Defaults to the current "
-            "time.time() on creation."
-        ),
-        default_factory=time.time,
-    )
-    created_requests: int = Field(
-        description="The number of requests created for this benchmark run.",
-        default=0,
-    )
-    queued_requests: int = Field(
-        description="The number of requests pending in queue for this benchmark run.",
-        default=0,
-    )
-    scheduled_requests: int = Field(
-        description=(
-            "The number of requests scheduled (actively running but waiting for the "
-            "desired start time) for this benchmark run."
-        ),
-        default=0,
-    )
-    processing_requests: int = Field(
-        description=(
-            "The number of requests actively being processed by the worker for this "
-            "benchmark run."
-        ),
-        default=0,
-    )
-    completed_requests: int = Field(
-        description=(
-            "The number of requests completed for this benchmark run. This includes "
-            "requests within the warmup and cooldown period, if any, along with the "
-            "final results."
-        ),
-        default=0,
-    )
-    successful_requests: int = Field(
-        description=(
-            "The number of requests that completed successfully without error. "
-            "This is a subset of the completed requests for any that did not error. "
-            "This includes requests within the warmup and cooldown period, if any, "
-            "along with the final results."
-        ),
-        default=0,
-    )
-    errored_requests: int = Field(
-        description=(
-            "The number of requests that errored during processing. This is a subset "
-            "of the completed requests for any that errored. This includes requests "
-            "within the warmup and cooldown period, if any, "
-            "along with the final results."
-        ),
-        default=0,
-    )
     in_warmup: bool = Field(
         description=(
             "A flag to indicate if the benchmark is currently in the warmup phase."
@@ -201,41 +145,160 @@ class BenchmarkAggregator(ABC, BaseModel, Generic[BENCH, REQ, RES]):
         exclude=True,
     )
 
-    queued_time: RunningStats = Field(
+    scheduler_created_requests: RunningStats = Field(
         description=(
-            "The running statistics for the time spent in queue for all requests that "
-            "completed within the benchmark run. This is the time from when the "
-            "request was created to when it was scheduled to be processed."
+            "The running statistics for the number of requests created for this "
+            "benchmark run. This includes all requests created, regardless of "
+            "their status."
         ),
         default_factory=RunningStats,
     )
-    scheduled_time: RunningStats = Field(
+    scheduler_queued_requests: RunningStats = Field(
         description=(
-            "The running statistics for the time spent scheduled for all requests that "
-            "completed within the benchmark run. This is the time from when the "
-            "request was scheduled to be processed to when it was actually started."
+            "The running statistics for the number of requests pending in queue "
+            "for this benchmark run. This includes requests that are waiting to "
+            "be scheduled."
         ),
         default_factory=RunningStats,
     )
-    worker_time: RunningStats = Field(
+    scheduler_scheduled_requests: RunningStats = Field(
         description=(
-            "The running statistics for the time spent processing for all requests that "
-            "completed within the benchmark run. This is the time from when the "
-            "request was started to when it was completed."
+            "The running statistics for the number of requests scheduled (actively "
+            "running but waiting for the desired start time) for this benchmark run."
         ),
         default_factory=RunningStats,
     )
-    targeted_worker_start_delay: RunningStats = Field(
+    scheduler_processing_requests: RunningStats = Field(
         description=(
-            "The running statistics for the delay between the targeted start time and "
-            "the actual start time for all requests that completed within the benchmark "
-            "run. This is the time from when the request was scheduled to be processed "
-            "to when it was actually started."
+            "The running statistics for the number of requests actively being "
+            "processed by the worker for this benchmark run."
+        ),
+        default_factory=RunningStats,
+    )
+    scheduler_completed_requests: RunningStats = Field(
+        description=(
+            "The running statistics for the number of requests completed for this "
+            "benchmark run. This includes requests within the warmup and cooldown "
+            "period, if any, along with the final results."
+        ),
+        default_factory=RunningStats,
+    )
+    successful_requests: RunningStats = Field(
+        description=(
+            "The running statistics for the number of requests that completed "
+            "successfully without error. This is a subset of the completed requests "
+            "for any that did not error. This includes requests within the warmup "
+            "and cooldown period, if any, along with the final results."
+        ),
+        default_factory=RunningStats,
+    )
+    errored_requests: RunningStats = Field(
+        description=(
+            "The running statistics for the number of requests that errored during "
+            "processing. This is a subset of the completed requests for any that "
+            "errored. This includes requests within the warmup and cooldown period, "
+            "if any, along with the final results."
         ),
         default_factory=RunningStats,
     )
 
-    def add_result(self, result: SchedulerResult[REQ, RES]):
+    queued_time: TimeRunningStats = Field(
+        description=(
+            "The running statistics for the time spent in queue for all requests that "
+            "completed within the benchmark run. This is the time from when the "
+            "request was created to when it was dequeued by the worker."
+        ),
+        default_factory=TimeRunningStats,
+    )
+    scheduled_time_delay: TimeRunningStats = Field(
+        description=(
+            "The running statistics for the time spent from when a request was "
+            "dequeued by the worker to when it was actually scheduled by the worker"
+            "for all requests that completed within the benchmark run. "
+            "This should be as close to 0 as possible, any additional time is "
+            "overheads from the system or the worker."
+        ),
+        default_factory=TimeRunningStats,
+    )
+    scheduled_time_sleep: TimeRunningStats = Field(
+        description=(
+            "The running statistics for the time for each request spent sleeping til "
+            "the desired start time was reached for all requests that completed within "
+            "the benchmark run. This is the time from when the request was scheduled "
+            "to when the desired start time was reached. "
+        ),
+        default_factory=TimeRunningStats,
+    )
+    worker_start_delay: TimeRunningStats = Field(
+        description=(
+            "The running statistics for the time delay between when the request was "
+            "scheduled and when the worker actually started processing subtracting any "
+            "sleep time for all requests that completed within the benchmark run. "
+            "This should be as close to 0 as possible, any additional time is "
+            "overheads from the system or the worker."
+        ),
+        default_factory=TimeRunningStats,
+    )
+    worker_time: TimeRunningStats = Field(
+        description=(
+            "The running statistics for the time spent processing all requests that "
+            "completed within the benchmark run. This is the time from when the "
+            "request was started to when it was completed."
+        ),
+        default_factory=TimeRunningStats,
+    )
+    worker_start_time_targeted_delay: TimeRunningStats = Field(
+        description=(
+            "The running statistics for the delay between the targeted start time and "
+            "the actual start time for requests that completed within the benchmark "
+            "run. This represents delays from the best case desired start time. "
+            "For async strategies, this represents delays from the ideal system. "
+            "For sync strategies, since those are doubled in queue, this should be "
+            "as close to the time for a request to be processed as possible."
+        ),
+        default_factory=TimeRunningStats,
+    )
+    request_start_time_delay: TimeRunningStats = Field(
+        description=(
+            "The running statistics for the delay between the actual request being "
+            "made and the time the worker started on the request for all requests "
+            "that completed within the benchmark run. This time should be as close to "
+            "0 as possible, any additional time is overhead from the system or "
+            "the worker."
+        ),
+        default_factory=TimeRunningStats,
+    )
+    request_start_time_targeted_delay: TimeRunningStats = Field(
+        description=(
+            "The running statistics for the delay between the targeted start time and "
+            "the actual start time for all requests that completed within the "
+            "benchmark run. This represents delays from the best case desired start "
+            "time. For async strategies, this represents delays from the ideal system. "
+            "For sync strategies, since those are duplicated in queue, this should be "
+            "as close to the time for a request to be processed."
+        ),
+        default_factory=TimeRunningStats,
+    )
+    request_time_delay: TimeRunningStats = Field(
+        description=(
+            "The running statistics for the delay in time between the total request "
+            "time and the worker time. This should be as close to 0 as possible, any "
+            "additional time is overhead from the system or the worker. "
+        ),
+        default_factory=TimeRunningStats,
+    )
+    request_time: TimeRunningStats = Field(
+        description=(
+            "The running statistics for the time spent processing all requests that "
+            "completed within the benchmark run. This is the time from when the "
+            "request was created to when it was completed."
+        ),
+        default_factory=TimeRunningStats,
+    )
+
+    def add_result(
+        self, result: SchedulerResult[REQ, RES], is_error: bool = False
+    ) -> bool:
         """
         Add a result to the aggregator. This will update the internal statistics
         and add the result to the list of results if it is not within the warmup or
@@ -243,7 +306,77 @@ class BenchmarkAggregator(ABC, BaseModel, Generic[BENCH, REQ, RES]):
 
         :param result: The result to add to the aggregator.
         """
-        self.add_base_result(result)
+        # Add base scheduler statistics to the aggregator
+        self.scheduler_created_requests += result.run_info.created_requests
+        self.scheduler_queued_requests += result.run_info.queued_requests
+        self.scheduler_scheduled_requests += result.run_info.scheduled_requests
+        self.scheduler_processing_requests += result.run_info.processing_requests
+        self.scheduler_completed_requests += result.run_info.completed_requests
+
+        if result.preempted or result.type_ != "request_complete":
+            # If the result was preempted or not completed yet
+            # we do not want to add it to the results.
+            return False
+
+        # add base result statistics given this was not preempted and it's completed
+        if not is_error:
+            self.successful_requests += 1
+        else:
+            self.errored_requests += 1
+
+        self.queued_time += (
+            result.request_info.dequeued_time - result.request_info.queued_time
+        )
+        self.scheduled_time_delay += (
+            result.request_info.scheduled_time - result.request_info.dequeued_time
+        )
+        sleep_time = max(
+            0.0,
+            result.request_info.targeted_start_time
+            - result.request_info.scheduled_time,
+        )
+        self.scheduled_time_sleep += sleep_time
+        time_to_worker_start = (
+            result.request_info.worker_start - result.request_info.scheduled_time
+        )
+        self.worker_start_delay += time_to_worker_start - sleep_time
+        self.worker_time += (
+            result.request_info.worker_end - result.request_info.worker_start
+        )
+        self.worker_start_time_targeted_delay += (
+            result.request_info.worker_start - result.request_info.targeted_start_time
+        )
+
+        # Add result to the list of results provided we are not in warmup or cooldown
+        total_completed = self.successful_requests.total + self.errored_requests.total
+        global_start_time = self.scheduler_created_requests.start_time
+
+        if (self.warmup_number and total_completed <= self.warmup_number) or (
+            self.warmup_duration
+            and result.request_info.worker_start
+            <= (global_start_time + self.warmup_duration)
+        ):
+            # within warmup period
+            self.in_warmup = True
+            return True
+
+        if (
+            self.cooldown_number
+            and total_completed > self.max_number - self.cooldown_number
+        ) or (
+            self.cooldown_duration
+            and result.request_info.worker_start
+            >= global_start_time + self.max_duration - self.cooldown_duration
+        ):
+            # within cooldown period
+            self.in_cooldown = True
+            return True
+
+        self.in_warmup = False
+        self.in_cooldown = False
+        self.results.append(result)
+
+        return True
 
     @abstractmethod
     def compile(self) -> BENCH:
@@ -253,74 +386,6 @@ class BenchmarkAggregator(ABC, BaseModel, Generic[BENCH, REQ, RES]):
         and return the compiled object.
         """
         ...
-
-    def add_base_result(
-        self, result: SchedulerResult[REQ, RES], is_error: bool = False
-    ):
-        """
-        Helper function to update the base statistics for the aggregator and add the
-        result to the list of results if it is not within the warmup or cooldown period.
-
-        :param result: The result to add to the aggregator.
-        :param is_error: A flag to indicate if the result was an error or not.
-        """
-        self.created_requests = result.run_info.created_requests
-        self.queued_requests = result.run_info.queued_requests
-        self.scheduled_requests = result.run_info.scheduled_requests
-        self.processing_requests = result.run_info.processing_requests
-        self.completed_requests = result.run_info.completed_requests
-
-        if result.type_ == "request_complete":
-            self._update_stats_from_result(result, is_error)
-            self._add_to_results_within_active_period(result)
-
-    def _update_stats_from_result(
-        self, result: SchedulerResult[REQ, RES], is_error: bool
-    ):
-        if is_error:
-            self.errored_requests += 1
-        else:
-            self.successful_requests += 1
-
-        self.queued_time.update(
-            result.request_info.scheduled_time - result.request_info.queued_time
-        )
-        self.scheduled_time.update(
-            result.request_info.worker_start - result.request_info.scheduled_time
-        )
-        self.worker_time.update(
-            result.request_info.worker_end - result.request_info.worker_start
-        )
-        self.targeted_worker_start_delay.update(
-            result.request_info.worker_start - result.request_info.targeted_start_time
-        )
-
-    def _add_to_results_within_active_period(self, result: SchedulerResult[REQ, RES]):
-        start_time = result.request_info.worker_start
-        end_time = result.request_info.worker_end
-        completed_number = self.errored_requests + self.successful_requests
-
-        if (self.warmup_number and completed_number <= self.warmup_number) or (
-            self.warmup_duration and start_time <= self.warmup_duration
-        ):
-            # within warmup period
-            self.in_warmup = True
-            return
-
-        if (
-            self.cooldown_number
-            and completed_number > self.max_number - self.cooldown_number
-        ) or (
-            self.cooldown_duration
-            and end_time >= self.max_duration - self.cooldown_duration
-        ):
-            # within cooldown period
-            self.in_cooldown = True
-            return
-
-        self.in_warmup = False
-        self.in_cooldown = False
-        self.results.append(result)
 
 
 AGG = TypeVar("AGG", bound=BenchmarkAggregator[BENCH, REQ, RES])
@@ -335,38 +400,27 @@ class GenerativeBenchmarkAggregator(
             "avaiable that match the preferred source."
         )
     )
+    processor_args: Optional[Dict[str, Any]] = Field(
+        description=(
+            "Additional arguments to pass to the tokenizer if it requires "
+            "any specific configuration for loading or processing."
+        ),
+    )
 
-    targeted_request_delay: RunningStats = Field(
-        description=(
-            "The running statistics for the delay between the targeted start time and "
-            "the actual start time for all requests that completed within the "
-            "benchmark run. This is the time from when the request was scheduled to "
-            "be processed to when it was actually started."
-        ),
-        default_factory=RunningStats,
-    )
-    request_latency: RunningStats = Field(
-        description=(
-            "The running statistics for the time spent processing all requests that "
-            "completed within the benchmark run. This is the time from when the "
-            "request was created to when it was completed."
-        ),
-        default_factory=RunningStats,
-    )
-    time_to_first_token: RunningStats = Field(
+    time_to_first_token: TimeRunningStats = Field(
         description=(
             "The running statistics for the time from the start of the request to the "
             "first token being generated for all requests that completed within the "
             "benchmark run."
         ),
-        default_factory=RunningStats,
+        default_factory=TimeRunningStats,
     )
-    inter_token_latency: RunningStats = Field(
+    inter_token_latency: TimeRunningStats = Field(
         description=(
             "The running statistics for the time between each token being generated "
             "for all requests that completed within the benchmark run."
         ),
-        default_factory=RunningStats,
+        default_factory=TimeRunningStats,
     )
     prompt_tokens: RunningStats = Field(
         description=(
@@ -390,7 +444,9 @@ class GenerativeBenchmarkAggregator(
         default_factory=RunningStats,
     )
 
-    def add_result(self, result: SchedulerResult[GenerationRequest, ResponseSummary]):
+    def add_result(
+        self, result: SchedulerResult[GenerationRequest, ResponseSummary]
+    ) -> bool:
         """
         Add a result to the aggregator. This will update the internal statistics
         and add the result to the list of results if it is not within the warmup or
@@ -398,11 +454,45 @@ class GenerativeBenchmarkAggregator(
 
         :param result: The result to add to the aggregator.
         """
-        is_error = result.type_ == "request_complete" and result.response.error
-        self.add_base_result(result, is_error=is_error)
+        is_error = result.type_ == "request_complete" and (
+            result.preempted or result.response.error
+        )
+        added = super().add_result(result, is_error=is_error)
 
-        if result.type_ == "request_complete":
-            self._update_generative_stats_from_result(result)
+        if not added:
+            return False
+
+        self.request_start_time_delay += (
+            result.response.start_time - result.request_info.worker_start
+        )
+        self.request_start_time_targeted_delay += (
+            result.response.start_time - result.request_info.targeted_start_time
+        )
+        self.request_time_delay += (
+            (result.response.start_time - result.request_info.worker_start)
+            + result.request_info.worker_end
+            - result.response.end_time
+        )
+        self.request_time += result.response.end_time - result.request_info.worker_start
+
+        self.time_to_first_token += (
+            result.response.first_iter_time - result.request_info.worker_start
+            if result.response.first_iter_time
+            else 0.0
+        )
+        self.inter_token_latency.update(
+            (result.response.last_iter_time - result.response.first_iter_time) * 1000.0
+            if result.response.last_iter_time and result.response.first_iter_time
+            else 0.0,
+            count=(result.response.output_tokens or 1) - 1,
+        )
+        self.prompt_tokens += result.response.prompt_tokens or 0
+        self.output_tokens += result.response.output_tokens or 0
+        self.total_tokens += (result.response.prompt_tokens or 0) + (
+            result.response.output_tokens or 0
+        )
+
+        return True
 
     def compile(self) -> GenerativeBenchmark:
         """
@@ -428,63 +518,25 @@ class GenerativeBenchmarkAggregator(
                 cooldown_duration=self.cooldown_duration,
             ),
             run_stats=BenchmarkRunStats(
-                start_time=self.start_time,
+                start_time=self.scheduler_created_requests.start_time,
                 end_time=time.time(),
-                total=self.completed_requests,
-                total_completed=self.successful_requests,
-                total_errored=self.errored_requests,
+                total=self.successful_requests.total + self.errored_requests.total,
+                total_completed=self.successful_requests.total,
+                total_errored=self.errored_requests.total,
                 queued_time_avg=self.queued_time.mean,
-                scheduled_time_avg=self.scheduled_time.mean,
+                scheduled_time_delay_avg=self.scheduled_time_delay.mean,
+                scheduled_time_sleep_avg=self.scheduled_time_sleep.mean,
+                worker_start_delay_avg=self.worker_start_delay.mean,
                 worker_time_avg=self.worker_time.mean,
-                worker_delay_avg=self.targeted_worker_start_delay.mean,
-                resolve_delay_avg=self.targeted_request_delay.mean,
+                worker_start_time_targeted_delay_avg=self.worker_start_time_targeted_delay.mean,
+                request_start_time_delay_avg=self.request_start_time_delay.mean,
+                request_start_time_targeted_delay_avg=self.request_start_time_targeted_delay.mean,
+                request_time_delay_avg=self.request_time_delay.mean,
+                request_time_avg=self.request_time.mean,
             ),
             worker=self.worker_description,
             requests_loader=self.request_loader_description,
             extras=self.extras,
-        )
-
-    def _update_generative_stats_from_result(
-        self, result: SchedulerResult[GenerationRequest, ResponseSummary]
-    ):
-        if self.request_latency.count == 0:
-            self.request_latency.start_time = self.start_time
-            self.targeted_request_delay.start_time = self.start_time
-            self.time_to_first_token.start_time = self.start_time
-            self.inter_token_latency.start_time = self.start_time
-            self.prompt_tokens.start_time = self.start_time
-            self.output_tokens.start_time = self.start_time
-            self.total_tokens.start_time = self.start_time
-
-        self.request_latency.update(
-            result.response.end_time - result.response.start_time
-            if result.response.end_time and result.response.start_time
-            else 0.0
-        )
-        self.targeted_request_delay.update(
-            result.response.start_time - result.request_info.targeted_start_time
-            if result.response.start_time
-            else 0.0
-        )
-        self.time_to_first_token.update(
-            (result.response.first_iter_time - result.response.start_time) * 1000.0
-            if result.response.first_iter_time and result.response.start_time
-            else 0.0
-        )
-        if result.response.output_tokens > 1:
-            self.inter_token_latency.update(
-                (result.response.last_iter_time - result.response.first_iter_time)
-                * 1000.0,
-                count=result.response.output_tokens - 1,
-            )
-        self.prompt_tokens.update(
-            result.response.prompt_tokens or 0,
-        )
-        self.output_tokens.update(
-            result.response.output_tokens or 0,
-        )
-        self.total_tokens.update(
-            (result.response.prompt_tokens or 0) + (result.response.output_tokens or 0),
         )
 
     def _compile_results(
@@ -499,12 +551,14 @@ class GenerativeBenchmarkAggregator(
                 requests_tokens=result.response.request_prompt_tokens,
                 response_tokens=result.response.response_prompt_tokens,
                 preferred_tokens_source=settings.preferred_prompt_tokens_source,
+                errored=result.response.error is not None,
             )
             output_tokens = self._compile_tokens_count(
                 value=result.response.value,
                 requests_tokens=result.response.request_output_tokens,
                 response_tokens=result.response.response_output_tokens,
                 preferred_tokens_source=settings.preferred_output_tokens_source,
+                errored=result.response.error is not None,
             )
 
             if result.response.error:
@@ -547,8 +601,17 @@ class GenerativeBenchmarkAggregator(
         requests_tokens: Optional[int],
         response_tokens: Optional[int],
         preferred_tokens_source: Optional[Literal["request", "response"]],
+        errored: bool,
     ) -> int:
-        if preferred_tokens_source is None and (requests_tokens or response_tokens):
+        if errored:
+            if self.processor is None or preferred_tokens_source in (
+                "response",
+                "request",
+            ):
+                # no processor or we are set to trust the response/request tokens
+                # set to response tokens since that is the most reliable source
+                return response_tokens or 0
+        elif preferred_tokens_source is None and (requests_tokens or response_tokens):
             return (
                 response_tokens or requests_tokens
             )  # trust response first if no preference
@@ -562,6 +625,7 @@ class GenerativeBenchmarkAggregator(
 
         self.processor = check_load_processor(
             self.processor,
+            processor_args=self.processor_args,
             error_msg="Processor/Tokenizer is required for calculating token counts.",
         )
         # no tokens that matched the preferred source,

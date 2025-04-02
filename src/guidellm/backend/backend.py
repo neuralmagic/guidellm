@@ -115,8 +115,8 @@ class Backend(ABC):
         If not successful, raises the appropriate exception.
         """
         logger.info("{} validating backend {}", self.__class__.__name__, self.type_)
-        self.check_setup()
-        models = self.available_models()
+        await self.check_setup()
+        models = await self.available_models()
         if not models:
             raise ValueError("No models available for the backend")
 
@@ -126,7 +126,7 @@ class Backend(ABC):
             pass
 
     @abstractmethod
-    def check_setup(self):
+    async def check_setup(self):
         """
         Check the setup for the backend.
         If unsuccessful, raises the appropriate exception.
@@ -136,7 +136,17 @@ class Backend(ABC):
         ...
 
     @abstractmethod
-    def available_models(self) -> List[str]:
+    async def prepare_multiprocessing(self):
+        """
+        Prepare the backend for use in a multiprocessing environment.
+        This is useful for backends that have instance state that can not
+        be shared across processes and should be cleared out and re-initialized
+        for each new process.
+        """
+        ...
+
+    @abstractmethod
+    async def available_models(self) -> List[str]:
         """
         Get the list of available models for the backend.
 

@@ -2,11 +2,11 @@ import math
 import os
 import random
 import time
-from abc import ABC, abstractmethod
 from typing import (
     Generator,
     Literal,
     Optional,
+    Union,
 )
 
 from pydantic import Field
@@ -22,13 +22,14 @@ __all__ = [
     "ThroughputStrategy",
     "AsyncConstantStrategy",
     "AsyncPoissonStrategy",
+    "strategy_display_str",
 ]
 
 
 StrategyType = Literal["synchronous", "concurrent", "throughput", "constant", "poisson"]
 
 
-class SchedulingStrategy(ABC, Serializable):
+class SchedulingStrategy(Serializable):
     """
     An abstract base class for scheduling strategies.
     This class defines the interface for scheduling requests and provides
@@ -45,39 +46,6 @@ class SchedulingStrategy(ABC, Serializable):
     )
 
     @property
-    def default_processes_limit(self) -> int:
-        """
-        The default limit on the number of worker processes for the scheduling strategy.
-
-        :return: The minimum between the number of CPU cores minus one
-            and the maximum number of worker processes allowed by settings.
-        """
-        cpu_cores = os.cpu_count() or 1
-
-        return min(max(1, cpu_cores - 1), settings.max_worker_processes)
-
-    @property
-    def default_queued_requests_limit(self) -> int:
-        """
-        The default limit on the number of queued requests for the scheduling strategy.
-
-        :return: The max concurrency value from settings, ensuring there are enough
-            requests even for the worst case scenario where the max concurrent requests
-            are pulled at once for processing.
-        """
-        return settings.max_concurrency
-
-    @property
-    def default_processing_requests_limit(self) -> int:
-        """
-        The default limit on the number of active requests for the scheduling strategy.
-
-        :return: The max concurrency value from settings.
-        """
-        return settings.max_concurrency
-
-    @property
-    @abstractmethod
     def processing_mode(self) -> Literal["sync", "async"]:
         """
         The processing mode for the scheduling strategy, either 'sync' or 'async'.
@@ -89,10 +57,9 @@ class SchedulingStrategy(ABC, Serializable):
         :return: The processing mode for the scheduling strategy,
             either 'sync' or 'async'.
         """
-        ...
+        return "async"
 
     @property
-    @abstractmethod
     def processes_limit(self) -> int:
         """
         The limit on the number of worker processes for the scheduling strategy.
@@ -101,10 +68,11 @@ class SchedulingStrategy(ABC, Serializable):
 
         :return: The number of processes for the scheduling strategy.
         """
-        ...
+        cpu_cores = os.cpu_count() or 1
+
+        return min(max(1, cpu_cores - 1), settings.max_worker_processes)
 
     @property
-    @abstractmethod
     def queued_requests_limit(self) -> Optional[int]:
         """
         The maximum number of queued requests for the scheduling strategy.
@@ -113,10 +81,9 @@ class SchedulingStrategy(ABC, Serializable):
 
         :return: The maximum number of queued requests for the scheduling strategy.
         """
-        ...
+        return settings.max_concurrency
 
     @property
-    @abstractmethod
     def processing_requests_limit(self) -> Optional[int]:
         """
         The maximum number of processing requests for the scheduling strategy.
@@ -125,9 +92,8 @@ class SchedulingStrategy(ABC, Serializable):
 
         :return: The maximum number of processing requests for the scheduling strategy.
         """
-        ...
+        return settings.max_concurrency
 
-    @abstractmethod
     def request_times(self) -> Generator[float, None, None]:
         """
         A generator that yields timestamps for when requests should be sent.
@@ -137,7 +103,6 @@ class SchedulingStrategy(ABC, Serializable):
         :return: A generator that yields timestamps for request scheduling
             or -1 for requests that should be sent immediately.
         """
-        ...
 
 
 class SynchronousStrategy(SchedulingStrategy):
@@ -334,18 +299,6 @@ class ThroughputStrategy(SchedulingStrategy):
         return "async"
 
     @property
-    def processes_limit(self) -> int:
-        """
-        The limit on the number of worker processes for the scheduling strategy.
-        It determines how many worker processes are created
-        for the scheduling strategy and must be implemented by subclasses.
-
-        :return: The default processes limit since none is enforced for
-            asynchronous strategies.
-        """
-        return self.default_processes_limit
-
-    @property
     def queued_requests_limit(self) -> int:
         """
         The maximum number of queued requests for the scheduling strategy.
@@ -370,7 +323,7 @@ class ThroughputStrategy(SchedulingStrategy):
             If max_concurrency is None, then the default processing requests limit
             will be used.
         """
-        return self.max_concurrency or self.default_processing_requests_limit
+        return self.max_concurrency or super().processing_requests_limit
 
     def request_times(self) -> Generator[float, None, None]:
         """
@@ -517,9 +470,23 @@ class AsyncPoissonStrategy(ThroughputStrategy):
             yield start_time
 
         # set the random seed for reproducibility
-        rand = random.Random(self.random_seed)
+        rand = random.Random(self.random_seed)  # noqa: S311
 
         while True:
             inter_arrival_time = rand.expovariate(self.rate)
             start_time += inter_arrival_time
             yield start_time
+
+
+def strategy_display_str(strategy: Union[StrategyType, SchedulingStrategy]) -> str:
+    strategy_type = strategy if isinstance(strategy, str) else strategy.type_
+    strategy_instance = strategy if isinstance(strategy, SchedulingStrategy) else None
+
+    if strategy_type == "concurrent":
+        rate = f"@{strategy_instance.streams}" if strategy_instance else "@##"
+    elif strategy_type in ("constant", "poisson"):
+        rate = f"@{strategy_instance.rate:.2f}" if strategy_instance else "@#.##"
+    else:
+        rate = ""
+
+    return f"{strategy_type}{rate}"

@@ -33,6 +33,7 @@ class StreamingTextResponse(BaseModel):
     type_: StreamingResponseType
     value: str
     start_time: float
+    first_iter_time: Optional[float]
     iter_count: int
     delta: str
     time: float
@@ -86,8 +87,8 @@ class ResponseSummary(BaseModel):
     value: str
     request_args: RequestArgs
     iterations: int = 0
-    start_time: Optional[float]
-    end_time: Optional[float]
+    start_time: float
+    end_time: float
     first_iter_time: Optional[float]
     last_iter_time: Optional[float]
     request_prompt_tokens: Optional[int] = None
@@ -120,6 +121,10 @@ class ResponseSummary(BaseModel):
 
         :return: The number of tokens in the output, if any.
         """
+        if self.error is not None:
+            # error occurred, can't trust request tokens were all generated
+            return self.response_prompt_tokens
+
         if settings.preferred_output_tokens_source == "request":
             return self.request_output_tokens or self.response_output_tokens
 

@@ -4,6 +4,7 @@ from .statistics import (
     Percentiles,
     RunningStats,
     StatusDistributionSummary,
+    TimeRunningStats,
 )
 
 __all__ = [
@@ -13,4 +14,5 @@ __all__ = [
     "Serializable",
     "SerializableFileType",
     "RunningStats",
+    "TimeRunningStats",
 ]

@@ -161,7 +161,6 @@ class Scheduler(Generic[REQ, RES]):
                     # yield control to the event loop
                     await asyncio.sleep(settings.default_async_loop_sleep)
             except Exception as err:
-                print(err)
                 raise RuntimeError(f"Scheduler run failed: {err}") from err
 
             yield SchedulerResult(
@@ -184,6 +183,7 @@ class Scheduler(Generic[REQ, RES]):
         multiprocessing.Queue,
         multiprocessing.Queue,
     ]:
+        await self.worker.prepare_multiprocessing()
         requests_queue = manager.Queue(
             maxsize=scheduling_strategy.queued_requests_limit
         )
@@ -281,7 +281,9 @@ class Scheduler(Generic[REQ, RES]):
                     if run_info.created_requests >= run_info.end_number:
                         raise StopIteration
 
-                    if (request_time := next(times_iter)) >= run_info.end_time:
+                    if (
+                        request_time := next(times_iter)
+                    ) >= run_info.end_time or time.time() >= run_info.end_time:
                         raise StopIteration
 
                     request = next(requests_iter)
@@ -349,6 +351,7 @@ class Scheduler(Generic[REQ, RES]):
                 response=process_response.response,
                 request_info=process_response.info,
                 run_info=run_info,
+                preempted=process_response.preempted,
             )
         raise ValueError(f"Invalid process response type: {process_response}")
 
