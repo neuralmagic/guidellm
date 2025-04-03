@@ -2,6 +2,7 @@ import asyncio
 from typing import Any, Literal, Mapping, Optional, Union, get_args
 
 import click
+from guidellm.utils.injector import create_report
 from loguru import logger
 from transformers import AutoTokenizer  # type: ignore[import-untyped]
 
@@ -290,7 +291,8 @@ def generate_benchmark_report(
     )
     report = asyncio.run(_run_executor_for_result(executor))
 
-    generate_ui_api_data(report)
+    js_data = generate_ui_api_data(report)
+    create_report(js_data, 'guidellm_report')
 
     # Save and print report
     guidance_report = GuidanceReport()

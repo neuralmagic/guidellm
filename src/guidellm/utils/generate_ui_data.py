@@ -5,7 +5,6 @@ import math
 from typing import Any, Dict, List
 from guidellm.core.distribution import Distribution
 from guidellm.core import TextGenerationBenchmarkReport, TextGenerationBenchmark
-from guidellm.utils.interpolation import interpolate_data_points
 
 def generate_metric_report(dist: Distribution, metric_label: str, n_buckets: int = 18):
     total = dist.__len__()
@@ -76,10 +75,6 @@ def generate_run_info(report: TextGenerationBenchmarkReport, benchmarks: List[Te
         "timestamp": timestamp
     }
 
-def linearly_interpolate_value(target_input, lower_input, lower_output, upperInput, upper_output):
-    fraction = (target_input - lower_input) / (upperInput - lower_input)
-    return lower_output + fraction * (upper_output - lower_output)
-
 def generate_request_over_time_data(benchmarks: List[TextGenerationBenchmark]) -> List[Dict[str, Any]]:
     filtered_benchmarks = filter(lambda bm: bm.start_time is not None, benchmarks)
     sorted_benchmarks = list(sorted(filtered_benchmarks, key=lambda bm: bm.start_time))
@@ -106,7 +101,7 @@ def generate_workload_details(report: TextGenerationBenchmarkReport, benchmarks:
     prompt_token_data = generate_metric_report(all_prompt_token_distribution, "tokenDistributions")
     output_token_data = generate_metric_report(all_output_token_distribution, "tokenDistributions")
 
-    prompt_token_samples = [result.prompt for benchmark in benchmarks for result in benchmark.results]
+    prompt_token_samples = [result.request.prompt for benchmark in benchmarks for result in benchmark.results]
     output_token_samples = [result.output for benchmark in benchmarks for result in benchmark.results]
 
     num_samples = min(5, len(prompt_token_samples), len(output_token_samples))
@@ -140,9 +135,9 @@ def generate_workload_details(report: TextGenerationBenchmarkReport, benchmarks:
     }
 
 def generate_benchmark_json(bm: TextGenerationBenchmark) -> Dict[str, Any]:
-    ttft_dist_ms = Distribution(data=[val * 1000 for val in bm.ttft_distribution.data])
+    ttft_dist_ms = Distribution(data=bm.ttft_distribution.data)
     ttft_data = generate_metric_report(ttft_dist_ms, 'ttft')
-    itl_dist_ms = Distribution(data=[val * 1000 for val in bm.itl_distribution.data])
+    itl_dist_ms = Distribution(data=bm.itl_distribution.data)
     itl_data = generate_metric_report(itl_dist_ms, 'tpot')
     throughput_dist_ms = Distribution(data=bm.output_token_throughput_distribution.data)
     throughput_data = generate_metric_report(throughput_dist_ms, 'throughput')
@@ -156,72 +151,17 @@ def generate_benchmark_json(bm: TextGenerationBenchmark) -> Dict[str, Any]:
         **latency__data,
     }
 
-def generate_interpolated_benchmarks(benchmarks: List[TextGenerationBenchmark]):
-    """
-    Should we only use constant rate benchmarks here since synchronous and throughput runs might not be appropriate to lump in for interoplation across all rps?
-
-    Other edge-case, what if rps doesn't span more than 1 whole rps even with multiple benchmarks
-    ex: 1.1, 1.3, 1.5, 2.1, 2.5, can interpolate at 2rps
-    or worse, 1.1, 1.4, 1.6, can't interpolate
-    """
-    if len(benchmarks) == 1:
-        return []
-    
-    sorted_benchmarks = sorted(benchmarks[:], key=lambda bm: bm.completed_request_rate)
-    rps_values = [bm.completed_request_rate for bm in sorted_benchmarks]
-    rps_range = list(range(math.ceil(min(rps_values)), math.ceil(max(rps_values))))
-
-    ttft_data_by_rps = list(map(lambda bm: (bm.completed_request_rate, bm.ttft_distribution.data), sorted_benchmarks))
-    interpolated_ttft_data_by_rps = interpolate_data_points(ttft_data_by_rps, rps_range)
-
-    itl_data_by_rps = list(map(lambda bm: (bm.completed_request_rate, bm.itl_distribution.data), sorted_benchmarks))
-    interpolated_itl_data_by_rps = interpolate_data_points(itl_data_by_rps, rps_range)
-
-    throughput_data_by_rps = list(map(lambda bm: (bm.completed_request_rate, bm.output_token_throughput_distribution.data), sorted_benchmarks))
-    interpolated_throughput_data_by_rps = interpolate_data_points(throughput_data_by_rps, rps_range)
-
-    latency_data_by_rps = list(map(lambda bm: (bm.completed_request_rate, bm.request_latency_distribution.data), sorted_benchmarks))
-    interpolated_latency_data_by_rps = interpolate_data_points(latency_data_by_rps, rps_range)
-
-    benchmark_json = []
-    for i in range(len(interpolated_ttft_data_by_rps)):
-        rps, interpolated_ttft_data = interpolated_ttft_data_by_rps[i]
-        ttft_dist_ms = Distribution(data=[val * 1000 for val in interpolated_ttft_data])
-        final_ttft_data = generate_metric_report(ttft_dist_ms, 'ttft')
-        
-        _, interpolated_itl_data = interpolated_itl_data_by_rps[i]
-        itl_dist_ms = Distribution(data=[val * 1000 for val in interpolated_itl_data])
-        final_itl_data = generate_metric_report(itl_dist_ms, 'tpot')
-
-        _, interpolated_throughput_data = interpolated_throughput_data_by_rps[i]
-        throughput_dist_ms = Distribution(data=interpolated_throughput_data)
-        final_throughput_data = generate_metric_report(throughput_dist_ms, 'throughput')
-
-        _, interpolated_latency_data = interpolated_latency_data_by_rps[i]
-        latency_dist_ms = Distribution(data=[val * 1000 for val in interpolated_latency_data])
-        final_latency_data = generate_metric_report(latency_dist_ms, 'timePerRequest')
-
-        benchmark_json.append({
-            "requestsPerSecond": rps,
-            **final_itl_data,
-            **final_ttft_data,
-            **final_throughput_data,
-            **final_latency_data,
-        })
-    return benchmark_json
-
 def generate_benchmarks_json(benchmarks: List[TextGenerationBenchmark]):
-    raw_benchmark_json = []
+    benchmark_json = []
     for benchmark in benchmarks:
         benchmarks_report = generate_benchmark_json(benchmark)
-        raw_benchmark_json.append(benchmarks_report)
-    interpolated_benchmark_json = generate_interpolated_benchmarks(benchmarks)
+        benchmark_json.append(benchmarks_report)
 
-    return { "raw": raw_benchmark_json, "interpolatedByRps": interpolated_benchmark_json }
+    return { "benchmarks": benchmark_json }
 
 def generate_js_variable(variable_name: str, data: dict) -> str:
     json_data = json.dumps(data, indent=2)
-    return f'`window.{variable_name} = {json_data};`'  # Wrap in quotes
+    return f'window.{variable_name} = {json_data};'
 
 def generate_ui_api_data(report: TextGenerationBenchmarkReport):
     filtered_benchmarks = list(filter(lambda bm: (bm.completed_request_rate > 0) and bm.mode != 'throughput', report.benchmarks))
@@ -241,4 +181,8 @@ def generate_ui_api_data(report: TextGenerationBenchmarkReport):
     with open("ben_test/benchmarks.js", "w") as f:
         f.write(benchmarks_script)
 
-    print("Reports saved to run_info.json, workload_details.json, benchmarks.json")
+    return {
+        "window.run_info = {};": run_info_script,
+        "window.workload_details = {};": workload_details_script,
+        "window.benchmarks = {};": benchmarks_script,
+    }
