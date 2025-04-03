@@ -32,9 +32,9 @@ class Environment(str, Enum):
 
 ENV_REPORT_MAPPING = {
     Environment.PROD: "https://guidellm.neuralmagic.com/local-report/index.html",
-    Environment.STAGING: "https://staging.guidellm.neuralmagic.com/local-report/index.html",
-    Environment.DEV: "https://dev.guidellm.neuralmagic.com/local-report/index.html",
-    Environment.LOCAL: "tests/dummy/report.html",
+    Environment.STAGING: "https://review.neuralmagic.com/guidellm-ui/staging/index.html",
+    Environment.DEV: "https://review.neuralmagic.com/guidellm-ui/dev/index.html",
+    Environment.LOCAL: "http://localhost:3000/index.html",
 }
 
 
@@ -112,8 +112,6 @@ class ReportGenerationSettings(BaseModel):
     """
 
     source: str = ""
-    report_html_match: str = "window.report_data = {};"
-    report_html_placeholder: str = "{}"
 
 
 class Settings(BaseSettings):
@@ -138,7 +136,7 @@ class Settings(BaseSettings):
     )
 
     # general settings
-    env: Environment = Environment.PROD
+    env: Environment = Environment.DEV
     request_timeout: int = 60 * 5  # 5 minutes
     request_http2: bool = True
     max_concurrency: int = 512

@@ -1,3 +1,4 @@
+from .generate_ui_data import generate_ui_api_data
 from .injector import create_report, inject_data
 from .progress import BenchmarkReportProgress
 from .text import (
@@ -24,6 +25,7 @@ __all__ = [
     "clean_text",
     "create_report",
     "filter_text",
+    "generate_ui_api_data",
     "inject_data",
     "is_path",
     "is_path_like",
@@ -37,4 +39,5 @@ __all__ = [
     "resolve_transformers_dataset_split",
     "split_lines_by_punctuation",
     "split_text",
+    "stretch_list",
 ]

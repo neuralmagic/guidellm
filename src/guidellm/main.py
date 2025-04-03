@@ -2,6 +2,7 @@ import asyncio
 from typing import Any, Literal, Mapping, Optional, Union, get_args
 
 import click
+from guidellm.utils.injector import create_report
 from loguru import logger
 from transformers import AutoTokenizer  # type: ignore[import-untyped]
 
@@ -15,6 +16,7 @@ from guidellm.request import (
 )
 from guidellm.request.base import RequestGenerator
 from guidellm.utils import BenchmarkReportProgress, cli_params
+from guidellm.utils.generate_ui_data import generate_ui_api_data
 
 __all__ = ["generate_benchmark_report"]
 
@@ -184,7 +186,6 @@ def generate_benchmark_report_cli(
         cont_refresh_table=enable_continuous_refresh,
     )
 
-
 def generate_benchmark_report(
     target: str,
     data: Optional[str],
@@ -289,6 +290,9 @@ def generate_benchmark_report(
         },
     )
     report = asyncio.run(_run_executor_for_result(executor))
+
+    js_data = generate_ui_api_data(report)
+    create_report(js_data, 'guidellm_report')
 
     # Save and print report
     guidance_report = GuidanceReport()
