@@ -176,7 +176,7 @@ class SyntheticTextItemsGenerator(Iterable[Dict[str, Union[str, int]]]):
             else:
                 right = mid
 
-        return self.text_creator.create_text(start_index, left)
+        return self.text_creator.create_text(start_index, left - start_index)
 
 
 class SyntheticDatasetCreator(DatasetCreator):
