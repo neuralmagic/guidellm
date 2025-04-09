@@ -22,12 +22,12 @@ class IntegerRangeSampler:
 
     def __iter__(self) -> Iterator[int]:
         calc_min = self.min_value
-        if not calc_min:
+        if calc_min is None:
             calc_min = max(
-                0, self.average - 5 * self.variance if self.variance else self.average
+                1, self.average - 5 * self.variance if self.variance else self.average
             )
         calc_max = self.max_value
-        if not calc_max:
+        if calc_max is None:
             calc_max = (
                 self.average + 5 * self.variance if self.variance else self.average
             )

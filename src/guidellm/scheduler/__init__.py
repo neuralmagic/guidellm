@@ -1,4 +1,9 @@
-from .result import SchedulerRequestInfo, SchedulerResult, SchedulerRunInfo
+from .result import (
+    SchedulerRequestInfo,
+    SchedulerRequestResult,
+    SchedulerResult,
+    SchedulerRunInfo,
+)
 from .scheduler import Scheduler
 from .strategy import (
     AsyncConstantStrategy,
@@ -20,6 +25,7 @@ from .worker import (
 
 __all__ = [
     "SchedulerRequestInfo",
+    "SchedulerRequestResult",
     "SchedulerResult",
     "SchedulerRunInfo",
     "Scheduler",

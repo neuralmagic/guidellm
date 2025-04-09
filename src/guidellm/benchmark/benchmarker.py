@@ -28,7 +28,7 @@ from guidellm.scheduler import (
     GenerativeRequestsWorker,
     RequestsWorker,
     Scheduler,
-    SchedulerResult,
+    SchedulerRequestResult,
     SchedulingStrategy,
 )
 
@@ -51,7 +51,7 @@ class BenchmarkerResult(Serializable, Generic[AGG, BENCH, REQ, RES]):
     current_strategy: Optional[SchedulingStrategy] = None
     current_aggregator: Optional[AGG] = None
     current_benchmark: Optional[BENCH] = None
-    current_result: Optional[SchedulerResult[REQ, RES]] = None
+    current_result: Optional[SchedulerRequestResult[REQ, RES]] = None
 
 
 class BenchmarkerStrategyLimits(Serializable):
@@ -187,53 +187,56 @@ class Benchmarker(Generic[AGG, BENCH, REQ, RES], ABC):
                 cooldown_duration=strategy_limits.cooldown_duration,
             )
 
-            yield BenchmarkerResult(
-                type_="scheduler_start",
-                start_time=start_time,
-                end_number=end_number,
-                profile=profile,
-                current_index=current_index,
-                current_strategy=scheduling_strategy,
-                current_aggregator=aggregator,
-                current_benchmark=None,
-                current_result=None,
-            )
-
             async for result in self.scheduler.run(
                 scheduling_strategy=scheduling_strategy,
                 max_number=max_number_per_strategy,
                 max_duration=max_duration_per_strategy,
             ):
-                aggregator.add_result(result)
+                if result.type_ == "run_start":
+                    yield BenchmarkerResult(
+                        type_="scheduler_start",
+                        start_time=start_time,
+                        end_number=end_number,
+                        profile=profile,
+                        current_index=current_index,
+                        current_strategy=scheduling_strategy,
+                        current_aggregator=aggregator,
+                        current_benchmark=None,
+                        current_result=None,
+                    )
+                elif result.type_ == "run_complete":
+                    yield BenchmarkerResult(
+                        type_="scheduler_complete",
+                        start_time=start_time,
+                        end_number=end_number,
+                        profile=profile,
+                        current_index=current_index,
+                        current_strategy=scheduling_strategy,
+                        current_aggregator=aggregator,
+                        current_benchmark=None,
+                        current_result=None,
+                    )
+                elif isinstance(result, SchedulerRequestResult):
+                    aggregator.add_result(result)
 
-                yield BenchmarkerResult(
-                    type_="scheduler_update",
-                    start_time=start_time,
-                    end_number=end_number,
-                    profile=profile,
-                    current_index=current_index,
-                    current_strategy=scheduling_strategy,
-                    current_aggregator=aggregator,
-                    current_benchmark=None,
-                    current_result=result,
-                )
-
-            yield BenchmarkerResult(
-                type_="scheduler_complete",
-                start_time=start_time,
-                end_number=end_number,
-                profile=profile,
-                current_index=current_index,
-                current_strategy=scheduling_strategy,
-                current_aggregator=aggregator,
-                current_benchmark=None,
-                current_result=None,
-            )
+                    yield BenchmarkerResult(
+                        type_="scheduler_update",
+                        start_time=start_time,
+                        end_number=end_number,
+                        profile=profile,
+                        current_index=current_index,
+                        current_strategy=scheduling_strategy,
+                        current_aggregator=aggregator,
+                        current_benchmark=None,
+                        current_result=result,
+                    )
+                else:
+                    raise ValueError(f"Unexpected result type: {type(result)}")
 
             benchmark: BENCH = aggregator.compile()
             profile.completed_strategy(
-                average_rate=benchmark.requests_per_second.completed.mean,
-                average_concurrency=benchmark.requests_concurrency.completed.mean,
+                average_rate=benchmark.requests_per_second.successful.mean,
+                average_concurrency=benchmark.requests_concurrency.successful.mean,
             )
 
             yield BenchmarkerResult(

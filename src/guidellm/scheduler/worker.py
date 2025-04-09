@@ -53,7 +53,17 @@ class WorkerProcessResult(Generic[REQ, RES]):
     request: REQ
     response: RES
     info: SchedulerRequestInfo
-    preempted: bool = False
+
+
+@dataclass
+class ResolveStatus:
+    requested: bool
+    completed: bool
+    errored: bool
+    canceled: bool
+
+    request_start: float
+    request_end: float
 
 
 class RequestsWorker(ABC, Generic[REQ, RES]):
@@ -92,7 +102,7 @@ class RequestsWorker(ABC, Generic[REQ, RES]):
         self,
         request: REQ,
         timeout_time: float,
-    ) -> RES:
+    ) -> Tuple[ResolveStatus, RES]:
         """
         An abstract method that must be implemented by subclasses.
         This method should handle the resolution of a request through asyncio,
@@ -153,22 +163,18 @@ class RequestsWorker(ABC, Generic[REQ, RES]):
             info=info,
         )
         asyncio.create_task(self.send_result(results_queue, result))
-        time_til_timeout = timeout_time - time.time()
 
-        if time_til_timeout > 0:
-            response = await self.resolve(request, timeout_time)
-            preempted = False
-            info.worker_end = time.time()
-        else:
-            response = None
-            preempted = True
-
+        status, response = await self.resolve(request, timeout_time)
+        info.worker_end = time.time()
+        info.requested = status.requested
+        info.completed = status.completed
+        info.errored = status.errored
+        info.canceled = status.canceled
         result = WorkerProcessResult(
             type_="request_complete",
             request=request,
             response=response,
             info=info,
-            preempted=preempted,
         )
         asyncio.create_task(self.send_result(results_queue, result))
 
@@ -326,7 +332,7 @@ class GenerativeRequestsWorker(RequestsWorker[GenerationRequest, ResponseSummary
         self,
         request: GenerationRequest,
         timeout_time: float,
-    ) -> ResponseSummary:
+    ) -> Tuple[ResolveStatus, ResponseSummary]:
         """
         Resolve a request by sending it to the backend and handling the response.
         This method sends the request to the backend, waits for a response,
@@ -341,8 +347,22 @@ class GenerativeRequestsWorker(RequestsWorker[GenerationRequest, ResponseSummary
         resolve_start_time = time.time()
         response = None
         error: Optional[str] = None
+        status = ResolveStatus(
+            requested=False,
+            completed=False,
+            errored=False,
+            canceled=False,
+            request_start=-1,
+            request_end=-1,
+        )
 
         try:
+            if timeout_time < time.time():
+                raise asyncio.TimeoutError(
+                    "The timeout time has already passed."
+                )  # exit early
+
+            status.requested = True
             request_func, request_kwargs = self._create_request_func_kwargs(request)
 
             async def _runner():
@@ -367,12 +387,18 @@ class GenerativeRequestsWorker(RequestsWorker[GenerationRequest, ResponseSummary
                     f"Received no ResponseSummary for request: {request} "
                     f"and backend: {self.backend}, received: {response}"
                 )
+
+            status.completed = True
         except asyncio.TimeoutError:
             error = "TimeoutError: The request timed out before completing."
+            status.errored = True
+            status.canceled = True
         except Exception as exc:  # noqa: BLE001
             error = str(exc)
+            status.errored = True
 
         return self._handle_response(
+            status=status,
             request=request,
             response=response,
             error=error,
@@ -418,11 +444,12 @@ class GenerativeRequestsWorker(RequestsWorker[GenerationRequest, ResponseSummary
 
     def _handle_response(
         self,
+        status: ResolveStatus,
         request: GenerationRequest,
         response: Any,
         error: Optional[str],
         resolve_start_time: float,
-    ) -> ResponseSummary:
+    ) -> Tuple[ResolveStatus, ResponseSummary]:
         if response is None or not isinstance(
             response, (ResponseSummary, StreamingTextResponse)
         ):
@@ -434,7 +461,7 @@ class GenerativeRequestsWorker(RequestsWorker[GenerationRequest, ResponseSummary
                     )
                 ) + (error or "")
 
-            return ResponseSummary(
+            response = ResponseSummary(
                 value="",
                 request_args=RequestArgs(
                     target=self.backend.target,
@@ -442,15 +469,14 @@ class GenerativeRequestsWorker(RequestsWorker[GenerationRequest, ResponseSummary
                     payload={},
                 ),
                 start_time=resolve_start_time,
-                end_time=time.time(),
+                end_time=status.request_end,
                 first_iter_time=None,
                 last_iter_time=None,
                 request_id=request.request_id,
                 error=error or "Unknown error",
             )
-
-        if isinstance(response, StreamingTextResponse):
-            return ResponseSummary(
+        elif isinstance(response, StreamingTextResponse):
+            response = ResponseSummary(
                 value=response.value,
                 request_args=RequestArgs(
                     target=self.backend.target,
@@ -470,5 +496,7 @@ class GenerativeRequestsWorker(RequestsWorker[GenerationRequest, ResponseSummary
             )
 
         response.error = error
+        status.request_start = response.start_time
+        status.request_end = response.end_time
 
-        return response
+        return status, response

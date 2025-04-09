@@ -13,12 +13,14 @@ from typing import (
     List,
     Optional,
     Tuple,
+    Union,
 )
 
 from loguru import logger
 
 from guidellm.config import settings
 from guidellm.scheduler.result import (
+    SchedulerRequestResult,
     SchedulerResult,
     SchedulerRunInfo,
 )
@@ -72,7 +74,7 @@ class Scheduler(Generic[REQ, RES]):
         scheduling_strategy: SchedulingStrategy,
         max_number: Optional[int] = None,
         max_duration: Optional[float] = None,
-    ) -> AsyncGenerator[SchedulerResult[REQ, RES], None]:
+    ) -> AsyncGenerator[Union[SchedulerResult, SchedulerRequestResult[REQ, RES]], None]:
         """
         The main method that runs the scheduler.
         This method is a generator that yields SchedulerResult objects
@@ -122,9 +124,6 @@ class Scheduler(Generic[REQ, RES]):
             )
             yield SchedulerResult(
                 type_="run_start",
-                request=None,
-                response=None,
-                request_info=None,
                 run_info=run_info,
             )
 
@@ -165,9 +164,6 @@ class Scheduler(Generic[REQ, RES]):
 
             yield SchedulerResult(
                 type_="run_complete",
-                request=None,
-                response=None,
-                request_info=None,
                 run_info=run_info,
             )
 
@@ -309,7 +305,7 @@ class Scheduler(Generic[REQ, RES]):
         self,
         responses_queue: multiprocessing.Queue,
         run_info: SchedulerRunInfo,
-    ) -> Optional[SchedulerResult]:
+    ) -> Optional[SchedulerRequestResult[REQ, RES]]:
         try:
             process_response: WorkerProcessResult[REQ, RES] = (
                 responses_queue.get_nowait()
@@ -321,37 +317,36 @@ class Scheduler(Generic[REQ, RES]):
             run_info.queued_requests -= 1
             run_info.scheduled_requests += 1
 
-            return SchedulerResult(
+            return SchedulerRequestResult(
                 type_="request_scheduled",
-                request=process_response.request,
-                response=None,
-                request_info=process_response.info,
                 run_info=run_info,
+                request=process_response.request,
+                request_info=process_response.info,
+                response=None,
             )
 
         if process_response.type_ == "request_start":
             run_info.scheduled_requests -= 1
             run_info.processing_requests += 1
 
-            return SchedulerResult(
+            return SchedulerRequestResult(
                 type_="request_start",
-                request=process_response.request,
-                response=None,
-                request_info=process_response.info,
                 run_info=run_info,
+                request=process_response.request,
+                request_info=process_response.info,
+                response=None,
             )
 
         if process_response.type_ == "request_complete":
             run_info.processing_requests -= 1
             run_info.completed_requests += 1
 
-            return SchedulerResult(
+            return SchedulerRequestResult(
                 type_="request_complete",
-                request=process_response.request,
-                response=process_response.response,
-                request_info=process_response.info,
                 run_info=run_info,
-                preempted=process_response.preempted,
+                request=process_response.request,
+                request_info=process_response.info,
+                response=process_response.response,
             )
         raise ValueError(f"Invalid process response type: {process_response}")
 

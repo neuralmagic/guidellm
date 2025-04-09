@@ -1,4 +1,6 @@
+import gzip
 import re
+from importlib.resources import as_file, files
 from pathlib import Path
 from typing import List, Optional, Union
 
@@ -6,6 +8,7 @@ import ftfy
 import httpx
 from loguru import logger
 
+from guidellm import data as package_data
 from guidellm.config import settings
 
 __all__ = [
@@ -92,6 +95,19 @@ def load_text(data: Union[str, Path], encoding: Optional[str] = None) -> str:
             response = client.get(data.strip())
             response.raise_for_status()
             return response.text
+
+    # check package data
+    if isinstance(data, str) and data.startswith("data:"):
+        resource_path = files(package_data).joinpath(data[5:])
+        with as_file(resource_path) as resource_file, gzip.open(
+            resource_file, "rt", encoding=encoding
+        ) as file:
+            return file.read()
+
+    # check gzipped files
+    if isinstance(data, str) and data.endswith(".gz"):
+        with gzip.open(data, "rt", encoding=encoding) as file:
+            return file.read()
 
     # check if it's raw text by not being a path
     if isinstance(data, str) and (

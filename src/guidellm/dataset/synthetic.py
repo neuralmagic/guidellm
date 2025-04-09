@@ -10,51 +10,62 @@ from datasets import (
     IterableDataset,
     IterableDatasetDict,
 )
-from pydantic import Field
+from pydantic import BaseModel, Field
 from transformers import PreTrainedTokenizerBase
 
-from guidellm.config import settings
 from guidellm.dataset.creator import ColumnInputTypes, DatasetCreator
-from guidellm.objects import Serializable
 from guidellm.utils import EndlessTextCreator, IntegerRangeSampler, check_load_processor
 
 __all__ = ["SyntheticDatasetCreator"]
 
 
-class SyntheticDatasetConfig(Serializable):
+class SyntheticDatasetConfig(BaseModel):
     prompt_tokens: int = Field(
-        description="The average number of text tokens generated for prompts."
+        description="The average number of text tokens generated for prompts.",
+        gt=0,
     )
-    prompt_tokens_variance: Optional[int] = Field(
-        description="The variance of the number of text tokens generated for prompts.",
+    prompt_tokens_stdev: Optional[int] = Field(
+        description="The standard deviation of the tokens generated for prompts.",
+        gt=0,
         default=None,
     )
     prompt_tokens_min: Optional[int] = Field(
         description="The minimum number of text tokens generated for prompts.",
+        gt=0,
         default=None,
     )
     prompt_tokens_max: Optional[int] = Field(
         description="The maximum number of text tokens generated for prompts.",
+        gt=0,
         default=None,
     )
     output_tokens: int = Field(
         description="The average number of text tokens generated for outputs.",
+        gt=0,
     )
-    output_tokens_variance: Optional[int] = Field(
-        description="The variance of the number of text tokens generated for outputs.",
+    output_tokens_stddev: Optional[int] = Field(
+        description="The standard deviation of the tokens generated for outputs.",
+        gt=0,
         default=None,
     )
     output_tokens_min: Optional[int] = Field(
         description="The minimum number of text tokens generated for outputs.",
+        gt=0,
         default=None,
     )
     output_tokens_max: Optional[int] = Field(
         description="The maximum number of text tokens generated for outputs.",
+        gt=0,
         default=None,
     )
     samples: int = Field(
         description="The number of samples to generate for the dataset.",
+        gt=0,
         default=1000,
+    )
+    source: str = Field(
+        description="The source of the text data to be used for generation.",
+        default="data:prideandprejudice.txt.gz",
     )
 
     @staticmethod
@@ -114,27 +125,25 @@ class SyntheticTextItemsGenerator(Iterable[Dict[str, Union[str, int]]]):
         self.random_seed = random_seed
         self.tokens = []
         self.text_creator = EndlessTextCreator(
-            data=settings.emulated_data.source,
-            filter_start=settings.emulated_data.filter_start,
-            filter_end=settings.emulated_data.filter_end,
+            data=config.source,
         )
 
     def __iter__(self) -> Iterator[Tuple[str, int, int]]:
         prompt_tokens_sampler = IntegerRangeSampler(
             average=self.config.prompt_tokens,
-            variance=self.config.prompt_tokens_variance,
+            variance=self.config.prompt_tokens_stdev,
             min_value=self.config.prompt_tokens_min,
             max_value=self.config.prompt_tokens_max,
             random_seed=self.random_seed,
         )
         output_tokens_sampler = IntegerRangeSampler(
             average=self.config.output_tokens,
-            variance=self.config.output_tokens_variance,
+            variance=self.config.output_tokens_stddev,
             min_value=self.config.output_tokens_min,
             max_value=self.config.output_tokens_max,
-            random_seed=self.random_seed,
+            random_seed=self.random_seed + 1,  # ensure diff dist from prompts
         )
-        rand = random.Random(self.random_seed)
+        rand = random.Random(self.random_seed + 2)  # ensure diff distribution
 
         for _, prompt_tokens, output_tokens in zip(
             range(self.config.samples),
@@ -149,12 +158,15 @@ class SyntheticTextItemsGenerator(Iterable[Dict[str, Union[str, int]]]):
             }
 
     def _create_prompt(self, prompt_tokens: int, start_index: int) -> str:
-        left = max(1, start_index - 2 * prompt_tokens)
-        right = start_index + 2 * prompt_tokens
+        if prompt_tokens <= 0:
+            return ""
+
+        left = start_index
+        right = start_index + 4 * prompt_tokens
 
         while left < right:
             mid = (left + right) // 2
-            test_prompt = self.text_creator.create_text(start_index, mid)
+            test_prompt = self.text_creator.create_text(start_index, mid - start_index)
             test_tokens = len(self.processor.tokenize(test_prompt))
 
             if test_tokens == prompt_tokens:

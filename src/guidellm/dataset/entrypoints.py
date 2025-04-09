@@ -4,8 +4,8 @@ from datasets import Dataset, IterableDataset
 from transformers import PreTrainedTokenizerBase
 
 from guidellm.dataset.creator import ColumnInputTypes, DatasetCreator
-from guidellm.dataset.datasets import HFDatasetsCreator
 from guidellm.dataset.file import FileDatasetCreator
+from guidellm.dataset.hf_datasets import HFDatasetsCreator
 from guidellm.dataset.in_memory import InMemoryDatasetCreator
 from guidellm.dataset.synthetic import SyntheticDatasetCreator
 

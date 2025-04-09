@@ -31,7 +31,7 @@ from guidellm.request import GenerationRequest
 from guidellm.scheduler import (
     REQ,
     RES,
-    SchedulerResult,
+    SchedulerRequestResult,
     SchedulingStrategy,
 )
 from guidellm.utils import check_load_processor
@@ -123,10 +123,10 @@ class BenchmarkAggregator(ABC, BaseModel, Generic[BENCH, REQ, RES]):
         )
     )
 
-    results: List[SchedulerResult[GenerationRequest, ResponseSummary]] = Field(
+    results: List[SchedulerRequestResult[GenerationRequest, ResponseSummary]] = Field(
         default_factory=list,
         description=(
-            "The list of results from the benchmark, both completed and errored, "
+            "The list of all results from the benchmark (complete, incomplete, error), "
             "that were not within the warmup or cooldown periods."
         ),
     )
@@ -183,12 +183,22 @@ class BenchmarkAggregator(ABC, BaseModel, Generic[BENCH, REQ, RES]):
         ),
         default_factory=RunningStats,
     )
+
     successful_requests: RunningStats = Field(
         description=(
             "The running statistics for the number of requests that completed "
             "successfully without error. This is a subset of the completed requests "
             "for any that did not error. This includes requests within the warmup "
             "and cooldown period, if any, along with the final results."
+        ),
+        default_factory=RunningStats,
+    )
+    incomplete_requests: RunningStats = Field(
+        description=(
+            "The running statistics for the number of requests that were incomplete "
+            "or preempted during processing. This includes requests "
+            "within the warmup and cooldown period, if any, along with the final "
+            "results."
         ),
         default_factory=RunningStats,
     )
@@ -297,7 +307,8 @@ class BenchmarkAggregator(ABC, BaseModel, Generic[BENCH, REQ, RES]):
     )
 
     def add_result(
-        self, result: SchedulerResult[REQ, RES], is_error: bool = False
+        self,
+        result: SchedulerRequestResult[REQ, RES],
     ) -> bool:
         """
         Add a result to the aggregator. This will update the internal statistics
@@ -305,24 +316,38 @@ class BenchmarkAggregator(ABC, BaseModel, Generic[BENCH, REQ, RES]):
         cooldown period.
 
         :param result: The result to add to the aggregator.
+        :return: True if the result was added, False if it was added because it
+            did not fit within the warmup or cooldown period, was not requested,
+            or is not finished
         """
         # Add base scheduler statistics to the aggregator
-        self.scheduler_created_requests += result.run_info.created_requests
-        self.scheduler_queued_requests += result.run_info.queued_requests
-        self.scheduler_scheduled_requests += result.run_info.scheduled_requests
-        self.scheduler_processing_requests += result.run_info.processing_requests
-        self.scheduler_completed_requests += result.run_info.completed_requests
+        self.scheduler_created_requests += max(0, result.run_info.created_requests)
+        self.scheduler_queued_requests += max(0, result.run_info.queued_requests)
+        self.scheduler_scheduled_requests += max(0, result.run_info.scheduled_requests)
+        self.scheduler_processing_requests += max(
+            0, result.run_info.processing_requests
+        )
+        self.scheduler_completed_requests += max(0, result.run_info.completed_requests)
 
-        if result.preempted or result.type_ != "request_complete":
-            # If the result was preempted or not completed yet
-            # we do not want to add it to the results.
+        if result.type_ != "request_complete" or (
+            result.request_info.canceled and not result.request_info.requested
+        ):
+            # If the result is not completed yet, don't add to the results
+            # If the result was canceled and not started, ignore it
             return False
 
         # add base result statistics given this was not preempted and it's completed
-        if not is_error:
+        if result.request_info.completed:
             self.successful_requests += 1
-        else:
+        elif result.request_info.canceled:
+            self.incomplete_requests += 1
+        elif result.request_info.errored:
             self.errored_requests += 1
+        else:
+            raise ValueError(
+                "Unexpected state: request_info must be either "
+                "completed, canceled, or errored."
+            )
 
         self.queued_time += (
             result.request_info.dequeued_time - result.request_info.queued_time
@@ -348,7 +373,11 @@ class BenchmarkAggregator(ABC, BaseModel, Generic[BENCH, REQ, RES]):
         )
 
         # Add result to the list of results provided we are not in warmup or cooldown
-        total_completed = self.successful_requests.total + self.errored_requests.total
+        total_completed = (
+            self.successful_requests.total
+            + self.incomplete_requests.total
+            + self.errored_requests.total
+        )
         global_start_time = self.scheduler_created_requests.start_time
 
         if (self.warmup_number and total_completed <= self.warmup_number) or (
@@ -445,7 +474,7 @@ class GenerativeBenchmarkAggregator(
     )
 
     def add_result(
-        self, result: SchedulerResult[GenerationRequest, ResponseSummary]
+        self, result: SchedulerRequestResult[GenerationRequest, ResponseSummary]
     ) -> bool:
         """
         Add a result to the aggregator. This will update the internal statistics
@@ -454,12 +483,7 @@ class GenerativeBenchmarkAggregator(
 
         :param result: The result to add to the aggregator.
         """
-        is_error = result.type_ == "request_complete" and (
-            result.preempted or result.response.error
-        )
-        added = super().add_result(result, is_error=is_error)
-
-        if not added:
+        if not super().add_result(result):
             return False
 
         self.request_start_time_delay += (
@@ -473,10 +497,10 @@ class GenerativeBenchmarkAggregator(
             + result.request_info.worker_end
             - result.response.end_time
         )
-        self.request_time += result.response.end_time - result.request_info.worker_start
+        self.request_time += result.response.end_time - result.response.start_time
 
         self.time_to_first_token += (
-            result.response.first_iter_time - result.request_info.worker_start
+            (result.response.first_iter_time - result.response.start_time) * 1000.0
             if result.response.first_iter_time
             else 0.0
         )
@@ -500,11 +524,12 @@ class GenerativeBenchmarkAggregator(
         This is required to be implemented by subclasses to finalize the benchmark
         and return the compiled object.
         """
-        completed, errored = self._compile_results()
+        successful, incomplete, errored = self._compile_results()
 
         return GenerativeBenchmark.from_stats(
             run_id=self.run_id,
-            completed=completed,
+            successful=successful,
+            incomplete=incomplete,
             errored=errored,
             args=BenchmarkArgs(
                 profile=self.profile,
@@ -520,8 +545,8 @@ class GenerativeBenchmarkAggregator(
             run_stats=BenchmarkRunStats(
                 start_time=self.scheduler_created_requests.start_time,
                 end_time=time.time(),
-                total=self.successful_requests.total + self.errored_requests.total,
-                total_completed=self.successful_requests.total,
+                total_successful=self.successful_requests.total,
+                total_incomplete=self.incomplete_requests.total,
                 total_errored=self.errored_requests.total,
                 queued_time_avg=self.queued_time.mean,
                 scheduled_time_delay_avg=self.scheduled_time_delay.mean,
@@ -541,9 +566,14 @@ class GenerativeBenchmarkAggregator(
 
     def _compile_results(
         self,
-    ) -> Tuple[List[Union[GenerativeTextResponseStats, GenerativeTextErrorStats]]]:
-        completed: List[GenerativeTextResponseStats] = []
-        errored: List[GenerativeTextErrorStats] = []
+    ) -> Tuple[
+        List[GenerativeTextResponseStats],
+        List[GenerativeTextErrorStats],
+        List[GenerativeTextErrorStats],
+    ]:
+        successful: List[GenerativeTextResponseStats] = []
+        incomplete: List[GenerativeTextErrorStats] = []
+        error: List[GenerativeTextErrorStats] = []
 
         for result in self.results:
             prompt_tokens = self._compile_tokens_count(
@@ -551,22 +581,40 @@ class GenerativeBenchmarkAggregator(
                 requests_tokens=result.response.request_prompt_tokens,
                 response_tokens=result.response.response_prompt_tokens,
                 preferred_tokens_source=settings.preferred_prompt_tokens_source,
-                errored=result.response.error is not None,
+                errored=result.request_info.errored,
             )
             output_tokens = self._compile_tokens_count(
                 value=result.response.value,
                 requests_tokens=result.response.request_output_tokens,
                 response_tokens=result.response.response_output_tokens,
                 preferred_tokens_source=settings.preferred_output_tokens_source,
-                errored=result.response.error is not None,
+                errored=result.request_info.errored,
             )
 
-            if result.response.error:
-                errored.append(
+            if result.request_info.canceled:
+                incomplete.append(
                     GenerativeTextErrorStats(
                         error=result.response.error,
                         request_id=result.request.request_id,
                         request_type=result.request.request_type,
+                        scheduler_info=result.request_info,
+                        prompt=str(result.request.content),
+                        prompt_tokens=prompt_tokens,
+                        output=result.response.value,
+                        output_tokens=output_tokens,
+                        start_time=result.response.start_time,
+                        end_time=result.response.end_time,
+                        first_token_time=result.response.first_iter_time,
+                        last_token_time=result.response.last_iter_time,
+                    )
+                )
+            elif result.request_info.errored:
+                error.append(
+                    GenerativeTextErrorStats(
+                        error=result.response.error,
+                        request_id=result.request.request_id,
+                        request_type=result.request.request_type,
+                        scheduler_info=result.request_info,
                         prompt=str(result.request.content),
                         prompt_tokens=prompt_tokens,
                         output=result.response.value,
@@ -578,10 +626,11 @@ class GenerativeBenchmarkAggregator(
                     )
                 )
             else:
-                completed.append(
+                successful.append(
                     GenerativeTextResponseStats(
                         request_id=result.request.request_id,
                         request_type=result.request.request_type,
+                        scheduler_info=result.request_info,
                         prompt=str(result.request.content),
                         prompt_tokens=prompt_tokens,
                         output=result.response.value,
@@ -593,34 +642,28 @@ class GenerativeBenchmarkAggregator(
                     )
                 )
 
-        return completed, errored
+        return successful, incomplete, error
 
     def _compile_tokens_count(
         self,
         value: str,
         requests_tokens: Optional[int],
         response_tokens: Optional[int],
-        preferred_tokens_source: Optional[Literal["request", "response"]],
+        preferred_tokens_source: Optional[Literal["request", "response", "local"]],
         errored: bool,
     ) -> int:
-        if errored:
-            if self.processor is None or preferred_tokens_source in (
-                "response",
-                "request",
-            ):
-                # no processor or we are set to trust the response/request tokens
-                # set to response tokens since that is the most reliable source
-                return response_tokens or 0
-        elif preferred_tokens_source is None and (requests_tokens or response_tokens):
-            return (
-                response_tokens or requests_tokens
-            )  # trust response first if no preference
-        elif preferred_tokens_source == "response" and response_tokens:
-            return response_tokens
-        elif preferred_tokens_source == "request" and requests_tokens:
-            return requests_tokens
-        elif self.processor is None:
-            # no processor available, fall back on unpreferred source or 0
+        if not errored and preferred_tokens_source == "response" and response_tokens:
+            return response_tokens or 0
+
+        if not errored and preferred_tokens_source == "request" and requests_tokens:
+            return requests_tokens or 0
+
+        if preferred_tokens_source in {"response", "request"} and (
+            self.processor is None or errored or response_tokens or requests_tokens
+        ):
+            # we had a preferred tokens source that isn't local and we either
+            # have the data to return something or we don't have the ability
+            # to calculate locally
             return response_tokens or requests_tokens or 0
 
         self.processor = check_load_processor(
@@ -628,6 +671,4 @@ class GenerativeBenchmarkAggregator(
             processor_args=self.processor_args,
             error_msg="Processor/Tokenizer is required for calculating token counts.",
         )
-        # no tokens that matched the preferred source,
-        # calculate locally based on the value
         return len(self.processor.tokenize(value))

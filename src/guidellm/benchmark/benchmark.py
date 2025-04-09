@@ -9,7 +9,7 @@ from guidellm.objects import (
     Serializable,
     StatusDistributionSummary,
 )
-from guidellm.scheduler import SchedulingStrategy
+from guidellm.scheduler import SchedulerRequestInfo, SchedulingStrategy
 
 __all__ = [
     "BENCH",
@@ -87,17 +87,17 @@ class BenchmarkRunStats(Serializable):
         description="The end time of the benchmark run.",
     )
 
-    total: int = Field(
+    total_successful: int = Field(
         description=(
-            "The total number of requests in the benchmark run, "
+            "The total number of successful requests in the benchmark run, "
             "including warmup and cooldown."
         ),
     )
-    total_completed: int = Field(
+    total_incomplete: int = Field(
         description=(
-            "The total number of completed requests in the benchmark run, "
+            "The total number of incomplete requests in the benchmark run, "
             "including warmup and cooldown."
-        ),
+        )
     )
     total_errored: int = Field(
         description=(
@@ -186,6 +186,15 @@ class BenchmarkRunStats(Serializable):
         )
     )
 
+    @computed_field
+    @property
+    def total(self) -> int:
+        """
+        :return: The total number of requests in the benchmark run, including
+            warmup and cooldown.
+        """
+        return self.total_successful + self.total_incomplete + self.total_errored
+
 
 class Benchmark(Serializable):
     """
@@ -259,6 +268,11 @@ class GenerativeTextResponseStats(Serializable):
     )
     request_type: Literal["text_completions", "chat_completions"] = Field(
         description="The type of request made to the generative backend."
+    )
+    scheduler_info: SchedulerRequestInfo = Field(
+        description=(
+            "The info about the request from the scheduler about how it was run."
+        ),
     )
     prompt: str = Field(
         description="The text prompt used for the generative request.",
@@ -376,13 +390,6 @@ class GenerativeTextErrorStats(GenerativeTextResponseStats):
             "before the error occurred."
         ),
     )
-    output_tokens: Optional[int] = Field(
-        default=None,
-        description=(
-            "The number of tokens in the generated output text, if any, "
-            "before the error occurred."
-        ),
-    )
     first_token_time: Optional[float] = Field(
         default=None,
         description=(
@@ -459,21 +466,37 @@ class GenerativeBenchmark(Benchmark):
     and end times for the benchmark, and the statistics for the requests and responses.
     """
 
-    completed_total: int = Field(
+    successful_total: int = Field(
         description=(
             "The total number of completed requests in the benchmark, "
             "excluding warmup and cooldown."
         )
     )
-    completed_sampled_size: Optional[int] = Field(
+    successful_sampled_size: Optional[int] = Field(
         default=None,
         description=(
             "The number of completed requests that were randomly sampled for "
             "the benchmark. None if no sampling was applied."
         ),
     )
-    completed_requests: List[GenerativeTextResponseStats] = Field(
+    successful_requests: List[GenerativeTextResponseStats] = Field(
         description="The list of completed requests.",
+    )
+    incomplete_total: int = Field(
+        description=(
+            "The total number of incomplete requests in the benchmark, "
+            "excluding warmup and cooldown."
+        )
+    )
+    incomplete_sampled_size: Optional[int] = Field(
+        default=None,
+        description=(
+            "The number of incomplete requests that were randomly sampled for "
+            "the benchmark. None if no sampling was applied."
+        ),
+    )
+    incomplete_requests: List[GenerativeTextResponseStats] = Field(
+        description="The list of incomplete requests.",
     )
     errored_total: int = Field(
         description=(
@@ -582,12 +605,21 @@ class GenerativeBenchmark(Benchmark):
             )
 
         if (
-            self.completed_sampled_size is not None
-            and sample_size > self.completed_sampled_size
+            self.successful_sampled_size is not None
+            and sample_size > self.successful_sampled_size
         ):
             raise ValueError(
                 "The benchmark's completed response have already been sampled with "
-                f"size {self.completed_sampled_size} and cannot be resampled with "
+                f"size {self.successful_sampled_size} and cannot be resampled with "
+                f"a larger size, given: {sample_size}"
+            )
+        if (
+            self.incomplete_sampled_size is not None
+            and sample_size > self.incomplete_sampled_size
+        ):
+            raise ValueError(
+                "The benchmark's incomplete response have already been sampled with "
+                f"size {self.incomplete_sampled_size} and cannot be resampled with "
                 f"a larger size, given: {sample_size}"
             )
         if (
@@ -600,13 +632,18 @@ class GenerativeBenchmark(Benchmark):
                 f"a larger size, given: {error_sample_size}"
             )
 
-        sample_size = min(sample_size, len(self.completed_requests))
+        sample_size = min(sample_size, len(self.successful_requests))
+        incomplete_sample_size = min(sample_size, len(self.incomplete_requests))
         error_sample_size = min(error_sample_size, len(self.errored_requests))
 
         sampled_instance = self.model_copy()
-        sampled_instance.completed_sampled_size = sample_size
-        sampled_instance.completed_requests = random.sample(
-            self.completed_requests, sample_size
+        sampled_instance.successful_sampled_size = sample_size
+        sampled_instance.successful_requests = random.sample(
+            self.successful_requests, sample_size
+        )
+        sampled_instance.incomplete_sampled_size = incomplete_sample_size
+        sampled_instance.incomplete_requests = random.sample(
+            self.incomplete_requests, incomplete_sample_size
         )
         sampled_instance.errored_sampled_size = error_sample_size
         sampled_instance.errored_requests = random.sample(
@@ -618,7 +655,8 @@ class GenerativeBenchmark(Benchmark):
     @staticmethod
     def from_stats(
         run_id: str,
-        completed: List[GenerativeTextResponseStats],
+        successful: List[GenerativeTextResponseStats],
+        incomplete: List[GenerativeTextResponseStats],
         errored: List[GenerativeTextErrorStats],
         args: BenchmarkArgs,
         run_stats: BenchmarkRunStats,
@@ -649,12 +687,32 @@ class GenerativeBenchmark(Benchmark):
         :return: A GenerativeBenchmark instance with the given statistics and metadata
             populated and calculated
         """
-        start_time = min(req.start_time for req in completed) if completed else 0.0
-        errored_with_outputs = [
-            req
-            for req in errored
-            if req.output_tokens is not None and req.output_tokens > 1
+        total = successful + incomplete + errored
+        total_types = [
+            *["successful"] * len(successful),
+            *["incomplete"] * len(incomplete),
+            *["error"] * len(errored),
         ]
+        start_time = min(req.start_time for req in total)
+        end_time = max(req.end_time for req in total)
+        total_with_prompt, total_types_with_prompt = zip(
+            *filter(
+                lambda val: bool(val[0].prompt_tokens),
+                zip(total, total_types),
+            )
+        )
+        total_with_output_first, total_types_with_output_first = zip(
+            *filter(
+                lambda val: bool(val[0].output_tokens),
+                zip(total, total_types),
+            )
+        )
+        total_with_output_multi, total_types_with_output_multi = zip(
+            *filter(
+                lambda val: bool(val[0].output_tokens > 1),
+                zip(total, total_types),
+            )
+        )
 
         return GenerativeBenchmark(
             run_id=run_id,
@@ -663,149 +721,76 @@ class GenerativeBenchmark(Benchmark):
             worker=worker,
             request_loader=requests_loader,
             extras=extras or {},
-            completed_total=len(completed),
-            completed_requests=completed,
+            successful_total=len(successful),
+            successful_requests=successful,
+            incomplete_total=len(incomplete),
+            incomplete_requests=incomplete,
             errored_total=len(errored),
             errored_requests=errored,
             start_time=start_time,
-            end_time=max(req.end_time for req in completed) if completed else 0.0,
+            end_time=end_time,
             requests_per_second=StatusDistributionSummary.from_request_times(
-                completed_requests=(
-                    [(req.start_time, req.end_time) for req in completed]
-                ),
-                errored_requests=[(req.start_time, req.end_time) for req in errored],
+                request_types=total_types,
+                requests=[(req.start_time, req.end_time) for req in total],
                 distribution_type="rate",
             ),
             requests_concurrency=StatusDistributionSummary.from_request_times(
-                completed_requests=(
-                    [(req.start_time, req.end_time) for req in completed]
-                ),
-                errored_requests=[(req.start_time, req.end_time) for req in errored],
+                request_types=total_types,
+                requests=[(req.start_time, req.end_time) for req in total],
                 distribution_type="concurrency",
             ),
             requests_latency=StatusDistributionSummary.from_values(
-                completed_values=[req.request_latency for req in completed],
-                errored_values=[req.request_latency for req in errored],
+                value_types=total_types,
+                values=[req.request_latency for req in total],
             ),
             prompts_token_count=StatusDistributionSummary.from_values(
-                completed_values=[req.prompt_tokens for req in completed],
-                errored_values=[req.prompt_tokens or 0 for req in errored],
+                value_types=list(total_types_with_prompt),
+                values=[req.prompt_tokens for req in total_with_prompt],
             ),
             outputs_token_count=StatusDistributionSummary.from_values(
-                completed_values=[req.output_tokens for req in completed],
-                errored_values=[req.output_tokens or 0 for req in errored],
+                value_types=list(total_types_with_output_first),
+                values=[req.output_tokens for req in total_with_output_first],
             ),
             times_to_first_token_ms=StatusDistributionSummary.from_values(
-                completed_values=[req.time_to_first_token_ms for req in completed],
-                errored_values=[
-                    req.time_to_first_token_ms for req in errored_with_outputs
-                ],
+                value_types=list(total_types_with_output_first),
+                values=[req.time_to_first_token_ms for req in total_with_output_first],
             ),
             times_per_output_tokens_ms=StatusDistributionSummary.from_values(
-                completed_values=(
-                    [
-                        req.time_per_output_token_ms
-                        for req in completed
-                        if req.output_tokens > 0
-                    ]
-                ),
-                errored_values=(
-                    [req.time_per_output_token_ms for req in errored_with_outputs]
-                ),
-                completed_weights=(
-                    [req.output_tokens for req in completed if req.output_tokens > 0]
-                ),
-                errored_weights=([req.output_tokens for req in errored_with_outputs]),
+                value_types=list(total_types_with_output_first),
+                values=[
+                    req.time_per_output_token_ms for req in total_with_output_first
+                ],
+                weights=[req.output_tokens for req in total_with_output_first],
             ),
             inter_token_latencies_ms=StatusDistributionSummary.from_values(
-                completed_values=(
-                    [
-                        req.inter_token_latency_ms
-                        for req in completed
-                        if req.output_tokens > 1
-                    ]
-                ),
-                errored_values=(
-                    [req.inter_token_latency_ms for req in errored_with_outputs]
-                ),
-                completed_weights=(
-                    [
-                        req.output_tokens - 1
-                        for req in completed
-                        if req.output_tokens > 1
-                    ]
-                ),
-                errored_weights=(
-                    [req.output_tokens - 1 for req in errored_with_outputs]
-                ),
+                value_types=list(total_types_with_output_multi),
+                values=[req.inter_token_latency_ms for req in total_with_output_multi],
+                weights=[req.output_tokens - 1 for req in total_with_output_multi],
             ),
             outputs_tokens_per_second=StatusDistributionSummary.from_iterable_request_times(
-                completed_requests=(
-                    [
-                        (req.start_time, req.end_time)
-                        for req in completed
-                        if req.output_tokens > 0
-                    ]
-                ),
-                errored_requests=(
-                    [(req.start_time, req.end_time) for req in errored_with_outputs]
-                ),
-                completed_first_iter_times=(
-                    [req.first_token_time for req in completed if req.output_tokens > 0]
-                ),
-                errored_first_iter_times=(
-                    [req.first_token_time for req in errored_with_outputs]
-                ),
-                completed_iter_counts=(
-                    [req.output_tokens for req in completed if req.output_tokens > 0]
-                ),
-                errored_iter_counts=(
-                    [req.output_tokens for req in errored_with_outputs]
-                ),
+                request_types=total_types_with_output_first,
+                requests=[
+                    (req.start_time, req.end_time) for req in total_with_output_first
+                ],
+                first_iter_times=[
+                    req.first_token_time for req in total_with_output_first
+                ],
+                iter_counts=[req.output_tokens for req in total_with_output_first],
             ),
             tokens_per_second=StatusDistributionSummary.from_iterable_request_times(
-                completed_requests=(
-                    [
-                        (req.start_time, req.end_time)
-                        for req in completed
-                        if req.prompt_tokens + req.output_tokens > 0
-                    ]
-                ),
-                errored_requests=(
-                    [(req.start_time, req.end_time) for req in errored_with_outputs]
-                ),
-                completed_first_iter_times=(
-                    [
-                        req.first_token_time
-                        for req in completed
-                        if req.prompt_tokens + req.output_tokens > 0
-                    ]
-                ),
-                errored_first_iter_times=(
-                    [req.first_token_time for req in errored_with_outputs]
-                ),
-                completed_iter_counts=(
-                    [
-                        req.prompt_tokens + req.output_tokens
-                        for req in completed
-                        if req.prompt_tokens + req.output_tokens > 0
-                    ]
-                ),
-                errored_iter_counts=(
-                    [
-                        req.prompt_tokens + req.output_tokens
-                        for req in errored_with_outputs
-                    ]
-                ),
-                completed_first_iter_counts=(
-                    [
-                        req.prompt_tokens or 1
-                        for req in completed
-                        if req.output_tokens > 0
-                    ]
-                ),
-                errored_first_iter_counts=(
-                    [req.prompt_tokens or 1 for req in errored_with_outputs]
-                ),
+                request_types=total_types_with_output_first,
+                requests=[
+                    (req.start_time, req.end_time) for req in total_with_output_first
+                ],
+                first_iter_times=[
+                    req.first_token_time for req in total_with_output_first
+                ],
+                iter_counts=[
+                    req.prompt_tokens + req.output_tokens
+                    for req in total_with_output_first
+                ],
+                first_iter_counts=[
+                    req.prompt_tokens for req in total_with_output_first
+                ],
             ),
         )

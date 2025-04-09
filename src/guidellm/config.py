@@ -74,24 +74,6 @@ class DatasetSettings(BaseModel):
     )
 
 
-class EmulatedDataSettings(BaseModel):
-    """
-    Emulated data settings for the application to use
-    """
-
-    source: str = "https://www.gutenberg.org/files/1342/1342-0.txt"
-    filter_start: str = "It is a truth universally acknowledged, that a"
-    filter_end: str = "CHISWICK PRESS:--CHARLES WHITTINGHAM AND CO."
-    clean_text_args: Dict[str, bool] = Field(
-        default_factory=lambda: {
-            "fix_encoding": True,
-            "clean_whitespace": True,
-            "remove_empty_lines": True,
-            "force_new_line_punctuation": True,
-        }
-    )
-
-
 class OpenAISettings(BaseModel):
     """
     OpenAI settings for the application to connect to the API
@@ -154,7 +136,6 @@ class Settings(BaseSettings):
 
     # Data settings
     dataset: DatasetSettings = DatasetSettings()
-    emulated_data: EmulatedDataSettings = EmulatedDataSettings()
 
     # Request/stats settings
     preferred_prompt_tokens_source: Optional[Literal["request", "response"]] = None

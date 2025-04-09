@@ -1,7 +1,7 @@
 from .creator import ColumnInputTypes, DatasetCreator
-from .datasets import HFDatasetsCreator
 from .entrypoints import load_dataset
 from .file import FileDatasetCreator
+from .hf_datasets import HFDatasetsCreator
 from .in_memory import InMemoryDatasetCreator
 from .synthetic import SyntheticDatasetCreator
 

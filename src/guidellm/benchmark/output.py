@@ -17,6 +17,7 @@ from guidellm.benchmark.profile import (
 )
 from guidellm.objects import Serializable
 from guidellm.scheduler import strategy_display_str
+from guidellm.utils import Colors
 
 __all__ = [
     "GenerativeBenchmarksReport",
@@ -115,7 +116,7 @@ class GenerativeBenchmarksConsole:
         for _ in range(new_lines):
             text.append("\n")
 
-        text.append(f"{title}:", style="bold underline")
+        text.append(f"{title}:", style=f"bold underline {Colors.INFO}")
         self.console.print(text)
 
     def print_labeled_line(self, label: str, value: str, indent: int = 4):
@@ -123,9 +124,9 @@ class GenerativeBenchmarksConsole:
             return
 
         text = Text()
-        text.append(label, style="bold")
+        text.append(label + ": ", style=f"bold {Colors.INFO}")
         text.append(": ")
-        text.append(value, style="italic cyan")
+        text.append(value, style="italic")
         self.console.print(
             Padding.indent(text, indent),
         )
@@ -134,7 +135,7 @@ class GenerativeBenchmarksConsole:
         if not self.enabled:
             return
 
-        text = Text(value, style=None)
+        text = Text(value)
         self.console.print(
             Padding.indent(text, indent),
         )
@@ -144,10 +145,10 @@ class GenerativeBenchmarksConsole:
             return
 
         self.print_section_header(title)
-        table = Table(*headers)
+        table = Table(*headers, header_style=f"bold {Colors.INFO}")
 
         for row in rows:
-            table.add_row(*[Text(item, style="cyan") for item in row])
+            table.add_row(*[Text(item, style="italic") for item in row])
 
         self.console.print(table)
 
@@ -220,23 +221,23 @@ class GenerativeBenchmarksConsole:
                     strategy_display_str(benchmark.args.strategy),
                     f"{datetime.fromtimestamp(benchmark.start_time).strftime("%H:%M:%S")}",
                     f"{(benchmark.end_time - benchmark.start_time):.1f}",
-                    f"{benchmark.requests_per_second.completed.mean:.2f}",
-                    f"{benchmark.requests_concurrency.completed.mean:.2f}",
-                    (f"{benchmark.completed_total:>5} / {benchmark.errored_total}"),
+                    f"{benchmark.requests_per_second.successful.mean:.2f}",
+                    f"{benchmark.requests_concurrency.successful.mean:.2f}",
+                    (f"{benchmark.successful_total:>5} / {benchmark.errored_total}"),
                     (
-                        f"{benchmark.prompts_token_count.completed.total_sum:.0f} / "
+                        f"{benchmark.prompts_token_count.successful.total_sum:.0f} / "
                         f"{benchmark.prompts_token_count.errored.total_sum:.0f}"
                     ),
                     (
-                        f"{benchmark.prompts_token_count.completed.mean:.0f} / "
+                        f"{benchmark.prompts_token_count.successful.mean:.0f} / "
                         f"{benchmark.prompts_token_count.errored.mean:.0f}"
                     ),
                     (
-                        f"{benchmark.outputs_token_count.completed.total_sum:.0f} / "
+                        f"{benchmark.outputs_token_count.successful.total_sum:.0f} / "
                         f"{benchmark.outputs_token_count.errored.total_sum:.0f}"
                     ),
                     (
-                        f"{benchmark.outputs_token_count.completed.mean:.0f} / "
+                        f"{benchmark.outputs_token_count.successful.mean:.0f} / "
                         f"{benchmark.outputs_token_count.errored.mean:.0f}"
                     ),
                 ]
@@ -270,29 +271,29 @@ class GenerativeBenchmarksConsole:
             rows.append(
                 [
                     strategy_display_str(benchmark.args.strategy),
-                    f"{benchmark.requests_per_second.completed.mean:.2f}",
-                    f"{benchmark.requests_concurrency.completed.mean:.2f}",
+                    f"{benchmark.requests_per_second.successful.mean:.2f}",
+                    f"{benchmark.requests_concurrency.successful.mean:.2f}",
                     f"{benchmark.outputs_tokens_per_second.total.mean:.1f}",
                     f"{benchmark.tokens_per_second.total.mean:.1f}",
                     (
-                        f"{benchmark.requests_latency.completed.mean:.2f} / "
-                        f"{benchmark.requests_latency.completed.median:.2f} / "
-                        f"{benchmark.requests_latency.completed.percentiles.p99:.2f}"
+                        f"{benchmark.requests_latency.successful.mean:.2f} / "
+                        f"{benchmark.requests_latency.successful.median:.2f} / "
+                        f"{benchmark.requests_latency.successful.percentiles.p99:.2f}"
                     ),
                     (
-                        f"{benchmark.times_to_first_token_ms.completed.mean:.1f} / "
-                        f"{benchmark.times_to_first_token_ms.completed.median:.1f} / "
-                        f"{benchmark.times_to_first_token_ms.completed.percentiles.p99:.1f}"
+                        f"{benchmark.times_to_first_token_ms.successful.mean:.1f} / "
+                        f"{benchmark.times_to_first_token_ms.successful.median:.1f} / "
+                        f"{benchmark.times_to_first_token_ms.successful.percentiles.p99:.1f}"
                     ),
                     (
-                        f"{benchmark.inter_token_latencies_ms.completed.mean:.1f} / "
-                        f"{benchmark.inter_token_latencies_ms.completed.median:.1f} / "
-                        f"{benchmark.inter_token_latencies_ms.completed.percentiles.p99:.1f}"
+                        f"{benchmark.inter_token_latencies_ms.successful.mean:.1f} / "
+                        f"{benchmark.inter_token_latencies_ms.successful.median:.1f} / "
+                        f"{benchmark.inter_token_latencies_ms.successful.percentiles.p99:.1f}"
                     ),
                     (
-                        f"{benchmark.times_per_output_tokens_ms.completed.mean:.1f} / "
-                        f"{benchmark.times_per_output_tokens_ms.completed.median:.1f} / "
-                        f"{benchmark.times_per_output_tokens_ms.completed.percentiles.p99:.1f}"
+                        f"{benchmark.times_per_output_tokens_ms.successful.mean:.1f} / "
+                        f"{benchmark.times_per_output_tokens_ms.successful.median:.1f} / "
+                        f"{benchmark.times_per_output_tokens_ms.successful.percentiles.p99:.1f}"
                     ),
                 ]
             )

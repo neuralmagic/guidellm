@@ -353,50 +353,109 @@ class DistributionSummary(Serializable):
 class StatusDistributionSummary(Serializable):
     """
     A serializable model representing distribution summary statistics
-    based on groupings of status (e.g., completed, errored) for a given
+    based on groupings of status (e.g., successful, incomplete, error) for a given
     distribution of numerical values.
-    Handles the total, completed, and errored distributions where the total
-    is the combination of the completed and errored distributions.
+    Handles the total, successful, and errored dfistributions where the total
+    is the combination of the successful and errored distributions.
     """
 
     total: DistributionSummary = Field(
-        description="The distribution summary for all statuses (errored, completed).",
-    )
-    completed: DistributionSummary = Field(
         description=(
-            "The distribution summary for completed statuses "
+            "The dist summary for all statuses (successful, incomplete, error).",
+        )
+    )
+    successful: DistributionSummary = Field(
+        description=(
+            "The distribution summary for successful statuses "
             "(e.g., successful requests)."
         )
     )
+    incomplete: DistributionSummary = Field(
+        description=(
+            "The distribution summary for incomplete statuses "
+            "(e.g., requests that hit a timeout error and were unable to complete)."
+        ),
+    )
     errored: DistributionSummary = Field(
         description=(
-            "The distribution summary for errored statuses " "(e.g., failed requests)."
+            "The distribution summary for errored statuses (e.g., failed requests)."
         )
     )
 
     @staticmethod
     def from_values(
-        completed_values: List[float],
-        errored_values: List[float],
-        completed_weights: Optional[List[float]] = None,
-        errored_weights: Optional[List[float]] = None,
+        value_types: List[Literal["successful", "incomplete", "error"]],
+        values: List[float],
+        weights: Optional[List[float]] = None,
         include_cdf: bool = False,
     ) -> "StatusDistributionSummary":
-        if completed_weights is None:
-            completed_weights = [1.0] * len(completed_values)
+        if any(
+            type_ not in {"successful", "incomplete", "error"} for type_ in value_types
+        ):
+            raise ValueError(
+                "value_types must be one of 'successful', 'incomplete', or 'error'. "
+                f"Got {value_types} instead.",
+            )
 
-        if errored_weights is None:
-            errored_weights = [1.0] * len(errored_values)
+        if weights is None:
+            weights = [1.0] * len(values)
+
+        if len(value_types) != len(values) or len(value_types) != len(weights):
+            raise ValueError(
+                "The length of value_types, values, and weights must be the same.",
+            )
+
+        _, successful_values, successful_weights = (
+            zip(*successful)
+            if (
+                successful := list(
+                    filter(
+                        lambda val: val[0] == "successful",
+                        zip(value_types, values, weights),
+                    )
+                )
+            )
+            else ([], [], [])
+        )
+        _, incomplete_values, incomplete_weights = (
+            zip(*incomplete)
+            if (
+                incomplete := list(
+                    filter(
+                        lambda val: val[0] == "incomplete",
+                        zip(value_types, values, weights),
+                    )
+                )
+            )
+            else ([], [], [])
+        )
+        _, errored_values, errored_weights = (
+            zip(*errored)
+            if (
+                errored := list(
+                    filter(
+                        lambda val: val[0] == "error",
+                        zip(value_types, values, weights),
+                    )
+                )
+            )
+            else ([], [], [])
+        )
 
         return StatusDistributionSummary(
             total=DistributionSummary.from_values(
-                values=[*completed_values, *errored_values],
-                weights=[*completed_weights, *errored_weights],
+                values=values,
+                weights=weights,
                 include_cdf=include_cdf,
             ),
-            completed=DistributionSummary.from_values(
-                values=completed_values,
-                weights=completed_weights,
+            successful=DistributionSummary.from_values(
+                values=successful_values,
+                weights=successful_weights,
+                include_cdf=include_cdf,
+            ),
+            incomplete=DistributionSummary.from_values(
+                values=incomplete_values,
+                weights=incomplete_weights,
                 include_cdf=include_cdf,
             ),
             errored=DistributionSummary.from_values(
@@ -408,21 +467,64 @@ class StatusDistributionSummary(Serializable):
 
     @staticmethod
     def from_request_times(
-        completed_requests: List[Tuple[float, float]],
-        errored_requests: List[Tuple[float, float]],
+        request_types: List[Literal["successful", "incomplete", "error"]],
+        requests: List[Tuple[float, float]],
         distribution_type: Literal["concurrency", "rate"],
         include_cdf: bool = False,
         epsilon: float = 1e-6,
     ) -> "StatusDistributionSummary":
+        if distribution_type not in {"concurrency", "rate"}:
+            raise ValueError(
+                f"Invalid distribution_type '{distribution_type}'. "
+                "Must be 'concurrency' or 'rate'."
+            )
+
+        if any(
+            type_ not in {"successful", "incomplete", "error"}
+            for type_ in request_types
+        ):
+            raise ValueError(
+                "request_types must be one of 'successful', 'incomplete', or 'error'. "
+                f"Got {request_types} instead.",
+            )
+
+        if len(request_types) != len(requests):
+            raise ValueError(
+                "The length of request_types and requests must be the same. "
+                f"Got {len(request_types)} and {len(requests)} instead.",
+            )
+
+        _, successful_requests = (
+            zip(*successful)
+            if (successful := list(zip(request_types, requests)))
+            else ([], [])
+        )
+        _, incomplete_requests = (
+            zip(*incomplete)
+            if (incomplete := list(zip(request_types, requests)))
+            else ([], [])
+        )
+        _, errored_requests = (
+            zip(*errored)
+            if (errored := list(zip(request_types, requests)))
+            else ([], [])
+        )
+
         return StatusDistributionSummary(
             total=DistributionSummary.from_request_times(
-                requests=[*completed_requests, *errored_requests],
+                requests=requests,
                 distribution_type=distribution_type,
                 include_cdf=include_cdf,
                 epsilon=epsilon,
             ),
-            completed=DistributionSummary.from_request_times(
-                requests=completed_requests,
+            successful=DistributionSummary.from_request_times(
+                requests=successful_requests,
+                distribution_type=distribution_type,
+                include_cdf=include_cdf,
+                epsilon=epsilon,
+            ),
+            incomplete=DistributionSummary.from_request_times(
+                requests=incomplete_requests,
                 distribution_type=distribution_type,
                 include_cdf=include_cdf,
                 epsilon=epsilon,
@@ -437,43 +539,138 @@ class StatusDistributionSummary(Serializable):
 
     @staticmethod
     def from_iterable_request_times(
-        completed_requests: List[Tuple[float, float]],
-        errored_requests: List[Tuple[float, float]],
-        completed_first_iter_times: List[float],
-        errored_first_iter_times: List[float],
-        completed_iter_counts: List[int],
-        errored_iter_counts: List[int],
-        completed_first_iter_counts: Optional[List[int]] = None,
-        errored_first_iter_counts: Optional[List[int]] = None,
+        request_types: List[Literal["successful", "incomplete", "error"]],
+        requests: List[Tuple[float, float]],
+        first_iter_times: List[float],
+        iter_counts: Optional[List[int]] = None,
+        first_iter_counts: Optional[List[int]] = None,
         include_cdf: bool = False,
         epsilon: float = 1e-6,
     ) -> "StatusDistributionSummary":
-        if completed_first_iter_counts is None:
-            completed_first_iter_counts = [1] * len(completed_requests)
+        if any(
+            type_ not in {"successful", "incomplete", "error"}
+            for type_ in request_types
+        ):
+            raise ValueError(
+                "request_types must be one of 'successful', 'incomplete', or 'error'. "
+                f"Got {request_types} instead.",
+            )
 
-        if errored_first_iter_counts is None:
-            errored_first_iter_counts = [1] * len(errored_requests)
+        if iter_counts is None:
+            iter_counts = [1] * len(requests)
+
+        if first_iter_counts is None:
+            first_iter_counts = [1] * len(requests)
+
+        if (
+            len(request_types) != len(requests)
+            or len(requests) != len(first_iter_times)
+            or len(requests) != len(iter_counts)
+            or len(requests) != len(first_iter_counts)
+        ):
+            raise ValueError(
+                "request_types, requests, first_iter_times, iter_counts, and "
+                "first_iter_counts must be the same length."
+                f"Given {len(request_types)}, {len(requests)}, "
+                f"{len(first_iter_times)}, {len(iter_counts)}, "
+                f"{len(first_iter_counts)}",
+            )
+
+        (
+            _,
+            successful_requests,
+            successful_first_iter_times,
+            successful_iter_counts,
+            successful_first_iter_counts,
+        ) = (
+            zip(*successful)
+            if (
+                successful := list(
+                    filter(
+                        lambda val: val[0] == "successful",
+                        zip(
+                            request_types,
+                            requests,
+                            first_iter_times,
+                            iter_counts,
+                            first_iter_counts,
+                        ),
+                    )
+                )
+            )
+            else ([], [], [], [], [])
+        )
+        (
+            _,
+            incomplete_requests,
+            incomplete_first_iter_times,
+            incomplete_iter_counts,
+            incomplete_first_iter_counts,
+        ) = (
+            zip(*incomplete)
+            if (
+                incomplete := list(
+                    filter(
+                        lambda val: val[0] == "incomplete",
+                        zip(
+                            request_types,
+                            requests,
+                            first_iter_times,
+                            iter_counts,
+                            first_iter_counts,
+                        ),
+                    )
+                )
+            )
+            else ([], [], [], [], [])
+        )
+        (
+            _,
+            errored_requests,
+            errored_first_iter_times,
+            errored_iter_counts,
+            errored_first_iter_counts,
+        ) = (
+            zip(*errored)
+            if (
+                errored := list(
+                    filter(
+                        lambda val: val[0] == "error",
+                        zip(
+                            request_types,
+                            requests,
+                            first_iter_times,
+                            iter_counts,
+                            first_iter_counts,
+                        ),
+                    )
+                )
+            )
+            else ([], [], [], [], [])
+        )
 
         return StatusDistributionSummary(
             total=DistributionSummary.from_iterable_request_times(
-                requests=[*completed_requests, *errored_requests],
-                first_iter_times=[
-                    *completed_first_iter_times,
-                    *errored_first_iter_times,
-                ],
-                iter_counts=[*completed_iter_counts, *errored_iter_counts],
-                first_iter_counts=[
-                    *completed_first_iter_counts,
-                    *errored_first_iter_counts,
-                ],
+                requests=requests,
+                first_iter_times=first_iter_times,
+                iter_counts=iter_counts,
+                first_iter_counts=first_iter_counts,
                 include_cdf=include_cdf,
                 epsilon=epsilon,
             ),
-            completed=DistributionSummary.from_iterable_request_times(
-                requests=completed_requests,
-                first_iter_times=completed_first_iter_times,
-                iter_counts=completed_iter_counts,
-                first_iter_counts=completed_first_iter_counts,
+            successful=DistributionSummary.from_iterable_request_times(
+                requests=successful_requests,
+                first_iter_times=successful_first_iter_times,
+                iter_counts=successful_iter_counts,
+                first_iter_counts=successful_first_iter_counts,
+                include_cdf=include_cdf,
+                epsilon=epsilon,
+            ),
+            incomplete=DistributionSummary.from_iterable_request_times(
+                requests=incomplete_requests,
+                first_iter_times=incomplete_first_iter_times,
+                iter_counts=incomplete_iter_counts,
+                first_iter_counts=incomplete_first_iter_counts,
                 include_cdf=include_cdf,
                 epsilon=epsilon,
             ),

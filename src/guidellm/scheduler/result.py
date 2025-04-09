@@ -10,6 +10,7 @@ from guidellm.scheduler.types import REQ, RES
 
 __all__ = [
     "SchedulerResult",
+    "SchedulerRequestResult",
     "SchedulerRunInfo",
     "SchedulerRequestInfo",
 ]
@@ -69,16 +70,23 @@ class SchedulerRequestInfo(Serializable):
     :param process_id: The ID of the underlying process that handled the request.
     """
 
+    requested: bool = False
+    completed: bool = False
+    errored: bool = False
+    canceled: bool = False
+
     targeted_start_time: float = -1
     queued_time: float = -1
     dequeued_time: float = -1
     scheduled_time: float = -1
     worker_start: float = -1
+    request_start: float = -1
+    request_end: float = -1
     worker_end: float = -1
     process_id: int = -1
 
 
-class SchedulerResult(Serializable, Generic[REQ, RES]):
+class SchedulerResult(Serializable):
     """
     The yielded, iterative result for a scheduler run.
     These are triggered on the start and end of the run,
@@ -110,8 +118,13 @@ class SchedulerResult(Serializable, Generic[REQ, RES]):
         "request_start",
         "request_complete",
     ]
-    request: REQ
-    response: Optional[RES]
-    request_info: Optional[SchedulerRequestInfo]
     run_info: SchedulerRunInfo
-    preempted: bool = False
+
+
+class SchedulerRequestResult(
+    SchedulerResult,
+    Generic[REQ, RES],
+):
+    request: REQ
+    request_info: SchedulerRequestInfo
+    response: Optional[RES] = None

@@ -25,6 +25,7 @@ from guidellm.scheduler import (
     StrategyType,
     strategy_display_str,
 )
+from guidellm.utils import Colors
 
 
 @dataclass
@@ -46,7 +47,8 @@ class BenchmarkerTaskProgressState:
     requests_rate: float = 0
     requests_latency: float = 0
     requests_processing: int = 0
-    requests_completed: int = 0
+    requests_successful: int = 0
+    requests_incomplete: int = 0
     requests_errored: int = 0
 
     worker_overheads_time_ms: float = 0.0
@@ -73,7 +75,7 @@ class BenchmarkerTaskProgressState:
         if self.max_number is None and self.max_duration is None:
             return 0
 
-        number = self.requests_completed + self.requests_errored
+        number = self.requests_successful + self.requests_errored
         number_percent = (
             number / float(self.max_number) * 1000 if self.max_number else -math.inf
         )
@@ -128,12 +130,55 @@ class BenchmarkerTaskProgressState:
             return " "
 
         return (
-            "Req: "
-            f"{self.requests_rate:>4.1f} req/sec, "
-            f"{self.requests_latency:2>.2f}s Lat, "
-            f"{self.requests_processing:>3.1f} Conc, "
-            f"{self.requests_completed:>4.0f} Comp, "
-            f"{self.requests_errored:>2.0f} Err"
+            f"[{Colors.INFO}]Req:[/{Colors.INFO}] "
+            + BenchmarkerTaskProgressState.format_progress_display(
+                value=self.requests_rate,
+                label="req/s",
+                total_characters=12,
+                digits_places=4,
+                decimal_places=1,
+            )
+            + ", "
+            + BenchmarkerTaskProgressState.format_progress_display(
+                value=self.requests_latency,
+                label="Lat",
+                units="s",
+                total_characters=12,
+                digits_places=4,
+                decimal_places=2,
+            )
+            + ", "
+            + BenchmarkerTaskProgressState.format_progress_display(
+                value=self.requests_processing,
+                label="Conc",
+                total_characters=12,
+                digits_places=4,
+                decimal_places=1,
+            )
+            + ", "
+            + BenchmarkerTaskProgressState.format_progress_display(
+                value=self.requests_successful,
+                label="Comp",
+                total_characters=12,
+                digits_places=5,
+                decimal_places=0,
+            )
+            + ", "
+            + BenchmarkerTaskProgressState.format_progress_display(
+                value=self.requests_incomplete,
+                label="Inc",
+                total_characters=12,
+                digits_places=5,
+                decimal_places=0,
+            )
+            + ", "
+            + BenchmarkerTaskProgressState.format_progress_display(
+                value=self.requests_errored,
+                label="Err",
+                total_characters=12,
+                digits_places=5,
+                decimal_places=0,
+            )
         )
 
     @property
@@ -142,11 +187,141 @@ class BenchmarkerTaskProgressState:
             return " "
 
         return (
-            f"Sys: "
-            f"{self.worker_overheads_time_ms:>3.1f}ms Worker OH, "
-            f"{self.backend_overheads_time_ms:>3.1f}ms Backend OH, "
-            f"{self.requests_sleep_time_ms:>5.0f}ms Req Sleep, "
-            f"{self.requests_targeted_start_time_delay_ms:>5.0f}ms Start Delay"
+            f"[{Colors.INFO}]Sys:[/{Colors.INFO}] "
+            + BenchmarkerTaskProgressState.format_progress_display(
+                value=self.worker_overheads_time_ms,
+                label="Work OH",
+                units="ms",
+                total_characters=18,
+                digits_places=3,
+                decimal_places=1,
+            )
+            + ", "
+            + BenchmarkerTaskProgressState.format_progress_display(
+                value=self.backend_overheads_time_ms,
+                label="Back OH",
+                units="ms",
+                total_characters=18,
+                digits_places=3,
+                decimal_places=1,
+            )
+            + ", "
+            + BenchmarkerTaskProgressState.format_progress_display(
+                value=self.requests_sleep_time_ms,
+                label="Req Sleep",
+                units="ms",
+                total_characters=18,
+                digits_places=5,
+                decimal_places=0,
+            )
+            + ", "
+            + BenchmarkerTaskProgressState.format_progress_display(
+                value=self.requests_targeted_start_time_delay_ms,
+                label="Start Del",
+                units="ms",
+                total_characters=18,
+                digits_places=5,
+                decimal_places=0,
+            )
+        )
+
+    @staticmethod
+    def format_progress_display(
+        value: float,
+        label: str,
+        units: str = "",
+        total_characters: Optional[int] = None,
+        digits_places: Optional[int] = None,
+        decimal_places: Optional[int] = None,
+    ) -> str:
+        if decimal_places is None and digits_places is None:
+            formatted_number = f"{value}:.0f"
+        elif digits_places is None:
+            formatted_number = f"{value:.{decimal_places}f}"
+        elif decimal_places is None:
+            formatted_number = f"{value:>{digits_places}f}"
+        else:
+            formatted_number = f"{value:>{digits_places}.{decimal_places}f}"
+
+        result = f"{formatted_number}{units} [{Colors.INFO}]{label}[/{Colors.INFO}]"
+        total_characters += len(Colors.INFO) * 2 + 5
+
+        if total_characters is not None and len(result) < total_characters:
+            result = result.rjust(total_characters)
+
+        return result
+
+
+class GenerativeTextBenchmarkerTaskProgressState(BenchmarkerTaskProgressState):
+    output_tokens: float = 0
+    prompt_tokens: float = 0
+    output_tokens_rate: float = 0
+    total_tokens_rate: float = 0
+    tokens_ttft: float = 0
+    tokens_itl: float = 0
+
+    @property
+    def fields(self) -> Dict[str, str]:
+        fields = super().fields
+        fields["tokens_summary"] = self.formatted_tokens_summary
+        return fields
+
+    @property
+    def formatted_tokens_summary(self) -> str:
+        if not self.started:
+            return " "
+
+        return (
+            f"[{Colors.INFO}]Tok:[/{Colors.INFO}] "
+            + BenchmarkerTaskProgressState.format_progress_display(
+                value=self.output_tokens_rate,
+                label="gen/s",
+                total_characters=12,
+                digits_places=4,
+                decimal_places=1,
+            )
+            + ", "
+            + BenchmarkerTaskProgressState.format_progress_display(
+                value=self.total_tokens_rate,
+                label="tot/s",
+                total_characters=12,
+                digits_places=4,
+                decimal_places=1,
+            )
+            + ", "
+            + BenchmarkerTaskProgressState.format_progress_display(
+                value=self.tokens_ttft,
+                label="TTFT",
+                units="ms",
+                total_characters=12,
+                digits_places=3,
+                decimal_places=1,
+            )
+            + ", "
+            + BenchmarkerTaskProgressState.format_progress_display(
+                value=self.tokens_itl,
+                label="ITL",
+                units="ms",
+                total_characters=12,
+                digits_places=3,
+                decimal_places=1,
+            )
+            + ", "
+            + BenchmarkerTaskProgressState.format_progress_display(
+                value=self.prompt_tokens,
+                label="Prompt",
+                total_characters=12,
+                digits_places=4,
+                decimal_places=0,
+            )
+            + ", "
+            + BenchmarkerTaskProgressState.format_progress_display(
+                value=self.output_tokens,
+                label="Gen",
+                total_characters=12,
+                digits_places=4,
+                decimal_places=0,
+            )
         )
 
 
@@ -155,15 +330,6 @@ BTPS = TypeVar("BTPS", bound=BenchmarkerTaskProgressState)
 
 class BenchmarkerProgressDisplay(Generic[BTPS]):
     def __init__(self, display_scheduler_stats: bool):
-        """
-        Progress display view:
-        | Benchmarks -----------------------------------------------------------------|
-        | [T]   N (S) Req: (#/sec, #sec, #proc, #com, #err) Tok: (#/sec, #TTFT, #ITL) |
-        | [T] % N (S) Req: (#/sec, #sec, #proc, #com, #err) Tok: (#/sec, #TTFT, #ITL) |
-        | ...                                                                         |
-        | ----------------------------------------------------------------------------|
-        SP Running... [BAR] (#/#) [ ELAPSED < ETA ]
-        """
         self.display_scheduler_stats = display_scheduler_stats
         self.started = False
         self.benchmarker_tasks_progress = Progress(*self.create_task_progress_columns())
@@ -174,10 +340,15 @@ class BenchmarkerProgressDisplay(Generic[BTPS]):
             expand=True,
         )
         self.benchmarker_progress = Progress(
-            TextColumn("Generating..."),
-            BarColumn(bar_width=None),
+            TextColumn("Generating...", style=f"italic {Colors.PROGRESS}"),
+            BarColumn(
+                bar_width=None,
+                complete_style=Colors.PROGRESS,
+                finished_style=Colors.SUCCESS,
+            ),
             TextColumn(
-                "({task.fields[completed_benchmarks]}/{task.fields[total_benchmarks]})"
+                "({task.fields[completed_benchmarks]}/{task.fields[total_benchmarks]})",
+                style=Colors.PROGRESS,
             ),
             TextColumn("["),
             TimeElapsedColumn(),
@@ -316,8 +487,11 @@ class BenchmarkerProgressDisplay(Generic[BTPS]):
         progress_state.requests_processing = (
             result.current_aggregator.scheduler_processing_requests.last
         )
-        progress_state.requests_completed = (
+        progress_state.requests_successful = (
             result.current_aggregator.successful_requests.total
+        )
+        progress_state.requests_incomplete = (
+            result.current_aggregator.incomplete_requests.total
         )
         progress_state.requests_errored = (
             result.current_aggregator.errored_requests.total
@@ -362,15 +536,15 @@ class BenchmarkerProgressDisplay(Generic[BTPS]):
         progress_state.compiling = False
         progress_state.ended = True
         progress_state.requests_rate = (
-            result.current_benchmark.requests_per_second.completed.mean
+            result.current_benchmark.requests_per_second.successful.mean
         )
         progress_state.requests_latency = (
-            result.current_benchmark.requests_latency.completed.mean
+            result.current_benchmark.requests_latency.successful.mean
         )
         progress_state.requests_processing = (
-            result.current_benchmark.requests_concurrency.completed.mean
+            result.current_benchmark.requests_concurrency.successful.mean
         )
-        progress_state.requests_completed = result.current_benchmark.completed_total
+        progress_state.requests_successful = result.current_benchmark.successful_total
         progress_state.requests_errored = result.current_benchmark.errored_total
 
     def handle_end(self, result: BenchmarkerResult):
@@ -390,8 +564,8 @@ class BenchmarkerProgressDisplay(Generic[BTPS]):
     def create_task_progress_columns(self) -> List[ProgressColumn]:
         columns = [
             TextColumn("[{task.fields[start_time]}]"),
-            SpinnerColumn(),
-            TaskProgressColumn(),
+            SpinnerColumn(style=Colors.PROGRESS),
+            TaskProgressColumn(style=Colors.PROGRESS),
             TextColumn("{task.description}"),
             TextColumn("({task.fields[progress_status]})"),
             TextColumn(" "),
@@ -424,36 +598,6 @@ class BenchmarkerProgressDisplay(Generic[BTPS]):
         )
 
 
-class GenerativeTextBenchmarkerTaskProgressState(BenchmarkerTaskProgressState):
-    output_tokens: float = 0
-    prompt_tokens: float = 0
-    output_tokens_rate: float = 0
-    total_tokens_rate: float = 0
-    tokens_ttft: float = 0
-    tokens_itl: float = 0
-
-    @property
-    def fields(self) -> Dict[str, str]:
-        fields = super().fields
-        fields["tokens_summary"] = self.formatted_tokens_summary
-        return fields
-
-    @property
-    def formatted_tokens_summary(self) -> str:
-        if not self.started:
-            return " "
-
-        return (
-            "Tok: "
-            f"{self.output_tokens_rate:4>.1f} gen/sec, "
-            f"{self.total_tokens_rate:>4.1f} tot/sec, "
-            f"{self.tokens_ttft:>3.1f}ms TTFT, "
-            f"{self.tokens_itl:>3.1f}ms ITL, "
-            f"{self.prompt_tokens:>4.0f} Prompt, "
-            f"{self.output_tokens:>4.0f} Gen"
-        )
-
-
 class GenerativeTextBenchmarkerProgressDisplay(
     BenchmarkerProgressDisplay[GenerativeTextBenchmarkerTaskProgressState]
 ):
@@ -470,22 +614,22 @@ class GenerativeTextBenchmarkerProgressDisplay(
         super().handle_update_benchmark_compiled(progress_state, result)
 
         progress_state.output_tokens = (
-            result.current_benchmark.outputs_token_count.completed.mean
+            result.current_benchmark.outputs_token_count.successful.mean
         )
         progress_state.prompt_tokens = (
-            result.current_benchmark.prompts_token_count.completed.mean
+            result.current_benchmark.prompts_token_count.successful.mean
         )
         progress_state.output_tokens_rate = (
-            result.current_benchmark.outputs_tokens_per_second.completed.mean
+            result.current_benchmark.outputs_tokens_per_second.successful.mean
         )
         progress_state.total_tokens_rate = (
-            result.current_benchmark.tokens_per_second.completed.mean
+            result.current_benchmark.tokens_per_second.successful.mean
         )
         progress_state.tokens_ttft = (
-            result.current_benchmark.times_to_first_token_ms.completed.mean
+            result.current_benchmark.times_to_first_token_ms.successful.mean
         )
         progress_state.tokens_itl = (
-            result.current_benchmark.inter_token_latencies_ms.completed.mean
+            result.current_benchmark.inter_token_latencies_ms.successful.mean
         )
 
     def create_task_progress_state(
@@ -508,13 +652,13 @@ class GenerativeTextBenchmarkerProgressDisplay(
         if not self.display_scheduler_stats:
             columns += [
                 TextColumn(
-                    "{task.fields[requests_summary]}\n{task.fields[tokens_summary]}\n"
+                    "{task.fields[requests_summary]}\n{task.fields[tokens_summary]}",
                 ),
             ]
         else:
             columns += [
                 TextColumn(
-                    "{task.fields[requests_summary]}\n{task.fields[tokens_summary]}\n{task.fields[scheduler_stats]}\n"
+                    "{task.fields[requests_summary]}\n{task.fields[tokens_summary]}\n{task.fields[scheduler_stats]}",
                 ),
             ]
 

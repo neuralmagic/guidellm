@@ -8,7 +8,7 @@ where = ["src"]
 include = ["*"]
 
 [tool.setuptools.package-data]
-guidellm = ["*"]
+"guidellm.data" = ["*.gz"]
 
 
 # ************************************************
