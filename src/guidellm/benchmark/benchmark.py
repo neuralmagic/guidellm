@@ -555,7 +555,7 @@ class GenerativeBenchmark(Benchmark):
             "completed, errored, and all requests."
         ),
     )
-    outputs_tokens_per_second: StatusDistributionSummary = Field(
+    output_tokens_per_second: StatusDistributionSummary = Field(
         description=(
             "The distribution of output tokens per second for completed, "
             "errored, and all requests."
