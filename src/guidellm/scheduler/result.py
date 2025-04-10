@@ -4,7 +4,7 @@ from typing import (
     Optional,
 )
 
-from guidellm.objects import Serializable
+from guidellm.objects import StandardBaseModel
 from guidellm.scheduler.strategy import SchedulingStrategy
 from guidellm.scheduler.types import REQ, RES
 
@@ -16,7 +16,7 @@ __all__ = [
 ]
 
 
-class SchedulerRunInfo(Serializable):
+class SchedulerRunInfo(StandardBaseModel):
     """
     Information about the current run of the scheduler.
     This class holds metadata about the scheduling run,
@@ -54,7 +54,7 @@ class SchedulerRunInfo(Serializable):
     completed_requests: int = 0
 
 
-class SchedulerRequestInfo(Serializable):
+class SchedulerRequestInfo(StandardBaseModel):
     """
     Information about a specific request run through the scheduler.
     This class holds metadata about the request, including
@@ -86,7 +86,7 @@ class SchedulerRequestInfo(Serializable):
     process_id: int = -1
 
 
-class SchedulerResult(Serializable):
+class SchedulerResult(StandardBaseModel):
     """
     The yielded, iterative result for a scheduler run.
     These are triggered on the start and end of the run,
@@ -111,6 +111,7 @@ class SchedulerResult(Serializable):
         and completed during the run.
     """
 
+    pydantic_type: Literal["scheduler_result"] = "scheduler_result"
     type_: Literal[
         "run_start",
         "run_complete",
@@ -125,6 +126,12 @@ class SchedulerRequestResult(
     SchedulerResult,
     Generic[REQ, RES],
 ):
+    pydantic_type: Literal["scheduler_request_result"] = "scheduler_request_result"
+    type_: Literal[
+        "request_scheduled",
+        "request_start",
+        "request_complete",
+    ]
     request: REQ
     request_info: SchedulerRequestInfo
     response: Optional[RES] = None

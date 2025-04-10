@@ -15,7 +15,7 @@ from guidellm.benchmark.profile import (
     SweepProfile,
     ThroughputProfile,
 )
-from guidellm.objects import Serializable
+from guidellm.objects import StandardBaseModel
 from guidellm.scheduler import strategy_display_str
 from guidellm.utils import Colors
 
@@ -26,7 +26,7 @@ __all__ = [
 ]
 
 
-class GenerativeBenchmarksReport(Serializable):
+class GenerativeBenchmarksReport(StandardBaseModel):
     benchmarks: List[GenerativeBenchmark]
 
 
@@ -204,14 +204,13 @@ class GenerativeBenchmarksConsole:
         headers = [
             "Benchmark",
             "Start Time",
+            "End Time",
             "Duration (sec)",
-            "Requests / sec",
-            "Requests Concurrency",
-            "Requests Made \n(comp / err)",
-            "Prompt Tok / Req \n(comp / err)",
-            "Output Tok / Req \n(comp / err)",
-            "Prompt Tokens \n(comp / err)",
-            "Output Tokens \n(comp / err)",
+            "Requests Made \n(comp / inc / err)",
+            "Prompt Tok / Req \n(comp / inc / err)",
+            "Output Tok / Req \n(comp / inc / err)",
+            "Prompt Tok Total \n(comp / inc / err)",
+            "Output Tok Total \n(comp / inc / err)",
         ]
         rows = []
 
@@ -220,25 +219,32 @@ class GenerativeBenchmarksConsole:
                 [
                     strategy_display_str(benchmark.args.strategy),
                     f"{datetime.fromtimestamp(benchmark.start_time).strftime("%H:%M:%S")}",
+                    f"{datetime.fromtimestamp(benchmark.end_time).strftime("%H:%M:%S")}",
                     f"{(benchmark.end_time - benchmark.start_time):.1f}",
-                    f"{benchmark.requests_per_second.successful.mean:.2f}",
-                    f"{benchmark.requests_concurrency.successful.mean:.2f}",
-                    (f"{benchmark.successful_total:>5} / {benchmark.errored_total}"),
                     (
-                        f"{benchmark.prompts_token_count.successful.total_sum:.0f} / "
+                        f"{benchmark.successful_total:>5} / "
+                        f"{benchmark.incomplete_total} / "
+                        f"{benchmark.errored_total}"
+                    ),
+                    (
+                        f"{benchmark.prompts_token_count.successful.mean:>5.1f} / "
+                        f"{benchmark.prompts_token_count.incomplete.mean:.1f} / "
+                        f"{benchmark.prompts_token_count.errored.mean:.1f}"
+                    ),
+                    (
+                        f"{benchmark.outputs_token_count.successful.mean:>5.1f} / "
+                        f"{benchmark.outputs_token_count.incomplete.mean:.1f} / "
+                        f"{benchmark.outputs_token_count.errored.mean:.1f}"
+                    ),
+                    (
+                        f"{benchmark.prompts_token_count.successful.total_sum:>6.0f} / "
+                        f"{benchmark.prompts_token_count.incomplete.total_sum:.0f} / "
                         f"{benchmark.prompts_token_count.errored.total_sum:.0f}"
                     ),
                     (
-                        f"{benchmark.prompts_token_count.successful.mean:.0f} / "
-                        f"{benchmark.prompts_token_count.errored.mean:.0f}"
-                    ),
-                    (
-                        f"{benchmark.outputs_token_count.successful.total_sum:.0f} / "
+                        f"{benchmark.outputs_token_count.successful.total_sum:>6.0f} / "
+                        f"{benchmark.outputs_token_count.incomplete.total_sum:.0f} / "
                         f"{benchmark.outputs_token_count.errored.total_sum:.0f}"
-                    ),
-                    (
-                        f"{benchmark.outputs_token_count.successful.mean:.0f} / "
-                        f"{benchmark.outputs_token_count.errored.mean:.0f}"
                     ),
                 ]
             )

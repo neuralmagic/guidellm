@@ -3,7 +3,11 @@ from .entrypoints import load_dataset
 from .file import FileDatasetCreator
 from .hf_datasets import HFDatasetsCreator
 from .in_memory import InMemoryDatasetCreator
-from .synthetic import SyntheticDatasetCreator
+from .synthetic import (
+    SyntheticDatasetConfig,
+    SyntheticDatasetCreator,
+    SyntheticTextItemsGenerator,
+)
 
 __all__ = [
     "DatasetCreator",
@@ -13,4 +17,6 @@ __all__ = [
     "FileDatasetCreator",
     "InMemoryDatasetCreator",
     "SyntheticDatasetCreator",
+    "SyntheticDatasetConfig",
+    "SyntheticTextItemsGenerator",
 ]

@@ -18,7 +18,10 @@ from .strategy import (
 from .types import REQ, RES
 from .worker import (
     GenerativeRequestsWorker,
+    GenerativeRequestsWorkerDescription,
     RequestsWorker,
+    ResolveStatus,
+    WorkerDescription,
     WorkerProcessRequest,
     WorkerProcessResult,
 )
@@ -39,8 +42,11 @@ __all__ = [
     "strategy_display_str",
     "REQ",
     "RES",
-    "GenerativeRequestsWorker",
-    "RequestsWorker",
     "WorkerProcessRequest",
     "WorkerProcessResult",
+    "ResolveStatus",
+    "WorkerDescription",
+    "RequestsWorker",
+    "GenerativeRequestsWorkerDescription",
+    "GenerativeRequestsWorker",
 ]

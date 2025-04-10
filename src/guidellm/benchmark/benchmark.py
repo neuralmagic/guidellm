@@ -6,7 +6,7 @@ from pydantic import Field, computed_field
 
 from guidellm.benchmark.profile import Profile
 from guidellm.objects import (
-    Serializable,
+    StandardBaseModel,
     StatusDistributionSummary,
 )
 from guidellm.scheduler import SchedulerRequestInfo, SchedulingStrategy
@@ -22,7 +22,7 @@ __all__ = [
 ]
 
 
-class BenchmarkArgs(Serializable):
+class BenchmarkArgs(StandardBaseModel):
     """
     A serializable model representing the arguments used to specify a benchmark run
     and how data was collected for it.
@@ -74,7 +74,7 @@ class BenchmarkArgs(Serializable):
     )
 
 
-class BenchmarkRunStats(Serializable):
+class BenchmarkRunStats(StandardBaseModel):
     """
     A serializable model representing the run process statistics for the
     entire benchmark run across all requests including warmup and cooldown.
@@ -196,7 +196,7 @@ class BenchmarkRunStats(Serializable):
         return self.total_successful + self.total_incomplete + self.total_errored
 
 
-class Benchmark(Serializable):
+class Benchmark(StandardBaseModel):
     """
     The base serializable model representing a benchmark run and its results.
     Specific benchmarker implementations should extend this model to include
@@ -228,13 +228,13 @@ class Benchmark(Serializable):
             "The process statistics for the entire benchmark run across all requests."
         )
     )
-    worker: Optional[Serializable] = Field(
+    worker: Optional[StandardBaseModel] = Field(
         description=(
             "The description and specifics for the worker used to resolve requests "
             "for this benchmark."
         )
     )
-    request_loader: Optional[Serializable] = Field(
+    request_loader: Optional[StandardBaseModel] = Field(
         description=(
             "The description and specifics for the request loader used to create "
             "requests for this benchmark."
@@ -257,7 +257,7 @@ class Benchmark(Serializable):
 BENCH = TypeVar("BENCH", bound=Benchmark)
 
 
-class GenerativeTextResponseStats(Serializable):
+class GenerativeTextResponseStats(StandardBaseModel):
     """
     A serializable model representing the request values, response values, and
     statistics for a generative text response.
@@ -660,8 +660,8 @@ class GenerativeBenchmark(Benchmark):
         errored: List[GenerativeTextErrorStats],
         args: BenchmarkArgs,
         run_stats: BenchmarkRunStats,
-        worker: Optional[Serializable],
-        requests_loader: Optional[Serializable],
+        worker: Optional[StandardBaseModel],
+        requests_loader: Optional[StandardBaseModel],
         extras: Optional[Dict[str, Any]],
     ) -> "GenerativeBenchmark":
         """

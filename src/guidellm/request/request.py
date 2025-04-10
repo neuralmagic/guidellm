@@ -3,12 +3,12 @@ from typing import Any, Dict, Literal, Optional
 
 from pydantic import Field
 
-from guidellm.objects.serializable import Serializable
+from guidellm.objects.pydantic import StandardBaseModel
 
 __all__ = ["GenerationRequest"]
 
 
-class GenerationRequest(Serializable):
+class GenerationRequest(StandardBaseModel):
     """
     A class representing a request for generation.
     This class is used to encapsulate the details of a generation request,

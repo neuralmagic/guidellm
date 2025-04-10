@@ -20,7 +20,7 @@ from guidellm.backend import Backend, ResponseSummary
 from guidellm.benchmark.aggregator import AGG, BENCH, GenerativeBenchmarkAggregator
 from guidellm.benchmark.benchmark import GenerativeBenchmark
 from guidellm.benchmark.profile import Profile
-from guidellm.objects import Serializable
+from guidellm.objects import StandardBaseModel
 from guidellm.request import GenerationRequest
 from guidellm.scheduler import (
     REQ,
@@ -35,7 +35,7 @@ from guidellm.scheduler import (
 __all__ = ["Benchmarker", "BenchmarkerResult", "GenerativeBenchmarker"]
 
 
-class BenchmarkerResult(Serializable, Generic[AGG, BENCH, REQ, RES]):
+class BenchmarkerResult(StandardBaseModel, Generic[AGG, BENCH, REQ, RES]):
     type_: Literal[
         "run_start",
         "run_complete",
@@ -54,7 +54,7 @@ class BenchmarkerResult(Serializable, Generic[AGG, BENCH, REQ, RES]):
     current_result: Optional[SchedulerRequestResult[REQ, RES]] = None
 
 
-class BenchmarkerStrategyLimits(Serializable):
+class BenchmarkerStrategyLimits(StandardBaseModel):
     requests_loader_size: Optional[int] = Field(
         description="Size of the request loader.",
     )
@@ -125,7 +125,7 @@ class Benchmarker(Generic[AGG, BENCH, REQ, RES], ABC):
         self,
         worker: RequestsWorker[REQ, RES],
         request_loader: Iterable[REQ],
-        requests_loader_description: Optional[Serializable] = None,
+        requests_loader_description: Optional[StandardBaseModel] = None,
         benchmark_save_extras: Optional[Dict[str, Any]] = None,
     ):
         self.worker = worker
@@ -291,7 +291,7 @@ class GenerativeBenchmarker(
         self,
         backend: Backend,
         request_loader: Iterable[GenerationRequest],
-        request_loader_description: Optional[Serializable] = None,
+        request_loader_description: Optional[StandardBaseModel] = None,
         benchmark_save_extras: Optional[Dict[str, Any]] = None,
         processor: Optional[Union[str, Path, PreTrainedTokenizer]] = None,
         processor_args: Optional[Dict[str, Any]] = None,

@@ -13,7 +13,7 @@ from typing import (
     Union,
 )
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from guidellm.backend import ResponseSummary
 from guidellm.benchmark.benchmark import (
@@ -24,15 +24,33 @@ from guidellm.benchmark.benchmark import (
     GenerativeTextErrorStats,
     GenerativeTextResponseStats,
 )
-from guidellm.benchmark.profile import Profile
+from guidellm.benchmark.profile import (
+    AsyncProfile,
+    ConcurrentProfile,
+    Profile,
+    SweepProfile,
+    SynchronousProfile,
+    ThroughputProfile,
+)
 from guidellm.config import settings
-from guidellm.objects import RunningStats, Serializable, TimeRunningStats
-from guidellm.request import GenerationRequest
+from guidellm.objects import RunningStats, StandardBaseModel, TimeRunningStats
+from guidellm.request import (
+    GenerationRequest,
+    GenerativeRequestLoaderDescription,
+    RequestLoaderDescription,
+)
 from guidellm.scheduler import (
     REQ,
     RES,
+    AsyncConstantStrategy,
+    AsyncPoissonStrategy,
+    ConcurrentStrategy,
+    GenerativeRequestsWorkerDescription,
     SchedulerRequestResult,
     SchedulingStrategy,
+    SynchronousStrategy,
+    ThroughputStrategy,
+    WorkerDescription,
 )
 from guidellm.utils import check_load_processor
 
@@ -43,7 +61,7 @@ __all__ = [
 ]
 
 
-class BenchmarkAggregator(ABC, BaseModel, Generic[BENCH, REQ, RES]):
+class BenchmarkAggregator(ABC, StandardBaseModel, Generic[BENCH, REQ, RES]):
     """
     A pydantic base class representing the base class for aggregating benchmark results.
     The purpose is to receive and process results from a Benchmarker as it iterates
@@ -55,25 +73,43 @@ class BenchmarkAggregator(ABC, BaseModel, Generic[BENCH, REQ, RES]):
     fully calculated.
     """
 
+    type_: Literal["benchmark_aggregator"] = "benchmark_aggregator"
     run_id: str = Field(
         description=(
             "The unique identifier for the encompasing benchmark run that this "
             "benchmark was a part of."
         )
     )
-    profile: Profile = Field(
+    profile: Union[
+        AsyncProfile,
+        SweepProfile,
+        ConcurrentProfile,
+        ThroughputProfile,
+        SynchronousProfile,
+        Profile,
+    ] = Field(
         description=(
             "The profile used for the entire benchamrk run that the strategy for "
             "the active benchmark was pulled from."
-        )
+        ),
+        discriminator="type_",
     )
     strategy_index: int = Field(
         description=(
             "The index of the strategy in the profile that was used for this benchmark."
         )
     )
-    strategy: SchedulingStrategy = Field(
-        description="The scheduling strategy used to run this benchmark. "
+    strategy: Union[
+        ConcurrentStrategy,
+        SchedulingStrategy,
+        ThroughputStrategy,
+        SynchronousStrategy,
+        AsyncPoissonStrategy,
+        AsyncConstantStrategy,
+        SchedulingStrategy,
+    ] = Field(
+        description="The scheduling strategy used to run this benchmark. ",
+        discriminator="type_",
     )
     max_number: Optional[int] = Field(
         description="The maximum number of requests to run for this benchmark, if any."
@@ -105,17 +141,23 @@ class BenchmarkAggregator(ABC, BaseModel, Generic[BENCH, REQ, RES]):
             "if any. These are requests that were not included in the final results."
         )
     )
-    worker_description: Optional[Serializable] = Field(
+    worker_description: Optional[
+        Union[GenerativeRequestsWorkerDescription, WorkerDescription]
+    ] = Field(
         description=(
             "The description and specifics for the worker used to resolve requests "
             "for this benchmark."
-        )
+        ),
+        discriminator="type_",
     )
-    request_loader_description: Optional[Serializable] = Field(
+    request_loader_description: Optional[
+        Union[GenerativeRequestLoaderDescription, RequestLoaderDescription]
+    ] = Field(
         description=(
             "The description and specifics for the request loader used to create "
             "requests for this benchmark."
-        )
+        ),
+        discriminator="type_",
     )
     extras: Dict[str, Any] = Field(
         description=(
@@ -123,7 +165,7 @@ class BenchmarkAggregator(ABC, BaseModel, Generic[BENCH, REQ, RES]):
         )
     )
 
-    results: List[SchedulerRequestResult[GenerationRequest, ResponseSummary]] = Field(
+    results: List[SchedulerRequestResult[REQ, RES]] = Field(
         default_factory=list,
         description=(
             "The list of all results from the benchmark (complete, incomplete, error), "
@@ -423,6 +465,9 @@ AGG = TypeVar("AGG", bound=BenchmarkAggregator[BENCH, REQ, RES])
 class GenerativeBenchmarkAggregator(
     BenchmarkAggregator[GenerativeBenchmark, GenerationRequest, ResponseSummary]
 ):
+    type_: Literal["generative_benchmark_aggregator"] = (
+        "generative_benchmark_aggregator"
+    )
     processor: Optional[Union[str, Path, Any]] = Field(
         description=(
             "The tokenizer to use for calculating token counts when none are "

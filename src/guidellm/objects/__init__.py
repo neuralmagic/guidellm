@@ -1,4 +1,4 @@
-from .serializable import Serializable, SerializableFileType
+from .pydantic import StandardBaseModel
 from .statistics import (
     DistributionSummary,
     Percentiles,
@@ -11,8 +11,7 @@ __all__ = [
     "Percentiles",
     "DistributionSummary",
     "StatusDistributionSummary",
-    "Serializable",
-    "SerializableFileType",
+    "StandardBaseModel",
     "RunningStats",
     "TimeRunningStats",
 ]

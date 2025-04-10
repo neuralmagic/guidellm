@@ -3,10 +3,10 @@ from pathlib import Path
 
 import pytest
 
-from guidellm.objects.serializable import Serializable
+from guidellm.objects.pydantic import StandardBaseModel
 
 
-class ExampleModel(Serializable):
+class ExampleModel(StandardBaseModel):
     name: str
     age: int
 

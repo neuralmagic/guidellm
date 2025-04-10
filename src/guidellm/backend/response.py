@@ -1,8 +1,9 @@
 from typing import Any, Dict, Literal, Optional
 
-from pydantic import BaseModel, computed_field
+from pydantic import computed_field
 
 from guidellm.config import settings
+from guidellm.objects.pydantic import StandardBaseModel
 
 __all__ = [
     "StreamingResponseType",
@@ -15,7 +16,7 @@ __all__ = [
 StreamingResponseType = Literal["start", "iter"]
 
 
-class StreamingTextResponse(BaseModel):
+class StreamingTextResponse(StandardBaseModel):
     """
     A model representing the response content for a streaming text request.
 
@@ -40,7 +41,7 @@ class StreamingTextResponse(BaseModel):
     request_id: Optional[str] = None
 
 
-class RequestArgs(BaseModel):
+class RequestArgs(StandardBaseModel):
     """
     A model representing the arguments for a request to a backend.
     Biases towards an HTTP request, but can be used for other types of backends.
@@ -60,7 +61,7 @@ class RequestArgs(BaseModel):
     http2: Optional[bool] = None
 
 
-class ResponseSummary(BaseModel):
+class ResponseSummary(StandardBaseModel):
     """
     A model representing a summary of a backend request.
     Always returned as the final iteration of a streaming request.

@@ -4,7 +4,7 @@ import numpy as np
 from pydantic import Field, computed_field
 
 from guidellm.config import settings
-from guidellm.objects import Serializable
+from guidellm.objects import StandardBaseModel
 from guidellm.scheduler import (
     AsyncConstantStrategy,
     AsyncPoissonStrategy,
@@ -29,7 +29,7 @@ __all__ = [
 ProfileType = Literal["synchronous", "concurrent", "throughput", "async", "sweep"]
 
 
-class Profile(Serializable):
+class Profile(StandardBaseModel):
     type_: ProfileType = Field(
         description="The type of benchmarking profile to use.",
     )

@@ -16,14 +16,19 @@ from datasets import Dataset, DatasetDict, IterableDataset, IterableDatasetDict
 from transformers import PreTrainedTokenizer
 
 from guidellm.dataset import ColumnInputTypes, load_dataset
-from guidellm.objects import Serializable
+from guidellm.objects import StandardBaseModel
 from guidellm.request.request import GenerationRequest
 
 __all__ = [
+    "RequestLoaderDescription",
     "RequestLoader",
     "GenerativeRequestLoaderDescription",
     "GenerativeRequestLoader",
 ]
+
+
+class RequestLoaderDescription(StandardBaseModel):
+    type_: Literal["request_loader"] = "request_loader"
 
 
 class RequestLoader(Iterable):
@@ -35,10 +40,11 @@ class RequestLoader(Iterable):
 
     @property
     @abstractmethod
-    def description(self) -> Serializable: ...
+    def description(self) -> RequestLoaderDescription: ...
 
 
-class GenerativeRequestLoaderDescription(Serializable):
+class GenerativeRequestLoaderDescription(RequestLoaderDescription):
+    type_: Literal["generative_request_loader"] = "generative_request_loader"
     data: str
     data_args: Optional[Dict[str, Any]]
     processor: str

@@ -12,7 +12,7 @@ from typing import (
 from pydantic import Field
 
 from guidellm.config import settings
-from guidellm.objects import Serializable
+from guidellm.objects import StandardBaseModel
 
 __all__ = [
     "StrategyType",
@@ -29,7 +29,7 @@ __all__ = [
 StrategyType = Literal["synchronous", "concurrent", "throughput", "constant", "poisson"]
 
 
-class SchedulingStrategy(Serializable):
+class SchedulingStrategy(StandardBaseModel):
     """
     An abstract base class for scheduling strategies.
     This class defines the interface for scheduling requests and provides

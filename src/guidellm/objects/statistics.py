@@ -6,7 +6,7 @@ from typing import Any, List, Literal, Optional, Tuple
 import numpy as np
 from pydantic import Field, computed_field
 
-from guidellm.objects import Serializable
+from guidellm.objects import StandardBaseModel
 
 __all__ = [
     "Percentiles",
@@ -17,7 +17,7 @@ __all__ = [
 ]
 
 
-class Percentiles(Serializable):
+class Percentiles(StandardBaseModel):
     """
     A serializable model representing percentiles of a distribution.
     """
@@ -54,7 +54,7 @@ class Percentiles(Serializable):
     )
 
 
-class DistributionSummary(Serializable):
+class DistributionSummary(StandardBaseModel):
     """
     A serializable model representing a statistical summary for a given
     distribution of numerical values.
@@ -350,7 +350,7 @@ class DistributionSummary(Serializable):
         )
 
 
-class StatusDistributionSummary(Serializable):
+class StatusDistributionSummary(StandardBaseModel):
     """
     A serializable model representing distribution summary statistics
     based on groupings of status (e.g., successful, incomplete, error) for a given
@@ -685,7 +685,7 @@ class StatusDistributionSummary(Serializable):
         )
 
 
-class RunningStats(Serializable):
+class RunningStats(StandardBaseModel):
     start_time: float = Field(
         default_factory=timer.time,
     )

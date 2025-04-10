@@ -16,7 +16,11 @@ from transformers import PreTrainedTokenizerBase
 from guidellm.dataset.creator import ColumnInputTypes, DatasetCreator
 from guidellm.utils import EndlessTextCreator, IntegerRangeSampler, check_load_processor
 
-__all__ = ["SyntheticDatasetCreator"]
+__all__ = [
+    "SyntheticDatasetCreator",
+    "SyntheticDatasetConfig",
+    "SyntheticTextItemsGenerator",
+]
 
 
 class SyntheticDatasetConfig(BaseModel):

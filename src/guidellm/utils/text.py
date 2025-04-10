@@ -16,6 +16,7 @@ __all__ = [
     "clean_text",
     "split_text",
     "load_text",
+    "is_puncutation",
     "EndlessTextCreator",
 ]
 

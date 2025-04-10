@@ -26,7 +26,7 @@ from guidellm.backend import (
     ResponseSummary,
     StreamingTextResponse,
 )
-from guidellm.objects import Serializable
+from guidellm.objects import StandardBaseModel
 from guidellm.request import GenerationRequest
 from guidellm.scheduler.result import SchedulerRequestInfo
 from guidellm.scheduler.types import REQ, RES
@@ -34,7 +34,10 @@ from guidellm.scheduler.types import REQ, RES
 __all__ = [
     "WorkerProcessRequest",
     "WorkerProcessResult",
+    "ResolveStatus",
+    "WorkerDescription",
     "RequestsWorker",
+    "GenerativeRequestsWorkerDescription",
     "GenerativeRequestsWorker",
 ]
 
@@ -66,6 +69,10 @@ class ResolveStatus:
     request_end: float
 
 
+class WorkerDescription(StandardBaseModel):
+    type_: Literal["worker"] = "worker"
+
+
 class RequestsWorker(ABC, Generic[REQ, RES]):
     """
     An abstract base class for a worker that processes requests.
@@ -79,7 +86,7 @@ class RequestsWorker(ABC, Generic[REQ, RES]):
 
     @property
     @abstractmethod
-    def description(self) -> Serializable:
+    def description(self) -> WorkerDescription:
         """
         An abstract property that must be implemented by subclasses.
         This property should return a Serializable class representing the information
@@ -256,7 +263,8 @@ class RequestsWorker(ABC, Generic[REQ, RES]):
             )
 
 
-class GenerativeRequestsWorkerDescription(Serializable):
+class GenerativeRequestsWorkerDescription(WorkerDescription):
+    type_: Literal["generative_requests_worker"] = "generative_requests_worker"
     backend_type: BackendType
     backend_target: str
     backend_model: str
@@ -279,7 +287,7 @@ class GenerativeRequestsWorker(RequestsWorker[GenerationRequest, ResponseSummary
         self.backend = backend
 
     @property
-    def description(self) -> Serializable:
+    def description(self) -> StandardBaseModel:
         """
         Get the description of the worker.
         :return: The description of the worker.
