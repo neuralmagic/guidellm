@@ -542,7 +542,7 @@ class GenerativeBenchmark(Benchmark):
             "milliseconds for completed, errored, and all requests."
         ),
     )
-    times_per_output_tokens_ms: StatusDistributionSummary = Field(
+    times_per_output_token_ms: StatusDistributionSummary = Field(
         description=(
             "The distribution of latencies per output token in milliseconds for "
             "completed, errored, and all requests. "
