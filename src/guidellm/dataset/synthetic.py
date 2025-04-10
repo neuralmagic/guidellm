@@ -43,7 +43,7 @@ class SyntheticDatasetConfig(BaseModel):
         description="The average number of text tokens generated for outputs.",
         gt=0,
     )
-    output_tokens_stddev: Optional[int] = Field(
+    output_tokens_stdev: Optional[int] = Field(
         description="The standard deviation of the tokens generated for outputs.",
         gt=0,
         default=None,
