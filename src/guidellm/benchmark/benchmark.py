@@ -530,7 +530,7 @@ class GenerativeBenchmark(Benchmark):
             "errored, and all requests."
         )
     )
-    outputs_token_count: StatusDistributionSummary = Field(
+    output_token_count: StatusDistributionSummary = Field(
         description=(
             "The distribution of token counts in the outputs for completed, "
             "errored, and all requests."
