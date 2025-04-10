@@ -524,7 +524,7 @@ class GenerativeBenchmark(Benchmark):
     requests_latency: StatusDistributionSummary = Field(
         description="The distribution of latencies for the completed requests.",
     )
-    prompts_token_count: StatusDistributionSummary = Field(
+    prompt_token_count: StatusDistributionSummary = Field(
         description=(
             "The distribution of token counts in the prompts for completed, "
             "errored, and all requests."
