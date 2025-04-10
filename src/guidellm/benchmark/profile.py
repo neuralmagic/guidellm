@@ -30,7 +30,7 @@ ProfileType = Literal["synchronous", "concurrent", "throughput", "async", "sweep
 
 
 class Profile(StandardBaseModel):
-    type_: ProfileType = Field(
+    type_: Literal["profile"] = Field(
         description="The type of benchmarking profile to use.",
     )
     completed_strategies: int = Field(

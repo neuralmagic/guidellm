@@ -45,7 +45,7 @@ class BenchmarkerTaskProgressState:
     in_cooldown: bool = False
 
     requests_rate: float = 0
-    requests_latency: float = 0
+    request_latency: float = 0
     requests_processing: int = 0
     requests_successful: int = 0
     requests_incomplete: int = 0
@@ -111,18 +111,24 @@ class BenchmarkerTaskProgressState:
     def formatted_progress_status(self) -> str:
         if self.ended:
             status = "complete"
+            color = Colors.SUCCESS
         elif self.compiling:
             status = "compiling"
+            color = Colors.PROGRESS
         elif self.started and self.in_warmup:
             status = "warmup"
+            color = Colors.PROGRESS
         elif self.started and self.in_cooldown:
             status = "cooldown"
+            color = Colors.PROGRESS
         elif self.started:
             status = "running"
+            color = Colors.PROGRESS
         else:
             status = "pending"
+            color = Colors.INFO
 
-        return status.ljust(9)
+        return f"[{color}]{status.ljust(8)}[/{color}]"
 
     @property
     def formatted_requests_summary(self) -> str:
@@ -140,7 +146,7 @@ class BenchmarkerTaskProgressState:
             )
             + ", "
             + BenchmarkerTaskProgressState.format_progress_display(
-                value=self.requests_latency,
+                value=self.request_latency,
                 label="Lat",
                 units="s",
                 total_characters=12,
@@ -483,7 +489,7 @@ class BenchmarkerProgressDisplay(Generic[BTPS]):
         progress_state.requests_rate = (
             result.current_aggregator.successful_requests.rate
         )
-        progress_state.requests_latency = result.current_aggregator.request_time.mean
+        progress_state.request_latency = result.current_aggregator.request_time.mean
         progress_state.requests_processing = (
             result.current_aggregator.scheduler_processing_requests.last
         )
@@ -538,8 +544,8 @@ class BenchmarkerProgressDisplay(Generic[BTPS]):
         progress_state.requests_rate = (
             result.current_benchmark.requests_per_second.successful.mean
         )
-        progress_state.requests_latency = (
-            result.current_benchmark.requests_latency.successful.mean
+        progress_state.request_latency = (
+            result.current_benchmark.request_latency.successful.mean
         )
         progress_state.requests_processing = (
             result.current_benchmark.requests_concurrency.successful.mean
@@ -614,22 +620,22 @@ class GenerativeTextBenchmarkerProgressDisplay(
         super().handle_update_benchmark_compiled(progress_state, result)
 
         progress_state.output_tokens = (
-            result.current_benchmark.outputs_token_count.successful.mean
+            result.current_benchmark.output_token_count.successful.mean
         )
         progress_state.prompt_tokens = (
-            result.current_benchmark.prompts_token_count.successful.mean
+            result.current_benchmark.prompt_token_count.successful.mean
         )
         progress_state.output_tokens_rate = (
-            result.current_benchmark.outputs_tokens_per_second.successful.mean
+            result.current_benchmark.output_tokens_per_second.successful.mean
         )
         progress_state.total_tokens_rate = (
             result.current_benchmark.tokens_per_second.successful.mean
         )
         progress_state.tokens_ttft = (
-            result.current_benchmark.times_to_first_token_ms.successful.mean
+            result.current_benchmark.time_to_first_token_ms.successful.mean
         )
         progress_state.tokens_itl = (
-            result.current_benchmark.inter_token_latencies_ms.successful.mean
+            result.current_benchmark.inter_token_latency_ms.successful.mean
         )
 
     def create_task_progress_state(

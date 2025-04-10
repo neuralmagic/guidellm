@@ -444,23 +444,23 @@ class StatusDistributionSummary(StandardBaseModel):
 
         return StatusDistributionSummary(
             total=DistributionSummary.from_values(
-                values=values,
-                weights=weights,
+                values,
+                weights,
                 include_cdf=include_cdf,
             ),
             successful=DistributionSummary.from_values(
-                values=successful_values,
-                weights=successful_weights,
+                successful_values,
+                successful_weights,
                 include_cdf=include_cdf,
             ),
             incomplete=DistributionSummary.from_values(
-                values=incomplete_values,
-                weights=incomplete_weights,
+                incomplete_values,
+                incomplete_weights,
                 include_cdf=include_cdf,
             ),
             errored=DistributionSummary.from_values(
-                values=errored_values,
-                weights=errored_weights,
+                errored_values,
+                errored_weights,
                 include_cdf=include_cdf,
             ),
         )
@@ -496,41 +496,62 @@ class StatusDistributionSummary(StandardBaseModel):
 
         _, successful_requests = (
             zip(*successful)
-            if (successful := list(zip(request_types, requests)))
+            if (
+                successful := list(
+                    filter(
+                        lambda val: val[0] == "successful",
+                        zip(request_types, requests),
+                    )
+                )
+            )
             else ([], [])
         )
         _, incomplete_requests = (
             zip(*incomplete)
-            if (incomplete := list(zip(request_types, requests)))
+            if (
+                incomplete := list(
+                    filter(
+                        lambda val: val[0] == "incomplete",
+                        zip(request_types, requests),
+                    )
+                )
+            )
             else ([], [])
         )
         _, errored_requests = (
             zip(*errored)
-            if (errored := list(zip(request_types, requests)))
+            if (
+                errored := list(
+                    filter(
+                        lambda val: val[0] == "error",
+                        zip(request_types, requests),
+                    )
+                )
+            )
             else ([], [])
         )
 
         return StatusDistributionSummary(
             total=DistributionSummary.from_request_times(
-                requests=requests,
+                requests,
                 distribution_type=distribution_type,
                 include_cdf=include_cdf,
                 epsilon=epsilon,
             ),
             successful=DistributionSummary.from_request_times(
-                requests=successful_requests,
+                successful_requests,
                 distribution_type=distribution_type,
                 include_cdf=include_cdf,
                 epsilon=epsilon,
             ),
             incomplete=DistributionSummary.from_request_times(
-                requests=incomplete_requests,
+                incomplete_requests,
                 distribution_type=distribution_type,
                 include_cdf=include_cdf,
                 epsilon=epsilon,
             ),
             errored=DistributionSummary.from_request_times(
-                requests=errored_requests,
+                errored_requests,
                 distribution_type=distribution_type,
                 include_cdf=include_cdf,
                 epsilon=epsilon,
@@ -651,34 +672,34 @@ class StatusDistributionSummary(StandardBaseModel):
 
         return StatusDistributionSummary(
             total=DistributionSummary.from_iterable_request_times(
-                requests=requests,
-                first_iter_times=first_iter_times,
-                iter_counts=iter_counts,
-                first_iter_counts=first_iter_counts,
+                requests,
+                first_iter_times,
+                iter_counts,
+                first_iter_counts,
                 include_cdf=include_cdf,
                 epsilon=epsilon,
             ),
             successful=DistributionSummary.from_iterable_request_times(
-                requests=successful_requests,
-                first_iter_times=successful_first_iter_times,
-                iter_counts=successful_iter_counts,
-                first_iter_counts=successful_first_iter_counts,
+                successful_requests,
+                successful_first_iter_times,
+                successful_iter_counts,
+                successful_first_iter_counts,
                 include_cdf=include_cdf,
                 epsilon=epsilon,
             ),
             incomplete=DistributionSummary.from_iterable_request_times(
-                requests=incomplete_requests,
-                first_iter_times=incomplete_first_iter_times,
-                iter_counts=incomplete_iter_counts,
-                first_iter_counts=incomplete_first_iter_counts,
+                incomplete_requests,
+                incomplete_first_iter_times,
+                incomplete_iter_counts,
+                incomplete_first_iter_counts,
                 include_cdf=include_cdf,
                 epsilon=epsilon,
             ),
             errored=DistributionSummary.from_iterable_request_times(
-                requests=errored_requests,
-                first_iter_times=errored_first_iter_times,
-                iter_counts=errored_iter_counts,
-                first_iter_counts=errored_first_iter_counts,
+                errored_requests,
+                errored_first_iter_times,
+                errored_iter_counts,
+                errored_first_iter_counts,
                 include_cdf=include_cdf,
                 epsilon=epsilon,
             ),

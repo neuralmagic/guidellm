@@ -142,7 +142,7 @@ class SyntheticTextItemsGenerator(Iterable[Dict[str, Union[str, int]]]):
         )
         output_tokens_sampler = IntegerRangeSampler(
             average=self.config.output_tokens,
-            variance=self.config.output_tokens_stddev,
+            variance=self.config.output_tokens_stdev,
             min_value=self.config.output_tokens_min,
             max_value=self.config.output_tokens_max,
             random_seed=self.random_seed + 1,  # ensure diff dist from prompts

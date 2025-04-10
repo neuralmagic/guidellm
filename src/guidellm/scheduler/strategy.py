@@ -41,7 +41,7 @@ class SchedulingStrategy(StandardBaseModel):
         This should be one of the predefined strategy types.
     """
 
-    type_: StrategyType = Field(
+    type_: Literal["strategy"] = Field(
         description="The type of scheduling strategy schedule requests with.",
     )
 

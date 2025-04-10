@@ -1,15 +1,36 @@
 import random
 import uuid
-from typing import Any, Dict, List, Literal, Optional, TypeVar
+from typing import Any, Dict, List, Literal, Optional, TypeVar, Union
 
 from pydantic import Field, computed_field
 
-from guidellm.benchmark.profile import Profile
+from guidellm.benchmark.profile import (
+    AsyncProfile,
+    ConcurrentProfile,
+    Profile,
+    SweepProfile,
+    SynchronousProfile,
+    ThroughputProfile,
+)
 from guidellm.objects import (
     StandardBaseModel,
     StatusDistributionSummary,
 )
-from guidellm.scheduler import SchedulerRequestInfo, SchedulingStrategy
+from guidellm.request import (
+    GenerativeRequestLoaderDescription,
+    RequestLoaderDescription,
+)
+from guidellm.scheduler import (
+    AsyncConstantStrategy,
+    AsyncPoissonStrategy,
+    ConcurrentStrategy,
+    GenerativeRequestsWorkerDescription,
+    SchedulerRequestInfo,
+    SchedulingStrategy,
+    SynchronousStrategy,
+    ThroughputStrategy,
+    WorkerDescription,
+)
 
 __all__ = [
     "BENCH",
@@ -28,19 +49,36 @@ class BenchmarkArgs(StandardBaseModel):
     and how data was collected for it.
     """
 
-    profile: Profile = Field(
+    profile: Union[
+        AsyncProfile,
+        SweepProfile,
+        ConcurrentProfile,
+        ThroughputProfile,
+        SynchronousProfile,
+        Profile,
+    ] = Field(
         description=(
             "The profile used for the entire benchmark run that the strategy for "
             "this benchmark was pulled from."
-        )
+        ),
+        discriminator="type_",
     )
     strategy_index: int = Field(
         description=(
             "The index of the strategy in the profile that was used for this benchmark."
         )
     )
-    strategy: SchedulingStrategy = Field(
-        description="The scheduling strategy used to run this benchmark. "
+    strategy: Union[
+        ConcurrentStrategy,
+        SchedulingStrategy,
+        ThroughputStrategy,
+        SynchronousStrategy,
+        AsyncPoissonStrategy,
+        AsyncConstantStrategy,
+        SchedulingStrategy,
+    ] = Field(
+        description="The scheduling strategy used to run this benchmark. ",
+        discriminator="type_",
     )
     max_number: Optional[int] = Field(
         description="The maximum number of requests to run for this benchmark, if any."
@@ -208,6 +246,7 @@ class Benchmark(StandardBaseModel):
     what rates and concurrency values to use for subsequent strategies.
     """
 
+    type_: Literal["benchmark"] = "benchmark"
     id_: str = Field(
         default_factory=lambda: str(uuid.uuid4()),
         description="The unique identifier for the benchmark.",
@@ -228,17 +267,23 @@ class Benchmark(StandardBaseModel):
             "The process statistics for the entire benchmark run across all requests."
         )
     )
-    worker: Optional[StandardBaseModel] = Field(
-        description=(
-            "The description and specifics for the worker used to resolve requests "
-            "for this benchmark."
+    worker: Optional[Union[GenerativeRequestsWorkerDescription, WorkerDescription]] = (
+        Field(
+            description=(
+                "The description and specifics for the worker used to resolve requests "
+                "for this benchmark."
+            ),
+            discriminator="type_",
         )
     )
-    request_loader: Optional[StandardBaseModel] = Field(
+    request_loader: Optional[
+        Union[GenerativeRequestLoaderDescription, RequestLoaderDescription]
+    ] = Field(
         description=(
             "The description and specifics for the request loader used to create "
             "requests for this benchmark."
-        )
+        ),
+        discriminator="type_",
     )
     extras: Dict[str, Any] = Field(
         description=(
@@ -263,6 +308,7 @@ class GenerativeTextResponseStats(StandardBaseModel):
     statistics for a generative text response.
     """
 
+    type_: Literal["generative_text_response"] = "generative_text_response"
     request_id: str = Field(
         description="The unique identifier for the request.",
     )
@@ -378,6 +424,7 @@ class GenerativeTextErrorStats(GenerativeTextResponseStats):
     error message and optional properties given the error occurred.
     """
 
+    type_: Literal["generative_text_error"] = "generative_text_error"
     error: str = Field(
         description=(
             "The error message for the error that occurred while making the request."
@@ -466,6 +513,7 @@ class GenerativeBenchmark(Benchmark):
     and end times for the benchmark, and the statistics for the requests and responses.
     """
 
+    type_: Literal["generative_benchmark"] = "generative_benchmark"
     successful_total: int = Field(
         description=(
             "The total number of completed requests in the benchmark, "
@@ -495,7 +543,7 @@ class GenerativeBenchmark(Benchmark):
             "the benchmark. None if no sampling was applied."
         ),
     )
-    incomplete_requests: List[GenerativeTextResponseStats] = Field(
+    incomplete_requests: List[GenerativeTextErrorStats] = Field(
         description="The list of incomplete requests.",
     )
     errored_total: int = Field(
@@ -521,7 +569,7 @@ class GenerativeBenchmark(Benchmark):
         description="The end time of the last request for the benchmark.",
     )
 
-    requests_latency: StatusDistributionSummary = Field(
+    request_latency: StatusDistributionSummary = Field(
         description="The distribution of latencies for the completed requests.",
     )
     prompt_token_count: StatusDistributionSummary = Field(
@@ -536,20 +584,20 @@ class GenerativeBenchmark(Benchmark):
             "errored, and all requests."
         )
     )
-    times_to_first_token_ms: StatusDistributionSummary = Field(
+    time_to_first_token_ms: StatusDistributionSummary = Field(
         description=(
             "The distribution of latencies to receiving the first token in "
             "milliseconds for completed, errored, and all requests."
         ),
     )
-    times_per_output_token_ms: StatusDistributionSummary = Field(
+    time_per_output_token_ms: StatusDistributionSummary = Field(
         description=(
             "The distribution of latencies per output token in milliseconds for "
             "completed, errored, and all requests. "
             "This includes the time to generate the first token and all other tokens."
         ),
     )
-    inter_token_latencies_ms: StatusDistributionSummary = Field(
+    inter_token_latency_ms: StatusDistributionSummary = Field(
         description=(
             "The distribution of latencies between tokens in milliseconds for "
             "completed, errored, and all requests."
@@ -656,7 +704,7 @@ class GenerativeBenchmark(Benchmark):
     def from_stats(
         run_id: str,
         successful: List[GenerativeTextResponseStats],
-        incomplete: List[GenerativeTextResponseStats],
+        incomplete: List[GenerativeTextErrorStats],
         errored: List[GenerativeTextErrorStats],
         args: BenchmarkArgs,
         run_stats: BenchmarkRunStats,
@@ -695,23 +743,38 @@ class GenerativeBenchmark(Benchmark):
         ]
         start_time = min(req.start_time for req in total)
         end_time = max(req.end_time for req in total)
-        total_with_prompt, total_types_with_prompt = zip(
-            *filter(
-                lambda val: bool(val[0].prompt_tokens),
-                zip(total, total_types),
+        total_with_prompt, total_types_with_prompt = (
+            zip(*filtered)
+            if (
+                filtered := list(
+                    filter(lambda val: bool(val[0].prompt), zip(total, total_types))
+                )
             )
+            else ([], [])
         )
-        total_with_output_first, total_types_with_output_first = zip(
-            *filter(
-                lambda val: bool(val[0].output_tokens),
-                zip(total, total_types),
+        total_with_output_first, total_types_with_output_first = (
+            zip(*filtered)
+            if (
+                filtered := list(
+                    filter(
+                        lambda val: bool(val[0].output_tokens > 0),
+                        zip(total, total_types),
+                    )
+                )
             )
+            else ([], [])
         )
-        total_with_output_multi, total_types_with_output_multi = zip(
-            *filter(
-                lambda val: bool(val[0].output_tokens > 1),
-                zip(total, total_types),
+        total_with_output_multi, total_types_with_output_multi = (
+            zip(*filtered)
+            if (
+                filtered := list(
+                    filter(
+                        lambda val: bool(val[0].output_tokens > 1),
+                        zip(total, total_types),
+                    )
+                )
             )
+            else ([], [])
         )
 
         return GenerativeBenchmark(
@@ -739,35 +802,35 @@ class GenerativeBenchmark(Benchmark):
                 requests=[(req.start_time, req.end_time) for req in total],
                 distribution_type="concurrency",
             ),
-            requests_latency=StatusDistributionSummary.from_values(
+            request_latency=StatusDistributionSummary.from_values(
                 value_types=total_types,
                 values=[req.request_latency for req in total],
             ),
-            prompts_token_count=StatusDistributionSummary.from_values(
+            prompt_token_count=StatusDistributionSummary.from_values(
                 value_types=list(total_types_with_prompt),
                 values=[req.prompt_tokens for req in total_with_prompt],
             ),
-            outputs_token_count=StatusDistributionSummary.from_values(
+            output_token_count=StatusDistributionSummary.from_values(
                 value_types=list(total_types_with_output_first),
                 values=[req.output_tokens for req in total_with_output_first],
             ),
-            times_to_first_token_ms=StatusDistributionSummary.from_values(
+            time_to_first_token_ms=StatusDistributionSummary.from_values(
                 value_types=list(total_types_with_output_first),
                 values=[req.time_to_first_token_ms for req in total_with_output_first],
             ),
-            times_per_output_tokens_ms=StatusDistributionSummary.from_values(
+            time_per_output_token_ms=StatusDistributionSummary.from_values(
                 value_types=list(total_types_with_output_first),
                 values=[
                     req.time_per_output_token_ms for req in total_with_output_first
                 ],
                 weights=[req.output_tokens for req in total_with_output_first],
             ),
-            inter_token_latencies_ms=StatusDistributionSummary.from_values(
+            inter_token_latency_ms=StatusDistributionSummary.from_values(
                 value_types=list(total_types_with_output_multi),
                 values=[req.inter_token_latency_ms for req in total_with_output_multi],
                 weights=[req.output_tokens - 1 for req in total_with_output_multi],
             ),
-            outputs_tokens_per_second=StatusDistributionSummary.from_iterable_request_times(
+            output_tokens_per_second=StatusDistributionSummary.from_iterable_request_times(
                 request_types=total_types_with_output_first,
                 requests=[
                     (req.start_time, req.end_time) for req in total_with_output_first

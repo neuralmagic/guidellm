@@ -1,5 +1,7 @@
 from collections import OrderedDict
 from datetime import datetime
+import json
+import yaml
 from pathlib import Path
 from typing import Any, List, Optional
 
@@ -29,20 +31,44 @@ __all__ = [
 class GenerativeBenchmarksReport(StandardBaseModel):
     benchmarks: List[GenerativeBenchmark]
 
+    def save_file(self, path: Path):
+        if path.is_dir():
+            path = path / "benchmarks.json"
+
+        path.parent.mkdir(parents=True, exist_ok=True)
+        extension = path.suffix.lower()
+
+        if extension == ".json":
+            self.save_json(path)
+        elif extension in [".yaml", ".yml"]:
+            self.save_yaml(path)
+        elif extension in [".csv"]:
+            self.save_csv(path)
+        else:
+            raise ValueError(f"Unsupported file extension: {extension} for {path}.")
+
+    def save_json(self, path: Path):
+        model_dict = self.model_dump()
+        model_json = json.dumps(model_dict)
+
+        with path.open("w") as file:
+            file.write(model_json)
+
+    def save_yaml(self, path: Path):
+        model_dict = self.model_dump()
+        model_yaml = yaml.dump(model_dict)
+
+        with path.open("w") as file:
+            file.write(model_yaml)
+
+    def save_csv(self, path: Path):
+        raise NotImplementedError("CSV format is not implemented yet.")
+
 
 def save_generative_benchmarks(benchmarks: List[GenerativeBenchmark], path: str):
-    path_inst = Path(path)
-
-    if path_inst.is_dir():
-        path_inst = path_inst / "generative_benchmarks.json"
-
-    extension = path_inst.suffix.lower()
-
-    if extension in [".json", ".yaml", ".yml"]:
-        report = GenerativeBenchmarksReport(benchmarks=benchmarks)
-        report.save_file(path_inst, type_="json" if extension == ".json" else "yaml")
-    else:
-        raise ValueError(f"Unsupported file extension: {extension} for {path_inst}. ")
+    path = Path(path)
+    report = GenerativeBenchmarksReport(benchmarks=benchmarks)
+    report.save_file(path)
 
 
 class GenerativeBenchmarksConsole:
@@ -227,24 +253,24 @@ class GenerativeBenchmarksConsole:
                         f"{benchmark.errored_total}"
                     ),
                     (
-                        f"{benchmark.prompts_token_count.successful.mean:>5.1f} / "
-                        f"{benchmark.prompts_token_count.incomplete.mean:.1f} / "
-                        f"{benchmark.prompts_token_count.errored.mean:.1f}"
+                        f"{benchmark.prompt_token_count.successful.mean:>5.1f} / "
+                        f"{benchmark.prompt_token_count.incomplete.mean:.1f} / "
+                        f"{benchmark.prompt_token_count.errored.mean:.1f}"
                     ),
                     (
-                        f"{benchmark.outputs_token_count.successful.mean:>5.1f} / "
-                        f"{benchmark.outputs_token_count.incomplete.mean:.1f} / "
-                        f"{benchmark.outputs_token_count.errored.mean:.1f}"
+                        f"{benchmark.output_token_count.successful.mean:>5.1f} / "
+                        f"{benchmark.output_token_count.incomplete.mean:.1f} / "
+                        f"{benchmark.output_token_count.errored.mean:.1f}"
                     ),
                     (
-                        f"{benchmark.prompts_token_count.successful.total_sum:>6.0f} / "
-                        f"{benchmark.prompts_token_count.incomplete.total_sum:.0f} / "
-                        f"{benchmark.prompts_token_count.errored.total_sum:.0f}"
+                        f"{benchmark.prompt_token_count.successful.total_sum:>6.0f} / "
+                        f"{benchmark.prompt_token_count.incomplete.total_sum:.0f} / "
+                        f"{benchmark.prompt_token_count.errored.total_sum:.0f}"
                     ),
                     (
-                        f"{benchmark.outputs_token_count.successful.total_sum:>6.0f} / "
-                        f"{benchmark.outputs_token_count.incomplete.total_sum:.0f} / "
-                        f"{benchmark.outputs_token_count.errored.total_sum:.0f}"
+                        f"{benchmark.output_token_count.successful.total_sum:>6.0f} / "
+                        f"{benchmark.output_token_count.incomplete.total_sum:.0f} / "
+                        f"{benchmark.output_token_count.errored.total_sum:.0f}"
                     ),
                 ]
             )
@@ -279,27 +305,27 @@ class GenerativeBenchmarksConsole:
                     strategy_display_str(benchmark.args.strategy),
                     f"{benchmark.requests_per_second.successful.mean:.2f}",
                     f"{benchmark.requests_concurrency.successful.mean:.2f}",
-                    f"{benchmark.outputs_tokens_per_second.total.mean:.1f}",
+                    f"{benchmark.output_tokens_per_second.total.mean:.1f}",
                     f"{benchmark.tokens_per_second.total.mean:.1f}",
                     (
-                        f"{benchmark.requests_latency.successful.mean:.2f} / "
-                        f"{benchmark.requests_latency.successful.median:.2f} / "
-                        f"{benchmark.requests_latency.successful.percentiles.p99:.2f}"
+                        f"{benchmark.request_latency.successful.mean:.2f} / "
+                        f"{benchmark.request_latency.successful.median:.2f} / "
+                        f"{benchmark.request_latency.successful.percentiles.p99:.2f}"
                     ),
                     (
-                        f"{benchmark.times_to_first_token_ms.successful.mean:.1f} / "
-                        f"{benchmark.times_to_first_token_ms.successful.median:.1f} / "
-                        f"{benchmark.times_to_first_token_ms.successful.percentiles.p99:.1f}"
+                        f"{benchmark.time_to_first_token_ms.successful.mean:.1f} / "
+                        f"{benchmark.time_to_first_token_ms.successful.median:.1f} / "
+                        f"{benchmark.time_to_first_token_ms.successful.percentiles.p99:.1f}"
                     ),
                     (
-                        f"{benchmark.inter_token_latencies_ms.successful.mean:.1f} / "
-                        f"{benchmark.inter_token_latencies_ms.successful.median:.1f} / "
-                        f"{benchmark.inter_token_latencies_ms.successful.percentiles.p99:.1f}"
+                        f"{benchmark.inter_token_latency_ms.successful.mean:.1f} / "
+                        f"{benchmark.inter_token_latency_ms.successful.median:.1f} / "
+                        f"{benchmark.inter_token_latency_ms.successful.percentiles.p99:.1f}"
                     ),
                     (
-                        f"{benchmark.times_per_output_tokens_ms.successful.mean:.1f} / "
-                        f"{benchmark.times_per_output_tokens_ms.successful.median:.1f} / "
-                        f"{benchmark.times_per_output_tokens_ms.successful.percentiles.p99:.1f}"
+                        f"{benchmark.time_per_output_token_ms.successful.mean:.1f} / "
+                        f"{benchmark.time_per_output_token_ms.successful.median:.1f} / "
+                        f"{benchmark.time_per_output_token_ms.successful.percentiles.p99:.1f}"
                     ),
                 ]
             )
