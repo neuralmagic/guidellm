@@ -117,14 +117,14 @@ class DistributionSummary(StandardBaseModel):
         :return: An instance of DistributionSummary with calculated values.
         """
         values, weights = zip(*distribution) if distribution else ([], [])
-        values = np.array(values)
-        weights = np.array(weights)
+        values = np.array(values)  # type: ignore[assignment]
+        weights = np.array(weights)  # type: ignore[assignment]
 
         # create the PDF
         probabilities = weights / np.sum(weights)  # type: ignore[operator]
         pdf = np.column_stack((values, probabilities))
         pdf = pdf[np.argsort(pdf[:, 0])]
-        values = pdf[:, 0]
+        values = pdf[:, 0]  # type: ignore[assignment]
         probabilities = pdf[:, 1]
 
         # calculate the CDF

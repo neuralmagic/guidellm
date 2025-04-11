@@ -1,8 +1,10 @@
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, List, Literal, Optional, Union
+from typing import Any, Dict, Iterable, List, Literal, Optional, Union
 
 from datasets import Dataset, DatasetDict, IterableDataset, IterableDatasetDict
-from transformers import PreTrainedTokenizer  # type: ignore[import]
+from transformers import (  # type: ignore[import]
+    PreTrainedTokenizerBase,
+)
 
 from guidellm.backend import Backend, BackendType
 from guidellm.benchmark.benchmark import GenerativeBenchmark
@@ -22,7 +24,7 @@ async def benchmark_generative_text(
     backend_type: BackendType,
     backend_args: Optional[Dict[str, Any]],
     model: Optional[str],
-    processor: Optional[Union[str, Path, PreTrainedTokenizer, Callable]],
+    processor: Optional[Optional[Union[str, Path, PreTrainedTokenizerBase]]],
     processor_args: Optional[Dict[str, Any]],
     data: Union[
         str,

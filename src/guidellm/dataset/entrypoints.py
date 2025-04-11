@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 from datasets import Dataset, IterableDataset
@@ -15,7 +16,7 @@ __all__ = ["load_dataset"]
 def load_dataset(
     data: Any,
     data_args: Optional[Dict[str, Any]],
-    processor: PreTrainedTokenizerBase,
+    processor: Optional[Union[str, Path, PreTrainedTokenizerBase]],
     processor_args: Optional[Dict[str, Any]],
     random_seed: int = 42,
     split_pref_order: Optional[List[str]] = None,
