@@ -36,12 +36,12 @@ Scale Efficiently: Evaluate and Optimize Your LLM Deployments for Real-World Inf
 Before installing, ensure you have the following prerequisites:
 
 - OS: Linux or MacOS
-- Python: 3.8 – 3.12
+- Python: 3.9 – 3.13
 
-GuideLLM is available on PyPI and is installed using `pip`:
+GuideLLM can be installed using pip:
 
 ```bash
-pip install guidellm
+pip install git+https://github.com/neuralmagic/guidellm.git
 ```
 
 For detailed installation instructions and requirements, see the [Installation Guide](https://github.com/neuralmagic/guidellm/tree/main/docs/install.md).
@@ -79,11 +79,11 @@ For more information on starting a TGI server, see the [TGI Documentation](https
 To run a GuideLLM evaluation, use the `guidellm` command with the appropriate model name and options on the server hosting the model or one with network access to the deployment server. For example, to evaluate the full performance range of the previously deployed Llama 3.1 8B model, run the following command:
 
 ```bash
-guidellm \
-  --target "http://localhost:8000/v1" \
+guidellm benchmark \
+  --target "http://localhost:8000" \
   --model "neuralmagic/Meta-Llama-3.1-8B-Instruct-quantized.w4a16" \
-  --data-type emulated \
-  --data "prompt_tokens=512,generated_tokens=128"
+  --rate-type sweep \
+  --data "prompt_tokens=256,output_tokens=128"
 ```
 
 The above command will begin the evaluation and output progress updates similar to the following (if running on a different server, be sure to update the target!): <img src= "https://raw.githubusercontent.com/neuralmagic/guidellm/main/docs/assets/sample-benchmarks.gif"/>
@@ -92,7 +92,8 @@ Notes:
 
 - The `--target` flag specifies the server hosting the model. In this case, it is a local vLLM server.
 - The `--model` flag specifies the model to evaluate. The model name should match the name of the model deployed on the server
-- By default, GuideLLM will run a `sweep` of performance evaluations across different request rates, each lasting 120 seconds and the results are printed out to the terminal.
+- The `--rate-type` flag specifies what load generation pattern GuideLLM will use when sending requests to the server. If `sweep` is specified GuideLLM will run multiple performance evaluations across different request rates.
+- By default GuideLLM will run over a fixed workload of 1000 requests configurable by `--max-requests`. If `--max-seconds` is set GuideLLM will instead run over a fixed time.
 
 #### 3. Analyze the Results
 
@@ -126,11 +127,9 @@ Some typical configurations for the CLI include:
   - `--rate-type throughput`: Throughput runs requests in a throughput manner, sending requests as fast as possible.
   - `--rate-type constant`: Constant runs requests at a constant rate. Specify the request rate per second with the `--rate` argument. For example, `--rate 10` or multiple rates with `--rate 10 --rate 20 --rate 30`.
   - `--rate-type poisson`: Poisson draws from a Poisson distribution with the mean at the specified rate, adding some real-world variance to the runs. Specify the request rate per second with the `--rate` argument. For example, `--rate 10` or multiple rates with `--rate 10 --rate 20 --rate 30`.
-- `--data-type`: The data to use for the benchmark. Options include `emulated`, `transformers`, and `file`.
-  - `--data-type emulated`: Emulated supports an EmulationConfig in string or file format for the `--data` argument to generate fake data. Specify the number of prompt tokens at a minimum and optionally the number of output tokens and other parameters for variance in the length. For example, `--data "prompt_tokens=128"`, `--data "prompt_tokens=128,generated_tokens=128" `, or `--data "prompt_tokens=128,prompt_tokens_variance=10" `.
-  - `--data-type file`: File supports a file path or URL to a file for the `--data` argument. The file should contain data encoded as a CSV, JSONL, TXT, or JSON/YAML file with a single prompt per line for CSV, JSONL, and TXT or a list of prompts for JSON/YAML. For example, `--data "data.txt"` where data.txt contents are `"prompt1\nprompt2\nprompt3"`.
-  - `--data-type transformers`: Transformers supports a dataset name or file path for the `--data` argument. For example, `--data "neuralmagic/LLM_compression_calibration"`.
-- `--max-seconds`: The maximum number of seconds to run each benchmark. The default is 120 seconds.
+  - `--rate-type concurrent`: Concurrent runs requests at a fixed concurrency. When a requests completes it is immediately replaced with a new request to maintain the set concurrency. Specify the request concurrency with `--rate`.
+- `--data`: A hugging face dataset name or arguments to generate a synthetic dataset.
+- `--max-seconds`: The maximum number of seconds to run each benchmark.
 - `--max-requests`: The maximum number of requests to run in each benchmark.
 
 For a complete list of supported CLI arguments, run the following command:
