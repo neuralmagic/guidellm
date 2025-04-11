@@ -277,7 +277,7 @@ class Benchmark(StandardBaseModel):
     Specific benchmarker implementations should extend this model to include
     additional information or metadata as needed.
 
-    Note, requests_per_second and requests_concurrency are kept at this level
+    Note, requests_per_second and request_concurrency are kept at this level
     and are expected to be populated by the subclass implementation to ensure
     the logic for Profiles can include more complicated logic for determining
     what rates and concurrency values to use for subsequent strategies.

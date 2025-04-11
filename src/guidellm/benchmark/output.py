@@ -258,29 +258,29 @@ class GenerativeBenchmarksConsole:
                     f"{datetime.fromtimestamp(benchmark.end_time).strftime("%H:%M:%S")}",
                     f"{(benchmark.end_time - benchmark.start_time):.1f}",
                     (
-                        f"{benchmark.successful_total:>5} / "
-                        f"{benchmark.incomplete_total} / "
-                        f"{benchmark.errored_total}"
+                        f"{benchmark.total_count.successful:>5} / "
+                        f"{benchmark.total_count.incomplete} / "
+                        f"{benchmark.total_count.errored}"
                     ),
                     (
-                        f"{benchmark.prompt_token_count.successful.mean:>5.1f} / "
-                        f"{benchmark.prompt_token_count.incomplete.mean:.1f} / "
-                        f"{benchmark.prompt_token_count.errored.mean:.1f}"
+                        f"{benchmark.metrics.prompt_token_count.successful.mean:>5.1f} / "
+                        f"{benchmark.metrics.prompt_token_count.incomplete.mean:.1f} / "
+                        f"{benchmark.metrics.prompt_token_count.errored.mean:.1f}"
                     ),
                     (
-                        f"{benchmark.output_token_count.successful.mean:>5.1f} / "
-                        f"{benchmark.output_token_count.incomplete.mean:.1f} / "
-                        f"{benchmark.output_token_count.errored.mean:.1f}"
+                        f"{benchmark.metrics.output_token_count.successful.mean:>5.1f} / "
+                        f"{benchmark.metrics.output_token_count.incomplete.mean:.1f} / "
+                        f"{benchmark.metrics.output_token_count.errored.mean:.1f}"
                     ),
                     (
-                        f"{benchmark.prompt_token_count.successful.total_sum:>6.0f} / "
-                        f"{benchmark.prompt_token_count.incomplete.total_sum:.0f} / "
-                        f"{benchmark.prompt_token_count.errored.total_sum:.0f}"
+                        f"{benchmark.metrics.prompt_token_count.successful.total_sum:>6.0f} / "
+                        f"{benchmark.metrics.prompt_token_count.incomplete.total_sum:.0f} / "
+                        f"{benchmark.metrics.prompt_token_count.errored.total_sum:.0f}"
                     ),
                     (
-                        f"{benchmark.output_token_count.successful.total_sum:>6.0f} / "
-                        f"{benchmark.output_token_count.incomplete.total_sum:.0f} / "
-                        f"{benchmark.output_token_count.errored.total_sum:.0f}"
+                        f"{benchmark.metrics.output_token_count.successful.total_sum:>6.0f} / "
+                        f"{benchmark.metrics.output_token_count.incomplete.total_sum:.0f} / "
+                        f"{benchmark.metrics.output_token_count.errored.total_sum:.0f}"
                     ),
                 ]
             )
@@ -313,29 +313,29 @@ class GenerativeBenchmarksConsole:
             rows.append(
                 [
                     strategy_display_str(benchmark.args.strategy),
-                    f"{benchmark.requests_per_second.successful.mean:.2f}",
-                    f"{benchmark.requests_concurrency.successful.mean:.2f}",
-                    f"{benchmark.output_tokens_per_second.total.mean:.1f}",
-                    f"{benchmark.tokens_per_second.total.mean:.1f}",
+                    f"{benchmark.metrics.requests_per_second.successful.mean:.2f}",
+                    f"{benchmark.metrics.request_concurrency.successful.mean:.2f}",
+                    f"{benchmark.metrics.output_tokens_per_second.total.mean:.1f}",
+                    f"{benchmark.metrics.tokens_per_second.total.mean:.1f}",
                     (
-                        f"{benchmark.request_latency.successful.mean:.2f} / "
-                        f"{benchmark.request_latency.successful.median:.2f} / "
-                        f"{benchmark.request_latency.successful.percentiles.p99:.2f}"
+                        f"{benchmark.metrics.request_latency.successful.mean:.2f} / "
+                        f"{benchmark.metrics.request_latency.successful.median:.2f} / "
+                        f"{benchmark.metrics.request_latency.successful.percentiles.p99:.2f}"
                     ),
                     (
-                        f"{benchmark.time_to_first_token_ms.successful.mean:.1f} / "
-                        f"{benchmark.time_to_first_token_ms.successful.median:.1f} / "
-                        f"{benchmark.time_to_first_token_ms.successful.percentiles.p99:.1f}"
+                        f"{benchmark.metrics.time_to_first_token_ms.successful.mean:.1f} / "
+                        f"{benchmark.metrics.time_to_first_token_ms.successful.median:.1f} / "
+                        f"{benchmark.metrics.time_to_first_token_ms.successful.percentiles.p99:.1f}"
                     ),
                     (
-                        f"{benchmark.inter_token_latency_ms.successful.mean:.1f} / "
-                        f"{benchmark.inter_token_latency_ms.successful.median:.1f} / "
-                        f"{benchmark.inter_token_latency_ms.successful.percentiles.p99:.1f}"
+                        f"{benchmark.metrics.inter_token_latency_ms.successful.mean:.1f} / "
+                        f"{benchmark.metrics.inter_token_latency_ms.successful.median:.1f} / "
+                        f"{benchmark.metrics.inter_token_latency_ms.successful.percentiles.p99:.1f}"
                     ),
                     (
-                        f"{benchmark.time_per_output_token_ms.successful.mean:.1f} / "
-                        f"{benchmark.time_per_output_token_ms.successful.median:.1f} / "
-                        f"{benchmark.time_per_output_token_ms.successful.percentiles.p99:.1f}"
+                        f"{benchmark.metrics.time_per_output_token_ms.successful.mean:.1f} / "
+                        f"{benchmark.metrics.time_per_output_token_ms.successful.median:.1f} / "
+                        f"{benchmark.metrics.time_per_output_token_ms.successful.percentiles.p99:.1f}"
                     ),
                 ]
             )
