@@ -21,7 +21,7 @@ from guidellm.benchmark.aggregator import AGG, BENCH, GenerativeBenchmarkAggrega
 from guidellm.benchmark.benchmark import GenerativeBenchmark
 from guidellm.benchmark.profile import Profile
 from guidellm.objects import StandardBaseModel
-from guidellm.request import GenerationRequest
+from guidellm.request import GenerationRequest, RequestLoaderDescription
 from guidellm.scheduler import (
     REQ,
     RES,
@@ -125,7 +125,7 @@ class Benchmarker(Generic[AGG, BENCH, REQ, RES], ABC):
         self,
         worker: RequestsWorker[REQ, RES],
         request_loader: Iterable[REQ],
-        requests_loader_description: Optional[StandardBaseModel] = None,
+        requests_loader_description: RequestLoaderDescription,
         benchmark_save_extras: Optional[Dict[str, Any]] = None,
     ):
         self.worker = worker
@@ -144,8 +144,8 @@ class Benchmarker(Generic[AGG, BENCH, REQ, RES], ABC):
         cooldown_percent_per_strategy: Optional[float],
     ) -> AsyncGenerator[BenchmarkerResult[AGG, BENCH, REQ, RES], None]:
         try:
-            requests_loader_size = len(self.scheduler.request_loader)
-        except Exception:
+            requests_loader_size = len(self.scheduler.request_loader)  # type: ignore[arg-type]
+        except Exception:  # noqa: BLE001
             requests_loader_size = None
 
         strategy_limits = BenchmarkerStrategyLimits(
@@ -174,7 +174,7 @@ class Benchmarker(Generic[AGG, BENCH, REQ, RES], ABC):
 
         while scheduling_strategy := profile.next_strategy():
             current_index += 1
-            aggregator: AGG[BENCH, REQ, RES] = self.create_benchmark_aggregator(
+            aggregator = self.create_benchmark_aggregator(
                 run_id=run_id,
                 profile=profile,
                 strategy_index=current_index,
@@ -272,7 +272,7 @@ class Benchmarker(Generic[AGG, BENCH, REQ, RES], ABC):
         strategy: SchedulingStrategy,
         max_number: Optional[int],
         max_duration: Optional[float],
-        warmup_number: Optional[float],
+        warmup_number: Optional[int],
         warmup_duration: Optional[float],
         cooldown_number: Optional[int],
         cooldown_duration: Optional[float],
@@ -291,7 +291,7 @@ class GenerativeBenchmarker(
         self,
         backend: Backend,
         request_loader: Iterable[GenerationRequest],
-        request_loader_description: Optional[StandardBaseModel] = None,
+        request_loader_description: RequestLoaderDescription,
         benchmark_save_extras: Optional[Dict[str, Any]] = None,
         processor: Optional[Union[str, Path, PreTrainedTokenizer]] = None,
         processor_args: Optional[Dict[str, Any]] = None,
@@ -313,7 +313,7 @@ class GenerativeBenchmarker(
         strategy: SchedulingStrategy,
         max_number: Optional[int],
         max_duration: Optional[float],
-        warmup_number: Optional[float],
+        warmup_number: Optional[int],
         warmup_duration: Optional[float],
         cooldown_number: Optional[int],
         cooldown_duration: Optional[float],

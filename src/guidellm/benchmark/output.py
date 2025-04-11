@@ -1,10 +1,10 @@
+import json
 from collections import OrderedDict
 from datetime import datetime
-import json
-import yaml
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Union
 
+import yaml
 from rich.console import Console
 from rich.padding import Padding
 from rich.table import Table
@@ -65,8 +65,10 @@ class GenerativeBenchmarksReport(StandardBaseModel):
         raise NotImplementedError("CSV format is not implemented yet.")
 
 
-def save_generative_benchmarks(benchmarks: List[GenerativeBenchmark], path: str):
-    path = Path(path)
+def save_generative_benchmarks(
+    benchmarks: List[GenerativeBenchmark], path: Union[Path, str]
+):
+    path = Path(path) if isinstance(path, str) else path
     report = GenerativeBenchmarksReport(benchmarks=benchmarks)
     report.save_file(path)
 
@@ -79,7 +81,11 @@ class GenerativeBenchmarksConsole:
 
     @property
     def benchmarks_profile_str(self) -> str:
-        profile = self.benchmarks[0].args.profile
+        profile = self.benchmarks[0].args.profile if self.benchmarks else None
+
+        if profile is None:
+            return "None"
+
         profile_args = OrderedDict(
             {
                 "type": profile.type_,
@@ -88,21 +94,25 @@ class GenerativeBenchmarksConsole:
         )
 
         if isinstance(profile, ConcurrentProfile):
-            profile_args["streams"] = profile.streams
+            profile_args["streams"] = str(profile.streams)
         elif isinstance(profile, ThroughputProfile):
-            profile_args["max_concurrency"] = profile.max_concurrency
+            profile_args["max_concurrency"] = str(profile.max_concurrency)
         elif isinstance(profile, AsyncProfile):
-            profile_args["max_concurrency"] = profile.max_concurrency
-            profile_args["rate"] = profile.rate
-            profile_args["initial_burst"] = profile.initial_burst
+            profile_args["max_concurrency"] = str(profile.max_concurrency)
+            profile_args["rate"] = str(profile.rate)
+            profile_args["initial_burst"] = str(profile.initial_burst)
         elif isinstance(profile, SweepProfile):
-            profile_args["sweep_size"] = profile.sweep_size
+            profile_args["sweep_size"] = str(profile.sweep_size)
 
         return ", ".join(f"{key}={value}" for key, value in profile_args.items())
 
     @property
     def benchmarks_args_str(self) -> str:
-        args = self.benchmarks[0].args
+        args = self.benchmarks[0].args if self.benchmarks else None
+
+        if args is None:
+            return "None"
+
         args_dict = OrderedDict(
             {
                 "max_number": args.max_number,
@@ -118,15 +128,15 @@ class GenerativeBenchmarksConsole:
 
     @property
     def benchmarks_worker_desc_str(self) -> str:
-        return str(self.benchmarks[0].worker)
+        return str(self.benchmarks[0].worker) if self.benchmarks else "None"
 
     @property
     def benchmarks_request_loader_desc_str(self) -> str:
-        return str(self.benchmarks[0].request_loader)
+        return str(self.benchmarks[0].request_loader) if self.benchmarks else "None"
 
     @property
     def benchmarks_extras_str(self) -> str:
-        extras = self.benchmarks[0].extras
+        extras = self.benchmarks[0].extras if self.benchmarks else None
 
         if not extras:
             return "None"

@@ -1,6 +1,6 @@
 import gzip
 import re
-from importlib.resources import as_file, files
+from importlib.resources import as_file, files  # type: ignore[attr-defined]
 from pathlib import Path
 from typing import List, Optional, Union
 

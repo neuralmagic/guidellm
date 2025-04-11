@@ -224,7 +224,7 @@ class BenchmarkRunStats(StandardBaseModel):
         )
     )
 
-    @computed_field
+    @computed_field  # type: ignore[misc]
     @property
     def total(self) -> int:
         """
@@ -309,7 +309,7 @@ class GenerativeTextResponseStats(StandardBaseModel):
     """
 
     type_: Literal["generative_text_response"] = "generative_text_response"
-    request_id: str = Field(
+    request_id: Optional[str] = Field(
         description="The unique identifier for the request.",
     )
     request_type: Literal["text_completions", "chat_completions"] = Field(
@@ -345,7 +345,7 @@ class GenerativeTextResponseStats(StandardBaseModel):
         description="The time the last token was received.",
     )
 
-    @computed_field
+    @computed_field  # type: ignore[misc]
     @property
     def request_latency(self) -> float:
         """
@@ -353,7 +353,7 @@ class GenerativeTextResponseStats(StandardBaseModel):
         """
         return self.end_time - self.start_time
 
-    @computed_field
+    @computed_field  # type: ignore[misc]
     @property
     def time_to_first_token_ms(self) -> float:
         """
@@ -362,7 +362,7 @@ class GenerativeTextResponseStats(StandardBaseModel):
         """
         return 1000 * (self.first_token_time - self.start_time)
 
-    @computed_field
+    @computed_field  # type: ignore[misc]
     @property
     def time_per_output_token_ms(self) -> float:
         """
@@ -376,7 +376,7 @@ class GenerativeTextResponseStats(StandardBaseModel):
             1000 * (self.last_token_time - self.first_token_time) / self.output_tokens
         )
 
-    @computed_field
+    @computed_field  # type: ignore[misc]
     @property
     def inter_token_latency_ms(self) -> float:
         """
@@ -392,7 +392,7 @@ class GenerativeTextResponseStats(StandardBaseModel):
             / (self.output_tokens - 1)
         )
 
-    @computed_field
+    @computed_field  # type: ignore[misc]
     @property
     def tokens_per_second(self) -> float:
         """
@@ -404,7 +404,7 @@ class GenerativeTextResponseStats(StandardBaseModel):
 
         return (self.prompt_tokens + self.output_tokens) / latency
 
-    @computed_field
+    @computed_field  # type: ignore[misc]
     @property
     def output_tokens_per_second(self) -> float:
         """
@@ -424,35 +424,35 @@ class GenerativeTextErrorStats(GenerativeTextResponseStats):
     error message and optional properties given the error occurred.
     """
 
-    type_: Literal["generative_text_error"] = "generative_text_error"
+    type_: Literal["generative_text_error"] = "generative_text_error"  # type: ignore[assignment]
     error: str = Field(
         description=(
             "The error message for the error that occurred while making the request."
         )
     )
-    output: Optional[str] = Field(
+    output: Optional[str] = Field(  # type: ignore[assignment]
         default=None,
         description=(
             "The generated text output from the generative request, if any, "
             "before the error occurred."
         ),
     )
-    first_token_time: Optional[float] = Field(
+    first_token_time: Optional[float] = Field(  # type: ignore[assignment]
         default=None,
         description=(
             "The time the first token was received, if any, before the error occurred."
         ),
     )
-    last_token_time: Optional[float] = Field(
+    last_token_time: Optional[float] = Field(  # type: ignore[assignment]
         default=None,
         description=(
             "The time the last token was received, if any, before the error occurred."
         ),
     )
 
-    @computed_field
+    @computed_field  # type: ignore[misc]
     @property
-    def time_to_first_token_ms(self) -> Optional[float]:
+    def time_to_first_token_ms(self) -> Optional[float]:  # type: ignore[override]
         """
         :return: The time in milliseconds from the start of the request to the first
             token received. None if the first token was not received.
@@ -462,9 +462,9 @@ class GenerativeTextErrorStats(GenerativeTextResponseStats):
 
         return super().time_to_first_token_ms
 
-    @computed_field
+    @computed_field  # type: ignore[misc]
     @property
-    def time_per_output_token_ms(self) -> Optional[float]:
+    def time_per_output_token_ms(self) -> Optional[float]:  # type: ignore[override]
         """
         :return: The average time in milliseconds per output token generated.
             This includes the time to generate the first token and all other tokens.
@@ -475,9 +475,9 @@ class GenerativeTextErrorStats(GenerativeTextResponseStats):
 
         return super().time_per_output_token_ms
 
-    @computed_field
+    @computed_field  # type: ignore[misc]
     @property
-    def inter_token_latency_ms(self) -> Optional[float]:
+    def inter_token_latency_ms(self) -> Optional[float]:  # type: ignore[override]
         """
         :return: The average time in milliseconds between generating tokens in the
             output text. Note, does not include the time to generate the first token.
@@ -492,9 +492,9 @@ class GenerativeTextErrorStats(GenerativeTextResponseStats):
 
         return super().inter_token_latency_ms
 
-    @computed_field
+    @computed_field  # type: ignore[misc]
     @property
-    def output_tokens_per_second(self) -> Optional[float]:
+    def output_tokens_per_second(self) -> Optional[float]:  # type: ignore[override]
         """
         :return: The average number of tokens generated per second in the output text.
             Note, does not include the time to generate the first token. None if there
@@ -513,7 +513,7 @@ class GenerativeBenchmark(Benchmark):
     and end times for the benchmark, and the statistics for the requests and responses.
     """
 
-    type_: Literal["generative_benchmark"] = "generative_benchmark"
+    type_: Literal["generative_benchmark"] = "generative_benchmark"  # type: ignore[assignment]
     successful_total: int = Field(
         description=(
             "The total number of completed requests in the benchmark, "
@@ -616,7 +616,7 @@ class GenerativeBenchmark(Benchmark):
         ),
     )
 
-    @computed_field
+    @computed_field  # type: ignore[misc]
     @property
     def duration(self) -> float:
         """
@@ -708,8 +708,8 @@ class GenerativeBenchmark(Benchmark):
         errored: List[GenerativeTextErrorStats],
         args: BenchmarkArgs,
         run_stats: BenchmarkRunStats,
-        worker: Optional[StandardBaseModel],
-        requests_loader: Optional[StandardBaseModel],
+        worker: WorkerDescription,
+        requests_loader: RequestLoaderDescription,
         extras: Optional[Dict[str, Any]],
     ) -> "GenerativeBenchmark":
         """
@@ -736,13 +736,14 @@ class GenerativeBenchmark(Benchmark):
             populated and calculated
         """
         total = successful + incomplete + errored
-        total_types = [
-            *["successful"] * len(successful),
-            *["incomplete"] * len(incomplete),
-            *["error"] * len(errored),
+        total_types: List[Literal["successful", "incomplete", "error"]] = [
+            *["successful"] * len(successful),  # type: ignore[list-item]
+            *["incomplete"] * len(incomplete),  # type: ignore[list-item]
+            *["error"] * len(errored),  # type: ignore[list-item]
         ]
         start_time = min(req.start_time for req in total)
         end_time = max(req.end_time for req in total)
+
         total_with_prompt, total_types_with_prompt = (
             zip(*filtered)
             if (
@@ -816,37 +817,43 @@ class GenerativeBenchmark(Benchmark):
             ),
             time_to_first_token_ms=StatusDistributionSummary.from_values(
                 value_types=list(total_types_with_output_first),
-                values=[req.time_to_first_token_ms for req in total_with_output_first],
+                values=[
+                    req.time_to_first_token_ms or 0 for req in total_with_output_first
+                ],
             ),
             time_per_output_token_ms=StatusDistributionSummary.from_values(
                 value_types=list(total_types_with_output_first),
                 values=[
-                    req.time_per_output_token_ms for req in total_with_output_first
+                    req.time_per_output_token_ms or 0 for req in total_with_output_first
                 ],
                 weights=[req.output_tokens for req in total_with_output_first],
             ),
             inter_token_latency_ms=StatusDistributionSummary.from_values(
                 value_types=list(total_types_with_output_multi),
-                values=[req.inter_token_latency_ms for req in total_with_output_multi],
+                values=[
+                    req.inter_token_latency_ms or 0 for req in total_with_output_multi
+                ],
                 weights=[req.output_tokens - 1 for req in total_with_output_multi],
             ),
             output_tokens_per_second=StatusDistributionSummary.from_iterable_request_times(
-                request_types=total_types_with_output_first,
+                request_types=list(total_types_with_output_first),
                 requests=[
                     (req.start_time, req.end_time) for req in total_with_output_first
                 ],
                 first_iter_times=[
-                    req.first_token_time for req in total_with_output_first
+                    req.first_token_time or req.start_time
+                    for req in total_with_output_first
                 ],
                 iter_counts=[req.output_tokens for req in total_with_output_first],
             ),
             tokens_per_second=StatusDistributionSummary.from_iterable_request_times(
-                request_types=total_types_with_output_first,
+                request_types=list(total_types_with_output_first),
                 requests=[
                     (req.start_time, req.end_time) for req in total_with_output_first
                 ],
                 first_iter_times=[
-                    req.first_token_time for req in total_with_output_first
+                    req.first_token_time or req.start_time
+                    for req in total_with_output_first
                 ],
                 iter_counts=[
                     req.prompt_tokens + req.output_tokens

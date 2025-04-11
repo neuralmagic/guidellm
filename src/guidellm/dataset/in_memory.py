@@ -7,7 +7,7 @@ from datasets import (
     IterableDataset,
     IterableDatasetDict,
 )
-from transformers import PreTrainedTokenizerBase
+from transformers import PreTrainedTokenizerBase  # type: ignore[import]
 
 from guidellm.dataset.creator import DatasetCreator
 
@@ -16,7 +16,7 @@ __all__ = ["InMemoryDatasetCreator"]
 
 class InMemoryDatasetCreator(DatasetCreator):
     @classmethod
-    def is_supported(cls, data: Any, data_args: Optional[Dict[str, Any]]) -> bool:
+    def is_supported(cls, data: Any, data_args: Optional[Dict[str, Any]]) -> bool:  # noqa: ARG003
         return isinstance(data, Iterable) and not isinstance(data, str)
 
     @classmethod
@@ -24,9 +24,9 @@ class InMemoryDatasetCreator(DatasetCreator):
         cls,
         data: Any,
         data_args: Optional[Dict[str, Any]],
-        processor: Optional[Union[str, Path, PreTrainedTokenizerBase]],
-        processor_args: Optional[Dict[str, Any]],
-        random_seed: int,
+        processor: Optional[Union[str, Path, PreTrainedTokenizerBase]],  # noqa: ARG003
+        processor_args: Optional[Dict[str, Any]],  # noqa: ARG003
+        random_seed: int,  # noqa: ARG003
     ) -> Union[Dataset, DatasetDict, IterableDataset, IterableDatasetDict]:
         if not isinstance(data, Iterable):
             raise TypeError(
@@ -39,7 +39,7 @@ class InMemoryDatasetCreator(DatasetCreator):
         if isinstance(data, Dict):
             # assume data is a dictionary of columns and values: {"c1": ["i1", "i2"]}
             data_dict = cls.format_data_dict(data)
-        elif isinstance(data[0], Dict):
+        elif isinstance(data[0], Dict):  # type: ignore[index]
             # assume data is a list of dictionaries: [{"c1": "i1"}, {"c1": "i2"}]
             data_dict = cls.format_data_iterable_dicts(data)
         else:
@@ -90,13 +90,13 @@ class InMemoryDatasetCreator(DatasetCreator):
                 f"got {type(data)}"
             )
 
-        if not all(isinstance(key, str) for key in data[0]):
+        if not all(isinstance(key, str) for key in data[0]):  # type: ignore[index]
             raise TypeError(
                 "Unsupported data format. Expected Dict[str, Any], "
                 f"but one of the items had a non string column for {data}"
             )
 
-        columns = list(data[0].keys())
+        columns = list(data[0].keys())  # type: ignore[index]
         if not all(
             len(item) == len(columns) and all(key in item for key in columns)
             for item in data
@@ -106,7 +106,7 @@ class InMemoryDatasetCreator(DatasetCreator):
                 f"for {data}"
             )
 
-        data_dict = {key: [] for key in columns}
+        data_dict: Dict[str, Any] = {key: [] for key in columns}
         for item in data:
             for key, value in item.items():
                 data_dict[key].append(value)
@@ -121,7 +121,8 @@ class InMemoryDatasetCreator(DatasetCreator):
                 f"got {type(data)}"
             )
 
-        first_type = type(data[0])
+        first_item = next(iter(data), None)
+        first_type = type(first_item)
         if not all(isinstance(item, first_type) for item in data):
             raise TypeError(
                 f"Unsupported data format. Not all types are the same for {data}"

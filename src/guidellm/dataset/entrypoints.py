@@ -1,9 +1,9 @@
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 from datasets import Dataset, IterableDataset
-from transformers import PreTrainedTokenizerBase
+from transformers import PreTrainedTokenizerBase  # type: ignore[import]
 
-from guidellm.dataset.creator import ColumnInputTypes, DatasetCreator
+from guidellm.dataset.creator import ColumnInputTypes
 from guidellm.dataset.file import FileDatasetCreator
 from guidellm.dataset.hf_datasets import HFDatasetsCreator
 from guidellm.dataset.in_memory import InMemoryDatasetCreator
@@ -20,7 +20,7 @@ def load_dataset(
     random_seed: int = 42,
     split_pref_order: Optional[List[str]] = None,
 ) -> Tuple[Union[Dataset, IterableDataset], Dict[ColumnInputTypes, str]]:
-    creators: List[DatasetCreator] = [
+    creators = [
         InMemoryDatasetCreator,
         SyntheticDatasetCreator,
         FileDatasetCreator,

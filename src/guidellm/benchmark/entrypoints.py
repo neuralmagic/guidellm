@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Literal, Optional, Union
 
 from datasets import Dataset, DatasetDict, IterableDataset, IterableDatasetDict
-from transformers import PreTrainedTokenizer
+from transformers import PreTrainedTokenizer  # type: ignore[import]
 
 from guidellm.backend import Backend, BackendType
 from guidellm.benchmark.benchmark import GenerativeBenchmark
@@ -111,6 +111,8 @@ async def benchmark_generative_text(
             progress.update(result)
 
         if result.type_ == "benchmark_compiled":
+            if result.current_benchmark is None:
+                raise ValueError("Current benchmark is None")
             benchmarks.append(result.current_benchmark)
 
     if output_console:

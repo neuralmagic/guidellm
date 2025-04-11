@@ -1,7 +1,7 @@
 import json
 import random
 from pathlib import Path
-from typing import Any, Dict, Iterable, Iterator, Optional, Tuple, Union
+from typing import Any, Dict, Iterable, Iterator, Literal, Optional, Union
 
 import yaml
 from datasets import (
@@ -11,7 +11,7 @@ from datasets import (
     IterableDatasetDict,
 )
 from pydantic import BaseModel, Field
-from transformers import PreTrainedTokenizerBase
+from transformers import PreTrainedTokenizerBase  # type: ignore[import]
 
 from guidellm.dataset.creator import ColumnInputTypes, DatasetCreator
 from guidellm.utils import EndlessTextCreator, IntegerRangeSampler, check_load_processor
@@ -107,7 +107,7 @@ class SyntheticDatasetConfig(BaseModel):
                 int(value.strip()) if value.strip().isnumeric() else value.strip()
             )
 
-        return SyntheticDatasetConfig(**config_dict)
+        return SyntheticDatasetConfig(**config_dict)  # type: ignore[arg-type]
 
     @staticmethod
     def parse_config_file(data: Union[str, Path]) -> "SyntheticDatasetConfig":
@@ -117,7 +117,14 @@ class SyntheticDatasetConfig(BaseModel):
         return SyntheticDatasetConfig(**config_dict)
 
 
-class SyntheticTextItemsGenerator(Iterable[Dict[str, Union[str, int]]]):
+class SyntheticTextItemsGenerator(
+    Iterable[
+        Dict[
+            Literal["prompt", "prompt_tokens_count", "output_tokens_count"],
+            Union[str, int],
+        ]
+    ]
+):
     def __init__(
         self,
         config: SyntheticDatasetConfig,
@@ -127,12 +134,18 @@ class SyntheticTextItemsGenerator(Iterable[Dict[str, Union[str, int]]]):
         self.config = config
         self.processor = processor
         self.random_seed = random_seed
-        self.tokens = []
         self.text_creator = EndlessTextCreator(
             data=config.source,
         )
 
-    def __iter__(self) -> Iterator[Tuple[str, int, int]]:
+    def __iter__(
+        self,
+    ) -> Iterator[
+        Dict[
+            Literal["prompt", "prompt_tokens_count", "output_tokens_count"],
+            Union[str, int],
+        ]
+    ]:
         prompt_tokens_sampler = IntegerRangeSampler(
             average=self.config.prompt_tokens,
             variance=self.config.prompt_tokens_stdev,
@@ -147,7 +160,8 @@ class SyntheticTextItemsGenerator(Iterable[Dict[str, Union[str, int]]]):
             max_value=self.config.output_tokens_max,
             random_seed=self.random_seed + 1,  # ensure diff dist from prompts
         )
-        rand = random.Random(self.random_seed + 2)  # ensure diff distribution
+        # ensure diff distribution from output tokens
+        rand = random.Random(self.random_seed + 2)  # noqa: S311
 
         for _, prompt_tokens, output_tokens in zip(
             range(self.config.samples),
@@ -185,7 +199,7 @@ class SyntheticTextItemsGenerator(Iterable[Dict[str, Union[str, int]]]):
 
 class SyntheticDatasetCreator(DatasetCreator):
     @classmethod
-    def is_supported(cls, data: Any, data_args: Optional[Dict[str, Any]]) -> bool:
+    def is_supported(cls, data: Any, data_args: Optional[Dict[str, Any]]) -> bool:  # noqa: ARG003
         if (
             isinstance(data, Path)
             and data.exists()

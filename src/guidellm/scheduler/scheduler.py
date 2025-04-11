@@ -118,6 +118,7 @@ class Scheduler(Generic[REQ, RES]):
         with multiprocessing.Manager() as manager, ProcessPoolExecutor(
             max_workers=scheduling_strategy.processes_limit
         ) as executor:
+            requests_iter: Optional[Iterator[Any]] = None
             futures, requests_queue, responses_queue = await self._start_processes(
                 manager, executor, scheduling_strategy
             )
@@ -239,10 +240,10 @@ class Scheduler(Generic[REQ, RES]):
 
         try:
             # update end number if the request loader is finite and less than max
-            iter_length = len(self.request_loader)
+            iter_length = len(self.request_loader)  # type: ignore[arg-type]
             if 0 < iter_length < end_number:
                 end_number = iter_length
-        except Exception:
+        except Exception:  # noqa: BLE001, S110
             pass
 
         if end_number == math.inf and end_time is None:
@@ -312,7 +313,7 @@ class Scheduler(Generic[REQ, RES]):
             process_response: WorkerProcessResult[REQ, RES] = (
                 responses_queue.get_nowait()
             )
-        except multiprocessing.queues.Empty:
+        except multiprocessing.queues.Empty:  # type: ignore[attr-defined]
             return None
 
         if process_response.type_ == "request_scheduled":

@@ -46,7 +46,7 @@ __all__ = [
 class WorkerProcessRequest(Generic[REQ]):
     request: REQ
     start_time: float
-    timeout_time: Optional[float]
+    timeout_time: float
     queued_time: float
 
 
@@ -54,7 +54,7 @@ class WorkerProcessRequest(Generic[REQ]):
 class WorkerProcessResult(Generic[REQ, RES]):
     type_: Literal["request_scheduled", "request_start", "request_complete"]
     request: REQ
-    response: RES
+    response: Optional[RES]
     info: SchedulerRequestInfo
 
 
@@ -125,14 +125,14 @@ class RequestsWorker(ABC, Generic[REQ, RES]):
     async def get_request(
         self, requests_queue: multiprocessing.Queue
     ) -> Optional[WorkerProcessRequest[REQ]]:
-        return await asyncio.to_thread(requests_queue.get)
+        return await asyncio.to_thread(requests_queue.get)  # type: ignore[attr-defined]
 
     async def send_result(
         self,
         results_queue: multiprocessing.Queue,
         result: WorkerProcessResult[REQ, RES],
     ):
-        await asyncio.to_thread(results_queue.put, result)
+        await asyncio.to_thread(results_queue.put, result)  # type: ignore[attr-defined]
 
     async def resolve_scheduler_request(
         self,
@@ -264,7 +264,7 @@ class RequestsWorker(ABC, Generic[REQ, RES]):
 
 
 class GenerativeRequestsWorkerDescription(WorkerDescription):
-    type_: Literal["generative_requests_worker"] = "generative_requests_worker"
+    type_: Literal["generative_requests_worker"] = "generative_requests_worker"  # type: ignore[assignment]
     backend_type: BackendType
     backend_target: str
     backend_model: str
@@ -287,7 +287,7 @@ class GenerativeRequestsWorker(RequestsWorker[GenerationRequest, ResponseSummary
         self.backend = backend
 
     @property
-    def description(self) -> StandardBaseModel:
+    def description(self) -> GenerativeRequestsWorkerDescription:
         """
         Get the description of the worker.
         :return: The description of the worker.
@@ -295,7 +295,7 @@ class GenerativeRequestsWorker(RequestsWorker[GenerationRequest, ResponseSummary
         return GenerativeRequestsWorkerDescription(
             backend_type=self.backend.type_,
             backend_target=self.backend.target,
-            backend_model=self.backend.model,
+            backend_model=self.backend.model or "None",
             backend_info=self.backend.info,
         )
 
@@ -376,7 +376,7 @@ class GenerativeRequestsWorker(RequestsWorker[GenerationRequest, ResponseSummary
             async def _runner():
                 # wrap function so we can enforce timeout and
                 # still return the latest state from the backend
-                async for resp in request_func(**request_kwargs):
+                async for resp in request_func(**request_kwargs):  # type: ignore[operator]
                     nonlocal response
                     response = resp
 
@@ -426,7 +426,7 @@ class GenerativeRequestsWorker(RequestsWorker[GenerationRequest, ResponseSummary
         request_kwargs: Dict[str, Any]
 
         if request.request_type == "text_completions":
-            request_func = self.backend.text_completions
+            request_func = self.backend.text_completions  # type: ignore[assignment]
             request_kwargs = {
                 "prompt": request.content,
                 "request_id": request.request_id,
@@ -435,7 +435,7 @@ class GenerativeRequestsWorker(RequestsWorker[GenerationRequest, ResponseSummary
                 **request.params,
             }
         elif request.request_type == "chat_completions":
-            request_func = self.backend.chat_completions
+            request_func = self.backend.chat_completions  # type: ignore[assignment]
             request_kwargs = {
                 "content": request.content,
                 "request_id": request.request_id,

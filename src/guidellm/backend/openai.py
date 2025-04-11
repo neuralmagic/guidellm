@@ -92,7 +92,7 @@ class OpenAIHTTPBackend(Backend):
             if max_output_tokens is not None
             else settings.openai.max_output_tokens
         )
-        self._async_client: Optional[httpx.Client] = None
+        self._async_client: Optional[httpx.AsyncClient] = None
 
     @property
     def target(self) -> str:
@@ -311,11 +311,12 @@ class OpenAIHTTPBackend(Backend):
         :return: The async HTTP client.
         """
         if self._async_client is None:
-            self._async_client = httpx.AsyncClient(
-                http2=self.http2, timeout=self.timeout
-            )
+            client = httpx.AsyncClient(http2=self.http2, timeout=self.timeout)
+            self._async_client = client
+        else:
+            client = self._async_client
 
-        return self._async_client
+        return client
 
     def _headers(self) -> Dict[str, str]:
         headers = {

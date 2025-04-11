@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
-from transformers import AutoTokenizer, PreTrainedTokenizerBase
+from transformers import AutoTokenizer, PreTrainedTokenizerBase  # type: ignore[import]
 
 __all__ = [
     "check_load_processor",

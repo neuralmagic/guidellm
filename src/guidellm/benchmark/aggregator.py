@@ -141,8 +141,8 @@ class BenchmarkAggregator(ABC, StandardBaseModel, Generic[BENCH, REQ, RES]):
             "if any. These are requests that were not included in the final results."
         )
     )
-    worker_description: Optional[
-        Union[GenerativeRequestsWorkerDescription, WorkerDescription]
+    worker_description: Union[
+        GenerativeRequestsWorkerDescription, WorkerDescription
     ] = Field(
         description=(
             "The description and specifics for the worker used to resolve requests "
@@ -150,8 +150,8 @@ class BenchmarkAggregator(ABC, StandardBaseModel, Generic[BENCH, REQ, RES]):
         ),
         discriminator="type_",
     )
-    request_loader_description: Optional[
-        Union[GenerativeRequestLoaderDescription, RequestLoaderDescription]
+    request_loader_description: Union[
+        GenerativeRequestLoaderDescription, RequestLoaderDescription
     ] = Field(
         description=(
             "The description and specifics for the request loader used to create "
@@ -391,10 +391,10 @@ class BenchmarkAggregator(ABC, StandardBaseModel, Generic[BENCH, REQ, RES]):
                 "completed, canceled, or errored."
             )
 
-        self.queued_time += (
+        self.queued_time += (  # type: ignore[misc]
             result.request_info.dequeued_time - result.request_info.queued_time
         )
-        self.scheduled_time_delay += (
+        self.scheduled_time_delay += (  # type: ignore[misc]
             result.request_info.scheduled_time - result.request_info.dequeued_time
         )
         sleep_time = max(
@@ -402,15 +402,15 @@ class BenchmarkAggregator(ABC, StandardBaseModel, Generic[BENCH, REQ, RES]):
             result.request_info.targeted_start_time
             - result.request_info.scheduled_time,
         )
-        self.scheduled_time_sleep += sleep_time
-        time_to_worker_start = (
+        self.scheduled_time_sleep += sleep_time  # type: ignore[misc]
+        time_to_worker_start = (  # type: ignore[misc]
             result.request_info.worker_start - result.request_info.scheduled_time
         )
-        self.worker_start_delay += time_to_worker_start - sleep_time
-        self.worker_time += (
+        self.worker_start_delay += time_to_worker_start - sleep_time  # type: ignore[misc]
+        self.worker_time += (  # type: ignore[misc]
             result.request_info.worker_end - result.request_info.worker_start
         )
-        self.worker_start_time_targeted_delay += (
+        self.worker_start_time_targeted_delay += (  # type: ignore[misc]
             result.request_info.worker_start - result.request_info.targeted_start_time
         )
 
@@ -433,9 +433,11 @@ class BenchmarkAggregator(ABC, StandardBaseModel, Generic[BENCH, REQ, RES]):
 
         if (
             self.cooldown_number
+            and self.max_number
             and total_completed > self.max_number - self.cooldown_number
         ) or (
             self.cooldown_duration
+            and self.max_duration
             and result.request_info.worker_start
             >= global_start_time + self.max_duration - self.cooldown_duration
         ):
@@ -459,14 +461,14 @@ class BenchmarkAggregator(ABC, StandardBaseModel, Generic[BENCH, REQ, RES]):
         ...
 
 
-AGG = TypeVar("AGG", bound=BenchmarkAggregator[BENCH, REQ, RES])
+AGG = TypeVar("AGG", bound=BenchmarkAggregator)
 
 
 class GenerativeBenchmarkAggregator(
     BenchmarkAggregator[GenerativeBenchmark, GenerationRequest, ResponseSummary]
 ):
     type_: Literal["generative_benchmark_aggregator"] = (
-        "generative_benchmark_aggregator"
+        "generative_benchmark_aggregator"  # type: ignore[assignment]
     )
     processor: Optional[Union[str, Path, Any]] = Field(
         description=(
@@ -531,20 +533,26 @@ class GenerativeBenchmarkAggregator(
         if not super().add_result(result):
             return False
 
-        self.request_start_time_delay += (
+        if result.request is None:
+            raise ValueError("Request is None, cannot add result.")
+
+        if result.response is None:
+            raise ValueError("Response is None, cannot add result.")
+
+        self.request_start_time_delay += (  # type: ignore[misc]
             result.response.start_time - result.request_info.worker_start
         )
-        self.request_start_time_targeted_delay += (
+        self.request_start_time_targeted_delay += (  # type: ignore[misc]
             result.response.start_time - result.request_info.targeted_start_time
         )
-        self.request_time_delay += (
+        self.request_time_delay += (  # type: ignore[misc]
             (result.response.start_time - result.request_info.worker_start)
             + result.request_info.worker_end
             - result.response.end_time
         )
-        self.request_time += result.response.end_time - result.response.start_time
+        self.request_time += result.response.end_time - result.response.start_time  # type: ignore[misc]
 
-        self.time_to_first_token += (
+        self.time_to_first_token += (  # type: ignore[misc]
             (result.response.first_iter_time - result.response.start_time) * 1000.0
             if result.response.first_iter_time
             else 0.0
@@ -590,9 +598,9 @@ class GenerativeBenchmarkAggregator(
             run_stats=BenchmarkRunStats(
                 start_time=self.scheduler_created_requests.start_time,
                 end_time=time.time(),
-                total_successful=self.successful_requests.total,
-                total_incomplete=self.incomplete_requests.total,
-                total_errored=self.errored_requests.total,
+                total_successful=int(self.successful_requests.total),
+                total_incomplete=int(self.incomplete_requests.total),
+                total_errored=int(self.errored_requests.total),
                 queued_time_avg=self.queued_time.mean,
                 scheduled_time_delay_avg=self.scheduled_time_delay.mean,
                 scheduled_time_sleep_avg=self.scheduled_time_sleep.mean,
@@ -621,6 +629,12 @@ class GenerativeBenchmarkAggregator(
         error: List[GenerativeTextErrorStats] = []
 
         for result in self.results:
+            if result.request is None:
+                raise ValueError("Request is None, cannot compile results.")
+
+            if result.response is None:
+                raise ValueError("Response is None, cannot compile results.")
+
             prompt_tokens = self._compile_tokens_count(
                 value=str(result.request.content),
                 requests_tokens=result.response.request_prompt_tokens,
@@ -639,7 +653,7 @@ class GenerativeBenchmarkAggregator(
             if result.request_info.canceled:
                 incomplete.append(
                     GenerativeTextErrorStats(
-                        error=result.response.error,
+                        error=result.response.error or "",
                         request_id=result.request.request_id,
                         request_type=result.request.request_type,
                         scheduler_info=result.request_info,
@@ -656,7 +670,7 @@ class GenerativeBenchmarkAggregator(
             elif result.request_info.errored:
                 error.append(
                     GenerativeTextErrorStats(
-                        error=result.response.error,
+                        error=result.response.error or "",
                         request_id=result.request.request_id,
                         request_type=result.request.request_type,
                         scheduler_info=result.request_info,
@@ -682,8 +696,8 @@ class GenerativeBenchmarkAggregator(
                         output_tokens=output_tokens,
                         start_time=result.response.start_time,
                         end_time=result.response.end_time,
-                        first_token_time=result.response.first_iter_time,
-                        last_token_time=result.response.last_iter_time,
+                        first_token_time=result.response.first_iter_time or -1,
+                        last_token_time=result.response.last_iter_time or -1,
                     )
                 )
 

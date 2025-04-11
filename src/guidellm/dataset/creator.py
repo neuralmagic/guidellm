@@ -3,12 +3,15 @@ from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 from datasets import Dataset, DatasetDict, IterableDataset, IterableDatasetDict
-from transformers import PreTrainedTokenizerBase
+from transformers import PreTrainedTokenizerBase  # type: ignore[import]
 
 __all__ = ["DatasetCreator", "ColumnInputTypes"]
 
 ColumnInputTypes = Literal[
-    "text_column", "prompt_tokens_count_column", "output_tokens_count_column"
+    "prompt_column",
+    "text_column",
+    "prompt_tokens_count_column",
+    "output_tokens_count_column",
 ]
 
 
@@ -71,7 +74,7 @@ class DatasetCreator(ABC):
         "eval_dataset",
         "eval_data",
     ]
-    DEFAULT_SPLITS_DATASET = {}
+    DEFAULT_SPLITS_DATASET: Dict[str, str] = {}
 
     @classmethod
     def create(
@@ -117,7 +120,7 @@ class DatasetCreator(ABC):
         cls,
         data_args: Optional[Dict[str, Any]],
     ) -> Dict[ColumnInputTypes, str]:
-        columns = {}
+        columns: Dict[ColumnInputTypes, str] = {}
 
         if data_args:
             if "prompt_column" in data_args:

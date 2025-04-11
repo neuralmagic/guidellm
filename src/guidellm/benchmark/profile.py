@@ -53,7 +53,7 @@ class Profile(StandardBaseModel):
         self.measured_concurrencies.append(average_concurrency)
         self.completed_strategies += 1
 
-    @computed_field
+    @computed_field  # type: ignore[misc]
     @property
     def strategy_types(self) -> List[StrategyType]:
         return []
@@ -63,7 +63,7 @@ class Profile(StandardBaseModel):
 
 
 class SynchronousProfile(Profile):
-    type_: Literal["synchronous"] = "synchronous"
+    type_: Literal["synchronous"] = "synchronous"  # type: ignore[assignment]
 
     @property
     def strategy_types(self) -> List[StrategyType]:
@@ -98,7 +98,7 @@ class SynchronousProfile(Profile):
 
 
 class ConcurrentProfile(Profile):
-    type_: Literal["concurrent"] = "concurrent"
+    type_: Literal["concurrent"] = "concurrent"  # type: ignore[assignment]
     streams: Union[int, Sequence[int]] = Field(
         description="The number of concurrent streams to use.",
     )
@@ -144,11 +144,11 @@ class ConcurrentProfile(Profile):
                 "No additional arguments are allowed for concurrent profile."
             )
 
-        return ConcurrentProfile(streams=rate)
+        return ConcurrentProfile(streams=[int(rat) for rat in rate])
 
 
 class ThroughputProfile(Profile):
-    type_: Literal["throughput"] = "throughput"
+    type_: Literal["throughput"] = "throughput"  # type: ignore[assignment]
     max_concurrency: Optional[int] = Field(
         default=None,
         description="The maximum number of concurrent requests that can be scheduled.",
@@ -184,7 +184,7 @@ class ThroughputProfile(Profile):
 
 
 class AsyncProfile(ThroughputProfile):
-    type_: Literal["async"] = "async"
+    type_: Literal["async"] = "async"  # type: ignore[assignment]
     strategy_type: Literal["constant", "poisson"] = Field(
         description="The type of asynchronous strategy to use.",
     )
@@ -235,7 +235,7 @@ class AsyncProfile(ThroughputProfile):
             raise ValueError(f"Invalid strategy type: {self.strategy_type}")
 
     @staticmethod
-    def from_standard_args(
+    def from_standard_args(  # type: ignore[override]
         rate_type: Union[StrategyType, ProfileType],
         rate: Optional[Union[float, Sequence[float]]],
         random_seed: int,
@@ -262,7 +262,7 @@ class AsyncProfile(ThroughputProfile):
             rate_type = "constant"  # default to constant if not specified
 
         return AsyncProfile(
-            strategy_type=rate_type,
+            strategy_type=rate_type,  # type: ignore[arg-type]
             rate=rate,
             random_seed=random_seed,
             **kwargs,
@@ -270,7 +270,7 @@ class AsyncProfile(ThroughputProfile):
 
 
 class SweepProfile(AsyncProfile):
-    type_: Literal["sweep"] = "sweep"
+    type_: Literal["sweep"] = "sweep"  # type: ignore[assignment]
     sweep_size: int = Field(
         description="The number of strategies to generate for the sweep.",
     )
@@ -280,7 +280,7 @@ class SweepProfile(AsyncProfile):
     @property
     def strategy_types(self) -> List[StrategyType]:
         return (
-            ["synchronous"] + ["throughput"] + [self.rate_type] * (self.sweep_size - 2)
+            ["synchronous"] + ["throughput"] + [self.rate_type] * (self.sweep_size - 2)  # type: ignore[return-value]
         )
 
     def next_strategy(self) -> Optional[SchedulingStrategy]:
@@ -315,7 +315,7 @@ class SweepProfile(AsyncProfile):
             raise ValueError(f"Invalid strategy type: {self.rate_type}")
 
     @staticmethod
-    def from_standard_args(
+    def from_standard_args(  # type: ignore[override]
         rate_type: Union[StrategyType, ProfileType],
         rate: Optional[Union[float, Sequence[float]]],
         random_seed: int,
@@ -350,7 +350,7 @@ class SweepProfile(AsyncProfile):
         if "strategy_type" not in kwargs:
             kwargs["strategy_type"] = "constant"
 
-        return SweepProfile(sweep_size=rate, random_seed=random_seed, **kwargs)
+        return SweepProfile(sweep_size=int(rate), random_seed=random_seed, **kwargs)
 
 
 def create_profile(

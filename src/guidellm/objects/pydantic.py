@@ -8,8 +8,8 @@ __all__ = ["StandardBaseModel"]
 
 class StandardBaseModel(BaseModel):
     """
-    A base class for models that require YAML and JSON serialization and
-    deserialization.
+    A base class for Pydantic models throughout GuideLLM enabling standard
+    configuration and logging.
     """
 
     model_config = ConfigDict(

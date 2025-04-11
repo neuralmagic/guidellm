@@ -42,24 +42,26 @@ def test_openai_http_backend_intialization():
 
 
 @pytest.mark.smoke()
-def test_openai_http_backend_available_models(httpx_openai_mock):
+@pytest.mark.asyncio()
+async def test_openai_http_backend_available_models(httpx_openai_mock):
     backend = OpenAIHTTPBackend(target="http://target.mock")
-    models = backend.available_models()
+    models = await backend.available_models()
     assert models == ["mock-model"]
 
 
 @pytest.mark.smoke()
-def test_openai_http_backend_validate(httpx_openai_mock):
+@pytest.mark.asyncio()
+async def test_openai_http_backend_validate(httpx_openai_mock):
     backend = OpenAIHTTPBackend(target="http://target.mock", model="mock-model")
-    backend.validate()
+    await backend.validate()
 
     backend = OpenAIHTTPBackend(target="http://target.mock")
-    backend.validate()
+    await backend.validate()
     assert backend.model == "mock-model"
 
     backend = OpenAIHTTPBackend(target="http://target.mock", model="invalid-model")
     with pytest.raises(ValueError):
-        backend.validate()
+        await backend.validate()
 
 
 @pytest.mark.smoke()

@@ -9,7 +9,7 @@ from datasets import (
     get_dataset_config_info,
     load_dataset,
 )
-from transformers import PreTrainedTokenizerBase
+from transformers import PreTrainedTokenizerBase  # type: ignore[import]
 
 from guidellm.dataset.creator import DatasetCreator
 
@@ -18,7 +18,7 @@ __all__ = ["HFDatasetsCreator"]
 
 class HFDatasetsCreator(DatasetCreator):
     @classmethod
-    def is_supported(cls, data: Any, data_args: Optional[Dict[str, Any]]) -> bool:
+    def is_supported(cls, data: Any, data_args: Optional[Dict[str, Any]]) -> bool:  # noqa: ARG003
         if isinstance(
             data, (Dataset, DatasetDict, IterableDataset, IterableDatasetDict)
         ):
@@ -33,7 +33,7 @@ class HFDatasetsCreator(DatasetCreator):
             try:
                 # try to load dataset
                 return get_dataset_config_info(data) is not None
-            except:
+            except Exception:  # noqa: BLE001, S110
                 pass
 
         return False
@@ -43,9 +43,9 @@ class HFDatasetsCreator(DatasetCreator):
         cls,
         data: Any,
         data_args: Optional[Dict[str, Any]],
-        processor: Optional[Union[str, Path, PreTrainedTokenizerBase]],
-        processor_args: Optional[Dict[str, Any]],
-        random_seed: int,
+        processor: Optional[Union[str, Path, PreTrainedTokenizerBase]],  # noqa: ARG003
+        processor_args: Optional[Dict[str, Any]],  # noqa: ARG003
+        random_seed: int,  # noqa: ARG003
     ) -> Union[Dataset, DatasetDict, IterableDataset, IterableDatasetDict]:
         if isinstance(data, (str, Path)):
             data = load_dataset(data, **(data_args or {}))

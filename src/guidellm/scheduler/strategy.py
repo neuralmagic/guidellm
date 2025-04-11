@@ -84,7 +84,7 @@ class SchedulingStrategy(StandardBaseModel):
         return settings.max_concurrency
 
     @property
-    def processing_requests_limit(self) -> Optional[int]:
+    def processing_requests_limit(self) -> int:
         """
         The maximum number of processing requests for the scheduling strategy.
         It determines how many requests can be processed at one time
@@ -103,6 +103,7 @@ class SchedulingStrategy(StandardBaseModel):
         :return: A generator that yields timestamps for request scheduling
             or -1 for requests that should be sent immediately.
         """
+        raise NotImplementedError("Subclasses must implement request_times() method.")
 
 
 class SynchronousStrategy(SchedulingStrategy):
@@ -117,7 +118,7 @@ class SynchronousStrategy(SchedulingStrategy):
     :param type_: The synchronous StrategyType to schedule requests synchronously.
     """
 
-    type_: Literal["synchronous"] = "synchronous"
+    type_: Literal["synchronous"] = "synchronous"  # type: ignore[assignment]
 
     @property
     def processing_mode(self) -> Literal["sync"]:
@@ -193,7 +194,7 @@ class ConcurrentStrategy(SchedulingStrategy):
         This must be a positive integer.
     """
 
-    type_: Literal["concurrent"] = "concurrent"
+    type_: Literal["concurrent"] = "concurrent"  # type: ignore[assignment]
     streams: int = Field(
         description=(
             "The number of concurrent streams to use for scheduling requests. "
@@ -275,7 +276,7 @@ class ThroughputStrategy(SchedulingStrategy):
     :param type_: The throughput StrategyType to schedule requests asynchronously.
     """
 
-    type_: Literal["throughput"] = "throughput"
+    type_: Literal["throughput"] = "throughput"  # type: ignore[assignment]
     max_concurrency: Optional[int] = Field(
         default=None,
         description=(
@@ -360,7 +361,7 @@ class AsyncConstantStrategy(ThroughputStrategy):
         False to not send an initial burst.
     """
 
-    type_: Literal["constant"] = "constant"
+    type_: Literal["constant"] = "constant"  # type: ignore[assignment]
     rate: float = Field(
         description=(
             "The rate at which to schedule requests asynchronously in "
@@ -428,7 +429,7 @@ class AsyncPoissonStrategy(ThroughputStrategy):
         False to not send an initial burst.
     """
 
-    type_: Literal["poisson"] = "poisson"
+    type_: Literal["poisson"] = "poisson"  # type: ignore[assignment]
     rate: float = Field(
         description=(
             "The rate at which to schedule requests asynchronously in "
@@ -483,9 +484,9 @@ def strategy_display_str(strategy: Union[StrategyType, SchedulingStrategy]) -> s
     strategy_instance = strategy if isinstance(strategy, SchedulingStrategy) else None
 
     if strategy_type == "concurrent":
-        rate = f"@{strategy_instance.streams}" if strategy_instance else "@##"
+        rate = f"@{strategy_instance.streams}" if strategy_instance else "@##"  # type: ignore[attr-defined]
     elif strategy_type in ("constant", "poisson"):
-        rate = f"@{strategy_instance.rate:.2f}" if strategy_instance else "@#.##"
+        rate = f"@{strategy_instance.rate:.2f}" if strategy_instance else "@#.##"  # type: ignore[attr-defined]
     else:
         rate = ""
 

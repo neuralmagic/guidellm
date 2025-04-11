@@ -13,6 +13,7 @@ from .text import (
 )
 
 __all__ = [
+    "IntegerRangeSampler",
     "Colors",
     "check_load_processor",
     "filter_text",

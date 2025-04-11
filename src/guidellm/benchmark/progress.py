@@ -19,6 +19,11 @@ from rich.progress import (
     TimeRemainingColumn,
 )
 
+from guidellm.benchmark.aggregator import (
+    BenchmarkAggregator,
+    GenerativeBenchmarkAggregator,
+)
+from guidellm.benchmark.benchmark import Benchmark, GenerativeBenchmark
 from guidellm.benchmark.benchmarker import BenchmarkerResult
 from guidellm.scheduler import (
     SchedulingStrategy,
@@ -39,17 +44,17 @@ class BenchmarkerTaskProgressState:
     ended: bool = False
 
     start_time: Optional[float] = None
-    max_number: Optional[int] = None
+    max_number: Optional[float] = None
     max_duration: Optional[float] = None
     in_warmup: bool = False
     in_cooldown: bool = False
 
     requests_rate: float = 0
     request_latency: float = 0
-    requests_processing: int = 0
-    requests_successful: int = 0
-    requests_incomplete: int = 0
-    requests_errored: int = 0
+    requests_processing: float = 0
+    requests_successful: float = 0
+    requests_incomplete: float = 0
+    requests_errored: float = 0
 
     worker_overheads_time_ms: float = 0.0
     backend_overheads_time_ms: float = 0.0
@@ -81,7 +86,7 @@ class BenchmarkerTaskProgressState:
         )
         duration_percent = (
             (time.time() - self.start_time) / self.max_duration * 1000
-            if self.max_duration
+            if self.max_duration and self.start_time
             else -math.inf
         )
 
@@ -250,10 +255,12 @@ class BenchmarkerTaskProgressState:
             formatted_number = f"{value:>{digits_places}.{decimal_places}f}"
 
         result = f"{formatted_number}{units} [{Colors.INFO}]{label}[/{Colors.INFO}]"
-        total_characters += len(Colors.INFO) * 2 + 5
 
-        if total_characters is not None and len(result) < total_characters:
-            result = result.rjust(total_characters)
+        if total_characters is not None:
+            total_characters += len(Colors.INFO) * 2 + 5
+
+            if len(result) < total_characters:
+                result = result.rjust(total_characters)
 
         return result
 
@@ -371,7 +378,7 @@ class BenchmarkerProgressDisplay(Generic[BTPS]):
             redirect_stderr=True,
         )
         self.active_task: Optional[TaskID] = None
-        self.benchmarker_tasks: List[BenchmarkerTaskProgressState] = []
+        self.benchmarker_tasks: List[BTPS] = []
         self.progress_task: Optional[TaskID] = None
 
     def update(self, result: BenchmarkerResult):
@@ -415,7 +422,7 @@ class BenchmarkerProgressDisplay(Generic[BTPS]):
                 task_id,
                 description=task_progress_state.description,
                 visible=True,
-                **task_progress_state.fields,
+                **task_progress_state.fields,  # type: ignore[arg-type]
             )
 
         self.progress_task = self.benchmarker_progress.add_task(
@@ -426,7 +433,7 @@ class BenchmarkerProgressDisplay(Generic[BTPS]):
         )
 
     def handle_update(self, result: BenchmarkerResult):
-        current_state = self.benchmarker_tasks[result.current_index]
+        current_state: BTPS = self.benchmarker_tasks[result.current_index]
 
         if result.type_ == "scheduler_start":
             self.handle_update_scheduler_start(current_state, result)
@@ -440,12 +447,15 @@ class BenchmarkerProgressDisplay(Generic[BTPS]):
         else:
             raise ValueError(f"Unknown result type: {result.type_}")
 
+        if self.progress_task is None:
+            raise RuntimeError("Progress task not set.")
+
         self.benchmarker_tasks_progress.update(
             current_state.task_id,
             description=current_state.description,
             completed=current_state.completed,
             total=current_state.total,
-            **current_state.fields,
+            **current_state.fields,  # type: ignore[arg-type]
         )
         self.benchmarker_progress.update(
             self.progress_task,
@@ -462,21 +472,22 @@ class BenchmarkerProgressDisplay(Generic[BTPS]):
             self.active_task = None
 
     def handle_update_scheduler_start(
-        self, progress_state: BenchmarkerTaskProgressState, result: BenchmarkerResult
+        self, progress_state: BTPS, result: BenchmarkerResult
     ):
         if self.active_task is not None:
             raise RuntimeError("Active task already set.")
 
-        progress_state.strategy = result.current_strategy
+        progress_state.strategy = result.current_strategy  # type: ignore[assignment]
         progress_state.started = True
+        current_aggregator: BenchmarkAggregator = result.current_aggregator  # type: ignore[assignment]
         progress_state.start_time = (
-            result.current_aggregator.scheduler_created_requests.start_time
+            current_aggregator.scheduler_created_requests.start_time
         )
-        progress_state.max_number = result.current_aggregator.max_number
-        progress_state.max_duration = result.current_aggregator.max_duration
+        progress_state.max_number = current_aggregator.max_number
+        progress_state.max_duration = current_aggregator.max_duration
 
     def handle_update_scheduler_update(
-        self, progress_state: BenchmarkerTaskProgressState, result: BenchmarkerResult
+        self, progress_state: BTPS, result: BenchmarkerResult
     ):
         if self.active_task is None:
             raise RuntimeError("Active task not set.")
@@ -484,41 +495,40 @@ class BenchmarkerProgressDisplay(Generic[BTPS]):
         if self.active_task != progress_state.task_id:
             raise RuntimeError("Active task does not match current task.")
 
-        progress_state.in_warmup = result.current_aggregator.in_warmup
-        progress_state.in_cooldown = result.current_aggregator.in_cooldown
-        progress_state.requests_rate = (
-            result.current_aggregator.successful_requests.rate
-        )
-        progress_state.request_latency = result.current_aggregator.request_time.mean
+        current_aggregator: BenchmarkAggregator = result.current_aggregator  # type: ignore[assignment]
+        progress_state.in_warmup = current_aggregator.in_warmup
+        progress_state.in_cooldown = current_aggregator.in_cooldown
+        progress_state.requests_rate = current_aggregator.successful_requests.rate
+        progress_state.request_latency = current_aggregator.request_time.mean
         progress_state.requests_processing = (
-            result.current_aggregator.scheduler_processing_requests.last
+            current_aggregator.scheduler_processing_requests.last
         )
         progress_state.requests_successful = (
-            result.current_aggregator.successful_requests.total
+            current_aggregator.successful_requests.total
         )
         progress_state.requests_incomplete = (
-            result.current_aggregator.incomplete_requests.total
+            current_aggregator.incomplete_requests.total
         )
-        progress_state.requests_errored = (
-            result.current_aggregator.errored_requests.total
-        )
+        progress_state.requests_errored = current_aggregator.errored_requests.total
 
         progress_state.worker_overheads_time_ms = (
-            result.current_aggregator.scheduled_time_delay.mean_ms
-            + result.current_aggregator.worker_start_delay.mean_ms
+            current_aggregator.scheduled_time_delay.mean_ms
+            + current_aggregator.worker_start_delay.mean_ms
         )
         progress_state.backend_overheads_time_ms = (
-            result.current_aggregator.request_time_delay.mean_ms
+            current_aggregator.request_time_delay.mean_ms
         )
         progress_state.requests_sleep_time_ms = (
-            result.current_aggregator.scheduled_time_sleep.mean_ms
+            current_aggregator.scheduled_time_sleep.mean_ms
         )
         progress_state.requests_targeted_start_time_delay_ms = (
-            result.current_aggregator.request_start_time_targeted_delay.mean_ms
+            current_aggregator.request_start_time_targeted_delay.mean_ms
         )
 
     def handle_update_scheduler_complete(
-        self, progress_state: BenchmarkerTaskProgressState, result: BenchmarkerResult
+        self,
+        progress_state: BTPS,
+        result: BenchmarkerResult,  # noqa: ARG002
     ):
         if self.active_task is None:
             raise RuntimeError("Active task not set.")
@@ -531,7 +541,7 @@ class BenchmarkerProgressDisplay(Generic[BTPS]):
         progress_state.compiling = True
 
     def handle_update_benchmark_compiled(
-        self, progress_state: BenchmarkerTaskProgressState, result: BenchmarkerResult
+        self, progress_state: BTPS, result: BenchmarkerResult
     ):
         if self.active_task is None:
             raise RuntimeError("Active task not set.")
@@ -539,21 +549,20 @@ class BenchmarkerProgressDisplay(Generic[BTPS]):
         if self.active_task != progress_state.task_id:
             raise RuntimeError("Active task does not match current task.")
 
+        current_benchmark: Benchmark = result.current_benchmark  # type: ignore[assignment]
         progress_state.compiling = False
         progress_state.ended = True
         progress_state.requests_rate = (
-            result.current_benchmark.requests_per_second.successful.mean
-        )
-        progress_state.request_latency = (
-            result.current_benchmark.request_latency.successful.mean
+            current_benchmark.requests_per_second.successful.mean
         )
         progress_state.requests_processing = (
-            result.current_benchmark.requests_concurrency.successful.mean
+            current_benchmark.requests_concurrency.successful.mean
         )
-        progress_state.requests_successful = result.current_benchmark.successful_total
-        progress_state.requests_errored = result.current_benchmark.errored_total
 
-    def handle_end(self, result: BenchmarkerResult):
+    def handle_end(self, result: BenchmarkerResult):  # noqa: ARG002
+        if self.progress_task is None:
+            raise RuntimeError("Progress task not set.")
+
         self.benchmarker_progress.update(
             self.progress_task,
             completed=len(self.benchmarker_tasks) * 1000,
@@ -593,11 +602,11 @@ class BenchmarkerProgressDisplay(Generic[BTPS]):
     def create_task_progress_state(
         self,
         task_id: TaskID,
-        index: int,
+        index: int,  # noqa: ARG002
         strategy_type: StrategyType,
-        result: BenchmarkerResult,
-    ) -> BenchmarkerTaskProgressState:
-        return BenchmarkerTaskProgressState(
+        result: BenchmarkerResult,  # noqa: ARG002
+    ) -> BTPS:
+        return BenchmarkerTaskProgressState(  # type: ignore[return-value]
             display_scheduler_stats=self.display_scheduler_stats,
             task_id=task_id,
             strategy=strategy_type,
@@ -607,43 +616,61 @@ class BenchmarkerProgressDisplay(Generic[BTPS]):
 class GenerativeTextBenchmarkerProgressDisplay(
     BenchmarkerProgressDisplay[GenerativeTextBenchmarkerTaskProgressState]
 ):
-    def handle_update_scheduler_update(self, progress_state, result):
+    def handle_update_scheduler_update(
+        self,
+        progress_state: GenerativeTextBenchmarkerTaskProgressState,
+        result: BenchmarkerResult,
+    ):
         super().handle_update_scheduler_update(progress_state, result)
-        progress_state.output_tokens = result.current_aggregator.output_tokens.mean
-        progress_state.prompt_tokens = result.current_aggregator.prompt_tokens.mean
-        progress_state.output_tokens_rate = result.current_aggregator.output_tokens.rate
-        progress_state.total_tokens_rate = result.current_aggregator.total_tokens.rate
-        progress_state.tokens_ttft = result.current_aggregator.time_to_first_token.mean
-        progress_state.tokens_itl = result.current_aggregator.inter_token_latency.mean
+        current_aggregator: GenerativeBenchmarkAggregator = result.current_aggregator  # type: ignore[assignment]
+        progress_state.output_tokens = current_aggregator.output_tokens.mean
+        progress_state.prompt_tokens = current_aggregator.prompt_tokens.mean
+        progress_state.output_tokens_rate = current_aggregator.output_tokens.rate
+        progress_state.total_tokens_rate = current_aggregator.total_tokens.rate
+        progress_state.tokens_ttft = current_aggregator.time_to_first_token.mean
+        progress_state.tokens_itl = current_aggregator.inter_token_latency.mean
 
-    def handle_update_benchmark_compiled(self, progress_state, result):
+    def handle_update_benchmark_compiled(
+        self,
+        progress_state: GenerativeTextBenchmarkerTaskProgressState,
+        result: BenchmarkerResult,
+    ):
         super().handle_update_benchmark_compiled(progress_state, result)
 
+        current_benchmark: GenerativeBenchmark = result.current_benchmark  # type: ignore[assignment]
+        progress_state.request_latency = (
+            current_benchmark.request_latency.successful.mean
+        )
+        progress_state.requests_processing = (
+            current_benchmark.requests_concurrency.successful.mean
+        )
+        progress_state.requests_successful = current_benchmark.successful_total
+        progress_state.requests_errored = current_benchmark.errored_total
         progress_state.output_tokens = (
-            result.current_benchmark.output_token_count.successful.mean
+            current_benchmark.output_token_count.successful.mean
         )
         progress_state.prompt_tokens = (
-            result.current_benchmark.prompt_token_count.successful.mean
+            current_benchmark.prompt_token_count.successful.mean
         )
         progress_state.output_tokens_rate = (
-            result.current_benchmark.output_tokens_per_second.successful.mean
+            current_benchmark.output_tokens_per_second.successful.mean
         )
         progress_state.total_tokens_rate = (
-            result.current_benchmark.tokens_per_second.successful.mean
+            current_benchmark.tokens_per_second.successful.mean
         )
         progress_state.tokens_ttft = (
-            result.current_benchmark.time_to_first_token_ms.successful.mean
+            current_benchmark.time_to_first_token_ms.successful.mean
         )
         progress_state.tokens_itl = (
-            result.current_benchmark.inter_token_latency_ms.successful.mean
+            current_benchmark.inter_token_latency_ms.successful.mean
         )
 
     def create_task_progress_state(
         self,
         task_id: TaskID,
-        index: int,
+        index: int,  # noqa: ARG002
         strategy_type: StrategyType,
-        result: BenchmarkerResult,
+        result: BenchmarkerResult,  # noqa: ARG002
     ) -> GenerativeTextBenchmarkerTaskProgressState:
         return GenerativeTextBenchmarkerTaskProgressState(
             display_scheduler_stats=self.display_scheduler_stats,

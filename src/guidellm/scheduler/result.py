@@ -126,7 +126,7 @@ class SchedulerRequestResult(
     SchedulerResult,
     Generic[REQ, RES],
 ):
-    pydantic_type: Literal["scheduler_request_result"] = "scheduler_request_result"
+    pydantic_type: Literal["scheduler_request_result"] = "scheduler_request_result"  # type: ignore[assignment]
     type_: Literal[
         "request_scheduled",
         "request_start",

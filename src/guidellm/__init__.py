@@ -13,7 +13,7 @@ import contextlib
 with open(os.devnull, "w") as devnull, contextlib.redirect_stderr(
     devnull
 ), contextlib.redirect_stdout(devnull):
-    from transformers.utils import logging as hf_logging
+    from transformers.utils import logging as hf_logging  # type: ignore[import]
 
     # Set the log level for the transformers library to ERROR
     # to ignore None of PyTorch, TensorFlow found

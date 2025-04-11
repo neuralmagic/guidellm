@@ -20,6 +20,9 @@ def test_streaming_response_types():
 def test_streaming_text_response_default_initilization():
     response = StreamingTextResponse(
         type_="start",
+        value="",
+        start_time=0.0,
+        first_iter_time=None,
         iter_count=0,
         delta="",
         time=0.0,
@@ -31,13 +34,19 @@ def test_streaming_text_response_default_initilization():
 def test_streaming_text_response_initialization():
     response = StreamingTextResponse(
         type_="start",
-        iter_count=0,
+        value="Hello, world!",
+        start_time=0.0,
+        first_iter_time=0.0,
+        iter_count=1,
         delta="Hello, world!",
         time=1.0,
         request_id="123",
     )
     assert response.type_ == "start"
-    assert response.iter_count == 0
+    assert response.value == "Hello, world!"
+    assert response.start_time == 0.0
+    assert response.first_iter_time == 0.0
+    assert response.iter_count == 1
     assert response.delta == "Hello, world!"
     assert response.time == 1.0
     assert response.request_id == "123"
@@ -47,6 +56,9 @@ def test_streaming_text_response_initialization():
 def test_streaming_text_response_marshalling():
     response = StreamingTextResponse(
         type_="start",
+        value="Hello, world!",
+        start_time=0.0,
+        first_iter_time=0.0,
         iter_count=0,
         delta="Hello, world!",
         time=1.0,
@@ -117,7 +129,18 @@ def test_response_summary_default_initialization():
         ),
         start_time=0.0,
         end_time=0.0,
+        first_iter_time=None,
+        last_iter_time=None,
     )
+    assert summary.value == "Hello, world!"
+    assert summary.request_args.target == "http://example.com"
+    assert summary.request_args.headers == {}
+    assert summary.request_args.payload == {}
+    assert summary.start_time == 0.0
+    assert summary.end_time == 0.0
+    assert summary.first_iter_time is None
+    assert summary.last_iter_time is None
+    assert summary.iterations == 0
     assert summary.request_prompt_tokens is None
     assert summary.request_output_tokens is None
     assert summary.response_prompt_tokens is None
@@ -137,6 +160,8 @@ def test_response_summary_initialization():
         start_time=1.0,
         end_time=2.0,
         iterations=3,
+        first_iter_time=1.0,
+        last_iter_time=2.0,
         request_prompt_tokens=5,
         request_output_tokens=10,
         response_prompt_tokens=5,
@@ -150,6 +175,8 @@ def test_response_summary_initialization():
     assert summary.start_time == 1.0
     assert summary.end_time == 2.0
     assert summary.iterations == 3
+    assert summary.first_iter_time == 1.0
+    assert summary.last_iter_time == 2.0
     assert summary.request_prompt_tokens == 5
     assert summary.request_output_tokens == 10
     assert summary.response_prompt_tokens == 5

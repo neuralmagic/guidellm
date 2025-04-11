@@ -13,7 +13,7 @@ from typing import (
 )
 
 from datasets import Dataset, DatasetDict, IterableDataset, IterableDatasetDict
-from transformers import PreTrainedTokenizer
+from transformers import PreTrainedTokenizer  # type: ignore[import]
 
 from guidellm.dataset import ColumnInputTypes, load_dataset
 from guidellm.objects import StandardBaseModel
@@ -44,7 +44,7 @@ class RequestLoader(Iterable):
 
 
 class GenerativeRequestLoaderDescription(RequestLoaderDescription):
-    type_: Literal["generative_request_loader"] = "generative_request_loader"
+    type_: Literal["generative_request_loader"] = "generative_request_loader"  # type: ignore[assignment]
     data: str
     data_args: Optional[Dict[str, Any]]
     processor: str
@@ -135,7 +135,7 @@ class GenerativeRequestLoader(RequestLoader):
     def num_unique_items(self, raise_err: bool = True) -> int:
         try:
             return len(self.dataset)
-        except Exception:
+        except Exception:  # noqa: BLE001, S110
             pass
 
         dataset_size = self.dataset.info.dataset_size
@@ -151,7 +151,7 @@ class GenerativeRequestLoader(RequestLoader):
         self,
         args_column_mappings: Dict[ColumnInputTypes, str],
     ) -> Dict[ColumnInputTypes, str]:
-        column_mappings = {}
+        column_mappings: Dict[ColumnInputTypes, str] = {}
 
         if "text_column" in args_column_mappings:
             column_mappings["prompt_column"] = args_column_mappings["text_column"]
@@ -182,6 +182,13 @@ class GenerativeRequestLoader(RequestLoader):
                 "'data_args' dictionary."
             )
         )
+
+        if not column_names:
+            raise ValueError(
+                "Unable to determine text column from dataset and it is required. "
+                "To specify the text column, set the 'text_column' key in the "
+                "'data_args' dictionary."
+            )
 
         if len(column_names) == 1:
             return column_names[0]

@@ -14,7 +14,7 @@ STRATEGY_PROFILE_CHOICES = set(
 )
 
 
-def parse_json(ctx, param, value):
+def parse_json(ctx, param, value):  # noqa: ARG001
     if value is None:
         return None
     try:
@@ -23,7 +23,7 @@ def parse_json(ctx, param, value):
         raise click.BadParameter(f"{param.name} must be a valid JSON string.") from err
 
 
-def parse_number_str(ctx, param, value):
+def parse_number_str(ctx, param, value):  # noqa: ARG001
     if value is None:
         return None
 

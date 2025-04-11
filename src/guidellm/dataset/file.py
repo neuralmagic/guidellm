@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
-import pandas as pd
+import pandas as pd  # type: ignore[import]
 from datasets import (
     Dataset,
     DatasetDict,
@@ -9,7 +9,7 @@ from datasets import (
     IterableDatasetDict,
     load_dataset,
 )
-from transformers import PreTrainedTokenizerBase
+from transformers import PreTrainedTokenizerBase  # type: ignore[import]
 
 from guidellm.dataset.creator import DatasetCreator
 
@@ -30,7 +30,7 @@ class FileDatasetCreator(DatasetCreator):
     }
 
     @classmethod
-    def is_supported(cls, data: Any, data_args: Optional[Dict[str, Any]]) -> bool:
+    def is_supported(cls, data: Any, data_args: Optional[Dict[str, Any]]) -> bool:  # noqa: ARG003
         if isinstance(data, (str, Path)) and (path := Path(data)).exists():
             # local folder or py file, assume supported
             return path.suffix.lower() in cls.SUPPORTED_TYPES
@@ -42,9 +42,9 @@ class FileDatasetCreator(DatasetCreator):
         cls,
         data: Any,
         data_args: Optional[Dict[str, Any]],
-        processor: Optional[Union[str, Path, PreTrainedTokenizerBase]],
-        processor_args: Optional[Dict[str, Any]],
-        random_seed: int,
+        processor: Optional[Union[str, Path, PreTrainedTokenizerBase]],  # noqa: ARG003
+        processor_args: Optional[Dict[str, Any]],  # noqa: ARG003
+        random_seed: int,  # noqa: ARG003
     ) -> Union[Dataset, DatasetDict, IterableDataset, IterableDatasetDict]:
         if not isinstance(data, (str, Path)):
             raise ValueError(f"Unsupported data type: {type(data)} given for {data}. ")
