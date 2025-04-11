@@ -1,6 +1,6 @@
 import random
 import uuid
-from typing import Any, Dict, List, Literal, Optional, TypeVar, Union
+from typing import Any, Dict, Generic, List, Literal, Optional, TypeVar, Union
 
 from pydantic import Field, computed_field
 
@@ -34,6 +34,7 @@ from guidellm.scheduler import (
 
 __all__ = [
     "BENCH",
+    "StatusBreakdown",
     "BenchmarkArgs",
     "BenchmarkRunStats",
     "Benchmark",
@@ -41,9 +42,28 @@ __all__ = [
     "GenerativeTextResponseStats",
     "GenerativeTextErrorStats",
     "GenerativeMetrics",
-    "GenerativeRequestsBreakdown",
     "GenerativeBenchmark",
 ]
+
+
+SuccessfulT = TypeVar("SuccessfulT")
+IncompleteT = TypeVar("IncompleteT")
+ErroredT = TypeVar("ErroredT")
+class StatusBreakdown(StandardBaseModel, Generic[SuccessfulT, IncompleteT, ErroredT]):
+    """
+    A serializable model representing the breakdown of statistics for a benchmark run
+    split into successful, incomplete, and errored.
+    """
+
+    successful: SuccessfulT = Field(
+        description="Successful",
+    )
+    incomplete: IncompleteT = Field(
+        description="Incomplete",
+    )
+    errored: ErroredT = Field(
+        description="Errored",
+    )
 
 
 class BenchmarkArgs(StandardBaseModel):
@@ -575,23 +595,6 @@ class GenerativeMetrics(BenchmarkMetrics):
     )
 
 
-class GenerativeRequestsBreakdown(StandardBaseModel):
-    """
-    A serializable model representing the breakdown of requests for a generative
-    benchmark run.
-    """
-
-    successful: List[GenerativeTextResponseStats] = Field(
-        description="The list of completed requests.",
-    )
-    incomplete: List[GenerativeTextErrorStats] = Field(
-        description="The list of incomplete requests.",
-    )
-    errored: List[GenerativeTextErrorStats] = Field(
-        description="The list of errored requests.",
-    )
-
-
 class GenerativeBenchmark(Benchmark):
     """
     A serializable model representing a benchmark run and its results for generative
@@ -652,7 +655,11 @@ class GenerativeBenchmark(Benchmark):
         ),
     )
     # Output is ordered so keep this at the end
-    requests: GenerativeRequestsBreakdown = Field(
+    requests: StatusBreakdown[
+        List[GenerativeTextResponseStats],
+        List[GenerativeTextErrorStats],
+        List[GenerativeTextErrorStats]
+    ] = Field(
         description=(
             "The breakdown of requests for the benchmark run including completed, "
             "incomplete, and errored requests."
@@ -905,7 +912,7 @@ class GenerativeBenchmark(Benchmark):
                     ],
                 ),
             ),
-            requests=GenerativeRequestsBreakdown(
+            requests=StatusBreakdown(
                 successful=successful,
                 incomplete=incomplete,
                 errored=errored,
