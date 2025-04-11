@@ -847,27 +847,31 @@ class GenerativeBenchmark(Benchmark):
                 time_to_first_token_ms=StatusDistributionSummary.from_values(
                     value_types=list(total_types_with_output_first),
                     values=[
-                        req.time_to_first_token_ms or 0 for req in total_with_output_first
+                        req.time_to_first_token_ms or 0
+                        for req in total_with_output_first
                     ],
                 ),
                 time_per_output_token_ms=StatusDistributionSummary.from_values(
                     value_types=list(total_types_with_output_first),
                     values=[
-                        req.time_per_output_token_ms or 0 for req in total_with_output_first
+                        req.time_per_output_token_ms or 0
+                        for req in total_with_output_first
                     ],
                     weights=[req.output_tokens for req in total_with_output_first],
                 ),
                 inter_token_latency_ms=StatusDistributionSummary.from_values(
                     value_types=list(total_types_with_output_multi),
                     values=[
-                        req.inter_token_latency_ms or 0 for req in total_with_output_multi
+                        req.inter_token_latency_ms or 0
+                        for req in total_with_output_multi
                     ],
                     weights=[req.output_tokens - 1 for req in total_with_output_multi],
                 ),
                 output_tokens_per_second=StatusDistributionSummary.from_iterable_request_times(
                     request_types=list(total_types_with_output_first),
                     requests=[
-                        (req.start_time, req.end_time) for req in total_with_output_first
+                        (req.start_time, req.end_time)
+                        for req in total_with_output_first
                     ],
                     first_iter_times=[
                         req.first_token_time or req.start_time
@@ -878,7 +882,8 @@ class GenerativeBenchmark(Benchmark):
                 tokens_per_second=StatusDistributionSummary.from_iterable_request_times(
                     request_types=list(total_types_with_output_first),
                     requests=[
-                        (req.start_time, req.end_time) for req in total_with_output_first
+                        (req.start_time, req.end_time)
+                        for req in total_with_output_first
                     ],
                     first_iter_times=[
                         req.first_token_time or req.start_time
