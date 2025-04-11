@@ -2,7 +2,6 @@ from abc import abstractmethod
 from pathlib import Path
 from typing import (
     Any,
-    Callable,
     Dict,
     Iterable,
     Iterator,
@@ -13,7 +12,7 @@ from typing import (
 )
 
 from datasets import Dataset, DatasetDict, IterableDataset, IterableDatasetDict
-from transformers import PreTrainedTokenizer  # type: ignore[import]
+from transformers import PreTrainedTokenizerBase  # type: ignore[import]
 
 from guidellm.dataset import ColumnInputTypes, load_dataset
 from guidellm.objects import StandardBaseModel
@@ -80,7 +79,7 @@ class GenerativeRequestLoader(RequestLoader):
             IterableDatasetDict,
         ],
         data_args: Optional[Dict[str, Any]],
-        processor: Optional[Union[str, Path, PreTrainedTokenizer, Callable]],
+        processor: Optional[Union[str, Path, PreTrainedTokenizerBase]],
         processor_args: Optional[Dict[str, Any]],
         shuffle: bool = True,
         iter_type: Literal["finite", "infinite"] = "finite",

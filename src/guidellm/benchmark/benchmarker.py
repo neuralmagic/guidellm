@@ -14,7 +14,7 @@ from typing import (
 )
 
 from pydantic import Field
-from transformers import PreTrainedTokenizer  # type: ignore  # noqa: PGH003
+from transformers import PreTrainedTokenizerBase  # type: ignore  # noqa: PGH003
 
 from guidellm.backend import Backend, ResponseSummary
 from guidellm.benchmark.aggregator import (
@@ -295,7 +295,7 @@ class GenerativeBenchmarker(
         request_loader: Iterable[GenerationRequest],
         request_loader_description: GenerativeRequestLoaderDescription,
         benchmark_save_extras: Optional[Dict[str, Any]] = None,
-        processor: Optional[Union[str, Path, PreTrainedTokenizer]] = None,
+        processor: Optional[Union[str, Path, PreTrainedTokenizerBase]] = None,
         processor_args: Optional[Dict[str, Any]] = None,
     ):
         super().__init__(
