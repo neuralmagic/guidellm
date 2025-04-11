@@ -38,10 +38,10 @@ Before installing, ensure you have the following prerequisites:
 - OS: Linux or MacOS
 - Python: 3.8 – 3.12
 
-GuideLLM is available on PyPI and is installed using `pip`:
+GuideLLM can be installed using pip:
 
 ```bash
-pip install guidellm
+pip install git+https://github.com/neuralmagic/guidellm.git
 ```
 
 For detailed installation instructions and requirements, see the [Installation Guide](https://github.com/neuralmagic/guidellm/tree/main/docs/install.md).
