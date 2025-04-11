@@ -37,8 +37,10 @@ __all__ = [
     "BenchmarkArgs",
     "BenchmarkRunStats",
     "Benchmark",
+    "BenchmarkMetrics",
     "GenerativeTextResponseStats",
     "GenerativeTextErrorStats",
+    "GenerativeMetrics",
     "GenerativeBenchmark",
 ]
 
@@ -234,6 +236,19 @@ class BenchmarkRunStats(StandardBaseModel):
         return self.total_successful + self.total_incomplete + self.total_errored
 
 
+class BenchmarkMetrics(StandardBaseModel):
+    """
+    A serializable model representing the metrics for a benchmark run.
+    """
+
+    request_per_second: StatusDistributionSummary = Field(
+        description="The distribution of requests per second for the benchmark.",
+    )
+    request_concurrency: StatusDistributionSummary = Field(
+        description="The distribution of requests concurrency for the benchmark.",
+    )
+
+
 class Benchmark(StandardBaseModel):
     """
     The base serializable model representing a benchmark run and its results.
@@ -291,11 +306,11 @@ class Benchmark(StandardBaseModel):
         )
     )
 
-    requests_per_second: StatusDistributionSummary = Field(
-        description="The distribution of requests per second for the benchmark.",
-    )
-    requests_concurrency: StatusDistributionSummary = Field(
-        description="The distribution of requests concurrency for the benchmark.",
+    metrics: BenchmarkMetrics = Field(
+        description=(
+            "The metrics for the benchmark run represented as a distribution of "
+            "various per-request statistics."
+        ),
     )
 
 
@@ -506,6 +521,59 @@ class GenerativeTextErrorStats(GenerativeTextResponseStats):
         return super().output_tokens_per_second
 
 
+class GenerativeMetrics(BenchmarkMetrics):
+    """
+    A serializable model representing the metrics for a generative benchmark run.
+    """
+
+    request_latency: StatusDistributionSummary = Field(
+        description="The distribution of latencies for the completed requests.",
+    )
+    prompt_token_count: StatusDistributionSummary = Field(
+        description=(
+            "The distribution of token counts in the prompts for completed, "
+            "errored, and all requests."
+        )
+    )
+    output_token_count: StatusDistributionSummary = Field(
+        description=(
+            "The distribution of token counts in the outputs for completed, "
+            "errored, and all requests."
+        )
+    )
+    time_to_first_token_ms: StatusDistributionSummary = Field(
+        description=(
+            "The distribution of latencies to receiving the first token in "
+            "milliseconds for completed, errored, and all requests."
+        ),
+    )
+    time_per_output_token_ms: StatusDistributionSummary = Field(
+        description=(
+            "The distribution of latencies per output token in milliseconds for "
+            "completed, errored, and all requests. "
+            "This includes the time to generate the first token and all other tokens."
+        ),
+    )
+    inter_token_latency_ms: StatusDistributionSummary = Field(
+        description=(
+            "The distribution of latencies between tokens in milliseconds for "
+            "completed, errored, and all requests."
+        ),
+    )
+    output_tokens_per_second: StatusDistributionSummary = Field(
+        description=(
+            "The distribution of output tokens per second for completed, "
+            "errored, and all requests."
+        ),
+    )
+    tokens_per_second: StatusDistributionSummary = Field(
+        description=(
+            "The distribution of tokens per second, including prompt and output tokens "
+            "for completed, errored, and all requests."
+        ),
+    )
+
+
 class GenerativeBenchmark(Benchmark):
     """
     A serializable model representing a benchmark run and its results for generative
@@ -568,51 +636,10 @@ class GenerativeBenchmark(Benchmark):
     end_time: float = Field(
         description="The end time of the last request for the benchmark.",
     )
-
-    request_latency: StatusDistributionSummary = Field(
-        description="The distribution of latencies for the completed requests.",
-    )
-    prompt_token_count: StatusDistributionSummary = Field(
+    metrics: GenerativeMetrics = Field(
         description=(
-            "The distribution of token counts in the prompts for completed, "
-            "errored, and all requests."
-        )
-    )
-    output_token_count: StatusDistributionSummary = Field(
-        description=(
-            "The distribution of token counts in the outputs for completed, "
-            "errored, and all requests."
-        )
-    )
-    time_to_first_token_ms: StatusDistributionSummary = Field(
-        description=(
-            "The distribution of latencies to receiving the first token in "
-            "milliseconds for completed, errored, and all requests."
-        ),
-    )
-    time_per_output_token_ms: StatusDistributionSummary = Field(
-        description=(
-            "The distribution of latencies per output token in milliseconds for "
-            "completed, errored, and all requests. "
-            "This includes the time to generate the first token and all other tokens."
-        ),
-    )
-    inter_token_latency_ms: StatusDistributionSummary = Field(
-        description=(
-            "The distribution of latencies between tokens in milliseconds for "
-            "completed, errored, and all requests."
-        ),
-    )
-    output_tokens_per_second: StatusDistributionSummary = Field(
-        description=(
-            "The distribution of output tokens per second for completed, "
-            "errored, and all requests."
-        ),
-    )
-    tokens_per_second: StatusDistributionSummary = Field(
-        description=(
-            "The distribution of tokens per second, including prompt and output tokens "
-            "for completed, errored, and all requests."
+            "The metrics for the benchmark run represented as a distribution of "
+            "various per-request statistics."
         ),
     )
 
@@ -793,74 +820,76 @@ class GenerativeBenchmark(Benchmark):
             errored_requests=errored,
             start_time=start_time,
             end_time=end_time,
-            requests_per_second=StatusDistributionSummary.from_request_times(
-                request_types=total_types,
-                requests=[(req.start_time, req.end_time) for req in total],
-                distribution_type="rate",
-            ),
-            requests_concurrency=StatusDistributionSummary.from_request_times(
-                request_types=total_types,
-                requests=[(req.start_time, req.end_time) for req in total],
-                distribution_type="concurrency",
-            ),
-            request_latency=StatusDistributionSummary.from_values(
-                value_types=total_types,
-                values=[req.request_latency for req in total],
-            ),
-            prompt_token_count=StatusDistributionSummary.from_values(
-                value_types=list(total_types_with_prompt),
-                values=[req.prompt_tokens for req in total_with_prompt],
-            ),
-            output_token_count=StatusDistributionSummary.from_values(
-                value_types=list(total_types_with_output_first),
-                values=[req.output_tokens for req in total_with_output_first],
-            ),
-            time_to_first_token_ms=StatusDistributionSummary.from_values(
-                value_types=list(total_types_with_output_first),
-                values=[
-                    req.time_to_first_token_ms or 0 for req in total_with_output_first
-                ],
-            ),
-            time_per_output_token_ms=StatusDistributionSummary.from_values(
-                value_types=list(total_types_with_output_first),
-                values=[
-                    req.time_per_output_token_ms or 0 for req in total_with_output_first
-                ],
-                weights=[req.output_tokens for req in total_with_output_first],
-            ),
-            inter_token_latency_ms=StatusDistributionSummary.from_values(
-                value_types=list(total_types_with_output_multi),
-                values=[
-                    req.inter_token_latency_ms or 0 for req in total_with_output_multi
-                ],
-                weights=[req.output_tokens - 1 for req in total_with_output_multi],
-            ),
-            output_tokens_per_second=StatusDistributionSummary.from_iterable_request_times(
-                request_types=list(total_types_with_output_first),
-                requests=[
-                    (req.start_time, req.end_time) for req in total_with_output_first
-                ],
-                first_iter_times=[
-                    req.first_token_time or req.start_time
-                    for req in total_with_output_first
-                ],
-                iter_counts=[req.output_tokens for req in total_with_output_first],
-            ),
-            tokens_per_second=StatusDistributionSummary.from_iterable_request_times(
-                request_types=list(total_types_with_output_first),
-                requests=[
-                    (req.start_time, req.end_time) for req in total_with_output_first
-                ],
-                first_iter_times=[
-                    req.first_token_time or req.start_time
-                    for req in total_with_output_first
-                ],
-                iter_counts=[
-                    req.prompt_tokens + req.output_tokens
-                    for req in total_with_output_first
-                ],
-                first_iter_counts=[
-                    req.prompt_tokens for req in total_with_output_first
-                ],
+            metrics=GenerativeMetrics(
+                request_per_second=StatusDistributionSummary.from_request_times(
+                    request_types=total_types,
+                    requests=[(req.start_time, req.end_time) for req in total],
+                    distribution_type="rate",
+                ),
+                request_concurrency=StatusDistributionSummary.from_request_times(
+                    request_types=total_types,
+                    requests=[(req.start_time, req.end_time) for req in total],
+                    distribution_type="concurrency",
+                ),
+                request_latency=StatusDistributionSummary.from_values(
+                    value_types=total_types,
+                    values=[req.request_latency for req in total],
+                ),
+                prompt_token_count=StatusDistributionSummary.from_values(
+                    value_types=list(total_types_with_prompt),
+                    values=[req.prompt_tokens for req in total_with_prompt],
+                ),
+                output_token_count=StatusDistributionSummary.from_values(
+                    value_types=list(total_types_with_output_first),
+                    values=[req.output_tokens for req in total_with_output_first],
+                ),
+                time_to_first_token_ms=StatusDistributionSummary.from_values(
+                    value_types=list(total_types_with_output_first),
+                    values=[
+                        req.time_to_first_token_ms or 0 for req in total_with_output_first
+                    ],
+                ),
+                time_per_output_token_ms=StatusDistributionSummary.from_values(
+                    value_types=list(total_types_with_output_first),
+                    values=[
+                        req.time_per_output_token_ms or 0 for req in total_with_output_first
+                    ],
+                    weights=[req.output_tokens for req in total_with_output_first],
+                ),
+                inter_token_latency_ms=StatusDistributionSummary.from_values(
+                    value_types=list(total_types_with_output_multi),
+                    values=[
+                        req.inter_token_latency_ms or 0 for req in total_with_output_multi
+                    ],
+                    weights=[req.output_tokens - 1 for req in total_with_output_multi],
+                ),
+                output_tokens_per_second=StatusDistributionSummary.from_iterable_request_times(
+                    request_types=list(total_types_with_output_first),
+                    requests=[
+                        (req.start_time, req.end_time) for req in total_with_output_first
+                    ],
+                    first_iter_times=[
+                        req.first_token_time or req.start_time
+                        for req in total_with_output_first
+                    ],
+                    iter_counts=[req.output_tokens for req in total_with_output_first],
+                ),
+                tokens_per_second=StatusDistributionSummary.from_iterable_request_times(
+                    request_types=list(total_types_with_output_first),
+                    requests=[
+                        (req.start_time, req.end_time) for req in total_with_output_first
+                    ],
+                    first_iter_times=[
+                        req.first_token_time or req.start_time
+                        for req in total_with_output_first
+                    ],
+                    iter_counts=[
+                        req.prompt_tokens + req.output_tokens
+                        for req in total_with_output_first
+                    ],
+                    first_iter_counts=[
+                        req.prompt_tokens for req in total_with_output_first
+                    ],
+                ),
             ),
         )
