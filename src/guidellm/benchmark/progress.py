@@ -639,13 +639,13 @@ class GenerativeTextBenchmarkerProgressDisplay(
 
         current_benchmark: GenerativeBenchmark = result.current_benchmark  # type: ignore[assignment]
         progress_state.request_latency = (
-            current_benchmark.request_latency.successful.mean
+            current_benchmark.metrics.request_latency.successful.mean
         )
         progress_state.requests_processing = (
-            current_benchmark.requests_concurrency.successful.mean
+            current_benchmark.metrics.request_concurrency.successful.mean
         )
-        progress_state.requests_successful = current_benchmark.successful_total
-        progress_state.requests_errored = current_benchmark.errored_total
+        progress_state.requests_successful = current_benchmark.total_count.successful
+        progress_state.requests_errored = current_benchmark.total_count.errored
         progress_state.output_tokens = (
             current_benchmark.metrics.output_token_count.successful.mean
         )
