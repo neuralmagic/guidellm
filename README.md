@@ -92,10 +92,8 @@ Notes:
 
 - The `--target` flag specifies the server hosting the model. In this case, it is a local vLLM server.
 - The `--model` flag specifies the model to evaluate. The model name should match the name of the model deployed on the server
-- The `--rate-type` flag specifies what load generation pattern GuideLLM will use when sending requests to the server.
-  If `sweep` is specified GuideLLM will run multiple performance evaluations across different request rates.
-- By default GuideLLM will run over a fixed workload of 1000 requests configurable by `--max-requests`.
-  If `--max-seconds` is set GuideLLM will instead run over a fixed time.
+- The `--rate-type` flag specifies what load generation pattern GuideLLM will use when sending requests to the server. If `sweep` is specified GuideLLM will run multiple performance evaluations across different request rates.
+- By default GuideLLM will run over a fixed workload of 1000 requests configurable by `--max-requests`. If `--max-seconds` is set GuideLLM will instead run over a fixed time.
 
 #### 3. Analyze the Results
 
