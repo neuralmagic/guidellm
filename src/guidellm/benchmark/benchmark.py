@@ -1,8 +1,9 @@
 import random
 import uuid
-from typing import Any, Dict, Generic, List, Literal, Optional, TypeVar, Union
+from typing import Any, Dict, Generic, List, Literal, Optional, Union
 
 from pydantic import Field, computed_field
+from typing_extensions import TypeVar
 
 from guidellm.benchmark.profile import (
     AsyncProfile,
@@ -46,7 +47,7 @@ __all__ = [
 ]
 
 
-SuccessfulT = TypeVar("SuccessfulT")
+SuccessfulT = TypeVar("SuccessfulT", default=Any)
 ErroredT = TypeVar("ErroredT", default=SuccessfulT)
 IncompleteT = TypeVar("IncompleteT", default=ErroredT)
 class StatusBreakdown(StandardBaseModel, Generic[SuccessfulT, ErroredT, IncompleteT]):
