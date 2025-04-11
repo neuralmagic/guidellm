@@ -1,4 +1,3 @@
-import asyncio
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, AsyncGenerator, Dict, List, Literal, Optional, Type, Union
@@ -102,27 +101,32 @@ class Backend(ABC):
         """
         ...
 
-    def validate(self):
+    @property
+    @abstractmethod
+    def info(self) -> Dict[str, Any]:
+        """
+        :return: The information about the backend.
+        """
+        ...
+
+    async def validate(self):
         """
         Handle final setup and validate the backend is ready for use.
         If not successful, raises the appropriate exception.
         """
         logger.info("{} validating backend {}", self.__class__.__name__, self.type_)
-        self.check_setup()
-        models = self.available_models()
+        await self.check_setup()
+        models = await self.available_models()
         if not models:
             raise ValueError("No models available for the backend")
 
-        async def _test_request():
-            async for _ in self.text_completions(
-                prompt="Test connection", output_token_count=1
-            ):  # type: ignore[attr-defined]
-                pass
-
-        asyncio.run(_test_request())
+        async for _ in self.text_completions(
+            prompt="Test connection", output_token_count=1
+        ):  # type: ignore[attr-defined]
+            pass
 
     @abstractmethod
-    def check_setup(self):
+    async def check_setup(self):
         """
         Check the setup for the backend.
         If unsuccessful, raises the appropriate exception.
@@ -132,7 +136,17 @@ class Backend(ABC):
         ...
 
     @abstractmethod
-    def available_models(self) -> List[str]:
+    async def prepare_multiprocessing(self):
+        """
+        Prepare the backend for use in a multiprocessing environment.
+        This is useful for backends that have instance state that can not
+        be shared across processes and should be cleared out and re-initialized
+        for each new process.
+        """
+        ...
+
+    @abstractmethod
+    async def available_models(self) -> List[str]:
         """
         Get the list of available models for the backend.
 

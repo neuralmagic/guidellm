@@ -36,10 +36,17 @@ class MockBackend(Backend):
     def model(self) -> Optional[str]:
         return self._model
 
-    def check_setup(self):
+    @property
+    def info(self) -> Dict[str, Any]:
+        return {}
+
+    async def prepare_multiprocessing(self):
         pass
 
-    def available_models(self) -> List[str]:
+    async def check_setup(self):
+        pass
+
+    async def available_models(self) -> List[str]:
         return [self.model]  # type: ignore
 
     async def text_completions(  # type: ignore
@@ -97,23 +104,37 @@ class MockBackend(Backend):
 
         yield StreamingTextResponse(
             type_="start",
+            value="",
+            start_time=start_time,
+            first_iter_time=None,
             iter_count=0,
             delta="",
             time=start_time,
             request_id=request_id,
         )
 
+        first_iter_time = None
+        last_iter_time = None
+
         for index, token in enumerate(tokens):
             if self._iter_delay:
                 await asyncio.sleep(self._iter_delay)
 
+            if first_iter_time is None:
+                first_iter_time = time.time()
+
             yield StreamingTextResponse(
                 type_="iter",
+                value="".join(tokens[: index + 1]),
+                start_time=start_time,
+                first_iter_time=first_iter_time,
                 iter_count=index + 1,
                 delta=token,
                 time=time.time(),
                 request_id=request_id,
             )
+
+            last_iter_time = time.time()
 
         yield ResponseSummary(
             value="".join(tokens),
@@ -125,6 +146,8 @@ class MockBackend(Backend):
             iterations=len(tokens),
             start_time=start_time,
             end_time=time.time(),
+            first_iter_time=first_iter_time,
+            last_iter_time=last_iter_time,
             request_prompt_tokens=prompt_token_count,
             request_output_tokens=output_token_count,
             response_prompt_tokens=len(prompt.split()) + prompt.count(" "),

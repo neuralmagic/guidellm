@@ -16,7 +16,11 @@ from guidellm.backend.response import (
 )
 from guidellm.config import settings
 
-__all__ = ["OpenAIHTTPBackend"]
+__all__ = ["OpenAIHTTPBackend", "TEXT_COMPLETIONS_PATH", "CHAT_COMPLETIONS_PATH"]
+
+
+TEXT_COMPLETIONS_PATH = "/v1/completions"
+CHAT_COMPLETIONS_PATH = "/v1/chat/completions"
 
 
 @Backend.register("openai_http")
@@ -61,6 +65,17 @@ class OpenAIHTTPBackend(Backend):
     ):
         super().__init__(type_="openai_http")
         self._target = target or settings.openai.base_url
+
+        if not self._target:
+            raise ValueError("Target URL must be provided for OpenAI HTTP backend.")
+
+        if self._target.endswith("/v1") or self._target.endswith("/v1/"):
+            # backwards compatability, strip v1 off
+            self._target = self._target[:-3]
+
+        if self._target.endswith("/"):
+            self._target = self._target[:-1]
+
         self._model = model
 
         api_key = api_key or settings.openai.api_key
@@ -77,6 +92,7 @@ class OpenAIHTTPBackend(Backend):
             if max_output_tokens is not None
             else settings.openai.max_output_tokens
         )
+        self._async_client: Optional[httpx.AsyncClient] = None
 
     @property
     def target(self) -> str:
@@ -94,7 +110,23 @@ class OpenAIHTTPBackend(Backend):
         """
         return self._model
 
-    def check_setup(self):
+    @property
+    def info(self) -> Dict[str, Any]:
+        """
+        :return: The information about the backend.
+        """
+        return {
+            "max_output_tokens": self.max_output_tokens,
+            "timeout": self.timeout,
+            "http2": self.http2,
+            "authorization": bool(self.authorization),
+            "organization": self.organization,
+            "project": self.project,
+            "text_completions_path": TEXT_COMPLETIONS_PATH,
+            "chat_completions_path": CHAT_COMPLETIONS_PATH,
+        }
+
+    async def check_setup(self):
         """
         Check if the backend is setup correctly and can be used for requests.
         Specifically, if a model is not provided, it grabs the first available model.
@@ -103,7 +135,7 @@ class OpenAIHTTPBackend(Backend):
 
         :raises ValueError: If no models or the provided model is not available.
         """
-        models = self.available_models()
+        models = await self.available_models()
         if not models:
             raise ValueError(f"No models available for target: {self.target}")
 
@@ -115,24 +147,32 @@ class OpenAIHTTPBackend(Backend):
                 "{models} for target: {self.target}"
             )
 
-    def available_models(self) -> List[str]:
+    async def prepare_multiprocessing(self):
+        """
+        Prepare the backend for use in a multiprocessing environment.
+        Clears out the sync and async clients to ensure they are re-initialized
+        for each process.
+        """
+        if self._async_client is not None:
+            await self._async_client.aclose()
+            self._async_client = None
+
+    async def available_models(self) -> List[str]:
         """
         Get the available models for the target server using the OpenAI models endpoint:
         /v1/models
         """
         target = f"{self.target}/v1/models"
         headers = self._headers()
+        response = await self._get_async_client().get(target, headers=headers)
+        response.raise_for_status()
 
-        with httpx.Client(http2=self.http2, timeout=self.timeout) as client:
-            response = client.get(target, headers=headers)
-            response.raise_for_status()
+        models = []
 
-            models = []
+        for item in response.json()["data"]:
+            models.append(item["id"])
 
-            for item in response.json()["data"]:
-                models.append(item["id"])
-
-            return models
+        return models
 
     async def text_completions(  # type: ignore[override]
         self,
@@ -160,7 +200,6 @@ class OpenAIHTTPBackend(Backend):
             a StreamingTextResponse for each received iteration,
             and a ResponseSummary for the final response.
         """
-
         logger.debug("{} invocation with args: {}", self.__class__.__name__, locals())
         headers = self._headers()
         payload = self._completions_payload(
@@ -171,7 +210,7 @@ class OpenAIHTTPBackend(Backend):
 
         try:
             async for resp in self._iterative_completions_request(
-                type_="text",
+                type_="text_completions",
                 request_id=request_id,
                 request_prompt_tokens=prompt_token_count,
                 request_output_tokens=output_token_count,
@@ -246,7 +285,7 @@ class OpenAIHTTPBackend(Backend):
 
         try:
             async for resp in self._iterative_completions_request(
-                type_="chat",
+                type_="chat_completions",
                 request_id=request_id,
                 request_prompt_tokens=prompt_token_count,
                 request_output_tokens=output_token_count,
@@ -263,6 +302,21 @@ class OpenAIHTTPBackend(Backend):
                 ex,
             )
             raise ex
+
+    def _get_async_client(self) -> httpx.AsyncClient:
+        """
+        Get the async HTTP client for making requests.
+        If the client has not been created yet, it will create one.
+
+        :return: The async HTTP client.
+        """
+        if self._async_client is None:
+            client = httpx.AsyncClient(http2=self.http2, timeout=self.timeout)
+            self._async_client = client
+        else:
+            client = self._async_client
+
+        return client
 
     def _headers(self) -> Dict[str, str]:
         headers = {
@@ -372,19 +426,17 @@ class OpenAIHTTPBackend(Backend):
 
     async def _iterative_completions_request(
         self,
-        type_: Literal["text", "chat"],
+        type_: Literal["text_completions", "chat_completions"],
         request_id: Optional[str],
         request_prompt_tokens: Optional[int],
         request_output_tokens: Optional[int],
         headers: Dict,
         payload: Dict,
     ) -> AsyncGenerator[Union[StreamingTextResponse, ResponseSummary], None]:
-        target = f"{self.target}/v1/"
-
-        if type_ == "text":
-            target += "completions"
-        elif type_ == "chat":
-            target += "chat/completions"
+        if type_ == "text_completions":
+            target = f"{self.target}{TEXT_COMPLETIONS_PATH}"
+        elif type_ == "chat_completions":
+            target = f"{self.target}{CHAT_COMPLETIONS_PATH}"
         else:
             raise ValueError(f"Unsupported type: {type_}")
 
@@ -400,58 +452,72 @@ class OpenAIHTTPBackend(Backend):
             payload,
         )
 
-        async with httpx.AsyncClient(http2=self.http2, timeout=self.timeout) as client:
-            response_value = ""
-            response_prompt_count: Optional[int] = None
-            response_output_count: Optional[int] = None
-            iter_count = 0
-            start_time = time.time()
-            iter_time = start_time
+        response_value = ""
+        response_prompt_count: Optional[int] = None
+        response_output_count: Optional[int] = None
+        iter_count = 0
+        start_time = time.time()
+        iter_time = start_time
+        first_iter_time: Optional[float] = None
+        last_iter_time: Optional[float] = None
 
-            yield StreamingTextResponse(
-                type_="start",
-                iter_count=iter_count,
-                delta="",
-                time=start_time,
-                request_id=request_id,
-            )
+        yield StreamingTextResponse(
+            type_="start",
+            value="",
+            start_time=start_time,
+            first_iter_time=None,
+            iter_count=iter_count,
+            delta="",
+            time=start_time,
+            request_id=request_id,
+        )
 
-            async with client.stream(
-                "POST", target, headers=headers, json=payload
-            ) as stream:
-                stream.raise_for_status()
+        # reset start time after yielding start response to ensure accurate timing
+        start_time = time.time()
 
-                async for line in stream.aiter_lines():
-                    iter_time = time.time()
-                    logger.debug(
-                        "{} request: {} recieved iter response line: {}",
-                        self.__class__.__name__,
-                        request_id,
-                        line,
+        async with self._get_async_client().stream(
+            "POST", target, headers=headers, json=payload
+        ) as stream:
+            stream.raise_for_status()
+
+            async for line in stream.aiter_lines():
+                iter_time = time.time()
+                logger.debug(
+                    "{} request: {} recieved iter response line: {}",
+                    self.__class__.__name__,
+                    request_id,
+                    line,
+                )
+
+                if not line or not line.strip().startswith("data:"):
+                    continue
+
+                if line.strip() == "data: [DONE]":
+                    break
+
+                data = json.loads(line.strip()[len("data: ") :])
+                if delta := self._extract_completions_delta_content(type_, data):
+                    if first_iter_time is None:
+                        first_iter_time = iter_time
+                    last_iter_time = iter_time
+
+                    iter_count += 1
+                    response_value += delta
+
+                    yield StreamingTextResponse(
+                        type_="iter",
+                        value=response_value,
+                        iter_count=iter_count,
+                        start_time=start_time,
+                        first_iter_time=first_iter_time,
+                        delta=delta,
+                        time=iter_time,
+                        request_id=request_id,
                     )
 
-                    if not line or not line.strip().startswith("data:"):
-                        continue
-
-                    if line.strip() == "data: [DONE]":
-                        break
-
-                    data = json.loads(line.strip()[len("data: ") :])
-                    if delta := self._extract_completions_delta_content(type_, data):
-                        iter_count += 1
-                        response_value += delta
-
-                        yield StreamingTextResponse(
-                            type_="iter",
-                            iter_count=iter_count,
-                            delta=delta,
-                            time=iter_time,
-                            request_id=request_id,
-                        )
-
-                    if usage := self._extract_completions_usage(data):
-                        response_prompt_count = usage["prompt"]
-                        response_output_count = usage["output"]
+                if usage := self._extract_completions_usage(data):
+                    response_prompt_count = usage["prompt"]
+                    response_output_count = usage["output"]
 
         logger.info(
             "{} request: {} with headers: {} and payload: {} completed with: {}",
@@ -473,6 +539,8 @@ class OpenAIHTTPBackend(Backend):
             ),
             start_time=start_time,
             end_time=iter_time,
+            first_iter_time=first_iter_time,
+            last_iter_time=last_iter_time,
             iterations=iter_count,
             request_prompt_tokens=request_prompt_tokens,
             request_output_tokens=request_output_tokens,
@@ -483,15 +551,15 @@ class OpenAIHTTPBackend(Backend):
 
     @staticmethod
     def _extract_completions_delta_content(
-        type_: Literal["text", "chat"], data: Dict
+        type_: Literal["text_completions", "chat_completions"], data: Dict
     ) -> Optional[str]:
         if "choices" not in data or not data["choices"]:
             return None
 
-        if type_ == "text":
+        if type_ == "text_completions":
             return data["choices"][0]["text"]
 
-        if type_ == "chat":
+        if type_ == "chat_completions":
             return data["choices"][0]["delta"]["content"]
 
         raise ValueError(f"Unsupported type: {type_}")

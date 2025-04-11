@@ -7,7 +7,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 __all__ = [
     "DatasetSettings",
-    "EmulatedDataSettings",
     "Environment",
     "LoggingSettings",
     "OpenAISettings",
@@ -74,24 +73,6 @@ class DatasetSettings(BaseModel):
     )
 
 
-class EmulatedDataSettings(BaseModel):
-    """
-    Emulated data settings for the application to use
-    """
-
-    source: str = "https://www.gutenberg.org/files/1342/1342-0.txt"
-    filter_start: str = "It is a truth universally acknowledged, that a"
-    filter_end: str = "CHISWICK PRESS:--CHARLES WHITTINGHAM AND CO."
-    clean_text_args: Dict[str, bool] = Field(
-        default_factory=lambda: {
-            "fix_encoding": True,
-            "clean_whitespace": True,
-            "remove_empty_lines": True,
-            "force_new_line_punctuation": True,
-        }
-    )
-
-
 class OpenAISettings(BaseModel):
     """
     OpenAI settings for the application to connect to the API
@@ -139,19 +120,29 @@ class Settings(BaseSettings):
 
     # general settings
     env: Environment = Environment.PROD
+    default_async_loop_sleep: float = 10e-5
+    logging: LoggingSettings = LoggingSettings()
+    default_sweep_number: int = 10
+
+    # HTTP settings
     request_timeout: int = 60 * 5  # 5 minutes
     request_http2: bool = True
+
+    # Scheduler settings
     max_concurrency: int = 512
-    num_sweep_profiles: int = 9
-    logging: LoggingSettings = LoggingSettings()
+    max_worker_processes: int = 10
+    max_add_requests_per_loop: int = 20
 
     # Data settings
     dataset: DatasetSettings = DatasetSettings()
-    emulated_data: EmulatedDataSettings = EmulatedDataSettings()
 
     # Request/stats settings
-    preferred_prompt_tokens_source: Optional[Literal["backend", "local"]] = None
-    preferred_output_tokens_source: Optional[Literal["backend", "local"]] = None
+    preferred_prompt_tokens_source: Optional[
+        Literal["request", "response", "local"]
+    ] = None
+    preferred_output_tokens_source: Optional[
+        Literal["request", "response", "local"]
+    ] = None
     preferred_backend: Literal["openai"] = "openai"
     openai: OpenAISettings = OpenAISettings()
 
