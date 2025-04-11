@@ -553,10 +553,10 @@ class BenchmarkerProgressDisplay(Generic[BTPS]):
         progress_state.compiling = False
         progress_state.ended = True
         progress_state.requests_rate = (
-            current_benchmark.metric.requests_per_second.successful.mean
+            current_benchmark.metrics.requests_per_second.successful.mean
         )
         progress_state.requests_processing = (
-            current_benchmark.metric.requests_concurrency.successful.mean
+            current_benchmark.metrics.request_concurrency.successful.mean
         )
 
     def handle_end(self, result: BenchmarkerResult):  # noqa: ARG002
@@ -647,22 +647,22 @@ class GenerativeTextBenchmarkerProgressDisplay(
         progress_state.requests_successful = current_benchmark.successful_total
         progress_state.requests_errored = current_benchmark.errored_total
         progress_state.output_tokens = (
-            current_benchmark.metric.output_token_count.successful.mean
+            current_benchmark.metrics.output_token_count.successful.mean
         )
         progress_state.prompt_tokens = (
-            current_benchmark.metric.prompt_token_count.successful.mean
+            current_benchmark.metrics.prompt_token_count.successful.mean
         )
         progress_state.output_tokens_rate = (
-            current_benchmark.metric.output_tokens_per_second.successful.mean
+            current_benchmark.metrics.output_tokens_per_second.successful.mean
         )
         progress_state.total_tokens_rate = (
-            current_benchmark.metric.tokens_per_second.successful.mean
+            current_benchmark.metrics.tokens_per_second.successful.mean
         )
         progress_state.tokens_ttft = (
-            current_benchmark.metric.time_to_first_token_ms.successful.mean
+            current_benchmark.metrics.time_to_first_token_ms.successful.mean
         )
         progress_state.tokens_itl = (
-            current_benchmark.metric.inter_token_latency_ms.successful.mean
+            current_benchmark.metrics.inter_token_latency_ms.successful.mean
         )
 
     def create_task_progress_state(

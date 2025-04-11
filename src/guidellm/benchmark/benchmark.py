@@ -822,7 +822,7 @@ class GenerativeBenchmark(Benchmark):
             start_time=start_time,
             end_time=end_time,
             metrics=GenerativeMetrics(
-                request_per_second=StatusDistributionSummary.from_request_times(
+                requests_per_second=StatusDistributionSummary.from_request_times(
                     request_types=total_types,
                     requests=[(req.start_time, req.end_time) for req in total],
                     distribution_type="rate",
