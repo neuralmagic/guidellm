@@ -47,9 +47,9 @@ __all__ = [
 
 
 SuccessfulT = TypeVar("SuccessfulT")
-IncompleteT = TypeVar("IncompleteT")
-ErroredT = TypeVar("ErroredT")
-class StatusBreakdown(StandardBaseModel, Generic[SuccessfulT, IncompleteT, ErroredT]):
+ErroredT = TypeVar("ErroredT", default=SuccessfulT)
+IncompleteT = TypeVar("IncompleteT", default=ErroredT)
+class StatusBreakdown(StandardBaseModel, Generic[SuccessfulT, ErroredT, IncompleteT]):
     """
     A serializable model representing the breakdown of statistics for a benchmark run
     split into successful, incomplete, and errored.
@@ -603,42 +603,16 @@ class GenerativeBenchmark(Benchmark):
     """
 
     type_: Literal["generative_benchmark"] = "generative_benchmark"  # type: ignore[assignment]
-    successful_total: int = Field(
+    total_count: StatusBreakdown[int] = Field(
         description=(
-            "The total number of completed requests in the benchmark, "
+            "The total number of requests in the benchmark, "
             "excluding warmup and cooldown."
         )
     )
-    successful_sampled_size: Optional[int] = Field(
+    sampled_size: Optional[StatusBreakdown[int]] = Field(
         default=None,
         description=(
-            "The number of completed requests that were randomly sampled for "
-            "the benchmark. None if no sampling was applied."
-        ),
-    )
-    incomplete_total: int = Field(
-        description=(
-            "The total number of incomplete requests in the benchmark, "
-            "excluding warmup and cooldown."
-        )
-    )
-    incomplete_sampled_size: Optional[int] = Field(
-        default=None,
-        description=(
-            "The number of incomplete requests that were randomly sampled for "
-            "the benchmark. None if no sampling was applied."
-        ),
-    )
-    errored_total: int = Field(
-        description=(
-            "The total number of errored requests in the benchmark, "
-            "excluding warmup and cooldown."
-        )
-    )
-    errored_sampled_size: Optional[int] = Field(
-        default=None,
-        description=(
-            "The number of errored requests that were randomly sampled for "
+            "The number of requests that were randomly sampled for "
             "the benchmark. None if no sampling was applied."
         ),
     )
@@ -648,6 +622,15 @@ class GenerativeBenchmark(Benchmark):
     end_time: float = Field(
         description="The end time of the last request for the benchmark.",
     )
+    @computed_field  # type: ignore[misc]
+    @property
+    def duration(self) -> float:
+        """
+        :return: The duration of the benchmark in seconds from the start of the
+            first request to the end of the last request.
+        """
+        return self.end_time - self.start_time
+
     metrics: GenerativeMetrics = Field(
         description=(
             "The metrics for the benchmark run represented as a distribution of "
@@ -658,22 +641,12 @@ class GenerativeBenchmark(Benchmark):
     requests: StatusBreakdown[
         List[GenerativeTextResponseStats],
         List[GenerativeTextErrorStats],
-        List[GenerativeTextErrorStats]
     ] = Field(
         description=(
             "The breakdown of requests for the benchmark run including completed, "
             "incomplete, and errored requests."
         ),
     )
-
-    @computed_field  # type: ignore[misc]
-    @property
-    def duration(self) -> float:
-        """
-        :return: The duration of the benchmark in seconds from the start of the
-            first request to the end of the last request.
-        """
-        return self.end_time - self.start_time
 
     def create_sampled(
         self, sample_size: int, error_sample_size: Optional[int] = None
@@ -703,30 +676,30 @@ class GenerativeBenchmark(Benchmark):
             )
 
         if (
-            self.successful_sampled_size is not None
-            and sample_size > self.successful_sampled_size
+            self.sampled_size is not None
+            and sample_size > self.sampled_size.successful
         ):
             raise ValueError(
                 "The benchmark's completed response have already been sampled with "
-                f"size {self.successful_sampled_size} and cannot be resampled with "
+                f"size {self.sampled_size.successful} and cannot be resampled with "
                 f"a larger size, given: {sample_size}"
             )
         if (
-            self.incomplete_sampled_size is not None
-            and sample_size > self.incomplete_sampled_size
+            self.sampled_size is not None
+            and sample_size > self.sampled_size.incomplete
         ):
             raise ValueError(
                 "The benchmark's incomplete response have already been sampled with "
-                f"size {self.incomplete_sampled_size} and cannot be resampled with "
+                f"size {self.sampled_size.incomplete} and cannot be resampled with "
                 f"a larger size, given: {sample_size}"
             )
         if (
-            self.errored_sampled_size is not None
-            and error_sample_size > self.errored_sampled_size
+            self.sampled_size is not None
+            and error_sample_size > self.sampled_size.errored
         ):
             raise ValueError(
                 "The benchmark's errored response have already been sampled with "
-                f"size {self.errored_sampled_size} and cannot be resampled with "
+                f"size {self.sampled_size.errored} and cannot be resampled with "
                 f"a larger size, given: {error_sample_size}"
             )
 
@@ -735,15 +708,20 @@ class GenerativeBenchmark(Benchmark):
         error_sample_size = min(error_sample_size, len(self.requests.errored))
 
         sampled_instance = self.model_copy()
-        sampled_instance.successful_sampled_size = sample_size
+        sampled_instance.sampled_size = StatusBreakdown(
+            successful=0,
+            incomplete=0,
+            errored=0,
+        )
+        sampled_instance.sampled_size.successful = sample_size
         sampled_instance.requests.successful = random.sample(
             self.requests.successful, sample_size
         )
-        sampled_instance.incomplete_sampled_size = incomplete_sample_size
+        sampled_instance.sampled_size.incomplete = incomplete_sample_size
         sampled_instance.requests.incomplete = random.sample(
             self.requests.incomplete, incomplete_sample_size
         )
-        sampled_instance.errored_sampled_size = error_sample_size
+        sampled_instance.sampled_size.errored = error_sample_size
         sampled_instance.requests.errored = random.sample(
             self.requests.errored, error_sample_size
         )
@@ -835,9 +813,11 @@ class GenerativeBenchmark(Benchmark):
             worker=worker,
             request_loader=requests_loader,
             extras=extras or {},
-            successful_total=len(successful),
-            incomplete_total=len(incomplete),
-            errored_total=len(errored),
+            total_count=StatusBreakdown(
+                successful=len(successful),
+                incomplete=len(incomplete),
+                errored=len(errored),
+            ),
             start_time=start_time,
             end_time=end_time,
             metrics=GenerativeMetrics(
