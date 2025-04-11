@@ -25,7 +25,11 @@ from guidellm.benchmark.aggregator import (
 from guidellm.benchmark.benchmark import BenchmarkArgs, GenerativeBenchmark
 from guidellm.benchmark.profile import Profile
 from guidellm.objects import StandardBaseModel
-from guidellm.request import GenerationRequest, RequestLoaderDescription
+from guidellm.request import (
+    GenerationRequest,
+    GenerativeRequestLoaderDescription,
+    RequestLoaderDescription,
+)
 from guidellm.scheduler import (
     GenerativeRequestsWorker,
     RequestsWorker,
@@ -289,7 +293,7 @@ class GenerativeBenchmarker(
         self,
         backend: Backend,
         request_loader: Iterable[GenerationRequest],
-        request_loader_description: RequestLoaderDescription,
+        request_loader_description: GenerativeRequestLoaderDescription,
         benchmark_save_extras: Optional[Dict[str, Any]] = None,
         processor: Optional[Union[str, Path, PreTrainedTokenizer]] = None,
         processor_args: Optional[Dict[str, Any]] = None,
@@ -324,8 +328,8 @@ class GenerativeBenchmarker(
                 cooldown_number=limits.cooldown_number,
                 cooldown_duration=limits.cooldown_duration,
             ),
-            worker_description=self.worker.description,
-            request_loader_description=self.requests_loader_description,
+            worker_description=self.worker.description,  # type: ignore[arg-type]
+            request_loader_description=self.requests_loader_description,  # type: ignore[arg-type]
             extras=self.benchmark_save_extras or {},
             processor=self.processor,
             processor_args=self.processor_args,

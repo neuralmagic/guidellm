@@ -124,10 +124,13 @@ async def test_backend_chat_completions(mock_backend):
 
 
 @pytest.mark.smoke()
-def test_backend_models(mock_backend):
-    assert mock_backend.available_models() == ["mock-model"]
+@pytest.mark.asyncio()
+async def test_backend_models(mock_backend):
+    models = await mock_backend.available_models()
+    assert models == ["mock-model"]
 
 
 @pytest.mark.smoke()
-def test_backend_validate(mock_backend):
-    mock_backend.validate()
+@pytest.mark.asyncio()
+async def test_backend_validate(mock_backend):
+    await mock_backend.validate()

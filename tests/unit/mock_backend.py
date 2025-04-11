@@ -43,7 +43,7 @@ class MockBackend(Backend):
     async def prepare_multiprocessing(self):
         pass
 
-    def check_setup(self):
+    async def check_setup(self):
         pass
 
     async def available_models(self) -> List[str]:

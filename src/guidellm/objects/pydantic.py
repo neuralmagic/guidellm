@@ -44,17 +44,17 @@ class StatusBreakdown(BaseModel, Generic[SuccessfulT, ErroredT, IncompleteT, Tot
 
     successful: SuccessfulT = Field(
         description="The results with a successful status.",
-        default=None,
+        default=None,  # type: ignore[assignment]
     )
     errored: ErroredT = Field(
         description="The results with an errored status.",
-        default=None,
+        default=None,  # type: ignore[assignment]
     )
     incomplete: IncompleteT = Field(
         description="The results with an incomplete status.",
-        default=None,
+        default=None,  # type: ignore[assignment]
     )
     total: TotalT = Field(
         description="The combination of all statuses.",
-        default=None,
+        default=None,  # type: ignore[assignment]
     )

@@ -301,7 +301,7 @@ class BenchmarkAggregator(
             "The completed requests for this benchmark run broken down by status"
             "and excluding warmup and cooldown requests."
         ),
-        default_factory=lambda: StatusBreakdown(
+        default_factory=lambda: StatusBreakdown(  # type: ignore[arg-type]
             successful=[],
             errored=[],
             incomplete=[],
@@ -360,10 +360,10 @@ class BenchmarkAggregator(
                 f"Got {result.request_info}"
             )
 
-        self.requests_stats.queued_time += (
+        self.requests_stats.queued_time.update(
             result.request_info.dequeued_time - result.request_info.queued_time
         )
-        self.requests_stats.scheduled_time_delay += (
+        self.requests_stats.scheduled_time_delay.update(
             result.request_info.scheduled_time - result.request_info.dequeued_time
         )
         sleep_time = max(
@@ -371,32 +371,33 @@ class BenchmarkAggregator(
             result.request_info.targeted_start_time
             - result.request_info.scheduled_time,
         )
-        self.requests_stats.scheduled_time_sleep += sleep_time
+        self.requests_stats.scheduled_time_sleep.update(sleep_time)
         time_to_worker_start = (
             result.request_info.worker_start - result.request_info.scheduled_time
         )
-        self.requests_stats.worker_start_delay += time_to_worker_start - sleep_time
-        self.requests_stats.worker_time += (
+        self.requests_stats.worker_start_delay.update(time_to_worker_start - sleep_time)
+        self.requests_stats.worker_time.update(
             result.request_info.worker_end - result.request_info.worker_start
         )
-        self.requests_stats.worker_start_time_targeted_delay += (
+        self.requests_stats.worker_start_time_targeted_delay.update(
             result.request_info.worker_start - result.request_info.targeted_start_time
         )
-        self.requests_stats.request_start_time_delay += (
+        self.requests_stats.request_start_time_delay.update(
             result.request_info.worker_start - result.request_info.targeted_start_time
         )
-        self.requests_stats.request_start_time_targeted_delay += (
+        self.requests_stats.request_start_time_targeted_delay.update(
             result.request_info.worker_start - result.request_info.targeted_start_time
         )
-        self.requests_stats.request_time_delay += (
-            result.request_info.worker_end - result.request_info.worker_start
-        ) - (result.request_info.worker_end - result.request_info.worker_start)
-        self.requests_stats.request_time += (
+        self.requests_stats.request_time_delay.update(
+            (result.request_info.worker_end - result.request_info.worker_start)
+            - (result.request_info.worker_end - result.request_info.worker_start)
+        )
+        self.requests_stats.request_time.update(
             result.request_info.worker_end - result.request_info.worker_start
         )
 
         # Add result to the list of results provided we are not in warmup or cooldown
-        total_completed = self.requests_stats.totals.total
+        total_completed = self.requests_stats.totals.total.total
         global_start_time = self.requests_stats.totals.total.start_time
 
         in_warmup_number = (
@@ -521,6 +522,20 @@ class GenerativeBenchmarkAggregator(
             "any specific configuration for loading or processing."
         ),
     )
+    worker_description: GenerativeRequestsWorkerDescription = Field(
+        description=(
+            "The description and specifics for the worker used to resolve requests "
+            "for this benchmark."
+        ),
+        discriminator="type_",
+    )
+    request_loader_description: GenerativeRequestLoaderDescription = Field(
+        description=(
+            "The description and specifics for the request loader used to create "
+            "requests for this benchmark."
+        ),
+        discriminator="type_",
+    )
     requests_stats: GenerativeRequestsRunningStats = Field(
         description=(
             "The running statistics for the requests for this benchmark run. "
@@ -548,22 +563,22 @@ class GenerativeBenchmarkAggregator(
         if result.response is None:
             raise ValueError("Response is None, cannot add result.")
 
-        self.requests_stats.request_start_time_delay += (
+        self.requests_stats.request_start_time_delay.update(
             result.response.start_time - result.request_info.worker_start
         )
-        self.requests_stats.request_start_time_targeted_delay += (
+        self.requests_stats.request_start_time_targeted_delay.update(
             result.response.start_time - result.request_info.targeted_start_time
         )
-        self.requests_stats.request_time_delay += (
+        self.requests_stats.request_time_delay.update(
             (result.response.start_time - result.request_info.worker_start)
             + result.request_info.worker_end
             - result.response.end_time
         )
-        self.requests_stats.request_time += (
+        self.requests_stats.request_time.update(
             result.response.end_time - result.response.start_time
         )
         if result.response.first_iter_time:
-            self.requests_stats.time_to_first_token += (
+            self.requests_stats.time_to_first_token.update(
                 result.response.first_iter_time - result.response.start_time
             )
         if result.response.last_iter_time and result.response.first_iter_time:
@@ -598,10 +613,10 @@ class GenerativeBenchmarkAggregator(
                 start_time=self.requests_stats.totals.total.start_time,
                 end_time=time.time(),
                 requests_made=StatusBreakdown(
-                    successful=self.requests_stats.totals.successful.total,
-                    errored=self.requests_stats.totals.errored.total,
-                    incomplete=self.requests_stats.totals.incomplete.total,
-                    total=self.requests_stats.totals.total.total,
+                    successful=int(self.requests_stats.totals.successful.total),
+                    errored=int(self.requests_stats.totals.errored.total),
+                    incomplete=int(self.requests_stats.totals.incomplete.total),
+                    total=int(self.requests_stats.totals.total.total),
                 ),
                 queued_time_avg=self.requests_stats.queued_time.mean,
                 scheduled_time_delay_avg=self.requests_stats.scheduled_time_delay.mean,
@@ -653,6 +668,7 @@ class GenerativeBenchmarkAggregator(
                 last_token_time=result.response.last_iter_time or -1.0,
             )
             for result in self.results.successful
+            if result.request and result.response
         ]
         incomplete: List[GenerativeTextErrorStats] = [
             GenerativeTextErrorStats(
@@ -682,6 +698,7 @@ class GenerativeBenchmarkAggregator(
                 last_token_time=result.response.last_iter_time,
             )
             for result in self.results.incomplete
+            if result.request and result.response
         ]
         error: List[GenerativeTextErrorStats] = [
             GenerativeTextErrorStats(
@@ -711,6 +728,7 @@ class GenerativeBenchmarkAggregator(
                 last_token_time=result.response.last_iter_time,
             )
             for result in self.results.errored
+            if result.request and result.response
         ]
 
         return successful, incomplete, error
