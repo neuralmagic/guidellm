@@ -29,7 +29,7 @@ from guidellm.backend import (
 from guidellm.objects import StandardBaseModel
 from guidellm.request import GenerationRequest
 from guidellm.scheduler.result import SchedulerRequestInfo
-from guidellm.scheduler.types import REQ, RES
+from guidellm.scheduler.types import RequestT, ResponseT
 
 __all__ = [
     "WorkerProcessRequest",
@@ -43,18 +43,18 @@ __all__ = [
 
 
 @dataclass
-class WorkerProcessRequest(Generic[REQ]):
-    request: REQ
+class WorkerProcessRequest(Generic[RequestT]):
+    request: RequestT
     start_time: float
     timeout_time: float
     queued_time: float
 
 
 @dataclass
-class WorkerProcessResult(Generic[REQ, RES]):
+class WorkerProcessResult(Generic[RequestT, ResponseT]):
     type_: Literal["request_scheduled", "request_start", "request_complete"]
-    request: REQ
-    response: Optional[RES]
+    request: RequestT
+    response: Optional[ResponseT]
     info: SchedulerRequestInfo
 
 
@@ -73,7 +73,7 @@ class WorkerDescription(StandardBaseModel):
     type_: Literal["worker"] = "worker"
 
 
-class RequestsWorker(ABC, Generic[REQ, RES]):
+class RequestsWorker(ABC, Generic[RequestT, ResponseT]):
     """
     An abstract base class for a worker that processes requests.
     This class defines the interface for a worker that can resolve requests
@@ -107,9 +107,9 @@ class RequestsWorker(ABC, Generic[REQ, RES]):
     @abstractmethod
     async def resolve(
         self,
-        request: REQ,
+        request: RequestT,
         timeout_time: float,
-    ) -> Tuple[ResolveStatus, RES]:
+    ) -> Tuple[ResolveStatus, ResponseT]:
         """
         An abstract method that must be implemented by subclasses.
         This method should handle the resolution of a request through asyncio,
@@ -124,13 +124,13 @@ class RequestsWorker(ABC, Generic[REQ, RES]):
 
     async def get_request(
         self, requests_queue: multiprocessing.Queue
-    ) -> Optional[WorkerProcessRequest[REQ]]:
+    ) -> Optional[WorkerProcessRequest[RequestT]]:
         return await asyncio.to_thread(requests_queue.get)  # type: ignore[attr-defined]
 
     async def send_result(
         self,
         results_queue: multiprocessing.Queue,
-        result: WorkerProcessResult[REQ, RES],
+        result: WorkerProcessResult[RequestT, ResponseT],
     ):
         await asyncio.to_thread(results_queue.put, result)  # type: ignore[attr-defined]
 
@@ -151,7 +151,7 @@ class RequestsWorker(ABC, Generic[REQ, RES]):
             scheduled_time=time.time(),
             process_id=process_id,
         )
-        result: WorkerProcessResult[REQ, RES] = WorkerProcessResult(
+        result: WorkerProcessResult[RequestT, ResponseT] = WorkerProcessResult(
             type_="request_scheduled",
             request=request,
             response=None,
@@ -177,6 +177,8 @@ class RequestsWorker(ABC, Generic[REQ, RES]):
         info.completed = status.completed
         info.errored = status.errored
         info.canceled = status.canceled
+        info.request_start = status.request_start
+        info.request_end = status.request_end
         result = WorkerProcessResult(
             type_="request_complete",
             request=request,

@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Literal, Optional, Tuple
 import numpy as np
 from pydantic import Field, computed_field
 
-from guidellm.objects import StandardBaseModel
+from guidellm.objects.pydantic import StandardBaseModel, StatusBreakdown
 
 __all__ = [
     "Percentiles",
@@ -401,36 +401,20 @@ class DistributionSummary(StandardBaseModel):
         )
 
 
-class StatusDistributionSummary(StandardBaseModel):
+class StatusDistributionSummary(
+    StatusBreakdown[
+        DistributionSummary,
+        DistributionSummary,
+        DistributionSummary,
+        DistributionSummary,
+    ]
+):
     """
     A pydantic model representing a statistical summary for a given
     distribution of numerical values grouped by status.
     Specifically used to represent the total, successful, incomplete,
     and errored values for a benchmark or other statistical summary.
     """
-
-    total: DistributionSummary = Field(
-        description=(
-            "The dist summary for all statuses (successful, incomplete, error)."
-        ),
-    )
-    successful: DistributionSummary = Field(
-        description=(
-            "The distribution summary for successful statuses "
-            "(e.g., successful requests)."
-        )
-    )
-    incomplete: DistributionSummary = Field(
-        description=(
-            "The distribution summary for incomplete statuses "
-            "(e.g., requests that hit a timeout error and were unable to complete)."
-        ),
-    )
-    errored: DistributionSummary = Field(
-        description=(
-            "The distribution summary for errored statuses (e.g., failed requests)."
-        )
-    )
 
     @staticmethod
     def from_values(

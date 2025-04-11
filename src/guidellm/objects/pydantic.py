@@ -1,9 +1,9 @@
-from typing import Any
+from typing import Any, Generic, TypeVar
 
 from loguru import logger
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
-__all__ = ["StandardBaseModel"]
+__all__ = ["StandardBaseModel", "StatusBreakdown"]
 
 
 class StandardBaseModel(BaseModel):
@@ -26,3 +26,35 @@ class StandardBaseModel(BaseModel):
             self.__class__.__name__,
             data,
         )
+
+
+SuccessfulT = TypeVar("SuccessfulT")
+ErroredT = TypeVar("ErroredT")
+IncompleteT = TypeVar("IncompleteT")
+TotalT = TypeVar("TotalT")
+
+
+class StatusBreakdown(BaseModel, Generic[SuccessfulT, ErroredT, IncompleteT, TotalT]):
+    """
+    A base class for Pydantic models that are separated by statuses including
+    successful, incomplete, and errored. It additionally enables the inclusion
+    of total, which is intended as the combination of all statuses.
+    Total may or may not be used depending on if it duplicates information.
+    """
+
+    successful: SuccessfulT = Field(
+        description="The results with a successful status.",
+        default=None,
+    )
+    errored: ErroredT = Field(
+        description="The results with an errored status.",
+        default=None,
+    )
+    incomplete: IncompleteT = Field(
+        description="The results with an incomplete status.",
+        default=None,
+    )
+    total: TotalT = Field(
+        description="The combination of all statuses.",
+        default=None,
+    )

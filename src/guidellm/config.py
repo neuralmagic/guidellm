@@ -137,8 +137,12 @@ class Settings(BaseSettings):
     dataset: DatasetSettings = DatasetSettings()
 
     # Request/stats settings
-    preferred_prompt_tokens_source: Optional[Literal["request", "response"]] = None
-    preferred_output_tokens_source: Optional[Literal["request", "response"]] = None
+    preferred_prompt_tokens_source: Optional[
+        Literal["request", "response", "local"]
+    ] = None
+    preferred_output_tokens_source: Optional[
+        Literal["request", "response", "local"]
+    ] = None
     preferred_backend: Literal["openai"] = "openai"
     openai: OpenAISettings = OpenAISettings()
 

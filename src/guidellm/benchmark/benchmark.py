@@ -1,9 +1,8 @@
 import random
 import uuid
-from typing import Any, Dict, Generic, List, Literal, Optional, Union
+from typing import Any, Dict, List, Literal, Optional, TypeVar, Union
 
 from pydantic import Field, computed_field
-from typing_extensions import TypeVar
 
 from guidellm.benchmark.profile import (
     AsyncProfile,
@@ -15,6 +14,7 @@ from guidellm.benchmark.profile import (
 )
 from guidellm.objects import (
     StandardBaseModel,
+    StatusBreakdown,
     StatusDistributionSummary,
 )
 from guidellm.request import (
@@ -34,7 +34,7 @@ from guidellm.scheduler import (
 )
 
 __all__ = [
-    "BENCH",
+    "BenchmarkT",
     "StatusBreakdown",
     "BenchmarkArgs",
     "BenchmarkRunStats",
@@ -45,26 +45,6 @@ __all__ = [
     "GenerativeMetrics",
     "GenerativeBenchmark",
 ]
-
-
-SuccessfulT = TypeVar("SuccessfulT", default=Any)
-ErroredT = TypeVar("ErroredT", default=SuccessfulT)
-IncompleteT = TypeVar("IncompleteT", default=ErroredT)
-class StatusBreakdown(StandardBaseModel, Generic[SuccessfulT, ErroredT, IncompleteT]):
-    """
-    A serializable model representing the breakdown of statistics for a benchmark run
-    split into successful, incomplete, and errored.
-    """
-
-    successful: SuccessfulT = Field(
-        description="Successful",
-    )
-    incomplete: IncompleteT = Field(
-        description="Incomplete",
-    )
-    errored: ErroredT = Field(
-        description="Errored",
-    )
 
 
 class BenchmarkArgs(StandardBaseModel):
@@ -148,26 +128,12 @@ class BenchmarkRunStats(StandardBaseModel):
     end_time: float = Field(
         description="The end time of the benchmark run.",
     )
-
-    total_successful: int = Field(
+    requests_made: StatusBreakdown[int, int, int, int] = Field(
         description=(
-            "The total number of successful requests in the benchmark run, "
-            "including warmup and cooldown."
-        ),
-    )
-    total_incomplete: int = Field(
-        description=(
-            "The total number of incomplete requests in the benchmark run, "
-            "including warmup and cooldown."
+            "The number of requests made for the benchmark run broken down by "
+            "status including successful, incomplete, errored, and the sum of all three"
         )
     )
-    total_errored: int = Field(
-        description=(
-            "The total number of errored requests in the benchmark run, "
-            "including warmup and cooldown."
-        )
-    )
-
     queued_time_avg: float = Field(
         description=(
             "The average time spent in the queue for each request in the benchmark "
@@ -248,15 +214,6 @@ class BenchmarkRunStats(StandardBaseModel):
         )
     )
 
-    @computed_field  # type: ignore[misc]
-    @property
-    def total(self) -> int:
-        """
-        :return: The total number of requests in the benchmark run, including
-            warmup and cooldown.
-        """
-        return self.total_successful + self.total_incomplete + self.total_errored
-
 
 class BenchmarkMetrics(StandardBaseModel):
     """
@@ -304,30 +261,23 @@ class Benchmark(StandardBaseModel):
             "The process statistics for the entire benchmark run across all requests."
         )
     )
-    worker: Optional[Union[GenerativeRequestsWorkerDescription, WorkerDescription]] = (
-        Field(
-            description=(
-                "The description and specifics for the worker used to resolve requests "
-                "for this benchmark."
-            ),
-            discriminator="type_",
-        )
+    worker: Union[WorkerDescription] = Field(
+        description=(
+            "The description and specifics for the worker used to resolve requests "
+            "for this benchmark."
+        ),
     )
-    request_loader: Optional[
-        Union[GenerativeRequestLoaderDescription, RequestLoaderDescription]
-    ] = Field(
+    request_loader: Union[RequestLoaderDescription] = Field(
         description=(
             "The description and specifics for the request loader used to create "
             "requests for this benchmark."
         ),
-        discriminator="type_",
     )
     extras: Dict[str, Any] = Field(
         description=(
             "Any additional information or metadata that was passed for this benchmark."
         )
     )
-
     metrics: BenchmarkMetrics = Field(
         description=(
             "The metrics for the benchmark run represented as a distribution of "
@@ -336,7 +286,7 @@ class Benchmark(StandardBaseModel):
     )
 
 
-BENCH = TypeVar("BENCH", bound=Benchmark)
+BenchmarkT = TypeVar("BenchmarkT", bound=Benchmark)
 
 
 class GenerativeTextResponseStats(StandardBaseModel):
@@ -604,25 +554,13 @@ class GenerativeBenchmark(Benchmark):
     """
 
     type_: Literal["generative_benchmark"] = "generative_benchmark"  # type: ignore[assignment]
-    total_count: StatusBreakdown[int] = Field(
-        description=(
-            "The total number of requests in the benchmark, "
-            "excluding warmup and cooldown."
-        )
-    )
-    sampled_size: Optional[StatusBreakdown[int]] = Field(
-        default=None,
-        description=(
-            "The number of requests that were randomly sampled for "
-            "the benchmark. None if no sampling was applied."
-        ),
-    )
     start_time: float = Field(
         description="The start time of the first request for the benchmark.",
     )
     end_time: float = Field(
         description="The end time of the last request for the benchmark.",
     )
+
     @computed_field  # type: ignore[misc]
     @property
     def duration(self) -> float:
@@ -632,99 +570,82 @@ class GenerativeBenchmark(Benchmark):
         """
         return self.end_time - self.start_time
 
+    worker: GenerativeRequestsWorkerDescription = Field(
+        description=(
+            "The description and specifics for the worker used to resolve requests "
+            "for this benchmark."
+        ),
+    )
+    request_loader: GenerativeRequestLoaderDescription = Field(
+        description=(
+            "The description and specifics for the request loader used to create "
+            "requests for this benchmark."
+        ),
+    )
     metrics: GenerativeMetrics = Field(
         description=(
             "The metrics for the benchmark run represented as a distribution of "
             "various per-request statistics."
         ),
     )
-    # Output is ordered so keep this at the end
+    # Output is ordered so keep the requests at the end for better readability in files
+    request_totals: StatusBreakdown[int, int, int, int] = Field(
+        description=(
+            "The number of requests made for the benchmark broken down by status "
+            "including successful, incomplete, errored, and the sum of all three"
+        )
+    )
+    request_samples: Optional[StatusBreakdown[int, int, int, None]] = Field(
+        description=(
+            "The number of requests that were randomly sampled for "
+            "the benchmark. None if no sampling was applied."
+        ),
+        default=None,
+    )
     requests: StatusBreakdown[
         List[GenerativeTextResponseStats],
         List[GenerativeTextErrorStats],
+        List[GenerativeTextErrorStats],
+        None,
     ] = Field(
         description=(
-            "The breakdown of requests for the benchmark run including completed, "
+            "The breakdown of requests for the benchmark run including successful, "
             "incomplete, and errored requests."
         ),
     )
 
-    def create_sampled(
-        self, sample_size: int, error_sample_size: Optional[int] = None
-    ) -> "GenerativeBenchmark":
+    def create_sampled(self, sample_size: int) -> "GenerativeBenchmark":
         """
         Create a new benchmark instance with a random sample of the completed and
         errored requests based on the given sample sizes. If the sample sizes are
         larger than the total number of requests, the sample sizes are capped at
         the total number of requests.
 
-        :param sample_size: The number of completed requests to sample.
-        :param error_sample_size: The number of errored requests to sample.
-            If None, defaults to the sample_size.
+        :param sample_size: The number of requests to sample for each status type.
         :return: A new benchmark instance with the sampled requests.
-        :raises ValueError: If the sample sizes are negative or if the
-            GenerativeBenchmark has already been sampled and the requested sample
-            sizes are larger than the previously sampled sizes.
+        :raises ValueError: If the sample sizes are negative.
         """
-        if error_sample_size is None:
-            error_sample_size = sample_size
-
         if sample_size < 0:
             raise ValueError(f"Sample size must be non-negative, given {sample_size}")
-        if error_sample_size < 0:
-            raise ValueError(
-                f"Error sample size must be non-negative, given {error_sample_size}"
-            )
-
-        if (
-            self.sampled_size is not None
-            and sample_size > self.sampled_size.successful
-        ):
-            raise ValueError(
-                "The benchmark's completed response have already been sampled with "
-                f"size {self.sampled_size.successful} and cannot be resampled with "
-                f"a larger size, given: {sample_size}"
-            )
-        if (
-            self.sampled_size is not None
-            and sample_size > self.sampled_size.incomplete
-        ):
-            raise ValueError(
-                "The benchmark's incomplete response have already been sampled with "
-                f"size {self.sampled_size.incomplete} and cannot be resampled with "
-                f"a larger size, given: {sample_size}"
-            )
-        if (
-            self.sampled_size is not None
-            and error_sample_size > self.sampled_size.errored
-        ):
-            raise ValueError(
-                "The benchmark's errored response have already been sampled with "
-                f"size {self.sampled_size.errored} and cannot be resampled with "
-                f"a larger size, given: {error_sample_size}"
-            )
 
         sample_size = min(sample_size, len(self.requests.successful))
+        error_sample_size = min(sample_size, len(self.requests.errored))
         incomplete_sample_size = min(sample_size, len(self.requests.incomplete))
-        error_sample_size = min(error_sample_size, len(self.requests.errored))
 
         sampled_instance = self.model_copy()
-        sampled_instance.sampled_size = StatusBreakdown(
-            successful=0,
-            incomplete=0,
-            errored=0,
-        )
-        sampled_instance.sampled_size.successful = sample_size
         sampled_instance.requests.successful = random.sample(
             self.requests.successful, sample_size
         )
-        sampled_instance.sampled_size.incomplete = incomplete_sample_size
+        sampled_instance.requests.errored = random.sample(
+            self.requests.errored, error_sample_size
+        )
         sampled_instance.requests.incomplete = random.sample(
             self.requests.incomplete, incomplete_sample_size
         )
-        sampled_instance.sampled_size.errored = error_sample_size
-        sampled_instance.requests.errored = random.sample(
-            self.requests.errored, error_sample_size
+        sampled_instance.request_samples = StatusBreakdown(
+            successful=len(sampled_instance.requests.successful),
+            incomplete=len(sampled_instance.requests.incomplete),
+            errored=len(sampled_instance.requests.errored),
         )
 
         return sampled_instance
@@ -737,8 +658,8 @@ class GenerativeBenchmark(Benchmark):
         errored: List[GenerativeTextErrorStats],
         args: BenchmarkArgs,
         run_stats: BenchmarkRunStats,
-        worker: WorkerDescription,
-        requests_loader: RequestLoaderDescription,
+        worker: GenerativeRequestsWorkerDescription,
+        requests_loader: GenerativeRequestLoaderDescription,
         extras: Optional[Dict[str, Any]],
     ) -> "GenerativeBenchmark":
         """
@@ -811,16 +732,11 @@ class GenerativeBenchmark(Benchmark):
             run_id=run_id,
             args=args,
             run_stats=run_stats,
-            worker=worker,
-            request_loader=requests_loader,
             extras=extras or {},
-            total_count=StatusBreakdown(
-                successful=len(successful),
-                incomplete=len(incomplete),
-                errored=len(errored),
-            ),
             start_time=start_time,
             end_time=end_time,
+            worker=worker,
+            request_loader=requests_loader,
             metrics=GenerativeMetrics(
                 requests_per_second=StatusDistributionSummary.from_request_times(
                     request_types=total_types,
@@ -897,6 +813,12 @@ class GenerativeBenchmark(Benchmark):
                         req.prompt_tokens for req in total_with_output_first
                     ],
                 ),
+            ),
+            request_totals=StatusBreakdown(
+                successful=len(successful),
+                incomplete=len(incomplete),
+                errored=len(errored),
+                total=len(total),
             ),
             requests=StatusBreakdown(
                 successful=successful,

@@ -1,7 +1,7 @@
 from typing import TypeVar
 
-__all__ = ["REQ", "RES"]
+__all__ = ["RequestT", "ResponseT"]
 
 
-REQ = TypeVar("REQ")
-RES = TypeVar("RES")
+RequestT = TypeVar("RequestT")
+ResponseT = TypeVar("ResponseT")

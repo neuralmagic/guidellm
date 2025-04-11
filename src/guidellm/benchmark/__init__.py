@@ -1,5 +1,5 @@
-from .aggregator import AGG, BenchmarkAggregator, GenerativeBenchmarkAggregator
-from .benchmark import BENCH, Benchmark, GenerativeBenchmark
+from .aggregator import AggregatorT, BenchmarkAggregator, GenerativeBenchmarkAggregator
+from .benchmark import Benchmark, BenchmarkT, GenerativeBenchmark
 from .benchmarker import Benchmarker, BenchmarkerResult, GenerativeBenchmarker
 from .entrypoints import benchmark_generative_text
 from .profile import (
@@ -14,8 +14,8 @@ from .profile import (
 )
 
 __all__ = [
-    "AGG",
-    "BENCH",
+    "AggregatorT",
+    "BenchmarkT",
     "Benchmark",
     "BenchmarkAggregator",
     "GenerativeBenchmark",

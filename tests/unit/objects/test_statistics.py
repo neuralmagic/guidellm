@@ -385,20 +385,6 @@ def test_status_distribution_summary_initialization():
     assert status_distribution_summary.errored.mean == 50.0
 
 
-def test_status_distribution_summary_invalid_initialization():
-    test_kwargs = {
-        "total": create_default_distribution_summary(),
-        "successful": create_default_distribution_summary(),
-        "incomplete": create_default_distribution_summary(),
-        "errored": create_default_distribution_summary(),
-    }
-    test_missing_keys = list(test_kwargs.keys())
-    for missing_key in test_missing_keys:
-        kwargs = {key: val for key, val in test_kwargs.items() if key != missing_key}
-        with pytest.raises(ValueError):
-            StatusDistributionSummary(**kwargs)  # type: ignore
-
-
 def test_status_distribution_summary_marshalling():
     status_distribution_summary = StatusDistributionSummary(
         total=create_default_distribution_summary(),

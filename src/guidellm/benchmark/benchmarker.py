@@ -17,16 +17,20 @@ from pydantic import Field
 from transformers import PreTrainedTokenizer  # type: ignore  # noqa: PGH003
 
 from guidellm.backend import Backend, ResponseSummary
-from guidellm.benchmark.aggregator import AGG, BENCH, GenerativeBenchmarkAggregator
-from guidellm.benchmark.benchmark import GenerativeBenchmark
+from guidellm.benchmark.aggregator import (
+    AggregatorT,
+    BenchmarkT,
+    GenerativeBenchmarkAggregator,
+)
+from guidellm.benchmark.benchmark import BenchmarkArgs, GenerativeBenchmark
 from guidellm.benchmark.profile import Profile
 from guidellm.objects import StandardBaseModel
 from guidellm.request import GenerationRequest, RequestLoaderDescription
 from guidellm.scheduler import (
-    REQ,
-    RES,
     GenerativeRequestsWorker,
     RequestsWorker,
+    RequestT,
+    ResponseT,
     Scheduler,
     SchedulerRequestResult,
     SchedulingStrategy,
@@ -35,7 +39,9 @@ from guidellm.scheduler import (
 __all__ = ["Benchmarker", "BenchmarkerResult", "GenerativeBenchmarker"]
 
 
-class BenchmarkerResult(StandardBaseModel, Generic[AGG, BENCH, REQ, RES]):
+class BenchmarkerResult(
+    StandardBaseModel, Generic[AggregatorT, BenchmarkT, RequestT, ResponseT]
+):
     type_: Literal[
         "run_start",
         "run_complete",
@@ -49,9 +55,9 @@ class BenchmarkerResult(StandardBaseModel, Generic[AGG, BENCH, REQ, RES]):
     profile: Profile
     current_index: int
     current_strategy: Optional[SchedulingStrategy] = None
-    current_aggregator: Optional[AGG] = None
-    current_benchmark: Optional[BENCH] = None
-    current_result: Optional[SchedulerRequestResult[REQ, RES]] = None
+    current_aggregator: Optional[AggregatorT] = None
+    current_benchmark: Optional[BenchmarkT] = None
+    current_result: Optional[SchedulerRequestResult[RequestT, ResponseT]] = None
 
 
 class BenchmarkerStrategyLimits(StandardBaseModel):
@@ -120,16 +126,16 @@ class BenchmarkerStrategyLimits(StandardBaseModel):
         return self.cooldown_percent_per_strategy * self.max_duration
 
 
-class Benchmarker(Generic[AGG, BENCH, REQ, RES], ABC):
+class Benchmarker(Generic[AggregatorT, BenchmarkT, RequestT, ResponseT], ABC):
     def __init__(
         self,
-        worker: RequestsWorker[REQ, RES],
-        request_loader: Iterable[REQ],
+        worker: RequestsWorker[RequestT, ResponseT],
+        request_loader: Iterable[RequestT],
         requests_loader_description: RequestLoaderDescription,
         benchmark_save_extras: Optional[Dict[str, Any]] = None,
     ):
         self.worker = worker
-        self.scheduler: Scheduler[REQ, RES] = Scheduler(
+        self.scheduler: Scheduler[RequestT, ResponseT] = Scheduler(
             worker=worker, request_loader=request_loader
         )
         self.requests_loader_description = requests_loader_description
@@ -142,7 +148,9 @@ class Benchmarker(Generic[AGG, BENCH, REQ, RES], ABC):
         max_duration_per_strategy: Optional[float],
         warmup_percent_per_strategy: Optional[float],
         cooldown_percent_per_strategy: Optional[float],
-    ) -> AsyncGenerator[BenchmarkerResult[AGG, BENCH, REQ, RES], None]:
+    ) -> AsyncGenerator[
+        BenchmarkerResult[AggregatorT, BenchmarkT, RequestT, ResponseT], None
+    ]:
         try:
             requests_loader_size = len(self.scheduler.request_loader)  # type: ignore[arg-type]
         except Exception:  # noqa: BLE001
@@ -179,12 +187,7 @@ class Benchmarker(Generic[AGG, BENCH, REQ, RES], ABC):
                 profile=profile,
                 strategy_index=current_index,
                 strategy=scheduling_strategy,
-                max_number=strategy_limits.max_number,
-                max_duration=strategy_limits.max_duration,
-                warmup_number=strategy_limits.warmup_number,
-                warmup_duration=strategy_limits.warmup_duration,
-                cooldown_number=strategy_limits.cooldown_number,
-                cooldown_duration=strategy_limits.cooldown_duration,
+                limits=strategy_limits,
             )
 
             async for result in self.scheduler.run(
@@ -233,7 +236,7 @@ class Benchmarker(Generic[AGG, BENCH, REQ, RES], ABC):
                 else:
                     raise ValueError(f"Unexpected result type: {type(result)}")
 
-            benchmark: BENCH = aggregator.compile()
+            benchmark: BenchmarkT = aggregator.compile()
             profile.completed_strategy(
                 average_rate=benchmark.metrics.requests_per_second.successful.mean,
                 average_concurrency=benchmark.metrics.request_concurrency.successful.mean,
@@ -270,13 +273,8 @@ class Benchmarker(Generic[AGG, BENCH, REQ, RES], ABC):
         profile: Profile,
         strategy_index: int,
         strategy: SchedulingStrategy,
-        max_number: Optional[int],
-        max_duration: Optional[float],
-        warmup_number: Optional[int],
-        warmup_duration: Optional[float],
-        cooldown_number: Optional[int],
-        cooldown_duration: Optional[float],
-    ) -> AGG: ...
+        limits: BenchmarkerStrategyLimits,
+    ) -> AggregatorT: ...
 
 
 class GenerativeBenchmarker(
@@ -311,27 +309,24 @@ class GenerativeBenchmarker(
         profile: Profile,
         strategy_index: int,
         strategy: SchedulingStrategy,
-        max_number: Optional[int],
-        max_duration: Optional[float],
-        warmup_number: Optional[int],
-        warmup_duration: Optional[float],
-        cooldown_number: Optional[int],
-        cooldown_duration: Optional[float],
+        limits: BenchmarkerStrategyLimits,
     ) -> GenerativeBenchmarkAggregator:
         return GenerativeBenchmarkAggregator(
-            processor=self.processor,
-            processor_args=self.processor_args,
             run_id=run_id,
-            profile=profile,
-            strategy_index=strategy_index,
-            strategy=strategy,
-            max_number=max_number,
-            max_duration=max_duration,
-            warmup_number=warmup_number,
-            warmup_duration=warmup_duration,
-            cooldown_number=cooldown_number,
-            cooldown_duration=cooldown_duration,
+            args=BenchmarkArgs(
+                profile=profile,
+                strategy_index=strategy_index,
+                strategy=strategy,
+                max_number=limits.max_number,
+                max_duration=limits.max_duration,
+                warmup_number=limits.warmup_number,
+                warmup_duration=limits.warmup_duration,
+                cooldown_number=limits.cooldown_number,
+                cooldown_duration=limits.cooldown_duration,
+            ),
             worker_description=self.worker.description,
             request_loader_description=self.requests_loader_description,
             extras=self.benchmark_save_extras or {},
+            processor=self.processor,
+            processor_args=self.processor_args,
         )

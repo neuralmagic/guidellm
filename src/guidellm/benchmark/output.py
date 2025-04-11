@@ -258,28 +258,28 @@ class GenerativeBenchmarksConsole:
                     f"{datetime.fromtimestamp(benchmark.end_time).strftime('%H:%M:%S')}",
                     f"{(benchmark.end_time - benchmark.start_time):.1f}",
                     (
-                        f"{benchmark.total_count.successful:>5} / "
-                        f"{benchmark.total_count.incomplete} / "
-                        f"{benchmark.total_count.errored}"
+                        f"{benchmark.request_totals.successful:>5} / "
+                        f"{benchmark.request_totals.incomplete} / "
+                        f"{benchmark.request_totals.errored}"
                     ),
                     (
-                        f"{benchmark.metrics.prompt_token_count.successful.mean:>5.1f} / " # noqa: E501
+                        f"{benchmark.metrics.prompt_token_count.successful.mean:>5.1f} / "  # noqa: E501
                         f"{benchmark.metrics.prompt_token_count.incomplete.mean:.1f} / "
                         f"{benchmark.metrics.prompt_token_count.errored.mean:.1f}"
                     ),
                     (
-                        f"{benchmark.metrics.output_token_count.successful.mean:>5.1f} / " # noqa: E501
+                        f"{benchmark.metrics.output_token_count.successful.mean:>5.1f} / "  # noqa: E501
                         f"{benchmark.metrics.output_token_count.incomplete.mean:.1f} / "
                         f"{benchmark.metrics.output_token_count.errored.mean:.1f}"
                     ),
                     (
-                        f"{benchmark.metrics.prompt_token_count.successful.total_sum:>6.0f} / " # noqa: E501
-                        f"{benchmark.metrics.prompt_token_count.incomplete.total_sum:.0f} / " # noqa: E501
+                        f"{benchmark.metrics.prompt_token_count.successful.total_sum:>6.0f} / "  # noqa: E501
+                        f"{benchmark.metrics.prompt_token_count.incomplete.total_sum:.0f} / "  # noqa: E501
                         f"{benchmark.metrics.prompt_token_count.errored.total_sum:.0f}"
                     ),
                     (
-                        f"{benchmark.metrics.output_token_count.successful.total_sum:>6.0f} / " # noqa: E501
-                        f"{benchmark.metrics.output_token_count.incomplete.total_sum:.0f} / " # noqa: E501
+                        f"{benchmark.metrics.output_token_count.successful.total_sum:>6.0f} / "  # noqa: E501
+                        f"{benchmark.metrics.output_token_count.incomplete.total_sum:.0f} / "  # noqa: E501
                         f"{benchmark.metrics.output_token_count.errored.total_sum:.0f}"
                     ),
                 ]
@@ -323,18 +323,18 @@ class GenerativeBenchmarksConsole:
                         f"{benchmark.metrics.request_latency.successful.percentiles.p99:.2f}"
                     ),
                     (
-                        f"{benchmark.metrics.time_to_first_token_ms.successful.mean:.1f} / " # noqa: E501
-                        f"{benchmark.metrics.time_to_first_token_ms.successful.median:.1f} / " # noqa: E501
+                        f"{benchmark.metrics.time_to_first_token_ms.successful.mean:.1f} / "  # noqa: E501
+                        f"{benchmark.metrics.time_to_first_token_ms.successful.median:.1f} / "  # noqa: E501
                         f"{benchmark.metrics.time_to_first_token_ms.successful.percentiles.p99:.1f}"
                     ),
                     (
-                        f"{benchmark.metrics.inter_token_latency_ms.successful.mean:.1f} / " # noqa: E501
-                        f"{benchmark.metrics.inter_token_latency_ms.successful.median:.1f} / " # noqa: E501
+                        f"{benchmark.metrics.inter_token_latency_ms.successful.mean:.1f} / "  # noqa: E501
+                        f"{benchmark.metrics.inter_token_latency_ms.successful.median:.1f} / "  # noqa: E501
                         f"{benchmark.metrics.inter_token_latency_ms.successful.percentiles.p99:.1f}"
                     ),
                     (
-                        f"{benchmark.metrics.time_per_output_token_ms.successful.mean:.1f} / " # noqa: E501
-                        f"{benchmark.metrics.time_per_output_token_ms.successful.median:.1f} / " # noqa: E501
+                        f"{benchmark.metrics.time_per_output_token_ms.successful.mean:.1f} / "  # noqa: E501
+                        f"{benchmark.metrics.time_per_output_token_ms.successful.median:.1f} / "  # noqa: E501
                         f"{benchmark.metrics.time_per_output_token_ms.successful.percentiles.p99:.1f}"
                     ),
                 ]

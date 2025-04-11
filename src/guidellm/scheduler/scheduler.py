@@ -25,7 +25,7 @@ from guidellm.scheduler.result import (
     SchedulerRunInfo,
 )
 from guidellm.scheduler.strategy import SchedulingStrategy
-from guidellm.scheduler.types import REQ, RES
+from guidellm.scheduler.types import RequestT, ResponseT
 from guidellm.scheduler.worker import (
     RequestsWorker,
     WorkerProcessRequest,
@@ -35,7 +35,7 @@ from guidellm.scheduler.worker import (
 __all__ = ["Scheduler"]
 
 
-class Scheduler(Generic[REQ, RES]):
+class Scheduler(Generic[RequestT, ResponseT]):
     """
     A class that handles the scheduling of requests to a worker.
     This class is responsible for managing the lifecycle of the requests,
@@ -57,8 +57,8 @@ class Scheduler(Generic[REQ, RES]):
 
     def __init__(
         self,
-        worker: RequestsWorker[REQ, RES],
-        request_loader: Iterable[REQ],
+        worker: RequestsWorker[RequestT, ResponseT],
+        request_loader: Iterable[RequestT],
     ):
         if not isinstance(worker, RequestsWorker):
             raise ValueError(f"Invalid worker: {worker}")
@@ -74,7 +74,9 @@ class Scheduler(Generic[REQ, RES]):
         scheduling_strategy: SchedulingStrategy,
         max_number: Optional[int] = None,
         max_duration: Optional[float] = None,
-    ) -> AsyncGenerator[Union[SchedulerResult, SchedulerRequestResult[REQ, RES]], None]:
+    ) -> AsyncGenerator[
+        Union[SchedulerResult, SchedulerRequestResult[RequestT, ResponseT]], None
+    ]:
         """
         The main method that runs the scheduler.
         This method is a generator that yields SchedulerResult objects
@@ -286,7 +288,7 @@ class Scheduler(Generic[REQ, RES]):
                         raise StopIteration
 
                     request = next(requests_iter)
-                    work_req: WorkerProcessRequest[REQ] = WorkerProcessRequest(
+                    work_req: WorkerProcessRequest[RequestT] = WorkerProcessRequest(
                         request=request,
                         start_time=request_time,
                         timeout_time=run_info.end_time,
@@ -308,9 +310,9 @@ class Scheduler(Generic[REQ, RES]):
         self,
         responses_queue: multiprocessing.Queue,
         run_info: SchedulerRunInfo,
-    ) -> Optional[SchedulerRequestResult[REQ, RES]]:
+    ) -> Optional[SchedulerRequestResult[RequestT, ResponseT]]:
         try:
-            process_response: WorkerProcessResult[REQ, RES] = (
+            process_response: WorkerProcessResult[RequestT, ResponseT] = (
                 responses_queue.get_nowait()
             )
         except multiprocessing.queues.Empty:  # type: ignore[attr-defined]

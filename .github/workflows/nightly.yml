@@ -10,11 +10,11 @@ jobs:
     strategy:
       matrix:
         python:
+          - "3.13"
           - "3.12"
           - "3.11"
           - "3.10"
           - "3.9"
-          - "3.8"
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python
@@ -31,11 +31,11 @@ jobs:
     strategy:
       matrix:
         python:
+          - "3.13"
           - "3.12"
           - "3.11"
           - "3.10"
           - "3.9"
-          - "3.8"
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python
@@ -52,11 +52,11 @@ jobs:
     strategy:
       matrix:
         python:
+          - "3.13"
           - "3.12"
           - "3.11"
           - "3.10"
           - "3.9"
-          - "3.8"
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python

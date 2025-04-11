@@ -6,7 +6,7 @@ from typing import (
 
 from guidellm.objects import StandardBaseModel
 from guidellm.scheduler.strategy import SchedulingStrategy
-from guidellm.scheduler.types import REQ, RES
+from guidellm.scheduler.types import RequestT, ResponseT
 
 __all__ = [
     "SchedulerResult",
@@ -124,7 +124,7 @@ class SchedulerResult(StandardBaseModel):
 
 class SchedulerRequestResult(
     SchedulerResult,
-    Generic[REQ, RES],
+    Generic[RequestT, ResponseT],
 ):
     pydantic_type: Literal["scheduler_request_result"] = "scheduler_request_result"  # type: ignore[assignment]
     type_: Literal[
@@ -132,6 +132,6 @@ class SchedulerRequestResult(
         "request_start",
         "request_complete",
     ]
-    request: REQ
+    request: RequestT
     request_info: SchedulerRequestInfo
-    response: Optional[RES] = None
+    response: Optional[ResponseT] = None

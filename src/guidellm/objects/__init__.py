@@ -1,4 +1,4 @@
-from .pydantic import StandardBaseModel
+from .pydantic import StandardBaseModel, StatusBreakdown
 from .statistics import (
     DistributionSummary,
     Percentiles,
@@ -8,10 +8,11 @@ from .statistics import (
 )
 
 __all__ = [
-    "Percentiles",
-    "DistributionSummary",
-    "StatusDistributionSummary",
     "StandardBaseModel",
+    "StatusBreakdown",
+    "DistributionSummary",
+    "Percentiles",
     "RunningStats",
+    "StatusDistributionSummary",
     "TimeRunningStats",
 ]

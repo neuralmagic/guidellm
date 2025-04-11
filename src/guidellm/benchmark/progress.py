@@ -481,10 +481,10 @@ class BenchmarkerProgressDisplay(Generic[BTPS]):
         progress_state.started = True
         current_aggregator: BenchmarkAggregator = result.current_aggregator  # type: ignore[assignment]
         progress_state.start_time = (
-            current_aggregator.scheduler_created_requests.start_time
+            current_aggregator.requests_stats.totals.total.start_time
         )
-        progress_state.max_number = current_aggregator.max_number
-        progress_state.max_duration = current_aggregator.max_duration
+        progress_state.max_number = current_aggregator.args.max_number
+        progress_state.max_duration = current_aggregator.args.max_duration
 
     def handle_update_scheduler_update(
         self, progress_state: BTPS, result: BenchmarkerResult
@@ -498,31 +498,36 @@ class BenchmarkerProgressDisplay(Generic[BTPS]):
         current_aggregator: BenchmarkAggregator = result.current_aggregator  # type: ignore[assignment]
         progress_state.in_warmup = current_aggregator.in_warmup
         progress_state.in_cooldown = current_aggregator.in_cooldown
-        progress_state.requests_rate = current_aggregator.successful_requests.rate
-        progress_state.request_latency = current_aggregator.request_time.mean
+        progress_state.requests_rate = (
+            current_aggregator.requests_stats.totals.successful.rate
+        )
+        progress_state.request_latency = (
+            current_aggregator.requests_stats.request_time.mean
+        )
         progress_state.requests_processing = (
-            current_aggregator.scheduler_processing_requests.last
+            current_aggregator.scheduler_stats.processing_requests.last
         )
         progress_state.requests_successful = (
-            current_aggregator.successful_requests.total
+            current_aggregator.requests_stats.totals.successful.total
         )
         progress_state.requests_incomplete = (
-            current_aggregator.incomplete_requests.total
+            current_aggregator.requests_stats.totals.incomplete.total
         )
-        progress_state.requests_errored = current_aggregator.errored_requests.total
-
+        progress_state.requests_errored = (
+            current_aggregator.requests_stats.totals.errored.total
+        )
         progress_state.worker_overheads_time_ms = (
-            current_aggregator.scheduled_time_delay.mean_ms
-            + current_aggregator.worker_start_delay.mean_ms
+            current_aggregator.requests_stats.scheduled_time_delay.mean_ms
+            + current_aggregator.requests_stats.worker_start_delay.mean_ms
         )
         progress_state.backend_overheads_time_ms = (
-            current_aggregator.request_time_delay.mean_ms
+            current_aggregator.requests_stats.request_time_delay.mean_ms
         )
         progress_state.requests_sleep_time_ms = (
-            current_aggregator.scheduled_time_sleep.mean_ms
+            current_aggregator.requests_stats.scheduled_time_sleep.mean_ms
         )
         progress_state.requests_targeted_start_time_delay_ms = (
-            current_aggregator.request_start_time_targeted_delay.mean_ms
+            current_aggregator.requests_stats.request_start_time_targeted_delay.mean_ms
         )
 
     def handle_update_scheduler_complete(
@@ -623,12 +628,24 @@ class GenerativeTextBenchmarkerProgressDisplay(
     ):
         super().handle_update_scheduler_update(progress_state, result)
         current_aggregator: GenerativeBenchmarkAggregator = result.current_aggregator  # type: ignore[assignment]
-        progress_state.output_tokens = current_aggregator.output_tokens.mean
-        progress_state.prompt_tokens = current_aggregator.prompt_tokens.mean
-        progress_state.output_tokens_rate = current_aggregator.output_tokens.rate
-        progress_state.total_tokens_rate = current_aggregator.total_tokens.rate
-        progress_state.tokens_ttft = current_aggregator.time_to_first_token.mean
-        progress_state.tokens_itl = current_aggregator.inter_token_latency.mean
+        progress_state.output_tokens = (
+            current_aggregator.requests_stats.output_tokens.mean
+        )
+        progress_state.prompt_tokens = (
+            current_aggregator.requests_stats.prompt_tokens.mean
+        )
+        progress_state.output_tokens_rate = (
+            current_aggregator.requests_stats.output_tokens.rate
+        )
+        progress_state.total_tokens_rate = (
+            current_aggregator.requests_stats.total_tokens.rate
+        )
+        progress_state.tokens_ttft = (
+            current_aggregator.requests_stats.time_to_first_token.mean_ms
+        )
+        progress_state.tokens_itl = (
+            current_aggregator.requests_stats.inter_token_latency.mean_ms
+        )
 
     def handle_update_benchmark_compiled(
         self,
@@ -641,11 +658,9 @@ class GenerativeTextBenchmarkerProgressDisplay(
         progress_state.request_latency = (
             current_benchmark.metrics.request_latency.successful.mean
         )
-        progress_state.requests_processing = (
-            current_benchmark.metrics.request_concurrency.successful.mean
-        )
-        progress_state.requests_successful = current_benchmark.total_count.successful
-        progress_state.requests_errored = current_benchmark.total_count.errored
+        progress_state.requests_successful = current_benchmark.request_totals.successful
+        progress_state.requests_errored = current_benchmark.request_totals.errored
+        progress_state.requests_incomplete = current_benchmark.request_totals.incomplete
         progress_state.output_tokens = (
             current_benchmark.metrics.output_token_count.successful.mean
         )

@@ -17,177 +17,48 @@ from pydantic import Field
 
 from guidellm.backend import ResponseSummary
 from guidellm.benchmark.benchmark import (
-    BENCH,
     BenchmarkArgs,
     BenchmarkRunStats,
+    BenchmarkT,
     GenerativeBenchmark,
     GenerativeTextErrorStats,
     GenerativeTextResponseStats,
 )
-from guidellm.benchmark.profile import (
-    AsyncProfile,
-    ConcurrentProfile,
-    Profile,
-    SweepProfile,
-    SynchronousProfile,
-    ThroughputProfile,
-)
 from guidellm.config import settings
-from guidellm.objects import RunningStats, StandardBaseModel, TimeRunningStats
+from guidellm.objects import (
+    RunningStats,
+    StandardBaseModel,
+    StatusBreakdown,
+    TimeRunningStats,
+)
 from guidellm.request import (
     GenerationRequest,
     GenerativeRequestLoaderDescription,
     RequestLoaderDescription,
 )
 from guidellm.scheduler import (
-    REQ,
-    RES,
-    AsyncConstantStrategy,
-    AsyncPoissonStrategy,
-    ConcurrentStrategy,
     GenerativeRequestsWorkerDescription,
+    RequestT,
+    ResponseT,
     SchedulerRequestResult,
-    SchedulingStrategy,
-    SynchronousStrategy,
-    ThroughputStrategy,
     WorkerDescription,
 )
 from guidellm.utils import check_load_processor
 
 __all__ = [
-    "AGG",
+    "AggregatorT",
     "BenchmarkAggregator",
     "GenerativeBenchmarkAggregator",
 ]
 
 
-class BenchmarkAggregator(ABC, StandardBaseModel, Generic[BENCH, REQ, RES]):
+class SchedulerRunningStats(StandardBaseModel):
     """
-    A pydantic base class representing the base class for aggregating benchmark results.
-    The purpose is to receive and process results from a Benchmarker as it iterates
-    through a Scheduler for an individual benchmark run.
-    As results are added, lightweight statistics are updated and stored for immediate
-    progress and informational updates to the caller.
-    Once the benchmark run is complete, the `compile` method is called to finalize
-    the benchmark and return a Benchmark object with all the results and statistics
-    fully calculated.
+    The metrics for the scheduler stored as running statistics for easy calculations
+    of rates, averages, totals, etc.
     """
 
-    type_: Literal["benchmark_aggregator"] = "benchmark_aggregator"
-    run_id: str = Field(
-        description=(
-            "The unique identifier for the encompasing benchmark run that this "
-            "benchmark was a part of."
-        )
-    )
-    profile: Union[
-        AsyncProfile,
-        SweepProfile,
-        ConcurrentProfile,
-        ThroughputProfile,
-        SynchronousProfile,
-        Profile,
-    ] = Field(
-        description=(
-            "The profile used for the entire benchamrk run that the strategy for "
-            "the active benchmark was pulled from."
-        ),
-        discriminator="type_",
-    )
-    strategy_index: int = Field(
-        description=(
-            "The index of the strategy in the profile that was used for this benchmark."
-        )
-    )
-    strategy: Union[
-        ConcurrentStrategy,
-        SchedulingStrategy,
-        ThroughputStrategy,
-        SynchronousStrategy,
-        AsyncPoissonStrategy,
-        AsyncConstantStrategy,
-        SchedulingStrategy,
-    ] = Field(
-        description="The scheduling strategy used to run this benchmark. ",
-        discriminator="type_",
-    )
-    max_number: Optional[int] = Field(
-        description="The maximum number of requests to run for this benchmark, if any."
-    )
-    max_duration: Optional[float] = Field(
-        description="The maximum duration in seconds to run this benchmark, if any."
-    )
-    warmup_number: Optional[int] = Field(
-        description=(
-            "The number of requests to run for the warmup phase of this benchmark, "
-            "if any. These are requests that were not included in the final results."
-        )
-    )
-    warmup_duration: Optional[float] = Field(
-        description=(
-            "The duration in seconds to run for the warmup phase of this benchmark, "
-            "if any. These are requests that were not included in the final results."
-        )
-    )
-    cooldown_number: Optional[int] = Field(
-        description=(
-            "The number of requests to run for the cooldown phase of this benchmark, "
-            "if any. These are requests that were not included in the final results."
-        )
-    )
-    cooldown_duration: Optional[float] = Field(
-        description=(
-            "The duration in seconds to run for the cooldown phase of this benchmark, "
-            "if any. These are requests that were not included in the final results."
-        )
-    )
-    worker_description: Union[
-        GenerativeRequestsWorkerDescription, WorkerDescription
-    ] = Field(
-        description=(
-            "The description and specifics for the worker used to resolve requests "
-            "for this benchmark."
-        ),
-        discriminator="type_",
-    )
-    request_loader_description: Union[
-        GenerativeRequestLoaderDescription, RequestLoaderDescription
-    ] = Field(
-        description=(
-            "The description and specifics for the request loader used to create "
-            "requests for this benchmark."
-        ),
-        discriminator="type_",
-    )
-    extras: Dict[str, Any] = Field(
-        description=(
-            "Any additional information or metadata that was passed for this benchmark."
-        )
-    )
-
-    results: List[SchedulerRequestResult[REQ, RES]] = Field(
-        default_factory=list,
-        description=(
-            "The list of all results from the benchmark (complete, incomplete, error), "
-            "that were not within the warmup or cooldown periods."
-        ),
-    )
-    in_warmup: bool = Field(
-        description=(
-            "A flag to indicate if the benchmark is currently in the warmup phase."
-        ),
-        default=False,
-        exclude=True,
-    )
-    in_cooldown: bool = Field(
-        description=(
-            "A flag to indicate if the benchmark is currently in the cooldown phase."
-        ),
-        default=False,
-        exclude=True,
-    )
-
-    scheduler_created_requests: RunningStats = Field(
+    created_requests: RunningStats = Field(
         description=(
             "The running statistics for the number of requests created for this "
             "benchmark run. This includes all requests created, regardless of "
@@ -195,7 +66,7 @@ class BenchmarkAggregator(ABC, StandardBaseModel, Generic[BENCH, REQ, RES]):
         ),
         default_factory=RunningStats,
     )
-    scheduler_queued_requests: RunningStats = Field(
+    queued_requests: RunningStats = Field(
         description=(
             "The running statistics for the number of requests pending in queue "
             "for this benchmark run. This includes requests that are waiting to "
@@ -203,21 +74,21 @@ class BenchmarkAggregator(ABC, StandardBaseModel, Generic[BENCH, REQ, RES]):
         ),
         default_factory=RunningStats,
     )
-    scheduler_scheduled_requests: RunningStats = Field(
+    scheduled_requests: RunningStats = Field(
         description=(
             "The running statistics for the number of requests scheduled (actively "
             "running but waiting for the desired start time) for this benchmark run."
         ),
         default_factory=RunningStats,
     )
-    scheduler_processing_requests: RunningStats = Field(
+    processing_requests: RunningStats = Field(
         description=(
             "The running statistics for the number of requests actively being "
             "processed by the worker for this benchmark run."
         ),
         default_factory=RunningStats,
     )
-    scheduler_completed_requests: RunningStats = Field(
+    completed_requests: RunningStats = Field(
         description=(
             "The running statistics for the number of requests completed for this "
             "benchmark run. This includes requests within the warmup and cooldown "
@@ -226,34 +97,27 @@ class BenchmarkAggregator(ABC, StandardBaseModel, Generic[BENCH, REQ, RES]):
         default_factory=RunningStats,
     )
 
-    successful_requests: RunningStats = Field(
-        description=(
-            "The running statistics for the number of requests that completed "
-            "successfully without error. This is a subset of the completed requests "
-            "for any that did not error. This includes requests within the warmup "
-            "and cooldown period, if any, along with the final results."
-        ),
-        default_factory=RunningStats,
-    )
-    incomplete_requests: RunningStats = Field(
-        description=(
-            "The running statistics for the number of requests that were incomplete "
-            "or preempted during processing. This includes requests "
-            "within the warmup and cooldown period, if any, along with the final "
-            "results."
-        ),
-        default_factory=RunningStats,
-    )
-    errored_requests: RunningStats = Field(
-        description=(
-            "The running statistics for the number of requests that errored during "
-            "processing. This is a subset of the completed requests for any that "
-            "errored. This includes requests within the warmup and cooldown period, "
-            "if any, along with the final results."
-        ),
-        default_factory=RunningStats,
-    )
 
+class RequestsRunningStats(StandardBaseModel):
+    """
+    The metrics for requests that have succeeded, been canceled, or errored stored
+    as running statistics for easy calculations of rates, averages, totals, etc.
+    """
+
+    totals: StatusBreakdown[RunningStats, RunningStats, RunningStats, RunningStats] = (
+        Field(
+            description=(
+                "The running statistics for the total number of requests that "
+                "completed within the benchmark run."
+            ),
+            default_factory=lambda: StatusBreakdown(
+                successful=RunningStats(),
+                errored=RunningStats(),
+                incomplete=RunningStats(),
+                total=RunningStats(),
+            ),
+        )
+    )
     queued_time: TimeRunningStats = Field(
         description=(
             "The running statistics for the time spent in queue for all requests that "
@@ -348,9 +212,106 @@ class BenchmarkAggregator(ABC, StandardBaseModel, Generic[BENCH, REQ, RES]):
         default_factory=TimeRunningStats,
     )
 
+
+class BenchmarkAggregator(
+    ABC, StandardBaseModel, Generic[BenchmarkT, RequestT, ResponseT]
+):
+    """
+    A pydantic base class representing the base class for aggregating benchmark results.
+    The purpose is to receive and process results from a Benchmarker as it iterates
+    through a Scheduler for an individual benchmark run.
+    As results are added, lightweight statistics are updated and stored for immediate
+    progress and informational updates to the caller.
+    Once the benchmark run is complete, the `compile` method is called to finalize
+    the benchmark and return a Benchmark object with all the results and statistics
+    fully calculated.
+    """
+
+    type_: Literal["benchmark_aggregator"] = "benchmark_aggregator"
+    run_id: str = Field(
+        description=(
+            "The unique identifier for the encompasing benchmark run that this "
+            "benchmark was a part of."
+        )
+    )
+    args: BenchmarkArgs = Field(
+        description=(
+            "The arguments used to create the benchmark run that this benchmark was "
+            "a part of."
+        )
+    )
+    worker_description: Union[
+        GenerativeRequestsWorkerDescription, WorkerDescription
+    ] = Field(
+        description=(
+            "The description and specifics for the worker used to resolve requests "
+            "for this benchmark."
+        ),
+        discriminator="type_",
+    )
+    request_loader_description: Union[
+        GenerativeRequestLoaderDescription, RequestLoaderDescription
+    ] = Field(
+        description=(
+            "The description and specifics for the request loader used to create "
+            "requests for this benchmark."
+        ),
+        discriminator="type_",
+    )
+    extras: Dict[str, Any] = Field(
+        description=(
+            "Any additional information or metadata that was passed for this benchmark."
+        )
+    )
+    in_warmup: bool = Field(
+        description=(
+            "A flag to indicate if the benchmark is currently in the warmup phase."
+        ),
+        default=False,
+        exclude=True,
+    )
+    in_cooldown: bool = Field(
+        description=(
+            "A flag to indicate if the benchmark is currently in the cooldown phase."
+        ),
+        default=False,
+        exclude=True,
+    )
+    scheduler_stats: SchedulerRunningStats = Field(
+        description=(
+            "The running statistics for the scheduler for this benchmark run. "
+            "This includes all requests created, regardless of their status."
+        ),
+        default_factory=SchedulerRunningStats,
+    )
+    requests_stats: RequestsRunningStats = Field(
+        description=(
+            "The running statistics for the requests for this benchmark run. "
+            "This includes all requests created, regardless of their status."
+        ),
+        default_factory=RequestsRunningStats,
+    )
+    results: StatusBreakdown[
+        List[SchedulerRequestResult[RequestT, ResponseT]],
+        List[SchedulerRequestResult[RequestT, ResponseT]],
+        List[SchedulerRequestResult[RequestT, ResponseT]],
+        None,
+    ] = Field(
+        description=(
+            "The completed requests for this benchmark run broken down by status"
+            "and excluding warmup and cooldown requests."
+        ),
+        default_factory=lambda: StatusBreakdown(
+            successful=[],
+            errored=[],
+            incomplete=[],
+            total=None,
+        ),
+    )
+
     def add_result(
         self,
-        result: SchedulerRequestResult[REQ, RES],
+        result: SchedulerRequestResult[RequestT, ResponseT],
     ) -> bool:
         """
         Add a result to the aggregator. This will update the internal statistics
@@ -362,14 +323,20 @@ class BenchmarkAggregator(ABC, StandardBaseModel, Generic[BENCH, REQ, RES]):
             did not fit within the warmup or cooldown period, was not requested,
             or is not finished
         """
-        # Add base scheduler statistics to the aggregator
-        self.scheduler_created_requests += max(0, result.run_info.created_requests)
-        self.scheduler_queued_requests += max(0, result.run_info.queued_requests)
-        self.scheduler_scheduled_requests += max(0, result.run_info.scheduled_requests)
-        self.scheduler_processing_requests += max(
+        # Add scheduler statistics
+        self.scheduler_stats.created_requests += max(
+            0, result.run_info.created_requests
+        )
+        self.scheduler_stats.queued_requests += max(0, result.run_info.queued_requests)
+        self.scheduler_stats.scheduled_requests += max(
+            0, result.run_info.scheduled_requests
+        )
+        self.scheduler_stats.processing_requests += max(
             0, result.run_info.processing_requests
         )
-        self.scheduler_completed_requests += max(0, result.run_info.completed_requests)
+        self.scheduler_stats.completed_requests += max(
+            0, result.run_info.completed_requests
+        )
 
         if result.type_ != "request_complete" or (
             result.request_info.canceled and not result.request_info.requested
@@ -378,23 +345,25 @@ class BenchmarkAggregator(ABC, StandardBaseModel, Generic[BENCH, REQ, RES]):
             # If the result was canceled and not started, ignore it
             return False
 
-        # add base result statistics given this was not preempted and it's completed
-        if result.request_info.completed:
-            self.successful_requests += 1
-        elif result.request_info.canceled:
-            self.incomplete_requests += 1
+        # Add request statistics
+        self.requests_stats.totals.total += 1
+        if result.request_info.canceled:
+            self.requests_stats.totals.incomplete += 1
         elif result.request_info.errored:
-            self.errored_requests += 1
+            self.requests_stats.totals.errored += 1
+        elif result.request_info.completed:
+            self.requests_stats.totals.successful += 1
         else:
             raise ValueError(
                 "Unexpected state: request_info must be either "
-                "completed, canceled, or errored."
+                "completed, canceled, or errored. "
+                f"Got {result.request_info}"
             )
 
-        self.queued_time += (  # type: ignore[misc]
+        self.requests_stats.queued_time += (
             result.request_info.dequeued_time - result.request_info.queued_time
         )
-        self.scheduled_time_delay += (  # type: ignore[misc]
+        self.requests_stats.scheduled_time_delay += (
             result.request_info.scheduled_time - result.request_info.dequeued_time
         )
         sleep_time = max(
@@ -402,57 +371,83 @@ class BenchmarkAggregator(ABC, StandardBaseModel, Generic[BENCH, REQ, RES]):
             result.request_info.targeted_start_time
             - result.request_info.scheduled_time,
         )
-        self.scheduled_time_sleep += sleep_time  # type: ignore[misc]
-        time_to_worker_start = (  # type: ignore[misc]
+        self.requests_stats.scheduled_time_sleep += sleep_time
+        time_to_worker_start = (
             result.request_info.worker_start - result.request_info.scheduled_time
         )
-        self.worker_start_delay += time_to_worker_start - sleep_time  # type: ignore[misc]
-        self.worker_time += (  # type: ignore[misc]
+        self.requests_stats.worker_start_delay += time_to_worker_start - sleep_time
+        self.requests_stats.worker_time += (
             result.request_info.worker_end - result.request_info.worker_start
         )
-        self.worker_start_time_targeted_delay += (  # type: ignore[misc]
+        self.requests_stats.worker_start_time_targeted_delay += (
             result.request_info.worker_start - result.request_info.targeted_start_time
+        )
+        self.requests_stats.request_start_time_delay += (
+            result.request_info.worker_start - result.request_info.targeted_start_time
+        )
+        self.requests_stats.request_start_time_targeted_delay += (
+            result.request_info.worker_start - result.request_info.targeted_start_time
+        )
+        self.requests_stats.request_time_delay += (
+            result.request_info.worker_end - result.request_info.worker_start
+        ) - (result.request_info.worker_end - result.request_info.worker_start)
+        self.requests_stats.request_time += (
+            result.request_info.worker_end - result.request_info.worker_start
         )
 
         # Add result to the list of results provided we are not in warmup or cooldown
-        total_completed = (
-            self.successful_requests.total
-            + self.incomplete_requests.total
-            + self.errored_requests.total
-        )
-        global_start_time = self.scheduler_created_requests.start_time
+        total_completed = self.requests_stats.totals.total
+        global_start_time = self.requests_stats.totals.total.start_time
 
-        if (self.warmup_number and total_completed <= self.warmup_number) or (
-            self.warmup_duration
+        in_warmup_number = (
+            self.args.warmup_number and total_completed <= self.args.warmup_number
+        )
+        in_warmup_duration = (
+            self.args.warmup_duration
             and result.request_info.worker_start
-            <= (global_start_time + self.warmup_duration)
-        ):
-            # within warmup period
+            <= (global_start_time - self.args.warmup_duration)
+        )
+
+        if in_warmup_number or in_warmup_duration:
             self.in_warmup = True
             return True
 
-        if (
-            self.cooldown_number
-            and self.max_number
-            and total_completed > self.max_number - self.cooldown_number
-        ) or (
-            self.cooldown_duration
-            and self.max_duration
+        self.in_warmup = False
+        in_cooldown_number = (
+            self.args.cooldown_number
+            and self.args.max_number
+            and total_completed > self.args.max_number - self.args.cooldown_number
+        )
+        in_cooldown_duration = (
+            self.args.cooldown_duration
+            and self.args.max_duration
             and result.request_info.worker_start
-            >= global_start_time + self.max_duration - self.cooldown_duration
-        ):
-            # within cooldown period
+            > global_start_time + self.args.max_duration - self.args.cooldown_duration
+        )
+
+        if in_cooldown_number or in_cooldown_duration:
             self.in_cooldown = True
             return True
 
-        self.in_warmup = False
         self.in_cooldown = False
-        self.results.append(result)
+
+        if result.request_info.canceled:
+            self.results.incomplete.append(result)
+        elif result.request_info.errored:
+            self.results.errored.append(result)
+        elif result.request_info.completed:
+            self.results.successful.append(result)
+        else:
+            raise ValueError(
+                "Unexpected state: request_info must be either "
+                "completed, canceled, or errored. "
+                f"Got {result.request_info}"
+            )
 
         return True
 
     @abstractmethod
-    def compile(self) -> BENCH:
+    def compile(self) -> BenchmarkT:
         """
         Compile the benchmark results and statistics into a Benchmark object.
         This is required to be implemented by subclasses to finalize the benchmark
@@ -461,27 +456,14 @@ class BenchmarkAggregator(ABC, StandardBaseModel, Generic[BENCH, REQ, RES]):
         ...
 
 
-AGG = TypeVar("AGG", bound=BenchmarkAggregator)
+AggregatorT = TypeVar("AggregatorT", bound=BenchmarkAggregator)
 
 
-class GenerativeBenchmarkAggregator(
-    BenchmarkAggregator[GenerativeBenchmark, GenerationRequest, ResponseSummary]
-):
-    type_: Literal["generative_benchmark_aggregator"] = (
-        "generative_benchmark_aggregator"  # type: ignore[assignment]
-    )
-    processor: Optional[Union[str, Path, Any]] = Field(
-        description=(
-            "The tokenizer to use for calculating token counts when none are "
-            "avaiable that match the preferred source."
-        )
-    )
-    processor_args: Optional[Dict[str, Any]] = Field(
-        description=(
-            "Additional arguments to pass to the tokenizer if it requires "
-            "any specific configuration for loading or processing."
-        ),
-    )
+class GenerativeRequestsRunningStats(RequestsRunningStats):
+    """
+    The metrics for generative requests that have succeeded, been canceled, or errored
+    stored as running statistics for easy calculations of rates, averages, totals, etc.
+    """
 
     time_to_first_token: TimeRunningStats = Field(
         description=(
@@ -520,6 +502,33 @@ class GenerativeBenchmarkAggregator(
         default_factory=RunningStats,
     )
 
+
+class GenerativeBenchmarkAggregator(
+    BenchmarkAggregator[GenerativeBenchmark, GenerationRequest, ResponseSummary]
+):
+    type_: Literal["generative_benchmark_aggregator"] = (
+        "generative_benchmark_aggregator"  # type: ignore[assignment]
+    )
+    processor: Optional[Union[str, Path, Any]] = Field(
+        description=(
+            "The tokenizer to use for calculating token counts when none are "
+            "avaiable that match the preferred source."
+        )
+    )
+    processor_args: Optional[Dict[str, Any]] = Field(
+        description=(
+            "Additional arguments to pass to the tokenizer if it requires "
+            "any specific configuration for loading or processing."
+        ),
+    )
+    requests_stats: GenerativeRequestsRunningStats = Field(
+        description=(
+            "The running statistics for the requests for this benchmark run. "
+            "This includes all requests created, regardless of their status."
+        ),
+        default_factory=GenerativeRequestsRunningStats,
+    )
+
     def add_result(
         self, result: SchedulerRequestResult[GenerationRequest, ResponseSummary]
     ) -> bool:
@@ -539,35 +548,35 @@ class GenerativeBenchmarkAggregator(
         if result.response is None:
             raise ValueError("Response is None, cannot add result.")
 
-        self.request_start_time_delay += (  # type: ignore[misc]
+        self.requests_stats.request_start_time_delay += (
             result.response.start_time - result.request_info.worker_start
         )
-        self.request_start_time_targeted_delay += (  # type: ignore[misc]
+        self.requests_stats.request_start_time_targeted_delay += (
             result.response.start_time - result.request_info.targeted_start_time
         )
-        self.request_time_delay += (  # type: ignore[misc]
+        self.requests_stats.request_time_delay += (
             (result.response.start_time - result.request_info.worker_start)
             + result.request_info.worker_end
             - result.response.end_time
         )
-        self.request_time += result.response.end_time - result.response.start_time  # type: ignore[misc]
-
-        self.time_to_first_token += (  # type: ignore[misc]
-            (result.response.first_iter_time - result.response.start_time) * 1000.0
-            if result.response.first_iter_time
-            else 0.0
+        self.requests_stats.request_time += (
+            result.response.end_time - result.response.start_time
         )
-        self.inter_token_latency.update(
-            (result.response.last_iter_time - result.response.first_iter_time) * 1000.0
-            if result.response.last_iter_time and result.response.first_iter_time
-            else 0.0,
-            count=(result.response.output_tokens or 1) - 1,
+        if result.response.first_iter_time:
+            self.requests_stats.time_to_first_token += (
+                result.response.first_iter_time - result.response.start_time
+            )
+        if result.response.last_iter_time and result.response.first_iter_time:
+            self.requests_stats.inter_token_latency.update(
+                result.response.last_iter_time - result.response.first_iter_time,
+                count=(result.response.output_tokens or 1) - 1,
+            )
+        self.requests_stats.prompt_tokens += result.response.request_prompt_tokens or 0
+        self.requests_stats.output_tokens += result.response.request_output_tokens or 0
+        total_tokens = (result.response.request_prompt_tokens or 0) + (
+            result.response.request_output_tokens or 0
         )
-        self.prompt_tokens += result.response.prompt_tokens or 0
-        self.output_tokens += result.response.output_tokens or 0
-        self.total_tokens += (result.response.prompt_tokens or 0) + (
-            result.response.output_tokens or 0
-        )
+        self.requests_stats.total_tokens += total_tokens
 
         return True
 
@@ -584,33 +593,26 @@ class GenerativeBenchmarkAggregator(
             successful=successful,
             incomplete=incomplete,
             errored=errored,
-            args=BenchmarkArgs(
-                profile=self.profile,
-                strategy_index=self.strategy_index,
-                strategy=self.strategy,
-                max_number=self.max_number,
-                max_duration=self.max_duration,
-                warmup_number=self.warmup_number,
-                warmup_duration=self.warmup_duration,
-                cooldown_number=self.cooldown_number,
-                cooldown_duration=self.cooldown_duration,
-            ),
+            args=self.args,
             run_stats=BenchmarkRunStats(
-                start_time=self.scheduler_created_requests.start_time,
+                start_time=self.requests_stats.totals.total.start_time,
                 end_time=time.time(),
-                total_successful=int(self.successful_requests.total),
-                total_incomplete=int(self.incomplete_requests.total),
-                total_errored=int(self.errored_requests.total),
-                queued_time_avg=self.queued_time.mean,
-                scheduled_time_delay_avg=self.scheduled_time_delay.mean,
-                scheduled_time_sleep_avg=self.scheduled_time_sleep.mean,
-                worker_start_delay_avg=self.worker_start_delay.mean,
-                worker_time_avg=self.worker_time.mean,
-                worker_start_time_targeted_delay_avg=self.worker_start_time_targeted_delay.mean,
-                request_start_time_delay_avg=self.request_start_time_delay.mean,
-                request_start_time_targeted_delay_avg=self.request_start_time_targeted_delay.mean,
-                request_time_delay_avg=self.request_time_delay.mean,
-                request_time_avg=self.request_time.mean,
+                requests_made=StatusBreakdown(
+                    successful=self.requests_stats.totals.successful.total,
+                    errored=self.requests_stats.totals.errored.total,
+                    incomplete=self.requests_stats.totals.incomplete.total,
+                    total=self.requests_stats.totals.total.total,
+                ),
+                queued_time_avg=self.requests_stats.queued_time.mean,
+                scheduled_time_delay_avg=self.requests_stats.scheduled_time_delay.mean,
+                scheduled_time_sleep_avg=self.requests_stats.scheduled_time_sleep.mean,
+                worker_start_delay_avg=self.requests_stats.worker_start_delay.mean,
+                worker_time_avg=self.requests_stats.worker_time.mean,
+                worker_start_time_targeted_delay_avg=self.requests_stats.worker_start_time_targeted_delay.mean,
+                request_start_time_delay_avg=self.requests_stats.request_start_time_delay.mean,
+                request_start_time_targeted_delay_avg=self.requests_stats.request_start_time_targeted_delay.mean,
+                request_time_delay_avg=self.requests_stats.request_time_delay.mean,
+                request_time_avg=self.requests_stats.request_time.mean,
             ),
             worker=self.worker_description,
             requests_loader=self.request_loader_description,
@@ -624,82 +626,92 @@ class GenerativeBenchmarkAggregator(
         List[GenerativeTextErrorStats],
         List[GenerativeTextErrorStats],
     ]:
-        successful: List[GenerativeTextResponseStats] = []
-        incomplete: List[GenerativeTextErrorStats] = []
-        error: List[GenerativeTextErrorStats] = []
-
-        for result in self.results:
-            if result.request is None:
-                raise ValueError("Request is None, cannot compile results.")
-
-            if result.response is None:
-                raise ValueError("Response is None, cannot compile results.")
-
-            prompt_tokens = self._compile_tokens_count(
-                value=str(result.request.content),
-                requests_tokens=result.response.request_prompt_tokens,
-                response_tokens=result.response.response_prompt_tokens,
-                preferred_tokens_source=settings.preferred_prompt_tokens_source,
-                errored=result.request_info.errored,
+        successful: List[GenerativeTextResponseStats] = [
+            GenerativeTextResponseStats(
+                request_id=result.request.request_id,
+                request_type=result.request.request_type,
+                scheduler_info=result.request_info,
+                prompt=str(result.request.content),
+                prompt_tokens=self._compile_tokens_count(
+                    value=str(result.request.content),
+                    requests_tokens=result.response.request_prompt_tokens,
+                    response_tokens=result.response.response_prompt_tokens,
+                    preferred_tokens_source=settings.preferred_prompt_tokens_source,
+                    errored=False,
+                ),
+                output=result.response.value,
+                output_tokens=self._compile_tokens_count(
+                    value=result.response.value,
+                    requests_tokens=result.response.request_output_tokens,
+                    response_tokens=result.response.response_output_tokens,
+                    preferred_tokens_source=settings.preferred_output_tokens_source,
+                    errored=False,
+                ),
+                start_time=result.response.start_time,
+                end_time=result.response.end_time,
+                first_token_time=result.response.first_iter_time or -1.0,
+                last_token_time=result.response.last_iter_time or -1.0,
             )
-            output_tokens = self._compile_tokens_count(
-                value=result.response.value,
-                requests_tokens=result.response.request_output_tokens,
-                response_tokens=result.response.response_output_tokens,
-                preferred_tokens_source=settings.preferred_output_tokens_source,
-                errored=result.request_info.errored,
+            for result in self.results.successful
+        ]
+        incomplete: List[GenerativeTextErrorStats] = [
+            GenerativeTextErrorStats(
+                error=result.response.error or "",
+                request_id=result.request.request_id,
+                request_type=result.request.request_type,
+                scheduler_info=result.request_info,
+                prompt=str(result.request.content),
+                prompt_tokens=self._compile_tokens_count(
+                    value=str(result.request.content),
+                    requests_tokens=result.response.request_prompt_tokens,
+                    response_tokens=result.response.response_prompt_tokens,
+                    preferred_tokens_source=settings.preferred_prompt_tokens_source,
+                    errored=True,
+                ),
+                output=result.response.value,
+                output_tokens=self._compile_tokens_count(
+                    value=result.response.value,
+                    requests_tokens=result.response.request_output_tokens,
+                    response_tokens=result.response.response_output_tokens,
+                    preferred_tokens_source=settings.preferred_output_tokens_source,
+                    errored=True,
+                ),
+                start_time=result.response.start_time,
+                end_time=result.response.end_time,
+                first_token_time=result.response.first_iter_time,
+                last_token_time=result.response.last_iter_time,
             )
-
-            if result.request_info.canceled:
-                incomplete.append(
-                    GenerativeTextErrorStats(
-                        error=result.response.error or "",
-                        request_id=result.request.request_id,
-                        request_type=result.request.request_type,
-                        scheduler_info=result.request_info,
-                        prompt=str(result.request.content),
-                        prompt_tokens=prompt_tokens,
-                        output=result.response.value,
-                        output_tokens=output_tokens,
-                        start_time=result.response.start_time,
-                        end_time=result.response.end_time,
-                        first_token_time=result.response.first_iter_time,
-                        last_token_time=result.response.last_iter_time,
-                    )
-                )
-            elif result.request_info.errored:
-                error.append(
-                    GenerativeTextErrorStats(
-                        error=result.response.error or "",
-                        request_id=result.request.request_id,
-                        request_type=result.request.request_type,
-                        scheduler_info=result.request_info,
-                        prompt=str(result.request.content),
-                        prompt_tokens=prompt_tokens,
-                        output=result.response.value,
-                        output_tokens=output_tokens,
-                        start_time=result.response.start_time,
-                        end_time=result.response.end_time,
-                        first_token_time=result.response.first_iter_time,
-                        last_token_time=result.response.last_iter_time,
-                    )
-                )
-            else:
-                successful.append(
-                    GenerativeTextResponseStats(
-                        request_id=result.request.request_id,
-                        request_type=result.request.request_type,
-                        scheduler_info=result.request_info,
-                        prompt=str(result.request.content),
-                        prompt_tokens=prompt_tokens,
-                        output=result.response.value,
-                        output_tokens=output_tokens,
-                        start_time=result.response.start_time,
-                        end_time=result.response.end_time,
-                        first_token_time=result.response.first_iter_time or -1,
-                        last_token_time=result.response.last_iter_time or -1,
-                    )
-                )
+            for result in self.results.incomplete
+        ]
+        error: List[GenerativeTextErrorStats] = [
+            GenerativeTextErrorStats(
+                error=result.response.error or "",
+                request_id=result.request.request_id,
+                request_type=result.request.request_type,
+                scheduler_info=result.request_info,
+                prompt=str(result.request.content),
+                prompt_tokens=self._compile_tokens_count(
+                    value=str(result.request.content),
+                    requests_tokens=result.response.request_prompt_tokens,
+                    response_tokens=result.response.response_prompt_tokens,
+                    preferred_tokens_source=settings.preferred_prompt_tokens_source,
+                    errored=True,
+                ),
+                output=result.response.value,
+                output_tokens=self._compile_tokens_count(
+                    value=result.response.value,
+                    requests_tokens=result.response.request_output_tokens,
+                    response_tokens=result.response.response_output_tokens,
+                    preferred_tokens_source=settings.preferred_output_tokens_source,
+                    errored=True,
+                ),
+                start_time=result.response.start_time,
+                end_time=result.response.end_time,
+                first_token_time=result.response.first_iter_time,
+                last_token_time=result.response.last_iter_time,
+            )
+            for result in self.results.errored
+        ]
 
         return successful, incomplete, error
 
