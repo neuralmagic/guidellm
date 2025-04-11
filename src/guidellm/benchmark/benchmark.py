@@ -263,7 +263,7 @@ class BenchmarkMetrics(StandardBaseModel):
     A serializable model representing the metrics for a benchmark run.
     """
 
-    request_per_second: StatusDistributionSummary = Field(
+    requests_per_second: StatusDistributionSummary = Field(
         description="The distribution of requests per second for the benchmark.",
     )
     request_concurrency: StatusDistributionSummary = Field(
