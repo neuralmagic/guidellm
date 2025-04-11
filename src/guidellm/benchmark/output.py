@@ -254,8 +254,8 @@ class GenerativeBenchmarksConsole:
             rows.append(
                 [
                     strategy_display_str(benchmark.args.strategy),
-                    f"{datetime.fromtimestamp(benchmark.start_time).strftime("%H:%M:%S")}",
-                    f"{datetime.fromtimestamp(benchmark.end_time).strftime("%H:%M:%S")}",
+                    f"{datetime.fromtimestamp(benchmark.start_time).strftime('%H:%M:%S')}",
+                    f"{datetime.fromtimestamp(benchmark.end_time).strftime('%H:%M:%S')}",
                     f"{(benchmark.end_time - benchmark.start_time):.1f}",
                     (
                         f"{benchmark.total_count.successful:>5} / "
