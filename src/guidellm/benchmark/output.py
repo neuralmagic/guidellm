@@ -302,7 +302,7 @@ class GenerativeBenchmarksConsole:
             "Requests Concurrency",
             "Output Tok / sec",
             "Total Tok / sec",
-            "Req Latency (ms)\n(mean / median / p99)",
+            "Req Latency (sec)\n(mean / median / p99)",
             "TTFT (ms)\n(mean / median / p99)",
             "ITL (ms)\n(mean / median / p99)",
             "TPOT (ms)\n(mean / median / p99)",
