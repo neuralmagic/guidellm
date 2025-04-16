@@ -21,7 +21,29 @@ with open(os.devnull, "w") as devnull, contextlib.redirect_stderr(
     hf_logging.set_verbosity_error()
     logging.getLogger("transformers").setLevel(logging.ERROR)
 
-from .config import settings
+from .config import (
+    settings,
+    DatasetSettings,
+    Environment,
+    LoggingSettings,
+    OpenAISettings,
+    print_config,
+    Settings,
+    reload_settings,
+)
 from .logger import configure_logger, logger
 
-__all__ = ["configure_logger", "logger", "settings", "generate_benchmark_report"]
+__all__ = [
+    # Config
+    "DatasetSettings",
+    "Environment",
+    "LoggingSettings",
+    "OpenAISettings",
+    "print_config",
+    "Settings",
+    "reload_settings",
+    "settings",
+    # Logger
+    "logger",
+    "configure_logger",
+]

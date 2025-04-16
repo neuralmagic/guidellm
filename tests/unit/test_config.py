@@ -139,7 +139,7 @@ def test_settings_with_env_variables(mocker):
     mocker.patch.dict(
         "os.environ",
         {
-            "GUIDELLM__DATASET__PREFERRED_DATA_COLUMNS": "['custom_column']",
+            "GUIDELLM__DATASET__PREFERRED_DATA_COLUMNS": '["custom_column"]',
             "GUIDELLM__OPENAI__API_KEY": "env_api_key",
             "GUIDELLM__TABLE_BORDER_CHAR": "*",
         },
