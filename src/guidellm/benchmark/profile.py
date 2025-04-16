@@ -253,9 +253,9 @@ class AsyncProfile(ThroughputProfile):
         if not isinstance(rate, Sequence):
             rate = [rate]
 
-        if not all(r.is_integer() and r > 0 for r in rate):
+        if not all(isinstance(r, (float, int)) and r > 0 for r in rate):
             raise ValueError(
-                f"All rate values must be positive integers, received {rate}"
+                f"All rate values must be positive numbers, received {rate}"
             )
 
         if rate_type == "async":
