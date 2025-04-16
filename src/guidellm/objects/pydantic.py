@@ -13,7 +13,7 @@ class StandardBaseModel(BaseModel):
     """
 
     model_config = ConfigDict(
-        extra="allow",
+        extra="ignore",
         use_enum_values=True,
         validate_assignment=True,
         from_attributes=True,

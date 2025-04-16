@@ -327,6 +327,14 @@ class SweepProfile(AsyncProfile):
         if "sweep_size" in kwargs:
             raise ValueError("Sweep size must not be provided, use rate instead.")
 
+        if isinstance(rate, Sequence):
+            if len(rate) != 1:
+                raise ValueError(
+                    "Rate must be a single value for sweep profile, received "
+                    f"{len(rate)} values."
+                )
+            rate = rate[0]
+
         if not rate:
             rate = settings.default_sweep_number
 
@@ -341,7 +349,8 @@ class SweepProfile(AsyncProfile):
             or rate <= 1
         ):
             raise ValueError(
-                f"Rate (sweep_size) must be a positive integer > 1, received {rate}"
+                f"Rate (sweep_size) must be a positive integer > 1, received {rate} "
+                f"with type {type(rate)}"
             )
 
         if not kwargs:

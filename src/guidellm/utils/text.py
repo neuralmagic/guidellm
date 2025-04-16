@@ -1,8 +1,9 @@
 import gzip
 import re
+import textwrap
 from importlib.resources import as_file, files  # type: ignore[attr-defined]
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import Any, List, Optional, Union
 
 import ftfy
 import httpx
@@ -12,6 +13,7 @@ from guidellm import data as package_data
 from guidellm.config import settings
 
 __all__ = [
+    "split_text_list_by_length",
     "filter_text",
     "clean_text",
     "split_text",
@@ -21,6 +23,54 @@ __all__ = [
 ]
 
 MAX_PATH_LENGTH = 4096
+
+
+def split_text_list_by_length(
+    text_list: List[Any],
+    max_characters: Union[int, List[int]],
+    pad_horizontal: bool = True,
+    pad_vertical: bool = True,
+) -> List[List[str]]:
+    """
+    Split a list of strings into a list of strings,
+    each with a maximum length of max_characters
+
+    :param text_list: the list of strings to split
+    :param max_characters: the maximum length of each string
+    :param pad_horizontal: whether to pad the strings horizontally, defaults to True
+    :param pad_vertical: whether to pad the strings vertically, defaults to True
+    :return: a list of strings
+    """
+    if not isinstance(max_characters, list):
+        max_characters = [max_characters] * len(text_list)
+
+    if len(max_characters) != len(text_list):
+        raise ValueError(
+            f"max_characters must be a list of the same length as text_list, "
+            f"but got {len(max_characters)} and {len(text_list)}"
+        )
+
+    result: List[List[str]] = []
+    for index, text in enumerate(text_list):
+        lines = textwrap.wrap(text, max_characters[index])
+        result.append(lines)
+
+    if pad_vertical:
+        max_lines = max(len(lines) for lines in result)
+        for lines in result:
+            while len(lines) < max_lines:
+                lines.append(" ")
+
+    if pad_horizontal:
+        for index in range(len(result)):
+            lines = result[index]
+            max_chars = max_characters[index]
+            new_lines = []
+            for line in lines:
+                new_lines.append(line.rjust(max_chars))
+            result[index] = new_lines
+
+    return result
 
 
 def filter_text(
