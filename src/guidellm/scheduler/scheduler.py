@@ -189,9 +189,6 @@ class Scheduler(Generic[RequestT, ResponseT]):
             maxsize=scheduling_strategy.queued_requests_limit
         )
         responses_queue = manager.Queue()
-        per_process_requests_limit = scheduling_strategy.processing_requests_limit // (
-            scheduling_strategy.processes_limit
-        )
 
         futures = []
         loop = asyncio.get_event_loop()
@@ -207,16 +204,17 @@ class Scheduler(Generic[RequestT, ResponseT]):
                     )
                 )
             elif scheduling_strategy.processing_mode == "async":
-                futures.append(
-                    loop.run_in_executor(
-                        executor,
-                        self.worker.process_loop_asynchronous,
-                        requests_queue,
-                        responses_queue,
-                        per_process_requests_limit,
-                        process_id,
+                if scheduling_strategy.process_requests_limits[process_id]:
+                    futures.append(
+                        loop.run_in_executor(
+                            executor,
+                            self.worker.process_loop_asynchronous,
+                            requests_queue,
+                            responses_queue,
+                            scheduling_strategy.process_requests_limits[process_id],
+                            process_id,
+                        )
                     )
-                )
             else:
                 raise ValueError(
                     f"Invalid processing mode: {scheduling_strategy.processing_mode} "

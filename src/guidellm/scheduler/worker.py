@@ -226,7 +226,15 @@ class RequestsWorker(ABC, Generic[RequestT, ResponseT]):
         process_id: int,
     ):
         async def _process_runner():
-            pending = asyncio.Semaphore(max_concurrency) if max_concurrency else None
+            if max_concurrency is not None:
+                if max_concurrency < 1:
+                    raise ValueError(
+                        f"max_concurrency must be greater than 0, got {max_concurrency}"
+                    )
+
+                pending = asyncio.Semaphore(max_concurrency)
+            else:
+                pending = None
 
             while (
                 process_request := await self.get_request(requests_queue)

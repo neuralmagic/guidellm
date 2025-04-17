@@ -4,6 +4,7 @@ import random
 import time
 from typing import (
     Generator,
+    List,
     Literal,
     Optional,
     Union,
@@ -94,6 +95,23 @@ class SchedulingStrategy(StandardBaseModel):
         """
         return settings.max_concurrency
 
+    @property
+    def process_requests_limits(self) -> List[int]:
+        """
+        The maximum number of requests per process for the scheduling strategy.
+        It determines how many requests can be processed by each worker process
+        for the scheduling strategy.
+
+        :return: A per-process list of the maximum number of requests per process.
+        """
+        split = self.processing_requests_limit // self.processes_limit
+        remain = self.processing_requests_limit % self.processes_limit
+
+        return [
+            split + 1 if i < remain else split
+            for i in range(self.processes_limit)
+        ]
+
     def request_times(self) -> Generator[float, None, None]:
         """
         A generator that yields timestamps for when requests should be sent.
@@ -167,6 +185,18 @@ class SynchronousStrategy(SchedulingStrategy):
             the processing requests to one that is ready to be processed.
         """
         return 1
+
+    @property
+    def process_requests_limits(self) -> List[int]:
+        """
+        The maximum number of requests per process for the scheduling strategy.
+        It determines how many requests can be processed by each worker process
+        for the scheduling strategy.
+
+        :return: A per-process list of the maximum number of requests per process.
+        """
+
+        return [1]
 
     def request_times(self) -> Generator[float, None, None]:
         """
