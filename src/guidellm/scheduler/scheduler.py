@@ -188,13 +188,25 @@ class Scheduler(Generic[RequestT, ResponseT]):
             maxsize=scheduling_strategy.queued_requests_limit
         )
         responses_queue = manager.Queue()
-        per_process_requests_limit = scheduling_strategy.processing_requests_limit // (
-            scheduling_strategy.processes_limit
+
+        num_processes = min(
+            scheduling_strategy.processes_limit,
+            scheduling_strategy.processing_requests_limit
+        )
+        requests_limit_split = (scheduling_strategy.processing_requests_limit //
+                                scheduling_strategy.processes_limit)
+        requests_limit_remain = (scheduling_strategy.processing_requests_limit %
+                                 scheduling_strategy.processes_limit)
+        process_ids = (id_ for id_ in range(num_processes))
+        process_requests_limits = (
+            requests_limit_split + 1
+            if i < requests_limit_remain else requests_limit_split
+            for i in range(num_processes)
         )
 
         futures = []
         loop = asyncio.get_event_loop()
-        for process_id in range(scheduling_strategy.processes_limit):
+        for id_, requests_limit in zip(process_ids, process_requests_limits):
             if scheduling_strategy.processing_mode == "sync":
                 futures.append(
                     loop.run_in_executor(
@@ -202,20 +214,20 @@ class Scheduler(Generic[RequestT, ResponseT]):
                         self.worker.process_loop_synchronous,
                         requests_queue,
                         responses_queue,
-                        process_id,
+                        id_,
                     )
                 )
             elif scheduling_strategy.processing_mode == "async":
-                futures.append(
-                    loop.run_in_executor(
-                        executor,
-                        self.worker.process_loop_asynchronous,
-                        requests_queue,
-                        responses_queue,
-                        per_process_requests_limit,
-                        process_id,
+                    futures.append(
+                        loop.run_in_executor(
+                            executor,
+                            self.worker.process_loop_asynchronous,
+                            requests_queue,
+                            responses_queue,
+                            requests_limit,
+                            id_,
+                        )
                     )
-                )
             else:
                 raise ValueError(
                     f"Invalid processing mode: {scheduling_strategy.processing_mode} "
