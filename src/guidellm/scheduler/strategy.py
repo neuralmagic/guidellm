@@ -2,8 +2,8 @@ import math
 import os
 import random
 import time
+from collections.abc import Generator
 from typing import (
-    Generator,
     Literal,
     Optional,
     Union,

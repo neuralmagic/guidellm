@@ -4,15 +4,13 @@ import multiprocessing
 import multiprocessing.queues
 import time
 from abc import ABC, abstractmethod
+from collections.abc import AsyncGenerator
 from dataclasses import dataclass
 from typing import (
     Any,
-    AsyncGenerator,
-    Dict,
     Generic,
     Literal,
     Optional,
-    Tuple,
     Union,
 )
 
@@ -109,7 +107,7 @@ class RequestsWorker(ABC, Generic[RequestT, ResponseT]):
         self,
         request: RequestT,
         timeout_time: float,
-    ) -> Tuple[ResolveStatus, ResponseT]:
+    ) -> tuple[ResolveStatus, ResponseT]:
         """
         An abstract method that must be implemented by subclasses.
         This method should handle the resolution of a request through asyncio,
@@ -270,7 +268,7 @@ class GenerativeRequestsWorkerDescription(WorkerDescription):
     backend_type: BackendType
     backend_target: str
     backend_model: str
-    backend_info: Dict[str, Any] = Field(
+    backend_info: dict[str, Any] = Field(
         default_factory=dict,
     )
 
@@ -342,7 +340,7 @@ class GenerativeRequestsWorker(RequestsWorker[GenerationRequest, ResponseSummary
         self,
         request: GenerationRequest,
         timeout_time: float,
-    ) -> Tuple[ResolveStatus, ResponseSummary]:
+    ) -> tuple[ResolveStatus, ResponseSummary]:
         """
         Resolve a request by sending it to the backend and handling the response.
         This method sends the request to the backend, waits for a response,
@@ -418,14 +416,14 @@ class GenerativeRequestsWorker(RequestsWorker[GenerationRequest, ResponseSummary
     def _create_request_func_kwargs(
         self,
         request: GenerationRequest,
-    ) -> Tuple[
+    ) -> tuple[
         AsyncGenerator[Union[StreamingTextResponse, ResponseSummary], None],
-        Dict[str, Any],
+        dict[str, Any],
     ]:
         request_func: AsyncGenerator[
             Union[StreamingTextResponse, ResponseSummary], None
         ]
-        request_kwargs: Dict[str, Any]
+        request_kwargs: dict[str, Any]
 
         if request.request_type == "text_completions":
             request_func = self.backend.text_completions  # type: ignore[assignment]
@@ -459,7 +457,7 @@ class GenerativeRequestsWorker(RequestsWorker[GenerationRequest, ResponseSummary
         response: Any,
         error: Optional[str],
         resolve_start_time: float,
-    ) -> Tuple[ResolveStatus, ResponseSummary]:
+    ) -> tuple[ResolveStatus, ResponseSummary]:
         if response is None or not isinstance(
             response, (ResponseSummary, StreamingTextResponse)
         ):

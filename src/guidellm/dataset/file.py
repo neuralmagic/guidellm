@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, Dict, Optional, Union
+from typing import Any, Optional, Union
 
 import pandas as pd  # type: ignore[import]
 from datasets import (
@@ -30,7 +30,7 @@ class FileDatasetCreator(DatasetCreator):
     }
 
     @classmethod
-    def is_supported(cls, data: Any, data_args: Optional[Dict[str, Any]]) -> bool:  # noqa: ARG003
+    def is_supported(cls, data: Any, data_args: Optional[dict[str, Any]]) -> bool:  # noqa: ARG003
         if isinstance(data, (str, Path)) and (path := Path(data)).exists():
             # local folder or py file, assume supported
             return path.suffix.lower() in cls.SUPPORTED_TYPES
@@ -41,9 +41,9 @@ class FileDatasetCreator(DatasetCreator):
     def handle_create(
         cls,
         data: Any,
-        data_args: Optional[Dict[str, Any]],
+        data_args: Optional[dict[str, Any]],
         processor: Optional[Union[str, Path, PreTrainedTokenizerBase]],  # noqa: ARG003
-        processor_args: Optional[Dict[str, Any]],  # noqa: ARG003
+        processor_args: Optional[dict[str, Any]],  # noqa: ARG003
         random_seed: int,  # noqa: ARG003
     ) -> Union[Dataset, DatasetDict, IterableDataset, IterableDatasetDict]:
         if not isinstance(data, (str, Path)):
@@ -63,7 +63,7 @@ class FileDatasetCreator(DatasetCreator):
 
     @classmethod
     def load_dataset(
-        cls, path: Path, data_args: Optional[Dict[str, Any]]
+        cls, path: Path, data_args: Optional[dict[str, Any]]
     ) -> Union[Dataset, IterableDataset]:
         if path.suffix.lower() in {".txt", ".text"}:
             with path.open("r") as file:

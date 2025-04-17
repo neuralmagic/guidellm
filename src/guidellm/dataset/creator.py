@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional, Tuple, Union
+from typing import Any, Literal, Optional, Union
 
 from datasets import Dataset, DatasetDict, IterableDataset, IterableDatasetDict
 from transformers import PreTrainedTokenizerBase  # type: ignore[import]
@@ -74,18 +74,18 @@ class DatasetCreator(ABC):
         "eval_dataset",
         "eval_data",
     ]
-    DEFAULT_SPLITS_DATASET: Dict[str, str] = {}
+    DEFAULT_SPLITS_DATASET: dict[str, str] = {}
 
     @classmethod
     def create(
         cls,
         data: Any,
-        data_args: Optional[Dict[str, Any]],
+        data_args: Optional[dict[str, Any]],
         processor: Optional[Union[str, Path, PreTrainedTokenizerBase]],
-        processor_args: Optional[Dict[str, Any]],
+        processor_args: Optional[dict[str, Any]],
         random_seed: int = 42,
-        split_pref_order: Optional[List[str]] = None,
-    ) -> Tuple[Union[Dataset, IterableDataset], Dict[ColumnInputTypes, str]]:
+        split_pref_order: Optional[list[str]] = None,
+    ) -> tuple[Union[Dataset, IterableDataset], dict[ColumnInputTypes, str]]:
         if not cls.is_supported(data, data_args):
             raise ValueError(f"Unsupported data type: {type(data)} given for {data}. ")
 
@@ -106,7 +106,7 @@ class DatasetCreator(ABC):
         return dataset, column_mappings
 
     @classmethod
-    def extract_args_split(cls, data_args: Optional[Dict[str, Any]]) -> str:
+    def extract_args_split(cls, data_args: Optional[dict[str, Any]]) -> str:
         split = "auto"
 
         if data_args and "split" in data_args:
@@ -118,9 +118,9 @@ class DatasetCreator(ABC):
     @classmethod
     def extract_args_column_mappings(
         cls,
-        data_args: Optional[Dict[str, Any]],
-    ) -> Dict[ColumnInputTypes, str]:
-        columns: Dict[ColumnInputTypes, str] = {}
+        data_args: Optional[dict[str, Any]],
+    ) -> dict[ColumnInputTypes, str]:
+        columns: dict[ColumnInputTypes, str] = {}
 
         if data_args:
             if "prompt_column" in data_args:
@@ -163,7 +163,7 @@ class DatasetCreator(ABC):
         cls,
         dataset: Union[DatasetDict, IterableDatasetDict],
         specified_split: Union[Literal["auto"], str] = "auto",
-        split_pref_order: Optional[Union[Literal["auto"], List[str]]] = "auto",
+        split_pref_order: Optional[Union[Literal["auto"], list[str]]] = "auto",
     ) -> Union[Dataset, IterableDataset]:
         if not isinstance(dataset, (DatasetDict, IterableDatasetDict)):
             raise ValueError(
@@ -199,15 +199,15 @@ class DatasetCreator(ABC):
 
     @classmethod
     @abstractmethod
-    def is_supported(cls, data: Any, data_args: Optional[Dict[str, Any]]) -> bool: ...
+    def is_supported(cls, data: Any, data_args: Optional[dict[str, Any]]) -> bool: ...
 
     @classmethod
     @abstractmethod
     def handle_create(
         cls,
         data: Any,
-        data_args: Optional[Dict[str, Any]],
+        data_args: Optional[dict[str, Any]],
         processor: Optional[Union[str, Path, PreTrainedTokenizerBase]],
-        processor_args: Optional[Dict[str, Any]],
+        processor_args: Optional[dict[str, Any]],
         random_seed: int,
     ) -> Union[Dataset, DatasetDict, IterableDataset, IterableDatasetDict]: ...

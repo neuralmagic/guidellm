@@ -3,7 +3,7 @@ import re
 import textwrap
 from importlib.resources import as_file, files  # type: ignore[attr-defined]
 from pathlib import Path
-from typing import Any, List, Optional, Union
+from typing import Any, Optional, Union
 
 import ftfy
 import httpx
@@ -26,11 +26,11 @@ MAX_PATH_LENGTH = 4096
 
 
 def split_text_list_by_length(
-    text_list: List[Any],
-    max_characters: Union[int, List[int]],
+    text_list: list[Any],
+    max_characters: Union[int, list[int]],
     pad_horizontal: bool = True,
     pad_vertical: bool = True,
-) -> List[List[str]]:
+) -> list[list[str]]:
     """
     Split a list of strings into a list of strings,
     each with a maximum length of max_characters
@@ -50,7 +50,7 @@ def split_text_list_by_length(
             f"but got {len(max_characters)} and {len(text_list)}"
         )
 
-    result: List[List[str]] = []
+    result: list[list[str]] = []
     for index, text in enumerate(text_list):
         lines = textwrap.wrap(text, max_characters[index])
         result.append(lines)
@@ -115,7 +115,7 @@ def clean_text(text: str) -> str:
     return re.sub(r"\s+", " ", ftfy.fix_text(text)).strip()
 
 
-def split_text(text: str, split_punctuation: bool = False) -> List[str]:
+def split_text(text: str, split_punctuation: bool = False) -> list[str]:
     text = clean_text(text)
 
     if split_punctuation:

@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, Dict, Optional, Union
+from typing import Any, Optional, Union
 
 from datasets import (
     Dataset,
@@ -18,7 +18,7 @@ __all__ = ["HFDatasetsCreator"]
 
 class HFDatasetsCreator(DatasetCreator):
     @classmethod
-    def is_supported(cls, data: Any, data_args: Optional[Dict[str, Any]]) -> bool:  # noqa: ARG003
+    def is_supported(cls, data: Any, data_args: Optional[dict[str, Any]]) -> bool:  # noqa: ARG003
         if isinstance(
             data, (Dataset, DatasetDict, IterableDataset, IterableDatasetDict)
         ):
@@ -42,9 +42,9 @@ class HFDatasetsCreator(DatasetCreator):
     def handle_create(
         cls,
         data: Any,
-        data_args: Optional[Dict[str, Any]],
+        data_args: Optional[dict[str, Any]],
         processor: Optional[Union[str, Path, PreTrainedTokenizerBase]],  # noqa: ARG003
-        processor_args: Optional[Dict[str, Any]],  # noqa: ARG003
+        processor_args: Optional[dict[str, Any]],  # noqa: ARG003
         random_seed: int,  # noqa: ARG003
     ) -> Union[Dataset, DatasetDict, IterableDataset, IterableDatasetDict]:
         if isinstance(data, (str, Path)):

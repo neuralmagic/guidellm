@@ -1,5 +1,6 @@
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, Dict, Iterable, Optional, Union
+from typing import Any, Optional, Union
 
 from datasets import (
     Dataset,
@@ -16,16 +17,16 @@ __all__ = ["InMemoryDatasetCreator"]
 
 class InMemoryDatasetCreator(DatasetCreator):
     @classmethod
-    def is_supported(cls, data: Any, data_args: Optional[Dict[str, Any]]) -> bool:  # noqa: ARG003
+    def is_supported(cls, data: Any, data_args: Optional[dict[str, Any]]) -> bool:  # noqa: ARG003
         return isinstance(data, Iterable) and not isinstance(data, str)
 
     @classmethod
     def handle_create(
         cls,
         data: Any,
-        data_args: Optional[Dict[str, Any]],
+        data_args: Optional[dict[str, Any]],
         processor: Optional[Union[str, Path, PreTrainedTokenizerBase]],  # noqa: ARG003
-        processor_args: Optional[Dict[str, Any]],  # noqa: ARG003
+        processor_args: Optional[dict[str, Any]],  # noqa: ARG003
         random_seed: int,  # noqa: ARG003
     ) -> Union[Dataset, DatasetDict, IterableDataset, IterableDatasetDict]:
         if not isinstance(data, Iterable):
@@ -36,10 +37,10 @@ class InMemoryDatasetCreator(DatasetCreator):
         if not data:
             raise ValueError("Data is empty")
 
-        if isinstance(data, Dict):
+        if isinstance(data, dict):
             # assume data is a dictionary of columns and values: {"c1": ["i1", "i2"]}
             data_dict = cls.format_data_dict(data)
-        elif isinstance(data[0], Dict):  # type: ignore[index]
+        elif isinstance(data[0], dict):  # type: ignore[index]
             # assume data is a list of dictionaries: [{"c1": "i1"}, {"c1": "i2"}]
             data_dict = cls.format_data_iterable_dicts(data)
         else:
@@ -49,8 +50,8 @@ class InMemoryDatasetCreator(DatasetCreator):
         return Dataset.from_dict(data_dict, **(data_args or {}))
 
     @classmethod
-    def format_data_dict(cls, data: Dict[Any, Any]) -> Dict[str, Any]:
-        if not isinstance(data, Dict):
+    def format_data_dict(cls, data: dict[Any, Any]) -> dict[str, Any]:
+        if not isinstance(data, dict):
             raise TypeError(
                 f"Unsupported data format. Expected Dict[str, Iterable[Any]], "
                 f"got {type(data)}"
@@ -76,15 +77,15 @@ class InMemoryDatasetCreator(DatasetCreator):
 
     @classmethod
     def format_data_iterable_dicts(
-        cls, data: Iterable[Dict[Any, Any]]
-    ) -> Dict[str, Any]:
+        cls, data: Iterable[dict[Any, Any]]
+    ) -> dict[str, Any]:
         if not isinstance(data, Iterable):
             raise TypeError(
                 f"Unsupported data format. Expected Iterable[Dict[str, Any]], "
                 f"got {type(data)}"
             )
 
-        if not all(isinstance(item, Dict) for item in data):
+        if not all(isinstance(item, dict) for item in data):
             raise TypeError(
                 f"Unsupported data format. Expected Iterable[Dict[str, Any]], "
                 f"got {type(data)}"
@@ -106,7 +107,7 @@ class InMemoryDatasetCreator(DatasetCreator):
                 f"for {data}"
             )
 
-        data_dict: Dict[str, Any] = {key: [] for key in columns}
+        data_dict: dict[str, Any] = {key: [] for key in columns}
         for item in data:
             for key, value in item.items():
                 data_dict[key].append(value)
@@ -114,7 +115,7 @@ class InMemoryDatasetCreator(DatasetCreator):
         return data_dict
 
     @classmethod
-    def format_data_iterable_values(cls, data: Iterable[Any]) -> Dict[str, Any]:
+    def format_data_iterable_values(cls, data: Iterable[Any]) -> dict[str, Any]:
         if not isinstance(data, Iterable):
             raise TypeError(
                 f"Unsupported data format. Expected Iterable[Iterable[Any]], "

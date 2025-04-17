@@ -3,12 +3,9 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import (
     Any,
-    Dict,
     Generic,
-    List,
     Literal,
     Optional,
-    Tuple,
     TypeVar,
     Union,
 )
@@ -258,7 +255,7 @@ class BenchmarkAggregator(
         ),
         discriminator="type_",
     )
-    extras: Dict[str, Any] = Field(
+    extras: dict[str, Any] = Field(
         description=(
             "Any additional information or metadata that was passed for this benchmark."
         )
@@ -292,9 +289,9 @@ class BenchmarkAggregator(
         default_factory=RequestsRunningStats,
     )
     results: StatusBreakdown[
-        List[SchedulerRequestResult[RequestT, ResponseT]],
-        List[SchedulerRequestResult[RequestT, ResponseT]],
-        List[SchedulerRequestResult[RequestT, ResponseT]],
+        list[SchedulerRequestResult[RequestT, ResponseT]],
+        list[SchedulerRequestResult[RequestT, ResponseT]],
+        list[SchedulerRequestResult[RequestT, ResponseT]],
         None,
     ] = Field(
         description=(
@@ -516,7 +513,7 @@ class GenerativeBenchmarkAggregator(
             "avaiable that match the preferred source."
         )
     )
-    processor_args: Optional[Dict[str, Any]] = Field(
+    processor_args: Optional[dict[str, Any]] = Field(
         description=(
             "Additional arguments to pass to the tokenizer if it requires "
             "any specific configuration for loading or processing."
@@ -636,12 +633,12 @@ class GenerativeBenchmarkAggregator(
 
     def _compile_results(
         self,
-    ) -> Tuple[
-        List[GenerativeTextResponseStats],
-        List[GenerativeTextErrorStats],
-        List[GenerativeTextErrorStats],
+    ) -> tuple[
+        list[GenerativeTextResponseStats],
+        list[GenerativeTextErrorStats],
+        list[GenerativeTextErrorStats],
     ]:
-        successful: List[GenerativeTextResponseStats] = [
+        successful: list[GenerativeTextResponseStats] = [
             GenerativeTextResponseStats(
                 request_id=result.request.request_id,
                 request_type=result.request.request_type,
@@ -670,7 +667,7 @@ class GenerativeBenchmarkAggregator(
             for result in self.results.successful
             if result.request and result.response
         ]
-        incomplete: List[GenerativeTextErrorStats] = [
+        incomplete: list[GenerativeTextErrorStats] = [
             GenerativeTextErrorStats(
                 error=result.response.error or "",
                 request_id=result.request.request_id,
@@ -700,7 +697,7 @@ class GenerativeBenchmarkAggregator(
             for result in self.results.incomplete
             if result.request and result.response
         ]
-        error: List[GenerativeTextErrorStats] = [
+        error: list[GenerativeTextErrorStats] = [
             GenerativeTextErrorStats(
                 error=result.response.error or "",
                 request_id=result.request.request_id,

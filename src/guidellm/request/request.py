@@ -1,5 +1,5 @@
 import uuid
-from typing import Any, Dict, Literal, Optional
+from typing import Any, Literal, Optional
 
 from pydantic import Field
 
@@ -56,21 +56,21 @@ class GenerationRequest(StandardBaseModel):
             "If raw content, raw_content=True must be passed in the params."
         )
     )
-    params: Dict[str, Any] = Field(
+    params: dict[str, Any] = Field(
         default_factory=dict,
         description=(
             "Additional parameters for the request that will be passed in as kwargs. "
             "For an http backend, these are passed into the body of the request. "
         ),
     )
-    stats: Dict[Literal["prompt_tokens"], int] = Field(
+    stats: dict[Literal["prompt_tokens"], int] = Field(
         default_factory=dict,
         description=(
             "Statistics for the request, such as the number of prompt tokens. "
             "Used for tracking and reporting purposes."
         ),
     )
-    constraints: Dict[Literal["output_tokens"], int] = Field(
+    constraints: dict[Literal["output_tokens"], int] = Field(
         default_factory=dict,
         description=(
             "Constraints for the request, such as the maximum number of output tokens. "
