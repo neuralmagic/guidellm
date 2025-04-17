@@ -220,24 +220,27 @@ class RequestsWorker(ABC, Generic[RequestT, ResponseT]):
         self,
         requests_queue: multiprocessing.Queue,
         results_queue: multiprocessing.Queue,
-        max_concurrency: Optional[int],
+        max_concurrency: int,
         process_id: int,
     ):
         async def _process_runner():
-            pending = asyncio.Semaphore(max_concurrency) if max_concurrency else None
+            pending = asyncio.Semaphore(max_concurrency)
+
+            if pending.locked():
+                raise ValueError(
+                    "Async worker called with max_concurrency < 1"
+                )
 
             while (
                 process_request := await self.get_request(requests_queue)
             ) is not None:
                 dequeued_time = time.time()
 
-                if pending:
-                    await pending.acquire()
+                await pending.acquire()
 
                 def _task_done(_: asyncio.Task):
                     nonlocal pending
-                    if pending:
-                        pending.release()
+                    pending.release()
 
                 task = asyncio.create_task(
                     self.resolve_scheduler_request(
@@ -325,7 +328,7 @@ class GenerativeRequestsWorker(RequestsWorker[GenerationRequest, ResponseSummary
         self,
         requests_queue: multiprocessing.Queue,
         results_queue: multiprocessing.Queue,
-        max_concurrency: Optional[int],
+        max_concurrency: int,
         process_id: int,
     ):
         asyncio.run(self.backend.validate())
