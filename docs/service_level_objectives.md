@@ -35,8 +35,6 @@ This category includes use cases where low latency is critical for external-faci
 - **SLOs**:
   - TTFT: ≤ 200ms for 99% of requests
   - ITL: ≤ 50ms for 99% of requests
-- **SLAs**:
-  - Guarantee TTFT ≤ 250ms for 95% of requests
 
 #### 2. Retrieval-Augmented Generation (RAG)
 
@@ -46,8 +44,6 @@ This category includes use cases where low latency is critical for external-faci
   - Request Latency: ≤ 3s for 99% of requests
   - TTFT: ≤ 300ms for 99% of requests (if iterative outputs are shown)
   - ITL: ≤ 100ms for 99% of requests (if iterative outputs are shown)
-- **SLAs**:
-  - Guarantee Request Latency ≤ 3.5s for 95% of requests
 
 #### 3. Instruction Following / Agentic AI
 
@@ -55,8 +51,6 @@ This category includes use cases where low latency is critical for external-faci
 
 - **SLOs**:
   - Request Latency: ≤ 5s for 99% of requests
-- **SLAs**:
-  - Guarantee Request Latency ≤ 5.5s for 95% of requests
 
 ### Real-Time, Internal Usage
 
@@ -69,8 +63,6 @@ This category includes use cases where low latency is important but less stringe
 - **SLOs**:
   - TTFT: ≤ 600ms for 99% of requests
   - ITL: ≤ 200ms for 99% of requests
-- **SLAs**:
-  - Guarantee TTFT ≤ 800ms for 95% of requests
 
 #### 5. Code Generation
 
@@ -79,8 +71,6 @@ This category includes use cases where low latency is important but less stringe
 - **SLOs**:
   - TTFT: ≤ 500ms for 99% of requests
   - ITL: ≤ 150ms for 99% of requests
-- **SLAs**:
-  - Guarantee TTFT ≤ 600ms for 95% of requests
 
 #### 6. Code Completion
 
@@ -88,8 +78,6 @@ This category includes use cases where low latency is important but less stringe
 
 - **SLOs**:
   - Request Latency: ≤ 2s for 99% of requests
-- **SLAs**:
-  - Guarantee Request Latency ≤ 2.5s for 95% of requests
 
 ### Offline, Batch Use Cases
 
@@ -101,8 +89,6 @@ This category includes use cases where maximizing throughput is the primary conc
 
 - **SLOs**:
   - Maximize Throughput: ≥ 100 requests per second
-- **SLAs**:
-  - Guarantee Throughput ≥ 80 requests per second
 
 #### 8. Analysis
 
@@ -110,8 +96,6 @@ This category includes use cases where maximizing throughput is the primary conc
 
 - **SLOs**:
   - Maximize Throughput: ≥ 150 requests per second
-- **SLAs**:
-  - Guarantee Throughput ≥ 120 requests per second
 
 ## Conclusion
 

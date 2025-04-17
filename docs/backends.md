@@ -14,7 +14,7 @@ GuideLLM supports OpenAI-compatible HTTP servers, which provide a standardized A
 
 [vLLM](https://github.com/vllm-project/vllm) is a high-performance OpenAI-compatible server designed for efficient LLM inference. It supports a variety of models and provides a simple interface for deployment.
 
-To start a vLLM server with a Llama 3.1 8B quantized model, run the following command:
+First ensure you have vLLM installed (`pip install vllm`), and then run the following command to start a vLLM server with a Llama 3.1 8B quantized model:
 
 ```bash
 vllm serve "neuralmagic/Meta-Llama-3.1-8B-Instruct-quantized.w4a16"

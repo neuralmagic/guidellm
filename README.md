@@ -56,7 +56,7 @@ For detailed installation instructions and requirements, see the [Installation G
 
 #### 1. Start an OpenAI Compatible Server (vLLM)
 
-GuideLLM requires an OpenAI-compatible server to run evaluations. [vLLM](https://github.com/vllm-project/vllm) is recommended for this purpose. To start a vLLM server with a Llama 3.1 8B quantized model, run the following command:
+GuideLLM requires an OpenAI-compatible server to run evaluations. [vLLM](https://github.com/vllm-project/vllm) is recommended for this purpose. After installing vLLM on your desired server (`pip install vllm`), start a vLLM server with a Llama 3.1 8B quantized modelby running the following command:
 
 ```bash
 vllm serve "neuralmagic/Meta-Llama-3.1-8B-Instruct-quantized.w4a16"
@@ -106,7 +106,7 @@ The results from GuideLLM are used to optimize your LLM deployment for performan
 
 For example, if we are deploying a chat application, we likely want to guarantee our time to first token (TTFT) and inter-token latency (ITL) are under certain thresholds to meet our service level objectives (SLOs) or agreements (SLAs). For example, setting TTFT to 200ms and ITL 25ms for the sample data provided in the example above, we can see that even though the server is capable of handling up to 13 requests per second, we would only be able to meet our SLOs for 99% of users at a request rate of 3.5 requests per second. If we relax our constraints on ITL to 50ms, then we can meet the TTFT SLA for 99% of users at a request rate of roughly 10 requests per second.
 
-For further details about deterimining the optimal request rate and SLOs, view the [SLOs documentation](https://raw.githubusercontent.com/neuralmagic/guidellm/main/docs/slos_and_slas.md).
+For further details about deterimining the optimal request rate and SLOs, view the [SLOs documentation](https://raw.githubusercontent.com/neuralmagic/guidellm/main/docs/service_level_objectives.md).
 
 ### Configurations
 
@@ -134,7 +134,7 @@ The `guidellm benchmark` command is used to run benchmarks against a generative 
 
 - `--data-sampler`: Enables applying `random` shuffling or sampling to the dataset. If not set, no sampling is applied.
 
-- `--rate-type`: Defines the type of benchmark to run. Supported types include:
+- `--rate-type`: Defines the type of benchmark to run (default sweep). Supported types include:
 
   - `synchronous`: Runs a single stream of requests one at a time. `--rate` must not be set for this mode.
   - `throughput`: Runs all requests in parallel to measure the maximum throughput for the server (bounded by GUIDELLM\_\_MAX_CONCURRENCY config argument). `--rate` must not be set for this mode.

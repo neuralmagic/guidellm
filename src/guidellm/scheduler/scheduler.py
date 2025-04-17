@@ -113,9 +113,12 @@ class Scheduler(Generic[RequestT, ResponseT]):
         if max_duration is not None and max_duration < 0:
             raise ValueError(f"Invalid max_duration: {max_duration}")
 
-        with multiprocessing.Manager() as manager, ProcessPoolExecutor(
-            max_workers=scheduling_strategy.processes_limit
-        ) as executor:
+        with (
+            multiprocessing.Manager() as manager,
+            ProcessPoolExecutor(
+                max_workers=scheduling_strategy.processes_limit
+            ) as executor,
+        ):
             requests_iter: Optional[Iterator[Any]] = None
             futures, requests_queue, responses_queue = await self._start_processes(
                 manager, executor, scheduling_strategy
