@@ -1,11 +1,14 @@
 import pytest
 
 from guidellm.config import (
+    DatasetSettings,
     Environment,
     LoggingSettings,
     OpenAISettings,
-    ReportGenerationSettings,
     Settings,
+    print_config,
+    reload_settings,
+    settings,
 )
 
 
@@ -15,10 +18,6 @@ def test_default_settings():
     assert settings.env == Environment.PROD
     assert settings.logging == LoggingSettings()
     assert settings.openai == OpenAISettings()
-    assert (
-        settings.report_generation.source
-        == "https://guidellm.neuralmagic.com/local-report/index.html"
-    )
 
 
 @pytest.mark.smoke()
@@ -30,7 +29,6 @@ def test_settings_from_env_variables(mocker):
             "GUIDELLM__logging__disabled": "true",
             "GUIDELLM__OPENAI__API_KEY": "test_key",
             "GUIDELLM__OPENAI__BASE_URL": "http://test.url",
-            "GUIDELLM__REPORT_GENERATION__SOURCE": "http://custom.url",
         },
     )
 
@@ -39,31 +37,6 @@ def test_settings_from_env_variables(mocker):
     assert settings.logging.disabled is True
     assert settings.openai.api_key == "test_key"
     assert settings.openai.base_url == "http://test.url"
-    assert settings.report_generation.source == "http://custom.url"
-
-
-@pytest.mark.smoke()
-def test_report_generation_default_source():
-    settings = Settings(env=Environment.LOCAL)
-    assert settings.report_generation.source == "tests/dummy/report.html"
-
-    settings = Settings(env=Environment.DEV)
-    assert (
-        settings.report_generation.source
-        == "https://dev.guidellm.neuralmagic.com/local-report/index.html"
-    )
-
-    settings = Settings(env=Environment.STAGING)
-    assert (
-        settings.report_generation.source
-        == "https://staging.guidellm.neuralmagic.com/local-report/index.html"
-    )
-
-    settings = Settings(env=Environment.PROD)
-    assert (
-        settings.report_generation.source
-        == "https://guidellm.neuralmagic.com/local-report/index.html"
-    )
 
 
 @pytest.mark.sanity()
@@ -88,6 +61,90 @@ def test_openai_settings():
 
 
 @pytest.mark.sanity()
-def test_report_generation_settings():
-    report_settings = ReportGenerationSettings(source="http://custom.report")
-    assert report_settings.source == "http://custom.report"
+def test_generate_env_file():
+    settings = Settings()
+    env_file_content = settings.generate_env_file()
+    assert "GUIDELLM__LOGGING__DISABLED" in env_file_content
+    assert "GUIDELLM__OPENAI__API_KEY" in env_file_content
+
+
+@pytest.mark.sanity()
+def test_reload_settings(mocker):
+    mocker.patch.dict(
+        "os.environ",
+        {
+            "GUIDELLM__env": "staging",
+            "GUIDELLM__logging__disabled": "false",
+        },
+    )
+    reload_settings()
+    assert settings.env == Environment.STAGING
+    assert settings.logging.disabled is False
+
+
+@pytest.mark.sanity()
+def test_print_config(capsys):
+    print_config()
+    captured = capsys.readouterr()
+    assert "Settings:" in captured.out
+    assert "GUIDELLM__LOGGING__DISABLED" in captured.out
+    assert "GUIDELLM__OPENAI__API_KEY" in captured.out
+
+
+@pytest.mark.sanity()
+def test_dataset_settings_defaults():
+    dataset_settings = DatasetSettings()
+    assert dataset_settings.preferred_data_columns == [
+        "prompt",
+        "instruction",
+        "input",
+        "inputs",
+        "question",
+        "context",
+        "text",
+        "content",
+        "body",
+        "data",
+    ]
+    assert dataset_settings.preferred_data_splits == [
+        "test",
+        "tst",
+        "validation",
+        "val",
+        "train",
+    ]
+
+
+@pytest.mark.sanity()
+def test_openai_settings_defaults():
+    openai_settings = OpenAISettings()
+    assert openai_settings.api_key is None
+    assert openai_settings.bearer_token is None
+    assert openai_settings.organization is None
+    assert openai_settings.project is None
+    assert openai_settings.base_url == "http://localhost:8000"
+    assert openai_settings.max_output_tokens == 16384
+
+
+@pytest.mark.sanity()
+def test_table_properties_defaults():
+    settings = Settings()
+    assert settings.table_border_char == "="
+    assert settings.table_headers_border_char == "-"
+    assert settings.table_column_separator_char == "|"
+
+
+@pytest.mark.sanity()
+def test_settings_with_env_variables(mocker):
+    mocker.patch.dict(
+        "os.environ",
+        {
+            "GUIDELLM__DATASET__PREFERRED_DATA_COLUMNS": '["custom_column"]',
+            "GUIDELLM__OPENAI__API_KEY": "env_api_key",
+            "GUIDELLM__TABLE_BORDER_CHAR": "*",
+        },
+    )
+    settings = Settings()
+    assert settings.dataset.preferred_data_columns == ["custom_column"]
+    assert settings.openai.api_key == "env_api_key"
+    assert settings.table_border_char == "*"

@@ -457,7 +457,12 @@ class GenerativeTextErrorStats(GenerativeTextResponseStats):
             This includes the time to generate the first token and all other tokens.
             None if the output_tokens is None or 0.
         """
-        if self.output_tokens is None or self.output_tokens == 0:
+        if (
+            self.output_tokens is None
+            or self.output_tokens == 0
+            or self.first_token_time is None
+            or self.last_token_time is None
+        ):
             return None
 
         return super().time_per_output_token_ms
@@ -614,41 +619,46 @@ class GenerativeBenchmark(Benchmark):
         ),
     )
 
-    def create_sampled(self, sample_size: int) -> "GenerativeBenchmark":
+    def set_sample_size(self, sample_size: Optional[int]) -> "GenerativeBenchmark":
         """
-        Create a new benchmark instance with a random sample of the completed and
-        errored requests based on the given sample sizes. If the sample sizes are
-        larger than the total number of requests, the sample sizes are capped at
-        the total number of requests.
+        Set the sample size for the benchmark. This will randomly sample the
+        requests for each status type to the given sample size or the maximum
+        number of requests for that status type, whichever is smaller.
+        This is applied to requests.successful, requests.errored, and
+        requests.incomplete.
+        If None, no sampling is applied and the state is kept.
 
         :param sample_size: The number of requests to sample for each status type.
-        :return: A new benchmark instance with the sampled requests.
-        :raises ValueError: If the sample sizes are negative.
+        :return: The benchmark with the sampled requests.
+        :raises ValueError: If the sample size is invalid.
         """
-        if sample_size < 0:
-            raise ValueError(f"Sample size must be non-negative, given {sample_size}")
 
-        sample_size = min(sample_size, len(self.requests.successful))
-        error_sample_size = min(sample_size, len(self.requests.errored))
-        incomplete_sample_size = min(sample_size, len(self.requests.incomplete))
+        if sample_size is not None:
+            if sample_size < 0 or not isinstance(sample_size, int):
+                raise ValueError(
+                    f"Sample size must be non-negative integer, given {sample_size}"
+                )
 
-        sampled_instance = self.model_copy()
-        sampled_instance.requests.successful = random.sample(
-            self.requests.successful, sample_size
-        )
-        sampled_instance.requests.errored = random.sample(
-            self.requests.errored, error_sample_size
-        )
-        sampled_instance.requests.incomplete = random.sample(
-            self.requests.incomplete, incomplete_sample_size
-        )
-        sampled_instance.request_samples = StatusBreakdown(
-            successful=len(sampled_instance.requests.successful),
-            incomplete=len(sampled_instance.requests.incomplete),
-            errored=len(sampled_instance.requests.errored),
-        )
+            sample_size = min(sample_size, len(self.requests.successful))
+            error_sample_size = min(sample_size, len(self.requests.errored))
+            incomplete_sample_size = min(sample_size, len(self.requests.incomplete))
 
-        return sampled_instance
+            self.requests.successful = random.sample(
+                self.requests.successful, sample_size
+            )
+            self.requests.errored = random.sample(
+                self.requests.errored, error_sample_size
+            )
+            self.requests.incomplete = random.sample(
+                self.requests.incomplete, incomplete_sample_size
+            )
+            self.request_samples = StatusBreakdown(
+                successful=len(self.requests.successful),
+                incomplete=len(self.requests.incomplete),
+                errored=len(self.requests.errored),
+            )
+
+        return self
 
     @staticmethod
     def from_stats(

@@ -1,3 +1,8 @@
+# Output files
+benchmarks.json
+benchmarks.yaml
+benchmarks.csv
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

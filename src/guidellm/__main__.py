@@ -211,6 +211,15 @@ def cli():
     help="A JSON string of extra data to save with the output benchmarks",
 )
 @click.option(
+    "--output-sampling",
+    type=int,
+    help=(
+        "The number of samples to save in the output file. "
+        "If None (default), will save all samples."
+    ),
+    default=None,
+)
+@click.option(
     "--random-seed",
     default=42,
     type=int,
@@ -237,6 +246,7 @@ def benchmark(
     disable_console_outputs,
     output_path,
     output_extras,
+    output_sampling,
     random_seed,
 ):
     asyncio.run(
@@ -261,6 +271,7 @@ def benchmark(
             output_console=not disable_console_outputs,
             output_path=output_path,
             output_extras=output_extras,
+            output_sampling=output_sampling,
             random_seed=random_seed,
         )
     )
