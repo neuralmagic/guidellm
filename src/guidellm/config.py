@@ -221,7 +221,3 @@ def print_config():
     Print the current configuration settings
     """
     print(f"Settings: \n{settings.generate_env_file()}")  # noqa: T201
-
-
-if __name__ == "__main__":
-    print_config()
