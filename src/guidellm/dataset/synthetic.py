@@ -1,7 +1,8 @@
 import json
 import random
+from collections.abc import Iterable, Iterator
 from pathlib import Path
-from typing import Any, Dict, Iterable, Iterator, Literal, Optional, Union
+from typing import Any, Literal, Optional, Union
 
 import yaml
 from datasets import (
@@ -119,7 +120,7 @@ class SyntheticDatasetConfig(BaseModel):
 
 class SyntheticTextItemsGenerator(
     Iterable[
-        Dict[
+        dict[
             Literal["prompt", "prompt_tokens_count", "output_tokens_count"],
             Union[str, int],
         ]
@@ -141,7 +142,7 @@ class SyntheticTextItemsGenerator(
     def __iter__(
         self,
     ) -> Iterator[
-        Dict[
+        dict[
             Literal["prompt", "prompt_tokens_count", "output_tokens_count"],
             Union[str, int],
         ]
@@ -199,7 +200,7 @@ class SyntheticTextItemsGenerator(
 
 class SyntheticDatasetCreator(DatasetCreator):
     @classmethod
-    def is_supported(cls, data: Any, data_args: Optional[Dict[str, Any]]) -> bool:  # noqa: ARG003
+    def is_supported(cls, data: Any, data_args: Optional[dict[str, Any]]) -> bool:  # noqa: ARG003
         if (
             isinstance(data, Path)
             and data.exists()
@@ -222,9 +223,9 @@ class SyntheticDatasetCreator(DatasetCreator):
     def handle_create(
         cls,
         data: Any,
-        data_args: Optional[Dict[str, Any]],
+        data_args: Optional[dict[str, Any]],
         processor: Optional[Union[str, Path, PreTrainedTokenizerBase]],
-        processor_args: Optional[Dict[str, Any]],
+        processor_args: Optional[dict[str, Any]],
         random_seed: int,
     ) -> Union[Dataset, DatasetDict, IterableDataset, IterableDatasetDict]:
         processor = check_load_processor(
@@ -244,8 +245,8 @@ class SyntheticDatasetCreator(DatasetCreator):
     @classmethod
     def extract_args_column_mappings(
         cls,
-        data_args: Optional[Dict[str, Any]],
-    ) -> Dict[ColumnInputTypes, str]:
+        data_args: Optional[dict[str, Any]],
+    ) -> dict[ColumnInputTypes, str]:
         data_args_columns = super().extract_args_column_mappings(data_args)
 
         if data_args_columns:

@@ -1,4 +1,5 @@
-from typing import List, Literal, Optional, Sequence, Union
+from collections.abc import Sequence
+from typing import Literal, Optional, Union
 
 import numpy as np
 from pydantic import Field, computed_field
@@ -37,11 +38,11 @@ class Profile(StandardBaseModel):
         default=0,
         description="The number of scheduling strategies generated so far.",
     )
-    measured_rates: List[float] = Field(
+    measured_rates: list[float] = Field(
         default_factory=list,
         description=("The average rates measured for the strategies that have run."),
     )
-    measured_concurrencies: List[float] = Field(
+    measured_concurrencies: list[float] = Field(
         default_factory=list,
         description=(
             "The average concurrency measured for the strategies that have run."
@@ -55,7 +56,7 @@ class Profile(StandardBaseModel):
 
     @computed_field  # type: ignore[misc]
     @property
-    def strategy_types(self) -> List[StrategyType]:
+    def strategy_types(self) -> list[StrategyType]:
         return []
 
     def next_strategy(self) -> Optional[SchedulingStrategy]:
@@ -66,7 +67,7 @@ class SynchronousProfile(Profile):
     type_: Literal["synchronous"] = "synchronous"  # type: ignore[assignment]
 
     @property
-    def strategy_types(self) -> List[StrategyType]:
+    def strategy_types(self) -> list[StrategyType]:
         return [self.type_]
 
     def next_strategy(self) -> Optional[SchedulingStrategy]:
@@ -104,7 +105,7 @@ class ConcurrentProfile(Profile):
     )
 
     @property
-    def strategy_types(self) -> List[StrategyType]:
+    def strategy_types(self) -> list[StrategyType]:
         num_strategies = len(self.streams) if isinstance(self.streams, Sequence) else 1
 
         return [self.type_] * num_strategies
@@ -155,7 +156,7 @@ class ThroughputProfile(Profile):
     )
 
     @property
-    def strategy_types(self) -> List[StrategyType]:
+    def strategy_types(self) -> list[StrategyType]:
         return [self.type_]
 
     def next_strategy(self) -> Optional[SchedulingStrategy]:
@@ -207,7 +208,7 @@ class AsyncProfile(ThroughputProfile):
     )
 
     @property
-    def strategy_types(self) -> List[StrategyType]:
+    def strategy_types(self) -> list[StrategyType]:
         num_strategies = len(self.rate) if isinstance(self.rate, Sequence) else 1
 
         return [self.strategy_type] * num_strategies
@@ -278,7 +279,7 @@ class SweepProfile(AsyncProfile):
     rate_type: Literal["constant", "poisson"] = "constant"
 
     @property
-    def strategy_types(self) -> List[StrategyType]:
+    def strategy_types(self) -> list[StrategyType]:
         return (
             ["synchronous"] + ["throughput"] + [self.rate_type] * (self.sweep_size - 2)  # type: ignore[return-value]
         )

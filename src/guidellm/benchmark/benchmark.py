@@ -1,6 +1,6 @@
 import random
 import uuid
-from typing import Any, Dict, List, Literal, Optional, TypeVar, Union
+from typing import Any, Literal, Optional, TypeVar, Union
 
 from pydantic import Field, computed_field
 
@@ -273,7 +273,7 @@ class Benchmark(StandardBaseModel):
             "requests for this benchmark."
         ),
     )
-    extras: Dict[str, Any] = Field(
+    extras: dict[str, Any] = Field(
         description=(
             "Any additional information or metadata that was passed for this benchmark."
         )
@@ -608,9 +608,9 @@ class GenerativeBenchmark(Benchmark):
         default=None,
     )
     requests: StatusBreakdown[
-        List[GenerativeTextResponseStats],
-        List[GenerativeTextErrorStats],
-        List[GenerativeTextErrorStats],
+        list[GenerativeTextResponseStats],
+        list[GenerativeTextErrorStats],
+        list[GenerativeTextErrorStats],
         None,
     ] = Field(
         description=(
@@ -663,14 +663,14 @@ class GenerativeBenchmark(Benchmark):
     @staticmethod
     def from_stats(
         run_id: str,
-        successful: List[GenerativeTextResponseStats],
-        incomplete: List[GenerativeTextErrorStats],
-        errored: List[GenerativeTextErrorStats],
+        successful: list[GenerativeTextResponseStats],
+        incomplete: list[GenerativeTextErrorStats],
+        errored: list[GenerativeTextErrorStats],
         args: BenchmarkArgs,
         run_stats: BenchmarkRunStats,
         worker: GenerativeRequestsWorkerDescription,
         requests_loader: GenerativeRequestLoaderDescription,
-        extras: Optional[Dict[str, Any]],
+        extras: Optional[dict[str, Any]],
     ) -> "GenerativeBenchmark":
         """
         Create a GenerativeBenchmark instance from the given statistics and metadata.
@@ -696,7 +696,7 @@ class GenerativeBenchmark(Benchmark):
             populated and calculated
         """
         total = successful + incomplete + errored
-        total_types: List[Literal["successful", "incomplete", "error"]] = [
+        total_types: list[Literal["successful", "incomplete", "error"]] = [
             *["successful"] * len(successful),  # type: ignore[list-item]
             *["incomplete"] * len(incomplete),  # type: ignore[list-item]
             *["error"] * len(errored),  # type: ignore[list-item]

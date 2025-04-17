@@ -1,11 +1,8 @@
 from abc import abstractmethod
+from collections.abc import Iterable, Iterator
 from pathlib import Path
 from typing import (
     Any,
-    Dict,
-    Iterable,
-    Iterator,
-    List,
     Literal,
     Optional,
     Union,
@@ -45,9 +42,9 @@ class RequestLoader(Iterable):
 class GenerativeRequestLoaderDescription(RequestLoaderDescription):
     type_: Literal["generative_request_loader"] = "generative_request_loader"  # type: ignore[assignment]
     data: str
-    data_args: Optional[Dict[str, Any]]
+    data_args: Optional[dict[str, Any]]
     processor: str
-    processor_args: Optional[Dict[str, Any]]
+    processor_args: Optional[dict[str, Any]]
 
 
 class GenerativeRequestLoader(RequestLoader):
@@ -72,15 +69,15 @@ class GenerativeRequestLoader(RequestLoader):
         data: Union[
             str,
             Path,
-            Iterable[Union[str, Dict[str, Any]]],
+            Iterable[Union[str, dict[str, Any]]],
             Dataset,
             DatasetDict,
             IterableDataset,
             IterableDatasetDict,
         ],
-        data_args: Optional[Dict[str, Any]],
+        data_args: Optional[dict[str, Any]],
         processor: Optional[Union[str, Path, PreTrainedTokenizerBase]],
-        processor_args: Optional[Dict[str, Any]],
+        processor_args: Optional[dict[str, Any]],
         shuffle: bool = True,
         iter_type: Literal["finite", "infinite"] = "finite",
         random_seed: int = 42,
@@ -148,9 +145,9 @@ class GenerativeRequestLoader(RequestLoader):
 
     def _create_column_mappings(
         self,
-        args_column_mappings: Dict[ColumnInputTypes, str],
-    ) -> Dict[ColumnInputTypes, str]:
-        column_mappings: Dict[ColumnInputTypes, str] = {}
+        args_column_mappings: dict[ColumnInputTypes, str],
+    ) -> dict[ColumnInputTypes, str]:
+        column_mappings: dict[ColumnInputTypes, str] = {}
 
         if "text_column" in args_column_mappings:
             column_mappings["prompt_column"] = args_column_mappings["text_column"]
@@ -224,7 +221,7 @@ class GenerativeRequestLoader(RequestLoader):
 
         return None
 
-    def _dataset_columns(self, err_msg: Optional[str] = None) -> Optional[List[str]]:
+    def _dataset_columns(self, err_msg: Optional[str] = None) -> Optional[list[str]]:
         try:
             column_names = self.dataset.column_names
 
@@ -240,7 +237,7 @@ class GenerativeRequestLoader(RequestLoader):
 
     def _get_dataset_iter(
         self, scope_create_count: int
-    ) -> Optional[Iterator[Dict[str, Any]]]:
+    ) -> Optional[Iterator[dict[str, Any]]]:
         if scope_create_count > 0 and self.iter_type != "infinite":
             return None
 
@@ -260,7 +257,7 @@ class GenerativeRequestLoader(RequestLoader):
 
         return dataset_iter
 
-    def _create_request(self, item: Dict[str, Any]) -> GenerationRequest:
+    def _create_request(self, item: dict[str, Any]) -> GenerationRequest:
         prompt_tokens = (
             item[self.column_mappings["prompt_tokens_count_column"]]
             if "prompt_tokens_count_column" in self.column_mappings

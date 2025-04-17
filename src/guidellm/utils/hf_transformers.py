@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, Dict, Optional, Union
+from typing import Any, Optional, Union
 
 from transformers import AutoTokenizer, PreTrainedTokenizerBase  # type: ignore[import]
 
@@ -10,7 +10,7 @@ __all__ = [
 
 def check_load_processor(
     processor: Optional[Union[str, Path, PreTrainedTokenizerBase]],
-    processor_args: Optional[Dict[str, Any]],
+    processor_args: Optional[dict[str, Any]],
     error_msg: str,
 ) -> PreTrainedTokenizerBase:
     if processor is None:

@@ -2,7 +2,7 @@ import math
 import time
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Dict, Generic, List, Optional, TypeVar, Union
+from typing import Generic, Optional, TypeVar, Union
 
 from rich.console import Group
 from rich.live import Live
@@ -100,7 +100,7 @@ class BenchmarkerTaskProgressState:
         return min(int(max(number_percent, duration_percent)), 1000)
 
     @property
-    def fields(self) -> Dict[str, str]:
+    def fields(self) -> dict[str, str]:
         fields = {
             "start_time": self.formatted_start_time,
             "progress_status": self.formatted_progress_status,
@@ -281,7 +281,7 @@ class GenerativeTextBenchmarkerTaskProgressState(BenchmarkerTaskProgressState):
     tokens_itl: float = 0
 
     @property
-    def fields(self) -> Dict[str, str]:
+    def fields(self) -> dict[str, str]:
         fields = super().fields
         fields["tokens_summary"] = self.formatted_tokens_summary
         return fields
@@ -385,7 +385,7 @@ class BenchmarkerProgressDisplay(Generic[BTPS]):
             redirect_stderr=True,
         )
         self.active_task: Optional[TaskID] = None
-        self.benchmarker_tasks: List[BTPS] = []
+        self.benchmarker_tasks: list[BTPS] = []
         self.progress_task: Optional[TaskID] = None
 
     def update(self, result: BenchmarkerResult):
@@ -588,7 +588,7 @@ class BenchmarkerProgressDisplay(Generic[BTPS]):
         self.benchmarker_tasks = []
         self.progress_task = None
 
-    def create_task_progress_columns(self) -> List[ProgressColumn]:
+    def create_task_progress_columns(self) -> list[ProgressColumn]:
         columns = [
             TextColumn("[{task.fields[start_time]}]"),
             SpinnerColumn(style=Colors.PROGRESS),
@@ -700,7 +700,7 @@ class GenerativeTextBenchmarkerProgressDisplay(
             strategy=strategy_type,
         )
 
-    def create_task_progress_columns(self) -> List[ProgressColumn]:
+    def create_task_progress_columns(self) -> list[ProgressColumn]:
         columns = super().create_task_progress_columns()
         columns = columns[:-1]  # remove the last display info column
 

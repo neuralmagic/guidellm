@@ -1,4 +1,4 @@
-from typing import Any, Dict, Literal, Optional
+from typing import Any, Literal, Optional
 
 from pydantic import computed_field
 
@@ -55,8 +55,8 @@ class RequestArgs(StandardBaseModel):
     """
 
     target: str
-    headers: Dict[str, str]
-    payload: Dict[str, Any]
+    headers: dict[str, str]
+    payload: dict[str, Any]
     timeout: Optional[float] = None
     http2: Optional[bool] = None
 

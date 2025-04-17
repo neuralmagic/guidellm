@@ -1,7 +1,7 @@
 import math
 import time as timer
 from collections import defaultdict
-from typing import Any, Dict, List, Literal, Optional, Tuple
+from typing import Any, Literal, Optional
 
 import numpy as np
 from pydantic import Field, computed_field
@@ -90,14 +90,14 @@ class DistributionSummary(StandardBaseModel):
     percentiles: Percentiles = Field(
         description="The percentiles of the distribution.",
     )
-    cumulative_distribution_function: Optional[List[Tuple[float, float]]] = Field(
+    cumulative_distribution_function: Optional[list[tuple[float, float]]] = Field(
         description="The cumulative distribution function (CDF) of the distribution.",
         default=None,
     )
 
     @staticmethod
     def from_distribution_function(
-        distribution: List[Tuple[float, float]],
+        distribution: list[tuple[float, float]],
         include_cdf: bool = False,
     ) -> "DistributionSummary":
         """
@@ -184,8 +184,8 @@ class DistributionSummary(StandardBaseModel):
 
     @staticmethod
     def from_values(
-        values: List[float],
-        weights: Optional[List[float]] = None,
+        values: list[float],
+        weights: Optional[list[float]] = None,
         include_cdf: bool = False,
     ) -> "DistributionSummary":
         """
@@ -215,7 +215,7 @@ class DistributionSummary(StandardBaseModel):
 
     @staticmethod
     def from_request_times(
-        requests: List[Tuple[float, float]],
+        requests: list[tuple[float, float]],
         distribution_type: Literal["concurrency", "rate"],
         include_cdf: bool = False,
         epsilon: float = 1e-6,
@@ -238,7 +238,7 @@ class DistributionSummary(StandardBaseModel):
         """
         if distribution_type == "concurrency":
             # convert to delta changes based on when requests were running
-            time_deltas: Dict[float, int] = defaultdict(int)
+            time_deltas: dict[float, int] = defaultdict(int)
             for start, end in requests:
                 time_deltas[start] += 1
                 time_deltas[end] -= 1
@@ -261,7 +261,7 @@ class DistributionSummary(StandardBaseModel):
             )
 
         # combine any events that are very close together
-        flattened_events: List[Tuple[float, float]] = []
+        flattened_events: list[tuple[float, float]] = []
         for time, val in sorted(events):
             last_time, last_val = (
                 flattened_events[-1] if flattened_events else (None, None)
@@ -277,7 +277,7 @@ class DistributionSummary(StandardBaseModel):
                 flattened_events.append((time, val))
 
         # convert to value distribution function
-        distribution: Dict[float, float] = defaultdict(float)
+        distribution: dict[float, float] = defaultdict(float)
 
         for ind in range(len(flattened_events) - 1):
             start_time, value = flattened_events[ind]
@@ -292,7 +292,7 @@ class DistributionSummary(StandardBaseModel):
                 rate = value / duration
                 distribution[rate] += duration
 
-        distribution_list: List[Tuple[float, float]] = sorted(distribution.items())
+        distribution_list: list[tuple[float, float]] = sorted(distribution.items())
 
         return DistributionSummary.from_distribution_function(
             distribution=distribution_list,
@@ -301,10 +301,10 @@ class DistributionSummary(StandardBaseModel):
 
     @staticmethod
     def from_iterable_request_times(
-        requests: List[Tuple[float, float]],
-        first_iter_times: List[float],
-        iter_counts: List[int],
-        first_iter_counts: Optional[List[int]] = None,
+        requests: list[tuple[float, float]],
+        first_iter_times: list[float],
+        iter_counts: list[int],
+        first_iter_counts: Optional[list[int]] = None,
         include_cdf: bool = False,
         epsilon: float = 1e-6,
     ) -> "DistributionSummary":
@@ -367,7 +367,7 @@ class DistributionSummary(StandardBaseModel):
                     events[first_iter + ind * iter_latency] += 1
 
         # combine any events that are very close together
-        flattened_events: List[Tuple[float, int]] = []
+        flattened_events: list[tuple[float, int]] = []
 
         for time, count in sorted(events.items()):
             last_time, last_count = (
@@ -384,7 +384,7 @@ class DistributionSummary(StandardBaseModel):
                 flattened_events.append((time, count))
 
         # convert to value distribution function
-        distribution: Dict[float, float] = defaultdict(float)
+        distribution: dict[float, float] = defaultdict(float)
 
         for ind in range(len(flattened_events) - 1):
             start_time, count = flattened_events[ind]
@@ -418,9 +418,9 @@ class StatusDistributionSummary(
 
     @staticmethod
     def from_values(
-        value_types: List[Literal["successful", "incomplete", "error"]],
-        values: List[float],
-        weights: Optional[List[float]] = None,
+        value_types: list[Literal["successful", "incomplete", "error"]],
+        values: list[float],
+        weights: Optional[list[float]] = None,
         include_cdf: bool = False,
     ) -> "StatusDistributionSummary":
         """
@@ -519,8 +519,8 @@ class StatusDistributionSummary(
 
     @staticmethod
     def from_request_times(
-        request_types: List[Literal["successful", "incomplete", "error"]],
-        requests: List[Tuple[float, float]],
+        request_types: list[Literal["successful", "incomplete", "error"]],
+        requests: list[tuple[float, float]],
         distribution_type: Literal["concurrency", "rate"],
         include_cdf: bool = False,
         epsilon: float = 1e-6,
@@ -631,11 +631,11 @@ class StatusDistributionSummary(
 
     @staticmethod
     def from_iterable_request_times(
-        request_types: List[Literal["successful", "incomplete", "error"]],
-        requests: List[Tuple[float, float]],
-        first_iter_times: List[float],
-        iter_counts: Optional[List[int]] = None,
-        first_iter_counts: Optional[List[int]] = None,
+        request_types: list[Literal["successful", "incomplete", "error"]],
+        requests: list[tuple[float, float]],
+        first_iter_times: list[float],
+        iter_counts: Optional[list[int]] = None,
+        first_iter_counts: Optional[list[int]] = None,
         include_cdf: bool = False,
         epsilon: float = 1e-6,
     ) -> "StatusDistributionSummary":

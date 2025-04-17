@@ -1,6 +1,7 @@
 import json
+from collections.abc import Sequence
 from enum import Enum
-from typing import Dict, List, Literal, Optional, Sequence
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -53,7 +54,7 @@ class DatasetSettings(BaseModel):
     Dataset settings for the application
     """
 
-    preferred_data_columns: List[str] = Field(
+    preferred_data_columns: list[str] = Field(
         default_factory=lambda: [
             "prompt",
             "instruction",
@@ -67,7 +68,7 @@ class DatasetSettings(BaseModel):
             "data",
         ]
     )
-    preferred_data_splits: List[str] = Field(
+    preferred_data_splits: list[str] = Field(
         default_factory=lambda: ["test", "tst", "validation", "val", "train"]
     )
 
@@ -178,7 +179,7 @@ class Settings(BaseSettings):
                 if isinstance(sub_value, Sequence) and not isinstance(sub_value, str):
                     value_str = ",".join(f'"{item}"' for item in sub_value)
                     env_file += f"{tag}=[{value_str}]\n"
-                elif isinstance(sub_value, Dict):
+                elif isinstance(sub_value, dict):
                     value_str = json.dumps(sub_value)
                     env_file += f"{tag}={value_str}\n"
                 elif not sub_value:

@@ -1,6 +1,6 @@
 import math
 import time
-from typing import List, Literal
+from typing import Literal
 
 import numpy as np
 import pytest
@@ -401,7 +401,7 @@ def test_status_distribution_summary_marshalling():
 
 
 def test_status_distribution_summary_from_values():
-    value_types: List[Literal["successful", "incomplete", "error"]] = [
+    value_types: list[Literal["successful", "incomplete", "error"]] = [
         "successful",
         "incomplete",
         "error",
@@ -465,7 +465,7 @@ def test_status_distribution_summary_from_values():
 
 
 def test_status_distribution_summary_from_request_times():
-    request_types: List[Literal["successful", "incomplete", "error"]] = [
+    request_types: list[Literal["successful", "incomplete", "error"]] = [
         "successful",
         "incomplete",
         "error",
@@ -513,7 +513,7 @@ def test_status_distribution_summary_from_request_times():
 
 
 def test_status_distribution_summary_from_iterable_request_times():
-    request_types: List[Literal["successful", "incomplete", "error"]] = [
+    request_types: list[Literal["successful", "incomplete", "error"]] = [
         "successful",
         "incomplete",
         "error",

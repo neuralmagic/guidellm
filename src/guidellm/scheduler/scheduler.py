@@ -3,16 +3,12 @@ import math
 import multiprocessing
 import multiprocessing.queues
 import time
+from collections.abc import AsyncGenerator, Iterable, Iterator
 from concurrent.futures import ProcessPoolExecutor
 from typing import (
     Any,
-    AsyncGenerator,
     Generic,
-    Iterable,
-    Iterator,
-    List,
     Optional,
-    Tuple,
     Union,
 )
 
@@ -179,8 +175,8 @@ class Scheduler(Generic[RequestT, ResponseT]):
         manager,
         executor: ProcessPoolExecutor,
         scheduling_strategy: SchedulingStrategy,
-    ) -> Tuple[
-        List[asyncio.Future],
+    ) -> tuple[
+        list[asyncio.Future],
         multiprocessing.Queue,
         multiprocessing.Queue,
     ]:
@@ -229,11 +225,11 @@ class Scheduler(Generic[RequestT, ResponseT]):
 
     def _run_setup(
         self,
-        processes: List[asyncio.Future],
+        processes: list[asyncio.Future],
         scheduling_strategy: SchedulingStrategy,
         max_number: Optional[int],
         max_duration: Optional[float],
-    ) -> Tuple[SchedulerRunInfo, Iterator[Any], Iterator[float]]:
+    ) -> tuple[SchedulerRunInfo, Iterator[Any], Iterator[float]]:
         requests_iter = iter(self.request_loader)
         start_time = time.time()
         times_iter = iter(scheduling_strategy.request_times())
@@ -357,7 +353,7 @@ class Scheduler(Generic[RequestT, ResponseT]):
 
     async def _stop_processes(
         self,
-        futures: List[asyncio.Future],
+        futures: list[asyncio.Future],
         requests_queue: multiprocessing.Queue,
     ):
         for _ in futures:

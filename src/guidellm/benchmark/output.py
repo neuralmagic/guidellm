@@ -4,7 +4,7 @@ import math
 from collections import OrderedDict
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional, Tuple, Union
+from typing import Any, Literal, Optional, Union
 
 import yaml
 from pydantic import Field
@@ -70,7 +70,7 @@ class GenerativeBenchmarksReport(StandardBaseModel):
 
         raise ValueError(f"Unsupported file type: {type_} for {path}.")
 
-    benchmarks: List[GenerativeBenchmark] = Field(
+    benchmarks: list[GenerativeBenchmark] = Field(
         description="The list of completed benchmarks contained within the report.",
         default_factory=list,
     )
@@ -184,12 +184,12 @@ class GenerativeBenchmarksReport(StandardBaseModel):
 
         with path.open("w", newline="") as file:
             writer = csv.writer(file)
-            headers: List[str] = []
-            rows: List[List[Union[str, float, List[float]]]] = []
+            headers: list[str] = []
+            rows: list[list[Union[str, float, list[float]]]] = []
 
             for benchmark in self.benchmarks:
-                benchmark_headers: List[str] = []
-                benchmark_values: List[Union[str, float, List[float]]] = []
+                benchmark_headers: list[str] = []
+                benchmark_values: list[Union[str, float, list[float]]] = []
 
                 desc_headers, desc_values = self._benchmark_desc_headers_and_values(
                     benchmark
@@ -224,7 +224,7 @@ class GenerativeBenchmarksReport(StandardBaseModel):
     def _file_setup(
         path: Union[str, Path],
         default_file_type: Literal["json", "yaml", "csv"] = "json",
-    ) -> Tuple[Path, Literal["json", "yaml", "csv"]]:
+    ) -> tuple[Path, Literal["json", "yaml", "csv"]]:
         path = Path(path) if not isinstance(path, Path) else path
 
         if path.is_dir():
@@ -247,7 +247,7 @@ class GenerativeBenchmarksReport(StandardBaseModel):
     @staticmethod
     def _benchmark_desc_headers_and_values(
         benchmark: GenerativeBenchmark,
-    ) -> Tuple[List[str], List[Union[str, float]]]:
+    ) -> tuple[list[str], list[Union[str, float]]]:
         headers = [
             "Type",
             "Run Id",
@@ -257,7 +257,7 @@ class GenerativeBenchmarksReport(StandardBaseModel):
             "End Time",
             "Duration",
         ]
-        values: List[Union[str, float]] = [
+        values: list[Union[str, float]] = [
             benchmark.type_,
             benchmark.run_id,
             benchmark.id_,
@@ -275,9 +275,9 @@ class GenerativeBenchmarksReport(StandardBaseModel):
     @staticmethod
     def _benchmark_extras_headers_and_values(
         benchmark: GenerativeBenchmark,
-    ) -> Tuple[List[str], List[str]]:
+    ) -> tuple[list[str], list[str]]:
         headers = ["Args", "Worker", "Request Loader", "Extras"]
-        values: List[str] = [
+        values: list[str] = [
             json.dumps(benchmark.args.model_dump()),
             json.dumps(benchmark.worker.model_dump()),
             json.dumps(benchmark.request_loader.model_dump()),
@@ -292,7 +292,7 @@ class GenerativeBenchmarksReport(StandardBaseModel):
     @staticmethod
     def _benchmark_status_headers_and_values(
         benchmark: GenerativeBenchmark, status: str
-    ) -> Tuple[List[str], List[Union[float, List[float]]]]:
+    ) -> tuple[list[str], list[Union[float, list[float]]]]:
         headers = [
             f"{status.capitalize()} Requests",
         ]
@@ -319,7 +319,7 @@ class GenerativeBenchmarksReport(StandardBaseModel):
         benchmark: GenerativeBenchmark,
         status: str,
         metric: str,
-    ) -> Tuple[List[str], List[Union[float, List[float]]]]:
+    ) -> tuple[list[str], list[Union[float, list[float]]]]:
         status_display = status.capitalize()
         metric_display = metric.replace("_", " ").capitalize()
         status_dist_summary: StatusDistributionSummary = getattr(
@@ -335,7 +335,7 @@ class GenerativeBenchmarksReport(StandardBaseModel):
                 "[min, 0.1, 1, 5, 10, 25, 75, 90, 95, 99, max]"
             ),
         ]
-        values: List[Union[float, List[float]]] = [
+        values: list[Union[float, list[float]]] = [
             dist_summary.mean,
             dist_summary.median,
             dist_summary.std_dev,
@@ -372,7 +372,7 @@ class GenerativeBenchmarksConsole:
             If False, all console output will be suppressed.
         """
         self.enabled = enabled
-        self.benchmarks: Optional[List[GenerativeBenchmark]] = None
+        self.benchmarks: Optional[list[GenerativeBenchmark]] = None
         self.console = Console()
 
     @property
@@ -496,8 +496,8 @@ class GenerativeBenchmarksConsole:
 
     def print_line(
         self,
-        value: Union[str, List[str]],
-        style: Union[str, List[str]] = "",
+        value: Union[str, list[str]],
+        style: Union[str, list[str]] = "",
         indent: int = 0,
         new_lines: int = 0,
     ):
@@ -539,10 +539,10 @@ class GenerativeBenchmarksConsole:
 
     def print_table(
         self,
-        headers: List[str],
-        rows: List[List[Any]],
+        headers: list[str],
+        rows: list[list[Any]],
         title: str,
-        sections: Optional[Dict[str, Tuple[int, int]]] = None,
+        sections: Optional[dict[str, tuple[int, int]]] = None,
         max_char_per_col: int = 2**10,
         indent: int = 0,
         new_lines: int = 2,
@@ -601,11 +601,11 @@ class GenerativeBenchmarksConsole:
 
     def calculate_max_chars_per_column(
         self,
-        headers: List[str],
-        rows: List[List[Any]],
-        sections: Optional[Dict[str, Tuple[int, int]]],
+        headers: list[str],
+        rows: list[list[Any]],
+        sections: Optional[dict[str, tuple[int, int]]],
         max_char_per_col: int,
-    ) -> List[int]:
+    ) -> list[int]:
         """
         Calculate the maximum number of characters per column in the table.
         This is done by checking the length of the headers, rows, and optional sections
@@ -649,7 +649,7 @@ class GenerativeBenchmarksConsole:
         return max_characters_per_column
 
     def print_table_divider(
-        self, max_chars_per_column: List[int], include_separators: bool, indent: int = 0
+        self, max_chars_per_column: list[int], include_separators: bool, indent: int = 0
     ):
         """
         Print a divider line for the table (top and bottom of table with '=' characters)
@@ -677,8 +677,8 @@ class GenerativeBenchmarksConsole:
 
     def print_table_sections(
         self,
-        sections: Dict[str, Tuple[int, int]],
-        max_chars_per_column: List[int],
+        sections: dict[str, tuple[int, int]],
+        max_chars_per_column: list[int],
         indent: int = 0,
     ):
         """
@@ -732,7 +732,7 @@ class GenerativeBenchmarksConsole:
         self.print_line(value=line_values, style=line_styles, indent=indent)
 
     def print_table_row(
-        self, column_lines: List[List[str]], style: str, indent: int = 0
+        self, column_lines: list[list[str]], style: str, indent: int = 0
     ):
         """
         Print a single row of a table to the console.
