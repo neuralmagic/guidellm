@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Literal, Optional, Union
+from typing import Any, Dict, Iterable, List, Literal, Optional, Tuple, Union
 
 from datasets import Dataset, DatasetDict, IterableDataset, IterableDatasetDict
 from transformers import (  # type: ignore[import]
@@ -7,11 +7,10 @@ from transformers import (  # type: ignore[import]
 )
 
 from guidellm.backend import Backend, BackendType
-from guidellm.benchmark.benchmark import GenerativeBenchmark
 from guidellm.benchmark.benchmarker import GenerativeBenchmarker
 from guidellm.benchmark.output import (
     GenerativeBenchmarksConsole,
-    save_generative_benchmarks,
+    GenerativeBenchmarksReport,
 )
 from guidellm.benchmark.profile import ProfileType, create_profile
 from guidellm.benchmark.progress import GenerativeTextBenchmarkerProgressDisplay
@@ -48,8 +47,9 @@ async def benchmark_generative_text(
     output_console: bool,
     output_path: Optional[Union[str, Path]],
     output_extras: Optional[Dict[str, Any]],
+    output_sampling: Optional[int],
     random_seed: int,
-) -> List[GenerativeBenchmark]:
+) -> Tuple[GenerativeBenchmarksReport, Optional[Path]]:
     console = GenerativeBenchmarksConsole(enabled=show_progress)
     console.print_line("Creating backend...")
     backend = Backend.create(
@@ -100,7 +100,7 @@ async def benchmark_generative_text(
         if show_progress
         else None
     )
-    benchmarks = []
+    report = GenerativeBenchmarksReport()
 
     async for result in benchmarker.run(
         profile=profile,
@@ -115,15 +115,26 @@ async def benchmark_generative_text(
         if result.type_ == "benchmark_compiled":
             if result.current_benchmark is None:
                 raise ValueError("Current benchmark is None")
-            benchmarks.append(result.current_benchmark)
+            report.benchmarks.append(
+                result.current_benchmark.set_sample_size(output_sampling)
+            )
 
     if output_console:
-        console.benchmarks = benchmarks
+        orig_enabled = console.enabled
+        console.enabled = True
+        console.benchmarks = report.benchmarks
         console.print_benchmarks_metadata()
         console.print_benchmarks_info()
         console.print_benchmarks_stats()
+        console.enabled = orig_enabled
 
     if output_path:
-        save_generative_benchmarks(benchmarks=benchmarks, path=output_path)
+        console.print_line("\nSaving benchmarks report...")
+        saved_path = report.save_file(output_path)
+        console.print_line(f"Benchmarks report saved to {saved_path}")
+    else:
+        saved_path = None
 
-    return benchmarks
+    console.print_line("\nBenchmarking complete.")
+
+    return report, saved_path

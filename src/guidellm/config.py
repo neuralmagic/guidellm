@@ -11,7 +11,6 @@ __all__ = [
     "LoggingSettings",
     "OpenAISettings",
     "print_config",
-    "ReportGenerationSettings",
     "Settings",
     "reload_settings",
     "settings",
@@ -87,16 +86,6 @@ class OpenAISettings(BaseModel):
     max_output_tokens: int = 16384
 
 
-class ReportGenerationSettings(BaseModel):
-    """
-    Report generation settings for the application
-    """
-
-    source: str = ""
-    report_html_match: str = "window.report_data = {};"
-    report_html_placeholder: str = "{}"
-
-
 class Settings(BaseSettings):
     """
     All the settings are powered by pydantic_settings and could be
@@ -139,22 +128,21 @@ class Settings(BaseSettings):
     # Request/stats settings
     preferred_prompt_tokens_source: Optional[
         Literal["request", "response", "local"]
-    ] = None
+    ] = "response"
     preferred_output_tokens_source: Optional[
         Literal["request", "response", "local"]
-    ] = None
+    ] = "response"
     preferred_backend: Literal["openai"] = "openai"
     openai: OpenAISettings = OpenAISettings()
 
-    # Report settings
-    report_generation: ReportGenerationSettings = ReportGenerationSettings()
+    # Output settings
+    table_border_char: str = "="
+    table_headers_border_char: str = "-"
+    table_column_separator_char: str = "|"
 
     @model_validator(mode="after")
     @classmethod
     def set_default_source(cls, values):
-        if not values.report_generation.source:
-            values.report_generation.source = ENV_REPORT_MAPPING.get(values.env)
-
         return values
 
     def generate_env_file(self) -> str:

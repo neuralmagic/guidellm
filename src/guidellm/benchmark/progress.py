@@ -32,6 +32,13 @@ from guidellm.scheduler import (
 )
 from guidellm.utils import Colors
 
+__all__ = [
+    "BenchmarkerTaskProgressState",
+    "BenchmarkerProgressDisplay",
+    "GenerativeTextBenchmarkerTaskProgressState",
+    "GenerativeTextBenchmarkerProgressDisplay",
+]
+
 
 @dataclass
 class BenchmarkerTaskProgressState:

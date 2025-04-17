@@ -10,6 +10,7 @@ from .text import (
     is_puncutation,
     load_text,
     split_text,
+    split_text_list_by_length,
 )
 
 __all__ = [
@@ -22,4 +23,5 @@ __all__ = [
     "load_text",
     "is_puncutation",
     "EndlessTextCreator",
+    "split_text_list_by_length",
 ]
