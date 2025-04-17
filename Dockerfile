@@ -33,4 +33,4 @@ HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
 # Set the entrypoint
-ENTRYPOINT ["/app/run_benchmark.sh"] 
+ENTRYPOINT ["/app/run_benchmark.sh"]
