@@ -298,6 +298,8 @@ class SweepProfile(AsyncProfile):
 
         min_rate = self.measured_rates[0]
         max_rate = self.measured_rates[1]
+        # Increase max rate by one step to hopefully find a better effective rate
+        max_rate += (max_rate - min_rate) / self.sweep_size
         rates = np.linspace(min_rate, max_rate, self.sweep_size - 1)[1:]
 
         if self.rate_type == "constant":
