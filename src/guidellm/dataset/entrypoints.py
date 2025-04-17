@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Optional, Union
 
 from datasets import Dataset, IterableDataset
 from transformers import PreTrainedTokenizerBase  # type: ignore[import]
@@ -15,12 +15,12 @@ __all__ = ["load_dataset"]
 
 def load_dataset(
     data: Any,
-    data_args: Optional[Dict[str, Any]],
+    data_args: Optional[dict[str, Any]],
     processor: Optional[Union[str, Path, PreTrainedTokenizerBase]],
-    processor_args: Optional[Dict[str, Any]],
+    processor_args: Optional[dict[str, Any]],
     random_seed: int = 42,
-    split_pref_order: Optional[List[str]] = None,
-) -> Tuple[Union[Dataset, IterableDataset], Dict[ColumnInputTypes, str]]:
+    split_pref_order: Optional[list[str]] = None,
+) -> tuple[Union[Dataset, IterableDataset], dict[ColumnInputTypes, str]]:
     creators = [
         InMemoryDatasetCreator,
         SyntheticDatasetCreator,

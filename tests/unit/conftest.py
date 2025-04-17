@@ -1,5 +1,6 @@
 import json
-from typing import Any, AsyncIterable, Dict, List, Literal, Optional
+from collections.abc import AsyncIterable
+from typing import Any, Literal, Optional
 from unittest.mock import MagicMock, patch
 
 import httpx
@@ -15,7 +16,7 @@ from .mock_backend import MockBackend
 def mock_auto_tokenizer():
     with patch("transformers.AutoTokenizer.from_pretrained") as mock_from_pretrained:
 
-        def _fake_tokenize(text: str) -> List[int]:
+        def _fake_tokenize(text: str) -> list[int]:
             tokens = text.split()
             return [0] * len(tokens)
 
@@ -72,7 +73,7 @@ class MockCompletionsIter(AsyncIterable):
             ):
                 continue
 
-            data: Dict[str, Any]
+            data: dict[str, Any]
 
             if isinstance(token_iter, StreamingTextResponse):
                 if self._type == "text":

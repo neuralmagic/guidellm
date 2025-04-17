@@ -1,13 +1,11 @@
 import time
 import uuid
 from abc import ABC, abstractmethod
+from collections.abc import AsyncGenerator, Iterable
 from pathlib import Path
 from typing import (
     Any,
-    AsyncGenerator,
-    Dict,
     Generic,
-    Iterable,
     Literal,
     Optional,
     Union,
@@ -136,7 +134,7 @@ class Benchmarker(Generic[AggregatorT, BenchmarkT, RequestT, ResponseT], ABC):
         worker: RequestsWorker[RequestT, ResponseT],
         request_loader: Iterable[RequestT],
         requests_loader_description: RequestLoaderDescription,
-        benchmark_save_extras: Optional[Dict[str, Any]] = None,
+        benchmark_save_extras: Optional[dict[str, Any]] = None,
     ):
         self.worker = worker
         self.scheduler: Scheduler[RequestT, ResponseT] = Scheduler(
@@ -294,9 +292,9 @@ class GenerativeBenchmarker(
         backend: Backend,
         request_loader: Iterable[GenerationRequest],
         request_loader_description: GenerativeRequestLoaderDescription,
-        benchmark_save_extras: Optional[Dict[str, Any]] = None,
+        benchmark_save_extras: Optional[dict[str, Any]] = None,
         processor: Optional[Union[str, Path, PreTrainedTokenizerBase]] = None,
-        processor_args: Optional[Dict[str, Any]] = None,
+        processor_args: Optional[dict[str, Any]] = None,
     ):
         super().__init__(
             worker=GenerativeRequestsWorker(backend),

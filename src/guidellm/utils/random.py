@@ -1,5 +1,6 @@
 import random
-from typing import Iterator, Optional
+from collections.abc import Iterator
+from typing import Optional
 
 __all__ = ["IntegerRangeSampler"]
 

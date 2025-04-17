@@ -1,8 +1,9 @@
 import asyncio
 import random
 import time
+from collections.abc import AsyncGenerator
 from pathlib import Path
-from typing import Any, AsyncGenerator, Dict, List, Optional, Union
+from typing import Any, Optional, Union
 
 from lorem.text import TextLorem  # type: ignore
 from PIL import Image
@@ -37,7 +38,7 @@ class MockBackend(Backend):
         return self._model
 
     @property
-    def info(self) -> Dict[str, Any]:
+    def info(self) -> dict[str, Any]:
         return {}
 
     async def prepare_multiprocessing(self):
@@ -46,12 +47,12 @@ class MockBackend(Backend):
     async def check_setup(self):
         pass
 
-    async def available_models(self) -> List[str]:
+    async def available_models(self) -> list[str]:
         return [self.model]  # type: ignore
 
     async def text_completions(  # type: ignore
         self,
-        prompt: Union[str, List[str]],
+        prompt: Union[str, list[str]],
         request_id: Optional[str] = None,
         prompt_token_count: Optional[int] = None,
         output_token_count: Optional[int] = None,
@@ -72,7 +73,7 @@ class MockBackend(Backend):
         self,
         content: Union[
             str,
-            List[Union[str, Dict[str, Union[str, Dict[str, str]]], Path, Image.Image]],
+            list[Union[str, dict[str, Union[str, dict[str, str]]], Path, Image.Image]],
             Any,
         ],
         request_id: Optional[str] = None,
@@ -156,7 +157,7 @@ class MockBackend(Backend):
         )
 
     @staticmethod
-    def _get_tokens(token_count: Optional[int] = None) -> List[str]:
+    def _get_tokens(token_count: Optional[int] = None) -> list[str]:
         if token_count is None:
             token_count = random.randint(8, 512)
 

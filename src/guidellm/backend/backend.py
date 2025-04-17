@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
+from collections.abc import AsyncGenerator
 from pathlib import Path
-from typing import Any, AsyncGenerator, Dict, List, Literal, Optional, Type, Union
+from typing import Any, Literal, Optional, Union
 
 from loguru import logger
 from PIL import Image
@@ -28,7 +29,7 @@ class Backend(ABC):
     :param type_: The type of the backend.
     """
 
-    _registry: Dict[BackendType, "Type[Backend]"] = {}
+    _registry: dict[BackendType, "type[Backend]"] = {}
 
     @classmethod
     def register(cls, backend_type: BackendType):
@@ -46,7 +47,7 @@ class Backend(ABC):
         if not issubclass(cls, Backend):
             raise TypeError("Only subclasses of Backend can be registered")
 
-        def inner_wrapper(wrapped_class: Type["Backend"]):
+        def inner_wrapper(wrapped_class: type["Backend"]):
             cls._registry[backend_type] = wrapped_class
             logger.info("Registered backend type: {}", backend_type)
             return wrapped_class
@@ -103,7 +104,7 @@ class Backend(ABC):
 
     @property
     @abstractmethod
-    def info(self) -> Dict[str, Any]:
+    def info(self) -> dict[str, Any]:
         """
         :return: The information about the backend.
         """
@@ -146,7 +147,7 @@ class Backend(ABC):
         ...
 
     @abstractmethod
-    async def available_models(self) -> List[str]:
+    async def available_models(self) -> list[str]:
         """
         Get the list of available models for the backend.
 
@@ -158,7 +159,7 @@ class Backend(ABC):
     @abstractmethod
     async def text_completions(
         self,
-        prompt: Union[str, List[str]],
+        prompt: Union[str, list[str]],
         request_id: Optional[str] = None,
         prompt_token_count: Optional[int] = None,
         output_token_count: Optional[int] = None,
@@ -190,7 +191,7 @@ class Backend(ABC):
         self,
         content: Union[
             str,
-            List[Union[str, Dict[str, Union[str, Dict[str, str]]], Path, Image.Image]],
+            list[Union[str, dict[str, Union[str, dict[str, str]]], Path, Image.Image]],
             Any,
         ],
         request_id: Optional[str] = None,

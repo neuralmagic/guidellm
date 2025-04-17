@@ -1,8 +1,9 @@
 import base64
 import json
 import time
+from collections.abc import AsyncGenerator
 from pathlib import Path
-from typing import Any, AsyncGenerator, Dict, List, Literal, Optional, Union
+from typing import Any, Literal, Optional, Union
 
 import httpx
 from loguru import logger
@@ -111,7 +112,7 @@ class OpenAIHTTPBackend(Backend):
         return self._model
 
     @property
-    def info(self) -> Dict[str, Any]:
+    def info(self) -> dict[str, Any]:
         """
         :return: The information about the backend.
         """
@@ -157,7 +158,7 @@ class OpenAIHTTPBackend(Backend):
             await self._async_client.aclose()
             self._async_client = None
 
-    async def available_models(self) -> List[str]:
+    async def available_models(self) -> list[str]:
         """
         Get the available models for the target server using the OpenAI models endpoint:
         /v1/models
@@ -176,7 +177,7 @@ class OpenAIHTTPBackend(Backend):
 
     async def text_completions(  # type: ignore[override]
         self,
-        prompt: Union[str, List[str]],
+        prompt: Union[str, list[str]],
         request_id: Optional[str] = None,
         prompt_token_count: Optional[int] = None,
         output_token_count: Optional[int] = None,
@@ -232,7 +233,7 @@ class OpenAIHTTPBackend(Backend):
         self,
         content: Union[
             str,
-            List[Union[str, Dict[str, Union[str, Dict[str, str]]], Path, Image.Image]],
+            list[Union[str, dict[str, Union[str, dict[str, str]]], Path, Image.Image]],
             Any,
         ],
         request_id: Optional[str] = None,
@@ -318,7 +319,7 @@ class OpenAIHTTPBackend(Backend):
 
         return client
 
-    def _headers(self) -> Dict[str, str]:
+    def _headers(self) -> dict[str, str]:
         headers = {
             "Content-Type": "application/json",
         }
@@ -335,8 +336,8 @@ class OpenAIHTTPBackend(Backend):
         return headers
 
     def _completions_payload(
-        self, orig_kwargs: Optional[Dict], max_output_tokens: Optional[int], **kwargs
-    ) -> Dict:
+        self, orig_kwargs: Optional[dict], max_output_tokens: Optional[int], **kwargs
+    ) -> dict:
         payload = orig_kwargs or {}
         payload.update(kwargs)
         payload["model"] = self.model
@@ -366,10 +367,10 @@ class OpenAIHTTPBackend(Backend):
     def _create_chat_messages(
         content: Union[
             str,
-            List[Union[str, Dict[str, Union[str, Dict[str, str]]], Path, Image.Image]],
+            list[Union[str, dict[str, Union[str, dict[str, str]]], Path, Image.Image]],
             Any,
         ],
-    ) -> List[Dict]:
+    ) -> list[dict]:
         if isinstance(content, str):
             return [
                 {
@@ -382,7 +383,7 @@ class OpenAIHTTPBackend(Backend):
             resolved_content = []
 
             for item in content:
-                if isinstance(item, Dict):
+                if isinstance(item, dict):
                     resolved_content.append(item)
                 elif isinstance(item, str):
                     resolved_content.append({"type": "text", "text": item})
@@ -430,8 +431,8 @@ class OpenAIHTTPBackend(Backend):
         request_id: Optional[str],
         request_prompt_tokens: Optional[int],
         request_output_tokens: Optional[int],
-        headers: Dict,
-        payload: Dict,
+        headers: dict,
+        payload: dict,
     ) -> AsyncGenerator[Union[StreamingTextResponse, ResponseSummary], None]:
         if type_ == "text_completions":
             target = f"{self.target}{TEXT_COMPLETIONS_PATH}"
@@ -551,7 +552,7 @@ class OpenAIHTTPBackend(Backend):
 
     @staticmethod
     def _extract_completions_delta_content(
-        type_: Literal["text_completions", "chat_completions"], data: Dict
+        type_: Literal["text_completions", "chat_completions"], data: dict
     ) -> Optional[str]:
         if "choices" not in data or not data["choices"]:
             return None
@@ -566,8 +567,8 @@ class OpenAIHTTPBackend(Backend):
 
     @staticmethod
     def _extract_completions_usage(
-        data: Dict,
-    ) -> Optional[Dict[Literal["prompt", "output"], int]]:
+        data: dict,
+    ) -> Optional[dict[Literal["prompt", "output"], int]]:
         if "usage" not in data or not data["usage"]:
             return None
 

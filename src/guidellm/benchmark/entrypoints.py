@@ -1,5 +1,6 @@
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Literal, Optional, Tuple, Union
+from typing import Any, Literal, Optional, Union
 
 from datasets import Dataset, DatasetDict, IterableDataset, IterableDatasetDict
 from transformers import (  # type: ignore[import]
@@ -21,23 +22,23 @@ from guidellm.scheduler import StrategyType
 async def benchmark_generative_text(
     target: str,
     backend_type: BackendType,
-    backend_args: Optional[Dict[str, Any]],
+    backend_args: Optional[dict[str, Any]],
     model: Optional[str],
     processor: Optional[Optional[Union[str, Path, PreTrainedTokenizerBase]]],
-    processor_args: Optional[Dict[str, Any]],
+    processor_args: Optional[dict[str, Any]],
     data: Union[
         str,
         Path,
-        Iterable[Union[str, Dict[str, Any]]],
+        Iterable[Union[str, dict[str, Any]]],
         Dataset,
         DatasetDict,
         IterableDataset,
         IterableDatasetDict,
     ],
-    data_args: Optional[Dict[str, Any]],
+    data_args: Optional[dict[str, Any]],
     data_sampler: Optional[Literal["random"]],
     rate_type: Union[StrategyType, ProfileType],
-    rate: Optional[Union[int, float, List[Union[int, float]]]],
+    rate: Optional[Union[int, float, list[Union[int, float]]]],
     max_seconds: Optional[float],
     max_requests: Optional[int],
     warmup_percent: Optional[float],
@@ -46,10 +47,10 @@ async def benchmark_generative_text(
     show_progress_scheduler_stats: bool,
     output_console: bool,
     output_path: Optional[Union[str, Path]],
-    output_extras: Optional[Dict[str, Any]],
+    output_extras: Optional[dict[str, Any]],
     output_sampling: Optional[int],
     random_seed: int,
-) -> Tuple[GenerativeBenchmarksReport, Optional[Path]]:
+) -> tuple[GenerativeBenchmarksReport, Optional[Path]]:
     console = GenerativeBenchmarksConsole(enabled=show_progress)
     console.print_line("Creating backend...")
     backend = Backend.create(
