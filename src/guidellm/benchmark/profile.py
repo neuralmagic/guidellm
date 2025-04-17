@@ -302,6 +302,15 @@ class SweepProfile(AsyncProfile):
         max_rate += (max_rate - min_rate) / self.sweep_size
         rates = np.linspace(min_rate, max_rate, self.sweep_size - 1)[1:]
 
+        # Round to the next 0.25
+        rates = (np.ceil(rates * 8) + 1 ) // 2 / 4
+        # Remove duplicates caused by rounding
+        rates = np.unique(rates)
+
+        # End early if we don't have enough rates
+        if self.completed_strategies - 1 > len(rates):
+            return None
+
         if self.rate_type == "constant":
             return AsyncConstantStrategy(
                 rate=rates[self.completed_strategies - 2],
