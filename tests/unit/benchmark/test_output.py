@@ -166,9 +166,11 @@ def test_console_print_table():
     console = GenerativeBenchmarksConsole(enabled=True)
     headers = ["Header1", "Header2"]
     rows = [["Row1Col1", "Row1Col2"], ["Row2Col1", "Row2Col2"]]
-    with patch.object(console, "print_section_header") as mock_header, patch.object(
-        console, "print_table_divider"
-    ) as mock_divider, patch.object(console, "print_table_row") as mock_row:
+    with (
+        patch.object(console, "print_section_header") as mock_header,
+        patch.object(console, "print_table_divider") as mock_divider,
+        patch.object(console, "print_table_row") as mock_row,
+    ):
         console.print_table(headers, rows, "Test Table")
         mock_header.assert_called_once()
         mock_divider.assert_called()
@@ -179,9 +181,10 @@ def test_console_print_benchmarks_metadata():
     console = GenerativeBenchmarksConsole(enabled=True)
     mock_benchmark = mock_generative_benchmark()
     console.benchmarks = [mock_benchmark]
-    with patch.object(console, "print_section_header") as mock_header, patch.object(
-        console, "print_labeled_line"
-    ) as mock_labeled:
+    with (
+        patch.object(console, "print_section_header") as mock_header,
+        patch.object(console, "print_labeled_line") as mock_labeled,
+    ):
         console.print_benchmarks_metadata()
         mock_header.assert_called_once()
         mock_labeled.assert_called()

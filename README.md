@@ -9,7 +9,7 @@
 Scale Efficiently: Evaluate and Optimize Your LLM Deployments for Real-World Inference
 </h3>
 
-[![GitHub Release](https://img.shields.io/github/release/neuralmagic/guidellm.svg?label=Version)](https://github.com/neuralmagic/guidellm/releases) [![Documentation](https://img.shields.io/badge/Documentation-8A2BE2?logo=read-the-docs&logoColor=%23ffffff&color=%231BC070)](https://github.com/neuralmagic/guidellm/tree/main/docs) [![License](https://img.shields.io/github/license/neuralmagic/guidellm.svg)](https://github.com/neuralmagic/guidellm/blob/main/LICENSE) [![PyPI Release](https://img.shields.io/pypi/v/guidellm.svg?label=PyPI%20Release)](https://pypi.python.org/pypi/guidellm) [![Pypi Release](https://img.shields.io/pypi/v/guidellm-nightly.svg?label=PyPI%20Nightly)](https://pypi.python.org/pypi/guidellm-nightly) [![Python Versions](https://img.shields.io/badge/Python-3.8--3.12-orange)](https://pypi.python.org/pypi/guidellm) [![Nightly Build](https://img.shields.io/github/actions/workflow/status/neuralmagic/guidellm/nightly.yml?branch=main&label=Nightly%20Build)](https://github.com/neuralmagic/guidellm/actions/workflows/nightly.yml)
+[![GitHub Release](https://img.shields.io/github/release/neuralmagic/guidellm.svg?label=Version)](https://github.com/neuralmagic/guidellm/releases) [![Documentation](https://img.shields.io/badge/Documentation-8A2BE2?logo=read-the-docs&logoColor=%23ffffff&color=%231BC070)](https://github.com/neuralmagic/guidellm/tree/main/docs) [![License](https://img.shields.io/github/license/neuralmagic/guidellm.svg)](https://github.com/neuralmagic/guidellm/blob/main/LICENSE) [![PyPI Release](https://img.shields.io/pypi/v/guidellm.svg?label=PyPI%20Release)](https://pypi.python.org/pypi/guidellm) [![Python Versions](https://img.shields.io/badge/Python-3.8--3.12-orange)](https://pypi.python.org/pypi/guidellm) [![Nightly Build](https://img.shields.io/github/actions/workflow/status/neuralmagic/guidellm/nightly.yml?branch=main&label=Nightly%20Build)](https://github.com/neuralmagic/guidellm/actions/workflows/nightly.yml)
 
 ## Overview
 
@@ -20,7 +20,7 @@ Scale Efficiently: Evaluate and Optimize Your LLM Deployments for Real-World Inf
   </picture>
 </p>
 
-**GuideLLM** is a powerful tool for evaluating and optimizing the deployment of large language models (LLMs). By simulating real-world inference workloads, GuideLLM helps users gauge the performance, resource needs, and cost implications of deploying LLMs on various hardware configurations. This approach ensures efficient, scalable, and cost-effective LLM inference serving while maintaining high service quality.
+**GuideLLM** is a platform for evaluating and optimizing the deployment of large language models (LLMs). By simulating real-world inference workloads, GuideLLM helps users gauge the performance, resource needs, and cost implications of deploying LLMs on various hardware configurations. This approach ensures efficient, scalable, and cost-effective LLM inference serving while maintaining high service quality.
 
 ### Key Features
 
@@ -38,7 +38,13 @@ Before installing, ensure you have the following prerequisites:
 - OS: Linux or MacOS
 - Python: 3.9 – 3.13
 
-GuideLLM can be installed using pip:
+The latest GuideLLM release can be installed using pip:
+
+```bash
+pip install guidellm
+```
+
+Or from source code using pip:
 
 ```bash
 pip install git+https://github.com/neuralmagic/guidellm.git
@@ -48,9 +54,9 @@ For detailed installation instructions and requirements, see the [Installation G
 
 ### Quick Start
 
-#### 1a. Start an OpenAI Compatible Server (vLLM)
+#### 1. Start an OpenAI Compatible Server (vLLM)
 
-GuideLLM requires an OpenAI-compatible server to run evaluations. [vLLM](https://github.com/vllm-project/vllm) is recommended for this purpose. To start a vLLM server with a Llama 3.1 8B quantized model, run the following command:
+GuideLLM requires an OpenAI-compatible server to run evaluations. [vLLM](https://github.com/vllm-project/vllm) is recommended for this purpose. After installing vLLM on your desired server (`pip install vllm`), start a vLLM server with a Llama 3.1 8B quantized modelby running the following command:
 
 ```bash
 vllm serve "neuralmagic/Meta-Llama-3.1-8B-Instruct-quantized.w4a16"
@@ -58,93 +64,94 @@ vllm serve "neuralmagic/Meta-Llama-3.1-8B-Instruct-quantized.w4a16"
 
 For more information on starting a vLLM server, see the [vLLM Documentation](https://docs.vllm.ai/en/latest/serving/openai_compatible_server.html).
 
-#### 1b. Start an OpenAI Compatible Server (Hugging Face TGI)
+For information on starting other supported inference servers or platforms, see the [Supported Backends documentation](https://github.com/neuralmagic/guidellm/tree/main/docs/backends.md).
 
-GuideLLM requires an OpenAI-compatible server to run evaluations. [Text Generation Inference](https://github.com/huggingface/text-generation-inference) can be used here. To start a TGI server with a Llama 3.1 8B using docker, run the following command:
+#### 2. Run a GuideLLM Benchmark
 
-```bash
-docker run --gpus 1 -ti --shm-size 1g --ipc=host --rm -p 8080:80 \
-  -e MODEL_ID=meta-llama/Meta-Llama-3.1-8B-Instruct \
-  -e NUM_SHARD=1 \
-  -e MAX_INPUT_TOKENS=4096 \
-  -e MAX_TOTAL_TOKENS=6000 \
-  -e HF_TOKEN=$(cat ~/.cache/huggingface/token) \
-  ghcr.io/huggingface/text-generation-inference:2.2.0
-```
+To run a GuideLLM benchmark, use the `guidellm benchmark` command with the target set to an OpenAI compatible server. For this example, the target is set to 'http://localhost:8000', assuming that vLLM is active and running on the same server. Be sure to update it appropriately. By default, GuideLLM will automatically determine the model avaialble on the server and use that. To target a different model, pass the desired name with the `--model` argument. Additionally, the `--rate-type` is set to `sweep` which will run a range of benchmarks automatically determining the minimum and maximum rates the server and model can support. Each benchmark run under the sweep will run for 30 seconds, as set by the `--max-seconds` argument. Finally, `--data` is set to a synthetic dataset with 256 prompt tokens and 128 output tokens per request. For more arguments, supported scenarios, and configurations, jump to the [Configurations Section](#configurations) or run `guidellm benchmark --help`.
 
-For more information on starting a TGI server, see the [TGI Documentation](https://huggingface.co/docs/text-generation-inference/index).
-
-#### 2. Run a GuideLLM Evaluation
-
-To run a GuideLLM evaluation, use the `guidellm` command with the appropriate model name and options on the server hosting the model or one with network access to the deployment server. For example, to evaluate the full performance range of the previously deployed Llama 3.1 8B model, run the following command:
+Now, to start benchmarking, run the following command:
 
 ```bash
 guidellm benchmark \
   --target "http://localhost:8000" \
-  --model "neuralmagic/Meta-Llama-3.1-8B-Instruct-quantized.w4a16" \
   --rate-type sweep \
+  --max-seconds 30 \
   --data "prompt_tokens=256,output_tokens=128"
 ```
 
-The above command will begin the evaluation and output progress updates similar to the following (if running on a different server, be sure to update the target!): <img src= "https://raw.githubusercontent.com/neuralmagic/guidellm/main/docs/assets/sample-benchmarks.gif"/>
-
-Notes:
-
-- The `--target` flag specifies the server hosting the model. In this case, it is a local vLLM server.
-- The `--model` flag specifies the model to evaluate. The model name should match the name of the model deployed on the server
-- The `--rate-type` flag specifies what load generation pattern GuideLLM will use when sending requests to the server. If `sweep` is specified GuideLLM will run multiple performance evaluations across different request rates.
-- By default GuideLLM will run over a fixed workload of 1000 requests configurable by `--max-requests`. If `--max-seconds` is set GuideLLM will instead run over a fixed time.
+The above command will begin the evaluation and provide progress updates similar to the following: <img src= "https://raw.githubusercontent.com/neuralmagic/guidellm/main/docs/assets/sample-benchmarks.gif"/>
 
 #### 3. Analyze the Results
 
-After the evaluation is completed, GuideLLM will summarize the results, including various performance metrics.
+After the evaluation is completed, GuideLLM will summarize the results into three sections:
 
-The output results will start with a summary of the evaluation, followed by the requests data for each benchmark run. For example, the start of the output will look like the following:
+1. Benchmarks Metadata: A summary of the benchmark run and the arguments used to create it, including the server, data, profile, and more.
+2. Benchmarks Info: A high level view of each benchmark and the requests that were run, including the type, duration, request statuses, and number of tokens.
+3. Benchmarks Stats: A summary of the statistics for each benchmark run, including the requests rate, concurrency, latency, and token level metrics such as TTFT, ITL, and more.
 
-<img alt="Sample GuideLLM benchmark start output" src="https://raw.githubusercontent.com/neuralmagic/guidellm/main/docs/assets/sample-output-start.png" />
+The sections will look similar to the following: <img alt="Sample GuideLLM benchmark output" src="https://raw.githubusercontent.com/neuralmagic/guidellm/main/docs/assets/sample-output.png" />
 
-The end of the output will include important performance summary metrics such as request latency, time to first token (TTFT), inter-token latency (ITL), and more:
+For further details about the metrics and definitions, view the [Metrics documentation](https://raw.githubusercontent.com/neuralmagic/guidellm/main/docs/metrics.md).
 
-<img alt="Sample GuideLLM benchmark end output" src="https://raw.githubusercontent.com/neuralmagic/guidellm/main/docs/assets/sample-output-end.png" />
+#### 4. Explore the Results File
+
+By default, the full results, including full statistics and request data, are saved to a file `benchmarks.json` in the current working directory. This file can be used for further analysis or reporting and additionally can be reloaded into Python for further analysis using the `guidellm.benchmark.GenerativeBenchmarksReport` class. You can specify a different file name and extension with the `--output` argument.
+
+For further details about the supported output file types, view the [Outputs documentation](raw.githubusercontent.com/neuralmagic/guidellm/main/docs/outputs.md).
 
 #### 4. Use the Results
 
 The results from GuideLLM are used to optimize your LLM deployment for performance, resource efficiency, and cost. By analyzing the performance metrics, you can identify bottlenecks, determine the optimal request rate, and select the most cost-effective hardware configuration for your deployment.
 
-For example, if we deploy a latency-sensitive chat application, we likely want to optimize for low time to first token (TTFT) and inter-token latency (ITL). A reasonable threshold will depend on the application requirements. Still, we may want to ensure time to first token (TTFT) is under 200ms and inter-token latency (ITL) is under 50ms (20 updates per second). From the example results above, we can see that the model can meet these requirements on average at a request rate of 2.37 requests per second for each server. If you'd like to target a higher percentage of requests meeting these requirements, you can use the **Performance Stats by Benchmark** section to determine the rate at which 90% or 95% of requests meet these requirements.
+For example, if we are deploying a chat application, we likely want to guarantee our time to first token (TTFT) and inter-token latency (ITL) are under certain thresholds to meet our service level objectives (SLOs) or agreements (SLAs). For example, setting TTFT to 200ms and ITL 25ms for the sample data provided in the example above, we can see that even though the server is capable of handling up to 13 requests per second, we would only be able to meet our SLOs for 99% of users at a request rate of 3.5 requests per second. If we relax our constraints on ITL to 50ms, then we can meet the TTFT SLA for 99% of users at a request rate of roughly 10 requests per second.
 
-If we deploy a throughput-sensitive summarization application, we likely want to optimize for the maximum requests the server can handle per second. In this case, the throughput benchmark shows that the server maxes out at 4.06 requests per second. If we need to handle more requests, consider adding more servers or upgrading the hardware configuration.
+For further details about deterimining the optimal request rate and SLOs, view the [SLOs documentation](https://raw.githubusercontent.com/neuralmagic/guidellm/main/docs/service_level_objectives.md).
 
 ### Configurations
 
-GuideLLM provides various CLI and environment options to customize evaluations, including setting the duration of each benchmark run, the number of concurrent requests, and the request rate.
+GuideLLM provides a variety of configurations through both the benchmark CLI command alongside environment variables which handle default values and more granular controls. Below, the most common configurations are listed. A complete list is easily accessible, though, by running `guidellm benchmark --help` or `guidellm config` respectively.
 
-Some typical configurations for the CLI include:
+#### Benchmark CLI
 
-- `--rate-type`: The rate to use for benchmarking. Options include `sweep`, `synchronous`, `throughput`, `constant`, and `poisson`.
-  - `--rate-type sweep`: (default) Sweep runs through the full range of the server's performance, starting with a `synchronous` rate, then `throughput`, and finally, 10 `constant` rates between the min and max request rate found.
-  - `--rate-type synchronous`: Synchronous runs requests synchronously, one after the other.
-  - `--rate-type throughput`: Throughput runs requests in a throughput manner, sending requests as fast as possible.
-  - `--rate-type constant`: Constant runs requests at a constant rate. Specify the request rate per second with the `--rate` argument. For example, `--rate 10` or multiple rates with `--rate 10 --rate 20 --rate 30`.
-  - `--rate-type poisson`: Poisson draws from a Poisson distribution with the mean at the specified rate, adding some real-world variance to the runs. Specify the request rate per second with the `--rate` argument. For example, `--rate 10` or multiple rates with `--rate 10 --rate 20 --rate 30`.
-  - `--rate-type concurrent`: Concurrent runs requests at a fixed concurrency. When a requests completes it is immediately replaced with a new request to maintain the set concurrency. Specify the request concurrency with `--rate`.
-- `--data`: A hugging face dataset name or arguments to generate a synthetic dataset.
-- `--max-seconds`: The maximum number of seconds to run each benchmark.
-- `--max-requests`: The maximum number of requests to run in each benchmark.
+The `guidellm benchmark` command is used to run benchmarks against a generative AI backend/server. The command accepts a variety of arguments to customize the benchmark run. The most common arguments include:
 
-For a complete list of supported CLI arguments, run the following command:
+- `--target`: Specifies the target path for the backend to run benchmarks against. For example, `http://localhost:8000`. This is required to define the server endpoint.
 
-```bash
-guidellm --help
-```
+- `--model`: Allows selecting a specific model from the server. If not provided, it defaults to the first model available on the server. Useful when multiple models are hosted on the same server.
 
-For a full list of configuration options, run the following command:
+- `--processor`: Used only for synthetic data creation or when the token source configuration is set to local for calculating token metrics locally. It must match the model's processor/tokenizer to ensure compatibility and correctness. This supports either a HuggingFace model ID or a local path to a processor/tokenizer.
 
-```bash
-guidellm-config
-```
+- `--data`: Specifies the dataset to use. This can be a HuggingFace dataset ID, a local path to a dataset, or standard text files such as CSV, JSONL, and more. Additionally, synthetic data configurations can be provided using JSON or key-value strings. Synthetic data options include:
 
-See the [GuideLLM Documentation](#Documentation) for further information.
+  - `prompt_tokens`: Average number of tokens for prompts.
+  - `output_tokens`: Average number of tokens for outputs.
+  - `TYPE_stdev`, `TYPE_min`, `TYPE_max`: Standard deviation, minimum, and maximum values for the specified type (e.g., `prompt_tokens`, `output_tokens`). If not provided, will use the provided tokens value only.
+  - `samples`: Number of samples to generate, defaults to 1000.
+  - `source`: Source text data for generation, defaults to a local copy of Pride and Prejudice.
+
+- `--data-args`: A JSON string used to specify the columns to source data from (e.g., `prompt_column`, `output_tokens_count_column`) and additional arguments to pass into the HuggingFace datasets constructor.
+
+- `--data-sampler`: Enables applying `random` shuffling or sampling to the dataset. If not set, no sampling is applied.
+
+- `--rate-type`: Defines the type of benchmark to run (default sweep). Supported types include:
+
+  - `synchronous`: Runs a single stream of requests one at a time. `--rate` must not be set for this mode.
+  - `throughput`: Runs all requests in parallel to measure the maximum throughput for the server (bounded by GUIDELLM\_\_MAX_CONCURRENCY config argument). `--rate` must not be set for this mode.
+  - `concurrent`: Runs a fixed number of streams of requests in parallel. `--rate` must be set to the desired concurrency level/number of streams.
+  - `constant`: Sends requests asynchronously at a constant rate set by `--rate`.
+  - `poisson`: Sends requests at a rate following a Poisson distribution with the mean set by `--rate`.
+  - `sweep`: Automatically determines the minimum and maximum rates the server can support by running synchronous and throughput benchmarks and then runs a series of benchmarks equally spaced between the two rates. The number of benchmarks is set by `--rate` (default is 10).
+
+- `--max-seconds`: Sets the maximum duration (in seconds) for each benchmark run. If not provided, the benchmark will run until the dataset is exhausted or `--max-requests` is reached.
+
+- `--max-requests`: Sets the maximum number of requests for each benchmark run. If not provided, the benchmark will run until `--max-seconds` is reached or the dataset is exhausted.
+
+- `--warmup-percent`: Specifies the percentage of the benchmark to treat as a warmup phase. Requests during this phase are excluded from the final results.
+
+- `--cooldown-percent`: Specifies the percentage of the benchmark to treat as a cooldown phase. Requests during this phase are excluded from the final results.
+
+- `--output-path`: Defines the path to save the benchmark results. Supports JSON, YAML, or CSV formats. If a directory is provided, the results will be saved as `benchmarks.json` in that directory. If not set, the results will be saved in the current working directory.
 
 ## Resources
 
@@ -155,9 +162,10 @@ Our comprehensive documentation provides detailed guides and resources to help y
 ### Core Docs
 
 - [**Installation Guide**](https://github.com/neuralmagic/guidellm/tree/main/docs/install.md) - This guide provides step-by-step instructions for installing GuideLLM, including prerequisites and setup tips.
+- [**Backends Guide**](https://github.com/neuralmagic/guidellm/tree/main/docs/backends.md) - A comprehensive overview of supported backends and how to set them up for use with GuideLLM.
+- [**Metrics Guide**](https://github.com/neuralmagic/guidellm/tree/main/docs/metrics.md) - Detailed explanations of the metrics used in GuideLLM, including definitions and how to interpret them.
+- [**Outputs Guide**](https://github.com/neuralmagic/guidellm/tree/main/docs/outputs.md) - Information on the different output formats supported by GuideLLM and how to use them.
 - [**Architecture Overview**](https://github.com/neuralmagic/guidellm/tree/main/docs/architecture.md) - A detailed look at GuideLLM's design, components, and how they interact.
-- [**CLI Guide**](https://github.com/neuralmagic/guidellm/tree/main/docs/guides/cli.md) - Comprehensive usage information for running GuideLLM via the command line, including available commands and options.
-- [**Configuration Guide**](https://github.com/neuralmagic/guidellm/tree/main/docs/guides/configuration.md) - Instructions on configuring GuideLLM to suit various deployment needs and performance goals.
 
 ### Supporting External Documentation
 
@@ -185,10 +193,8 @@ We appreciate contributions to the code, examples, integrations, documentation, 
 
 We invite you to join our growing community of developers, researchers, and enthusiasts passionate about LLMs and optimization. Whether you're looking for help, want to share your own experiences, or stay up to date with the latest developments, there are plenty of ways to get involved:
 
-- [**Neural Magic Community Slack**](https://neuralmagic.com/community/) - Join our Slack channel to connect with other GuideLLM users and developers. Ask questions, share your work, and get real-time support.
+- [**vLLM Slack**](https://inviter.co/vllm-slack) - Join the vLLM Slack community to connect with other users, ask questions, and share your experiences.
 - [**GitHub Issues**](https://github.com/neuralmagic/guidellm/issues) - Report bugs, request features, or browse existing issues. Your feedback helps us improve GuideLLM.
-- [**Subscribe to Updates**](https://neuralmagic.com/subscribe/) - Sign up for the latest news, announcements, and updates about GuideLLM, webinars, events, and more.
-- [**Contact Us**](http://neuralmagic.com/contact/) - Use our contact form for general questions about Neural Magic or GuideLLM.
 
 ### Cite
 
@@ -201,4 +207,7 @@ If you find GuideLLM helpful in your research or projects, please consider citin
   year={2024},
   howpublished={\url{https://github.com/neuralmagic/guidellm}},
 }
+```
+
+```
 ```
