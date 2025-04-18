@@ -98,12 +98,11 @@ jobs:
           python-version: ${{ matrix.python }}
       - name: Install dependencies
         run: pip install toml loguru tox
-      - name: Set environment variables
-        run: |
-          echo "GUIDELLM_BUILD_TYPE=dev" >> $GITHUB_ENV
-          echo "GUIDELLM_BUILD_NUMBER=${{ github.event.pull_request.number }}" >> $GITHUB_ENV
       - name: Build the package
-        run: tox -e build
+        run: |
+          export GUIDELLM_BUILD_TYPE=dev
+          export GUIDELLM_BUILD_NUMBER=${{ github.event.pull_request.number }}
+          tox -e build
       - name: Upload build artifacts
         id: artifact-upload
         uses: actions/upload-artifact@v4
