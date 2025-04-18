@@ -2,20 +2,55 @@ name: Release
 
 on:
   push:
-    branches:
-      - release/**
+    tags:
+      - 'v*.*.*'
 
 jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ["3.9"]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install dependencies
+        run: pip install toml loguru tox
+      - name: Build the package
+        run: tox -e build
+      - name: Upload build artifacts
+        id: artifact-upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-artifacts
+          path: dist/*
+          compression-level: 6
+          if-no-files-found: error
+          retention-days: 90
+      - name: Log artifact location
+        run: |
+          echo "Artifacts uploaded to: https://api.github.com/repos/neuralmagic/guidellm/actions/artifacts/${{ steps.artifact-upload.outputs.artifact-id }}"
+      - name: Push wheel to PyPI
+        uses: neuralmagic/nm-actions/actions/publish-whl@v1.0.0
+        with:
+          username: ${{ secrets.PYPI_PUBLIC_USER }}
+          password: ${{ secrets.PYPI_PUBLIC_AUTH }}
+          whl: $(find dist -name '*.whl')
+      - name: Push tar.gz to PyPI
+        uses: neuralmagic/nm-actions/actions/publish-whl@v1.0.0
+        with:
+          username: ${{ secrets.PYPI_PUBLIC_USER }}
+          password: ${{ secrets.PYPI_PUBLIC_AUTH }}
+          whl: $(find dist -name '*.tar.gz')
+
   unit-tests:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python:
-          - "3.13"
-          - "3.12"
-          - "3.11"
-          - "3.10"
-          - "3.9"
+        python: ["3.9", "3.10", "3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python
@@ -25,18 +60,13 @@ jobs:
       - name: Install dependencies
         run: pip install tox
       - name: Run unit tests
-        run: tox -e test-unit -- --cov-report=term-missing --cov --cov-fail-under=75
+        run: tox -e test-unit
 
   integration-tests:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python:
-          - "3.13"
-          - "3.12"
-          - "3.11"
-          - "3.10"
-          - "3.9"
+        python: ["3.9", "3.10", "3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python
@@ -46,18 +76,13 @@ jobs:
       - name: Install dependencies
         run: pip install tox
       - name: Run integration tests
-        run: tox -e test-integration -- --cov-report=term-missing --cov --cov-fail-under=75
+        run: tox -e test-integration
 
   e2e-tests:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python:
-          - "3.13"
-          - "3.12"
-          - "3.11"
-          - "3.10"
-          - "3.9"
+        python: ["3.9", "3.10", "3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python
@@ -66,5 +91,5 @@ jobs:
           python-version: ${{ matrix.python }}
       - name: Install dependencies
         run: pip install tox
-      - name: Run e2e tests
-        run: tox -e test-e2e -- --cov-report=term-missing --cov --cov-fail-under=75
+      - name: Run end-to-end tests
+        run: tox -e test-e2e

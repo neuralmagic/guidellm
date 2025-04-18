@@ -1,63 +1,19 @@
-name: Development
+name: Release Candidate
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
+  push:
+    branches:
+      - 'release/*'
+  create:
+    branches:
+      - 'release/*'
 
 jobs:
-  quality-checks:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python: ["3.9", "3.10", "3.11", "3.12", "3.13"]
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python }}
-      - name: Install dependencies
-        run: pip install tox
-      - name: Run quality checks
-        run: tox -e quality
-
-  type-checks:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python: ["3.9", "3.10", "3.11", "3.12", "3.13"]
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python }}
-      - name: Install dependencies
-        run: pip install tox
-      - name: Run quality checks
-        run: tox -e types
-
-  precommit-checks:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python: ["3.9", "3.10", "3.11", "3.12", "3.13"]
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python }}
-      - name: Install dependencies
-        run: pip install pre-commit
-      - name: Run pre-commit checks
-        run: pre-commit run --all-files
-
   unit-tests:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python: ["3.9", "3.13"]
+        python: ["3.9", "3.10", "3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python
@@ -67,13 +23,13 @@ jobs:
       - name: Install dependencies
         run: pip install tox
       - name: Run unit tests
-        run: tox -e test-unit -- -m "smoke or sanity"
+        run: tox -e test-unit
 
   integration-tests:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python: ["3.9", "3.13"]
+        python: ["3.9", "3.10", "3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python
@@ -83,13 +39,30 @@ jobs:
       - name: Install dependencies
         run: pip install tox
       - name: Run integration tests
-        run: tox -e test-integration -- -m smoke
+        run: tox -e test-integration
 
-  build:
+  e2e-tests:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python: ["3.8", "3.12"]
+        python: ["3.9", "3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install dependencies
+        run: pip install tox
+      - name: Run end-to-end tests
+        run: tox -e test-e2e
+
+  build-and-publish:
+    needs: [unit-tests, integration-tests, e2e-tests]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ["3.9"]
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python
@@ -100,8 +73,8 @@ jobs:
         run: pip install toml loguru tox
       - name: Set environment variables
         run: |
-          echo "GUIDELLM_BUILD_TYPE=dev" >> $GITHUB_ENV
-          echo "GUIDELLM_BUILD_NUMBER=${{ github.event.pull_request.number }}" >> $GITHUB_ENV
+          echo "GUIDELLM_BUILD_TYPE=release_candidate" >> $GITHUB_ENV
+          echo "GUIDELLM_BUILD_NUMBER=${{ github.run_number }}" >> $GITHUB_ENV
       - name: Inject build properties
         run: python utils/inject_build_props.py
       - name: Build the package
@@ -110,14 +83,23 @@ jobs:
         id: artifact-upload
         uses: actions/upload-artifact@v4
         with:
-          name: build-artifacts
+          name: release-candidate-artifacts
           path: dist/*
           compression-level: 6
           if-no-files-found: error
           retention-days: 30
-      - name: Comment Install instructions
-        uses: mshick/add-pr-comment@v2
+      - name: Log artifact location
+        run: |
+          echo "Artifacts uploaded to: https://api.github.com/repos/neuralmagic/guidellm/actions/artifacts/${{ steps.artifact-upload.outputs.artifact-id }}"
+      - name: Push wheel to PyPI
+        uses: neuralmagic/nm-actions/actions/publish-whl@v1.0.0
         with:
-          message: |
-            Build artifacts (.whl and .tar.gz) are available for download for up to 30 days.
-            They are located at https://api.github.com/repos/neuralmagic/guidellm/actions/artifacts/${{ steps.artifact-upload.outputs.artifact-id }}
+          username: ${{ secrets.PYPI_PUBLIC_USER }}
+          password: ${{ secrets.PYPI_PUBLIC_AUTH }}
+          whl: $(find dist -name '*.whl')
+      - name: Push tar.gz to PyPI
+        uses: neuralmagic/nm-actions/actions/publish-whl@v1.0.0
+        with:
+          username: ${{ secrets.PYPI_PUBLIC_USER }}
+          password: ${{ secrets.PYPI_PUBLIC_AUTH }}
+          whl: $(find dist -name '*.tar.gz')

@@ -1,8 +1,9 @@
-name: Development
+name: Main
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
+  push:
+    branches:
+      - main
 
 jobs:
   quality-checks:
@@ -84,40 +85,3 @@ jobs:
         run: pip install tox
       - name: Run integration tests
         run: tox -e test-integration -- -m smoke
-
-  build:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python: ["3.8", "3.12"]
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python }}
-      - name: Install dependencies
-        run: pip install toml loguru tox
-      - name: Set environment variables
-        run: |
-          echo "GUIDELLM_BUILD_TYPE=dev" >> $GITHUB_ENV
-          echo "GUIDELLM_BUILD_NUMBER=${{ github.event.pull_request.number }}" >> $GITHUB_ENV
-      - name: Inject build properties
-        run: python utils/inject_build_props.py
-      - name: Build the package
-        run: tox -e build
-      - name: Upload build artifacts
-        id: artifact-upload
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-artifacts
-          path: dist/*
-          compression-level: 6
-          if-no-files-found: error
-          retention-days: 30
-      - name: Comment Install instructions
-        uses: mshick/add-pr-comment@v2
-        with:
-          message: |
-            Build artifacts (.whl and .tar.gz) are available for download for up to 30 days.
-            They are located at https://api.github.com/repos/neuralmagic/guidellm/actions/artifacts/${{ steps.artifact-upload.outputs.artifact-id }}

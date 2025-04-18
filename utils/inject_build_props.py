@@ -23,12 +23,16 @@ def construct_project_name_and_version(build_type, build_number, current_version
         )
 
     if build_type == "dev":
-        project_name = "guidellm_dev"
+        project_name = "guidellm"
         version = f"{current_version}.dev{build_number}"
     elif build_type == "nightly":
-        project_name = "guidellm_nightly"
+        project_name = "guidellm"
         date_str = datetime.now().strftime("%Y%m%d")
-        version = f"{current_version}.{date_str}"
+        version = f"{current_version}.a{date_str}"
+    elif build_type == "release_candidate":
+        project_name = "guidellm"
+        date_str = datetime.now().strftime("%Y%m%d")
+        version = f"{current_version}.rc{date_str}"
     elif build_type == "release":
         project_name = "guidellm"
         version = current_version
