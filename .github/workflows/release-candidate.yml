@@ -1,15 +1,19 @@
-name: Nightly
+name: Release Candidate
 
 on:
-  schedule:
-    - cron: '0 0 * * *'  # Runs at midnight every night
+  push:
+    branches:
+      - 'release/*'
+  create:
+    branches:
+      - 'release/*'
 
 jobs:
   unit-tests:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python: ["3.9", "3.13"]
+        python: ["3.9", "3.10", "3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python
@@ -19,13 +23,13 @@ jobs:
       - name: Install dependencies
         run: pip install tox
       - name: Run unit tests
-        run: tox -e test-unit -- -m --cov=guidellm --cov-report=term-missing --cov-fail-under=75
+        run: tox -e test-unit
 
   integration-tests:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python: ["3.9", "3.13"]
+        python: ["3.9", "3.10", "3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python
@@ -35,13 +39,13 @@ jobs:
       - name: Install dependencies
         run: pip install tox
       - name: Run integration tests
-        run: tox -e test-integration -- -m "smoke or sanity"
+        run: tox -e test-integration
 
   e2e-tests:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python: ["3.9", "3.13"]
+        python: ["3.9", "3.10", "3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python
@@ -50,8 +54,8 @@ jobs:
           python-version: ${{ matrix.python }}
       - name: Install dependencies
         run: pip install tox
-      - name: Run integration tests
-        run: tox -e test-e2e -- -m smoke
+      - name: Run end-to-end tests
+        run: tox -e test-e2e
 
   build-and-publish:
     needs: [unit-tests, integration-tests, e2e-tests]
@@ -69,35 +73,15 @@ jobs:
         run: pip install toml loguru tox
       - name: Set environment variables
         run: |
-          echo "GUIDELLM_BUILD_TYPE=nightly" >> $GITHUB_ENV
+          echo "GUIDELLM_BUILD_TYPE=release_candidate" >> $GITHUB_ENV
           echo "GUIDELLM_BUILD_NUMBER=${{ github.run_number }}" >> $GITHUB_ENV
       - name: Build the package
         run: tox -e build
-      - name: Find wheel artifact
-        id: find-asset-whl
-        run: |
-          echo "::set-output name=asset::$(find dist -name '*.whl')"
-      - name: Find tar.gz artifact
-        id: find-asset-targz
-        run: |
-          echo "::set-output name=asset::$(find dist -name '*.tar.gz')"
-      - name: Push wheel to PyPI
-        uses: neuralmagic/nm-actions/actions/publish-whl@v1.0.0
-        with:
-          username: ${{ secrets.PYPI_PUBLIC_USER }}
-          password: ${{ secrets.PYPI_PUBLIC_AUTH }}
-          whl: ${{ steps.find-asset-whl.outputs.asset }}
-      - name: Push tar.gz to PyPI
-        uses: neuralmagic/nm-actions/actions/publish-whl@v1.0.0
-        with:
-          username: ${{ secrets.PYPI_PUBLIC_USER }}
-          password: ${{ secrets.PYPI_PUBLIC_AUTH }}
-          whl: ${{ steps.find-asset-targz.outputs.asset }}
       - name: Upload build artifacts
         id: artifact-upload
         uses: actions/upload-artifact@v4
         with:
-          name: nightly-build-artifacts
+          name: release-candidate-artifacts
           path: dist/*
           compression-level: 6
           if-no-files-found: error
@@ -105,3 +89,15 @@ jobs:
       - name: Log artifact location
         run: |
           echo "Artifacts uploaded to: https://api.github.com/repos/neuralmagic/guidellm/actions/artifacts/${{ steps.artifact-upload.outputs.artifact-id }}"
+      - name: Push wheel to PyPI
+        uses: neuralmagic/nm-actions/actions/publish-whl@v1.0.0
+        with:
+          username: ${{ secrets.PYPI_PUBLIC_USER }}
+          password: ${{ secrets.PYPI_PUBLIC_AUTH }}
+          whl: $(find dist -name '*.whl')
+      - name: Push tar.gz to PyPI
+        uses: neuralmagic/nm-actions/actions/publish-whl@v1.0.0
+        with:
+          username: ${{ secrets.PYPI_PUBLIC_USER }}
+          password: ${{ secrets.PYPI_PUBLIC_AUTH }}
+          whl: $(find dist -name '*.tar.gz')

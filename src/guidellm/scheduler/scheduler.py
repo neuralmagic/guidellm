@@ -191,16 +191,21 @@ class Scheduler(Generic[RequestT, ResponseT]):
 
         num_processes = min(
             scheduling_strategy.processes_limit,
-            scheduling_strategy.processing_requests_limit
+            scheduling_strategy.processing_requests_limit,
         )
-        requests_limit_split = (scheduling_strategy.processing_requests_limit //
-                                scheduling_strategy.processes_limit)
-        requests_limit_remain = (scheduling_strategy.processing_requests_limit %
-                                 scheduling_strategy.processes_limit)
+        requests_limit_split = (
+            scheduling_strategy.processing_requests_limit
+            // scheduling_strategy.processes_limit
+        )
+        requests_limit_remain = (
+            scheduling_strategy.processing_requests_limit
+            % scheduling_strategy.processes_limit
+        )
         process_ids = (id_ for id_ in range(num_processes))
         process_requests_limits = (
             requests_limit_split + 1
-            if i < requests_limit_remain else requests_limit_split
+            if i < requests_limit_remain
+            else requests_limit_split
             for i in range(num_processes)
         )
 
@@ -218,16 +223,16 @@ class Scheduler(Generic[RequestT, ResponseT]):
                     )
                 )
             elif scheduling_strategy.processing_mode == "async":
-                    futures.append(
-                        loop.run_in_executor(
-                            executor,
-                            self.worker.process_loop_asynchronous,
-                            requests_queue,
-                            responses_queue,
-                            requests_limit,
-                            id_,
-                        )
+                futures.append(
+                    loop.run_in_executor(
+                        executor,
+                        self.worker.process_loop_asynchronous,
+                        requests_queue,
+                        responses_queue,
+                        requests_limit,
+                        id_,
                     )
+                )
             else:
                 raise ValueError(
                     f"Invalid processing mode: {scheduling_strategy.processing_mode} "

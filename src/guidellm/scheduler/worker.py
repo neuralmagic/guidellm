@@ -227,9 +227,7 @@ class RequestsWorker(ABC, Generic[RequestT, ResponseT]):
             pending = asyncio.Semaphore(max_concurrency)
 
             if pending.locked():
-                raise ValueError(
-                    "Async worker called with max_concurrency < 1"
-                )
+                raise ValueError("Async worker called with max_concurrency < 1")
 
             while (
                 process_request := await self.get_request(requests_queue)
