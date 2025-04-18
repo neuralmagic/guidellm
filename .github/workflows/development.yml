@@ -118,4 +118,4 @@ jobs:
         with:
           message: |
             Build artifacts (.whl and .tar.gz) are available for download for up to 30 days.
-            They are located at https://api.github.com/repos/neuralmagic/guidellm/actions/artifacts/${{ steps.artifact-upload.outputs.artifact-id }}
+            They are located at ${{ steps.artifact-upload.outputs.artifact-url }}
