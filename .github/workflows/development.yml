@@ -102,8 +102,6 @@ jobs:
         run: |
           echo "GUIDELLM_BUILD_TYPE=dev" >> $GITHUB_ENV
           echo "GUIDELLM_BUILD_NUMBER=${{ github.event.pull_request.number }}" >> $GITHUB_ENV
-      - name: Inject build properties
-        run: python utils/inject_build_props.py
       - name: Build the package
         run: tox -e build
       - name: Upload build artifacts

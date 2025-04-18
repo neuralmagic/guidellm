@@ -19,6 +19,10 @@ jobs:
           python-version: ${{ matrix.python }}
       - name: Install dependencies
         run: pip install toml loguru tox
+      - name: Set environment variables
+        run: |
+          echo "GUIDELLM_BUILD_TYPE=release" >> $GITHUB_ENV
+          echo "GUIDELLM_BUILD_NUMBER=${{ github.run_number }}" >> $GITHUB_ENV
       - name: Build the package
         run: tox -e build
       - name: Upload build artifacts
