@@ -145,7 +145,7 @@ class OpenAIHTTPBackend(Backend):
         elif self.model not in models:
             raise ValueError(
                 f"Model {self.model} not found in available models:"
-                "{models} for target: {self.target}"
+                f"{models} for target: {self.target}"
             )
 
     async def prepare_multiprocessing(self):
