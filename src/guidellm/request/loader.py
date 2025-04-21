@@ -11,6 +11,7 @@ from typing import (
 from datasets import Dataset, DatasetDict, IterableDataset, IterableDatasetDict
 from transformers import PreTrainedTokenizerBase  # type: ignore[import]
 
+from guidellm.config import settings
 from guidellm.dataset import ColumnInputTypes, load_dataset
 from guidellm.objects import StandardBaseModel
 from guidellm.request.request import GenerationRequest
@@ -61,6 +62,8 @@ class GenerativeRequestLoader(RequestLoader):
         "content",
         "conversation",
         "conversations",
+        "turn",
+        "turns",
         "text",
     ]
 
@@ -270,7 +273,7 @@ class GenerativeRequestLoader(RequestLoader):
         )
 
         return GenerationRequest(
-            request_type="text_completions",
+            request_type=settings.preferred_route,
             content=item[self.column_mappings["prompt_column"]],
             stats=(
                 {"prompt_tokens": prompt_tokens} if prompt_tokens is not None else {}
