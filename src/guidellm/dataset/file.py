@@ -71,19 +71,21 @@ class FileDatasetCreator(DatasetCreator):
 
             dataset = Dataset.from_dict({"text": items}, **(data_args or {}))
         elif path.suffix.lower() == ".csv":
-            dataset = load_dataset("csv", data_files=path, **(data_args or {}))
+            dataset = load_dataset("csv", data_files=str(path), **(data_args or {}))
         elif path.suffix.lower() in {".json", ".jsonl"}:
-            dataset = load_dataset("json", data_files=path, **(data_args or {}))
+            dataset = load_dataset("json", data_files=str(path), **(data_args or {}))
         elif path.suffix.lower() == ".parquet":
-            dataset = load_dataset("parquet", data_files=path, **(data_args or {}))
+            dataset = load_dataset("parquet", data_files=str(path), **(data_args or {}))
         elif path.suffix.lower() == ".arrow":
-            dataset = load_dataset("arrow", data_files=path, **(data_args or {}))
+            dataset = load_dataset("arrow", data_files=str(path), **(data_args or {}))
         elif path.suffix.lower() == ".hdf5":
-            dataset = Dataset.from_pandas(pd.read_hdf(path), **(data_args or {}))
+            dataset = Dataset.from_pandas(pd.read_hdf(str(path)), **(data_args or {}))
         elif path.suffix.lower() == ".db":
-            dataset = Dataset.from_sql(con=path, **(data_args or {}))
+            dataset = Dataset.from_sql(con=str(path), **(data_args or {}))
         elif path.suffix.lower() == ".tar":
-            dataset = load_dataset("webdataset", data_files=path, **(data_args or {}))
+            dataset = load_dataset(
+                "webdataset", data_files=str(path), **(data_args or {})
+            )
         else:
             raise ValueError(f"Unsupported file type: {path.suffix} given for {path}. ")
 

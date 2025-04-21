@@ -202,6 +202,13 @@ class OpenAIHTTPBackend(Backend):
             and a ResponseSummary for the final response.
         """
         logger.debug("{} invocation with args: {}", self.__class__.__name__, locals())
+
+        if isinstance(prompt, list):
+            raise ValueError(
+                "List prompts (batching) is currently not supported for "
+                f"text_completions OpenAI pathways. Received: {prompt}"
+            )
+
         headers = self._headers()
         payload = self._completions_payload(
             orig_kwargs=kwargs,
