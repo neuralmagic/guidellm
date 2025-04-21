@@ -113,8 +113,14 @@ jobs:
           if-no-files-found: error
           retention-days: 30
       - name: Comment Install instructions
-        uses: mshick/add-pr-comment@v2
+        uses: actions/github-script@v7
         with:
-          message: |
-            Build artifacts (.whl and .tar.gz) are available for download for up to 30 days.
-            They are located at ${{ steps.artifact-upload.outputs.artifact-url }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `Build artifacts (.whl and .tar.gz) are available for download for up to 30 days.
+              They are located at ${{ steps.artifact-upload.outputs.artifact-url }}`
+            })
