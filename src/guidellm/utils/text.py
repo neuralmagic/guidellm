@@ -150,9 +150,10 @@ def load_text(data: Union[str, Path], encoding: Optional[str] = None) -> str:
     # check package data
     if isinstance(data, str) and data.startswith("data:"):
         resource_path = files(package_data).joinpath(data[5:])
-        with as_file(resource_path) as resource_file, gzip.open(
-            resource_file, "rt", encoding=encoding
-        ) as file:
+        with (
+            as_file(resource_path) as resource_file,
+            gzip.open(resource_file, "rt", encoding=encoding) as file,
+        ):
             return file.read()
 
     # check gzipped files

@@ -7,6 +7,7 @@ import click
 
 from guidellm.backend import BackendType
 from guidellm.benchmark import ProfileType, benchmark_generative_text
+from guidellm.config import print_config
 from guidellm.scheduler import StrategyType
 
 STRATEGY_PROFILE_CHOICES = set(
@@ -42,7 +43,9 @@ def cli():
     pass
 
 
-@cli.command()
+@cli.command(
+    help="Run a benchmark against a generative model using the specified arguments."
+)
 @click.option(
     "--target",
     required=True,
@@ -275,6 +278,16 @@ def benchmark(
             random_seed=random_seed,
         )
     )
+
+
+@cli.command(
+    help=(
+        "Print out the available configuration settings that can be set "
+        "through environment variables."
+    )
+)
+def config():
+    print_config()
 
 
 if __name__ == "__main__":
