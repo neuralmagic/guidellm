@@ -131,7 +131,7 @@ exclude = ["venv", ".tox"]
 follow_imports = 'silent'
 
 [[tool.mypy.overrides]]
-module = ["datasets.*", "tranformers.*", "setuptools.*", "setuptools_git_versioning.*"]
+module = ["datasets.*", "transformers.*", "setuptools.*", "setuptools_git_versioning.*"]
 ignore_missing_imports=true
 
 
