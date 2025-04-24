@@ -26,14 +26,14 @@ repos:
         pydantic_settings,
         pyyaml,
         respx,
-        requests,
         rich,
+        setuptools,
+        setuptools-git-versioning,
         transformers,
 
         # dev dependencies
         pytest,
         pydantic_settings,
-        requests-mock,
 
         # types
         types-click,
