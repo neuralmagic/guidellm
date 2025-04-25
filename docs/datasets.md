@@ -24,7 +24,7 @@ guidellm benchmark \
     --target "http://localhost:8000" \
     --rate-type "throughput" \
     --max-requests 1000 \
-    --data "path/to/dataset.ext" \
+    --data "path/to/dataset|dataset_id" \
     --data-args '{"prompt_column": "prompt", "split": "train"}' \
     --processor "path/to/processor" \
     --processor-args '{"arg1": "value1"}' \
@@ -103,6 +103,8 @@ guidellm benchmark \
 #### Notes
 
 - Hugging Face datasets can be specified by ID, a local directory, or a path to a local Python file.
+- A supported Hugging Face datasets format is defined as one that can be loaded using the `datasets` library with the `load_dataset` function and therefore it is representable as a `Dataset`, `DatasetDict`, `IterableDataset`, or `IterableDatasetDict`. More information on the supported data types and additional args for the underlying use of `load_dataset` can be found in the [Hugging Face datasets documentation](https://huggingface.co/docs/datasets/en/loading#hugging-face-hub).
+- A processor/tokenizer is only required if `GUIDELLM__PREFERRED_PROMPT_TOKENS_SOURCE="local"` or `GUIDELLM__PREFERRED_OUTPUT_TOKENS_SOURCE="local"` is set in the environment. In this case, the processor/tokenizer must be specified using the `--processor` argument. If not set, the processor/tokenizer will be set to the model passed in or retrieved from the server.
 
 ### File-Based Datasets
 
@@ -110,27 +112,35 @@ GuideLLM supports various file formats for datasets, including text, CSV, JSON, 
 
 #### Supported Formats with Examples
 
-- **Text files (`.txt`, `.text`)**
+- **Text files (`.txt`, `.text`)**: Where each line is a separate prompt to use.
   ```
   Hello, how are you?
   What is your name?
   ```
-- **CSV files (`.csv`)**
+- **CSV files (`.csv`)**: Where each row is a separate dataset entry and the first row contains the column names. The columns should include `prompt` or other common names for the prompt which will be used as the prompt column. Additional columns can be included based on the previously mentioned aliases for the `--data-args` argument.
   ```csv
-  prompt,output
-  "Hello, how are you?","I'm fine."
-  "What is your name?","My name is GuideLLM."
+  prompt,output_tokens_count,additional_column,additional_column2
+  Hello, how are you?,5,foo,bar
+  What is your name?,3,baz,qux
   ```
-- **JSON files (`.json`, `.jsonl`)**
+- **JSON Lines files (`.jsonl`)**: Where each line is a separate JSON object. The objects should include `prompt` or other common names for the prompt which will be used as the prompt column. Additional fields can be included based on the previously mentioned aliases for the `--data-args` argument.
   ```json
-  [
-    {"prompt": "Hello, how are you?", "output": "I'm fine."},
-    {"prompt": "What is your name?", "output": "My name is GuideLLM."}
-  ]
+  {"prompt": "Hello, how are you?", "output_tokens_count": 5, "additional_column": "foo", "additional_column2": "bar"}
+  {"prompt": "What is your name?", "output_tokens_count": 3, "additional_column": "baz", "additional_column2": "qux"}
   ```
-- **Parquet files (`.parquet`)** Example: A binary columnar storage format for efficient data processing.
-- **Arrow files (`.arrow`)** Example: A cross-language development platform for in-memory data.
-- **HDF5 files (`.hdf5`)** Example: A hierarchical data format for storing large amounts of data.
+- **JSON files (`.json`)**: Where the entire dataset is represented as a JSON array of objects nested under a specific key. To surface the correct key to use, a `--data-args` argument must be passed in of `"field": "NAME"` for where the array exists. The objects should include `prompt` or other common names for the prompt which will be used as the prompt column. Additional fields can be included based on the previously mentioned aliases for the `--data-args` argument.
+  ```json
+  {
+    "version": "1.0",
+    "data": [
+      {"prompt": "Hello, how are you?", "output_tokens_count": 5, "additional_column": "foo", "additional_column2": "bar"},
+      {"prompt": "What is your name?", "output_tokens_count": 3, "additional_column": "baz", "additional_column2": "qux"}
+    ]
+  }
+  ```
+- **Parquet files (`.parquet`)** Example: A binary columnar storage format for efficient data processing. For more information on the supported formats, see the Hugging Face dataset documentation linked in the [Notes](#notes) section.
+- **Arrow files (`.arrow`)** Example: A cross-language development platform for in-memory data. For more information on the supported formats, see the Hugging Face dataset documentation linked in the [Notes](#notes) section.
+- **HDF5 files (`.hdf5`)** Example: A hierarchical data format for storing large amounts of data. For more information on the supported formats, see the Hugging Face dataset documentation linked in the [Notes](#notes) section.
 
 #### Example Commands
 
@@ -139,12 +149,18 @@ guidellm benchmark \
     --target "http://localhost:8000" \
     --rate-type "throughput" \
     --max-requests 1000 \
-    --data "path/to/dataset.ext"
+    --data "path/to/dataset.ext" \
+    --data-args '{"prompt_column": "prompt", "split": "train"}'
 ```
+
+Where `.ext` can be any of the supported file formats listed above.
 
 #### Notes
 
-- Ensure the file format matches the expected structure for the dataset.
+- Ensure the file format matches the expected structure for the dataset and is listed as a supported format.
+- The `--data-args` argument can be used to specify additional parameters for parsing the dataset, such as the prompt column name or the split to use.
+- A processor/tokenizer is only required if `GUIDELLM__PREFERRED_PROMPT_TOKENS_SOURCE="local"` or `GUIDELLM__PREFERRED_OUTPUT_TOKENS_SOURCE="local"` is set in the environment. In this case, the processor/tokenizer must be specified using the `--processor` argument. If not set, the processor/tokenizer will be set to the model passed in or retrieved from the server.
+- More information on the supported formats and additional args for the underlying use of `load_dataset` can be found in the [Hugging Face datasets documentation](https://huggingface.co/docs/datasets/en/loading#local-and-remote-files).
 
 ### In-Memory Datasets
 
@@ -152,23 +168,28 @@ In-memory datasets allow you to directly pass data as Python objects, making the
 
 #### Supported Formats with Examples
 
-- **Dictionary of columns and values**
+- **Dictionary of columns and values**: Where each key is a column name and the values are lists of data points. The keys should include `prompt` or other common names for the prompt which will be used as the prompt column. Additional columns can be included based on the previously mentioned aliases for the `--data-args` argument.
   ```python
   {
       "column1": ["value1", "value2"],
       "column2": ["value3", "value4"]
   }
   ```
-- **List of dictionaries**
+- **List of dictionaries**: Where each dictionary represents a single data point with key-value pairs. The dictionaries should include `prompt` or other common names for the prompt which will be used as the prompt column. Additional fields can be included based on the previously mentioned aliases for the `--data-args` argument.
   ```python
   [
       {"column1": "value1", "column2": "value3"},
       {"column1": "value2", "column2": "value4"}
   ]
   ```
-- **List of items**
+- **List of items**: Where each item is a single data point. The items should include `prompt` or other common names for the prompt which will be used as the prompt column. Additional fields can be included based on the previously mentioned aliases for the `--data-args` argument.
   ```python
-  ["value1", "value2", "value3"]
+  [
+      "value1",
+      "value2",
+      "value3"
+  ]
+
   ```
 
 #### Example Usage
@@ -190,3 +211,4 @@ benchmark_generative_text(data=data, ...)
 - For dictionaries, all columns must have the same number of samples.
 - For lists of dictionaries, all items must have the same keys.
 - For lists of items, all elements must be of the same type.
+- A processor/tokenizer is only required if `GUIDELLM__PREFERRED_PROMPT_TOKENS_SOURCE="local"` or `GUIDELLM__PREFERRED_OUTPUT_TOKENS_SOURCE="local"` is set in the environment. In this case, the processor/tokenizer must be specified using the `--processor` argument. If not set, the processor/tokenizer will be set to the model passed in or retrieved from the server.
