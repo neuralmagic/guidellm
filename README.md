@@ -163,6 +163,7 @@ Our comprehensive documentation offers detailed guides and resources to help you
 
 - [**Installation Guide**](https://github.com/neuralmagic/guidellm/tree/main/docs/install.md) - This guide provides step-by-step instructions for installing GuideLLM, including prerequisites and setup tips.
 - [**Backends Guide**](https://github.com/neuralmagic/guidellm/tree/main/docs/backends.md) - A comprehensive overview of supported backends and how to set them up for use with GuideLLM.
+- [**Data/Datasets Guide**](https://github.com/neuralmagic/guidellm/tree/main/docs/datasets.md) - Information on supported datasets, including how to use them for benchmarking.
 - [**Metrics Guide**](https://github.com/neuralmagic/guidellm/tree/main/docs/metrics.md) - Detailed explanations of the metrics used in GuideLLM, including definitions and how to interpret them.
 - [**Outputs Guide**](https://github.com/neuralmagic/guidellm/tree/main/docs/outputs.md) - Information on the different output formats supported by GuideLLM and how to use them.
 - [**Architecture Overview**](https://github.com/neuralmagic/guidellm/tree/main/docs/architecture.md) - A detailed look at GuideLLM's design, components, and how they interact.
