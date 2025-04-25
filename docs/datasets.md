@@ -150,7 +150,7 @@ guidellm benchmark \
 
 In-memory datasets allow you to directly pass data as Python objects, making them ideal for quick prototyping and testing without the need to save data to disk.
 
-### Supported Formats with Examples
+#### Supported Formats with Examples
 
 - **Dictionary of columns and values**
   ```python
@@ -171,7 +171,7 @@ In-memory datasets allow you to directly pass data as Python objects, making the
   ["value1", "value2", "value3"]
   ```
 
-### Example Usage
+#### Example Usage
 
 ```python
 from guidellm.benchmark import benchmark_generative_text
@@ -184,7 +184,7 @@ data = [
 benchmark_generative_text(data=data, ...)
 ```
 
-### Notes
+#### Notes
 
 - Ensure that the data format is consistent and adheres to one of the supported structures.
 - For dictionaries, all columns must have the same number of samples.
