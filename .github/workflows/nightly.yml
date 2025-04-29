@@ -60,17 +60,19 @@ jobs:
       matrix:
         python: ["3.9"]
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
       - name: Install dependencies
-        run: pip install toml loguru tox
+        run: pip install tox
       - name: Build the package
         run: |
           export GUIDELLM_BUILD_TYPE=nightly
-          export GUIDELLM_BUILD_NUMBER=${{ github.run_number }}
           tox -e build
       - name: Find wheel artifact
         id: find-asset-whl
@@ -103,4 +105,4 @@ jobs:
           retention-days: 30
       - name: Log artifact location
         run: |
-          echo "Artifacts uploaded to: https://api.github.com/repos/neuralmagic/guidellm/actions/artifacts/${{ steps.artifact-upload.outputs.artifact-id }}"
+          echo "Artifacts uploaded to: ${{ steps.artifact-upload.outputs.artifact-url }}"

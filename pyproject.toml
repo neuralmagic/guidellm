@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools >= 61.0", "wheel", "build"]
+requires = ["setuptools >= 61.0", "setuptools-git-versioning>=2.0,<3"]
 build-backend = "setuptools.build_meta"
 
 
@@ -16,14 +16,32 @@ include = ["*"]
 # ************************************************
 
 [project]
+dynamic = ["version"]
 name = "guidellm"
-version = "0.3.0"
 description = "Guidance platform for deploying and managing large language models."
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.9.0,<4.0"
-license = { file = "LICENSE" }
-authors = [ { name = "Neuralmagic, Inc." } ]
-urls = { homepage = "https://github.com/neuralmagic/guidellm" }
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [ { name = "Red Hat" } ]
+keywords = [
+    "ai",
+    "benchmarking",
+    "deep-learning",
+    "deployment",
+    "evaluation",
+    "guidance",
+    "inference",
+    "language-models",
+    "large-language-model",
+    "llm",
+    "machine-learning",
+    "model-benchmark",
+    "model-evaluation",
+    "nlp",
+    "performance",
+    "vllm",
+]
 dependencies = [
     "click",
     "datasets",
@@ -36,13 +54,17 @@ dependencies = [
     "pydantic>=2.0.0",
     "pydantic-settings>=2.0.0",
     "pyyaml>=6.0.0",
-    "requests",
     "rich",
     "transformers",
 ]
 
 [project.optional-dependencies]
 dev = [
+    # build
+    "build>=1.0.0",
+    "setuptools>=61.0",
+    "setuptools-git-versioning>=2.0,<3",
+
     # general and configurations
     "pre-commit~=3.5.0",
     "scipy~=1.10",
@@ -56,7 +78,6 @@ dev = [
     "pytest-cov~=5.0.0",
     "pytest-mock~=3.14.0",
     "pytest-rerunfailures~=14.0",
-    "requests-mock~=1.12.1",
     "respx~=0.22.0",
 
     # code quality
@@ -75,6 +96,12 @@ dev = [
     "types-requests~=2.32.0",
     "types-toml",
 ]
+
+[project.urls]
+homepage = "https://github.com/neuralmagic/guidellm"
+source = "https://github.com/neuralmagic/guidellm"
+issues = "https://github.com/neuralmagic/guidellm/issues"
+docs = "https://github.com/neuralmagic/guidellm/tree/main/docs"
 
 
 [project.entry-points.console_scripts]
@@ -104,7 +131,7 @@ exclude = ["venv", ".tox"]
 follow_imports = 'silent'
 
 [[tool.mypy.overrides]]
-module = ["datasets.*"]
+module = ["datasets.*", "transformers.*", "setuptools.*", "setuptools_git_versioning.*"]
 ignore_missing_imports=true
 
 
