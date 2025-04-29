@@ -115,11 +115,19 @@ def clean_text(text: str) -> str:
     return re.sub(r"\s+", " ", ftfy.fix_text(text)).strip()
 
 
-def split_text(text: str, split_punctuation: bool = False) -> list[str]:
+def split_text(
+    text: str, split_punctuation: bool = False, split_whitespace: bool = False
+) -> list[str]:
     text = clean_text(text)
 
+    if split_punctuation and split_whitespace:
+        return re.findall(r"\w+|\s+|[^\w\s]", text)
+
     if split_punctuation:
-        return re.findall(r"[\w]+|[.,!?;]", text)
+        return re.findall(r"\w+|[^\w\s]", text)
+
+    if split_whitespace:
+        return re.findall(r"\S+|\s+", text)
 
     return text.split()
 

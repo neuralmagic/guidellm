@@ -31,9 +31,11 @@ repos:
         transformers,
 
         # dev dependencies
+        fastapi,
         pytest,
         pydantic_settings,
         requests-mock,
+        uvicorn,
 
         # types
         types-click,
