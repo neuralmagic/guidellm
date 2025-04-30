@@ -1,3 +1,7 @@
+# build version files
+src/guidellm/version.txt
+src/guidellm/version.py
+
 # Output files
 benchmarks.json
 benchmarks.yaml
