@@ -51,6 +51,62 @@ jobs:
           password: ${{ secrets.PYPI_PUBLIC_AUTH }}
           whl: $(find dist -name '*.tar.gz')
 
+  update-main-version:
+    needs: build-and-publish
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+      - name: Install dependencies
+        run: pip install packaging
+      - name: Set Tag Version
+        id: set-tag-version
+        run: echo "tag_version=${GITHUB_REF#refs/*/}" >> $GITHUB_OUTPUT
+      - name: Set setup.py version
+        id: set-setup-version
+        run: echo "setup_version=$(grep -oP 'LAST_RELEASE_VERSION = Version\("\K[^"]+' setup.py)" >> $GITHUB_OUTPUT
+      - name: Check if version needs to be updated
+        id: check-version
+        run: |
+          TAG_VERSION=${{ steps.set-tag-version.outputs.tag_version }}
+          SETUP_VERSION=${{ steps.set-setup-version.outputs.setup_version }}
+          if [ "$(python -c "from packaging.version import Version; print(Version('$TAG_VERSION') > Version('$SETUP_VERSION'))")" = "True" ]; then
+            echo "Version needs to be updated."
+            echo "update_needed=true" >> $GITHUB_OUTPUT
+          else
+            echo "No update needed."
+            echo "update_needed=false" >> $GITHUB_OUTPUT
+          fi
+      - name: Generate GitHub App token
+        id: app-token
+        if: steps.check-version.outputs.update_needed == 'true'
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.GH_NM_REDHAT_AUTOMATION_APP_ID }}
+          private-key: ${{ secrets.GH_NM_REDHAT_AUTOMATION_APP_PRIVATE_KEY }}
+      - name: Update LAST_RELEASE_VERSION in setup.py
+        if: steps.check-version.outputs.update_needed == 'true'
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+        run:
+          TAG_VERSION=${{ steps.set-tag-version.outputs.tag_version }}
+          SETUP_VERSION=${{ steps.set-setup-version.outputs.setup_version }}
+          sed -i "s/LAST_RELEASE_VERSION = Version(\"[^\"]*\")/LAST_RELEASE_VERSION = Version(\"$TAG_VERSION\")/" setup.py
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add setup.py
+          git commit -m "Update LAST_RELEASE_VERSION from $SETUP_VERSION to $TAG_VERSION"
+          git push origin main
+
   unit-tests:
     runs-on: ubuntu-latest
     strategy:
