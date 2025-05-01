@@ -84,12 +84,12 @@ def cli():
         "The type of backend to use to run requests against. Defaults to 'openai_http'."
         f" Supported types: {', '.join(get_args(BackendType))}"
     ),
-    default=GenerativeTextScenario.backend_type,
+    default=GenerativeTextScenario.model_fields["backend_type"].default,
 )
 @click.option(
     "--backend-args",
     callback=parse_json,
-    default=GenerativeTextScenario.backend_args,
+    default=GenerativeTextScenario.model_fields["backend_args"].default,
     help=(
         "A JSON string containing any arguments to pass to the backend as a "
         "dict with **kwargs."
@@ -97,7 +97,7 @@ def cli():
 )
 @click.option(
     "--model",
-    default=GenerativeTextScenario.model,
+    default=GenerativeTextScenario.model_fields["model"].default,
     type=str,
     help=(
         "The ID of the model to benchmark within the backend. "
@@ -106,7 +106,7 @@ def cli():
 )
 @click.option(
     "--processor",
-    default=GenerativeTextScenario.processor,
+    default=GenerativeTextScenario.model_fields["processor"].default,
     type=str,
     help=(
         "The processor or tokenizer to use to calculate token counts for statistics "
@@ -116,7 +116,7 @@ def cli():
 )
 @click.option(
     "--processor-args",
-    default=GenerativeTextScenario.processor_args,
+    default=GenerativeTextScenario.model_fields["processor_args"].default,
     callback=parse_json,
     help=(
         "A JSON string containing any arguments to pass to the processor constructor "
@@ -135,7 +135,7 @@ def cli():
 )
 @click.option(
     "--data-args",
-    default=GenerativeTextScenario.data_args,
+    default=GenerativeTextScenario.model_fields["data_args"].default,
     callback=parse_json,
     help=(
         "A JSON string containing any arguments to pass to the dataset creation "
@@ -144,7 +144,7 @@ def cli():
 )
 @click.option(
     "--data-sampler",
-    default=GenerativeTextScenario.data_sampler,
+    default=GenerativeTextScenario.model_fields["data_sampler"].default,
     type=click.Choice(["random"]),
     help=(
         "The data sampler type to use. 'random' will add a random shuffle on the data. "
@@ -162,7 +162,7 @@ def cli():
 )
 @click.option(
     "--rate",
-    default=GenerativeTextScenario.rate,
+    default=GenerativeTextScenario.model_fields["rate"].default,
     callback=parse_number_str,
     help=(
         "The rates to run the benchmark at. "
@@ -176,7 +176,7 @@ def cli():
 @click.option(
     "--max-seconds",
     type=float,
-    default=GenerativeTextScenario.max_seconds,
+    default=GenerativeTextScenario.model_fields["max_seconds"].default,
     help=(
         "The maximum number of seconds each benchmark can run for. "
         "If None, will run until max_requests or the data is exhausted."
@@ -185,7 +185,7 @@ def cli():
 @click.option(
     "--max-requests",
     type=int,
-    default=GenerativeTextScenario.max_requests,
+    default=GenerativeTextScenario.model_fields["max_requests"].default,
     help=(
         "The maximum number of requests each benchmark can run for. "
         "If None, will run until max_seconds or the data is exhausted."
@@ -194,7 +194,7 @@ def cli():
 @click.option(
     "--warmup-percent",
     type=float,
-    default=GenerativeTextScenario.warmup_percent,
+    default=GenerativeTextScenario.model_fields["warmup_percent"].default,
     help=(
         "The percent of the benchmark (based on max-seconds, max-requets, "
         "or lenth of dataset) to run as a warmup and not include in the final results. "
@@ -204,7 +204,7 @@ def cli():
 @click.option(
     "--cooldown-percent",
     type=float,
-    default=GenerativeTextScenario.cooldown_percent,
+    default=GenerativeTextScenario.model_fields["cooldown_percent"].default,
     help=(
         "The percent of the benchmark (based on max-seconds, max-requets, or lenth "
         "of dataset) to run as a cooldown and not include in the final results. "
@@ -214,19 +214,19 @@ def cli():
 @click.option(
     "--disable-progress",
     is_flag=True,
-    default=not GenerativeTextScenario.show_progress,
+    default=not GenerativeTextScenario.model_fields["show_progress"].default,
     help="Set this flag to disable progress updates to the console",
 )
 @click.option(
     "--display-scheduler-stats",
     is_flag=True,
-    default=GenerativeTextScenario.show_progress_scheduler_stats,
+    default=GenerativeTextScenario.model_fields["show_progress_scheduler_stats"].default,
     help="Set this flag to display stats for the processes running the benchmarks",
 )
 @click.option(
     "--disable-console-outputs",
     is_flag=True,
-    default=not GenerativeTextScenario.output_console,
+    default=not GenerativeTextScenario.model_fields["output_console"].default,
     help="Set this flag to disable console output",
 )
 @click.option(
@@ -243,7 +243,7 @@ def cli():
 @click.option(
     "--output-extras",
     callback=parse_json,
-    default=GenerativeTextScenario.output_extras,
+    default=GenerativeTextScenario.model_fields["output_extras"].default,
     help="A JSON string of extra data to save with the output benchmarks",
 )
 @click.option(
@@ -253,11 +253,11 @@ def cli():
         "The number of samples to save in the output file. "
         "If None (default), will save all samples."
     ),
-    default=GenerativeTextScenario.output_sampling,
+    default=GenerativeTextScenario.model_fields["output_sampling"].default,
 )
 @click.option(
     "--random-seed",
-    default=GenerativeTextScenario.random_seed,
+    default=GenerativeTextScenario.model_fields["random_seed"].default,
     type=int,
     help="The random seed to use for benchmarking to ensure reproducibility.",
 )
