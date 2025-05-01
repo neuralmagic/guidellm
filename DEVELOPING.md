@@ -1,117 +1,113 @@
-# Developer Documentation
+# Developing for Speculators
 
-## Introduction
+Thank you for your interest in contributing to Speculators! This document provides detailed instructions for setting up your development environment, implementing changes, and adhering to the project's best practices. Your contributions help us grow and improve this project.
 
-Welcome to the developer documentation for `guidellm`, a guidance platform for evaluating large language model deployments. This document aims to provide developers with all the necessary information to contribute to the project effectively.
-
-## Getting Started
+## Setting Up Your Development Environment
 
 ### Prerequisites
 
 Before you begin, ensure you have the following installed:
 
-- Python 3.8 or higher
-- `pip` (Python package installer)
-- `git` (version control system)
+- Python 3.9 or higher
+- pip (Python package manager)
+- Tox
+- Git
 
-### Installation
+### Cloning the Repository
 
-1. Clone the repository:
+1. Clone the repository to your local machine:
 
    ```bash
    git clone https://github.com/neuralmagic/guidellm.git
    cd guidellm
    ```
 
-2. Install the required dependencies:
+2. (Optional) If you plan to contribute changes back, fork the repository and clone your fork instead:
 
    ```bash
-   pip install -e .[dev]
+   git clone https://github.com/<your-username>/guidellm.git
+   cd guidellm
    ```
 
-## Project Structure
+### Installing Dependencies
 
-The project follows a standard Python project structure:
+To install the required dependencies for the package and development, run:
 
-```plaintext
-guidellm/
-├── src/
-│ └── guidellm/
-├── tests/
-│ ├── unit/
-│ ├── integration/
-│ └── e2e/
-├── pyproject.toml
-├── tox.ini
-└── README.md
+```bash
+pip install -e ./[dev]
 ```
 
-- **src/guidellm/**: Main source code for the project.
-- **tests/**: Test cases categorized into unit, integration, and end-to-end tests.
+The `-e` flag installs the package in editable mode, allowing you to make changes to the code without reinstalling it. The `[dev]` part installs additional dependencies needed for development, such as testing and linting tools.
 
-## Development Environment Setup
+## Implementing Changes
 
-To set up your development environment, follow these steps:
+### Writing Code
 
-1. Install pre-commit hooks:
-
-   ```bash
-   pre-commit install
-   ```
-
-2. Ensure all dependencies are installed:
+1. **Create a Branch**: Create a new branch for your changes:
 
    ```bash
-   pip install -e .[dev]
+   git checkout -b feature/your-feature-name
    ```
 
-## Code Quality and Style Guidelines
+2. **Make Changes**: Implement your changes in the appropriate files. Ensure that all public functions and classes have clear and concise docstrings.
 
-We use several tools to maintain code quality and consistency:
+3. **Update Documentation**: Update or add documentation to reflect your changes. This includes updating README files, docstrings, and any relevant guides.
 
-### Ruff
+## Running Quality, Style, and Type Checks
 
-Ruff is used for linting and formatting checks.
+We use Tox to simplify running various tasks in isolated environments. Tox standardizes environments to ensure consistency across local development, CI/CD pipelines, and releases. This guarantees that the code behaves the same regardless of where it is executed.
 
-- Configuration is in `pyproject.toml`.
-- To run Ruff:
-  ```bash
-  ruff check src tests
-  ```
+Additionally, to ensure consistency and quality of the codebase, we use [ruff](https://github.com/astral-sh/ruff) for linting and styling, [isort](https://pycqa.github.io/isort/) for sorting imports, [mypy](https://github.com/python/mypy) for type checking, and [mdformat](https://github.com/hukkin/mdformat) for formatting Markdown files.
 
-### Isort
+### Code Quality and Style
 
-Isort is used for sorting imports.
+To check code quality, including linting and formatting:
 
-- Configuration is in `pyproject.toml`.
-- To sort imports:
-  ```bash
-  isort src tests
-  ```
+```bash
+tox -e quality
+```
 
-### Flake8
+To automatically fix style issues:
 
-Flake8 is used for linting.
+```bash
+tox -e style
+```
 
-- Configuration is in `tox.ini`.
-- To run Flake8:
-  ```bash
-  flake8 src tests --max-line-length 88
-  ```
+### Type Checking
 
-### MyPy
+To ensure type safety using Mypy:
 
-MyPy is used for type checking.
+```bash
+tox -e types
+```
 
-- Configuration is in `pyproject.toml`.
-- To run MyPy:
-  ```bash
-  mypy src/guidellm
-  ```
+### Link Checking
 
-## Testing
+To ensure valid links added to the documentation / Markdown files:
 
-We use `pytest` for running tests.
+```bash
+tox -e links
+```
+
+### Automating Quality Checks with Pre-Commit Hooks (Optional)
+
+We use [pre-commit](https://pre-commit.com/) to automate quality checks before commits. Pre-commit hooks run checks like linting, formatting, and type checking, ensuring that only high-quality code is committed.
+
+To install the pre-commit hooks, run:
+
+```bash
+pre-commit install
+```
+
+This will set up the hooks to run automatically before each commit. To manually run the hooks on all files, use:
+
+```bash
+pre-commit run --all-files
+```
+
+## Running Tests
+
+For testing, we use [pytest](https://docs.pytest.org/) as our testing framework. We have different test suites for unit tests, integration tests, and end-to-end tests. To run the tests, you can use Tox, which will automatically create isolated environments for each test suite. Tox will also ensure that the tests are run in a consistent environment, regardless of where they are executed.
 
 ### Running All Tests
 
@@ -121,139 +117,71 @@ To run all tests:
 tox
 ```
 
-Additionally, all tests are marked with smoke, sanity, or regression tags for better organization. To run tests with a specific tag, use the `-m` flag:
+### Running Specific Tests
+
+- Unit tests (focused on individual components with mocking):
+
+  ```bash
+  tox -e test-unit
+  ```
+
+- Integration tests (focused on interactions between components ideally without mocking):
+
+  ```bash
+  tox -e test-integration
+  ```
+
+- End-to-end tests (focused on the entire system and user interfaces):
+
+  ```bash
+  tox -e test-e2e
+  ```
+
+### Running Tests with Coverage
+
+To ensure your changes are covered by tests, run:
 
 ```bash
-tox -- -m "smoke or sanity"
+tox -e test-unit -- --cov=speculators --cov-report=html
 ```
 
-### Running Unit Tests
+Review the coverage report to confirm that your new code is adequately tested.
 
-The unit tests are located in the `tests/unit` directory. To run the unit tests, use the following command:
+## Opening a Pull Request
 
-```bash
-tox -e test-unit
-```
+1. **Push Changes**: Push your branch to your forked repository (if you forked):
 
-### Running Integration Tests
+   ```bash
+   git push origin feature/your-feature-name
+   ```
 
-The integration tests are located in the `tests/integration` directory. To run the integration tests, use the following command:
+2. **Open a Pull Request**: Go to the original repository and open a pull request. Use the following template for your pull request description:
 
-```bash
-tox -e test-integration
-```
+   ```markdown
+   # Title; ex: Add feature X to improve Y
 
-### Running End-to-End Tests
+   ## Summary:
 
-The end-to-end tests are located in the `tests/e2e` directory. To run the end-to-end tests, use the following command:
+   Short paragraph detailing the pull request changes and reasoning in addition to any relevant context.
 
-```bash
-tox -e test-e2e
-```
+   ## Details:
 
-## Formatting, Linting, and Type Checking
+   - Detailed list of changes made in the pull request
 
-### Running Quality Checks (Linting)
+   ## Test Plan:
 
-To run quality checks (ruff, isort, flake8, mypy), use the following command:
+   - Detailed list of steps to test the changes made in the pull request
 
-```bash
-tox -e quality
-```
+   ## Related Issues
 
-### Running Auto Formatting and Validation
+   - List of related issues or other pull requests; ex: "Fixes #1234"
+   ```
 
-To run formatting checks and fixes (ruff, isort, flake8) for automatic formatting, use the following command:
+3. **Address Feedback**: Respond to any feedback from reviewers and make necessary changes.
 
-```bash
-tox -e style
-```
+## Additional Resources
 
-### Type Checking
-
-To run type checks (MyPy), use the following command:
-
-```bash
-tox -e types
-```
-
-## Building the Project
-
-To build the project, use the following command:
-
-```bash
-tox -e build
-```
-
-## Cleaning Up
-
-To clean up build, dist, and cache files, use the following command:
-
-```bash
-tox -e clean
-```
-
-## Continuous Integration/Continuous Deployment (CI/CD)
-
-Our CI/CD pipeline is configured using GitHub Actions. The configuration files are located in the .github/workflows/ directory. You can run the CI/CD pipeline locally using act or similar tools.
-
-## Contributing
-
-Please refer to the CONTRIBUTING.md file for guidelines on how to contribute to the project.
-
-## Maintaining
-
-Please refer to the MAINTAINERS file for maintenance guidelines and contact information.
-
-## Project configuration
-
-The project configuartion is powered by _[`🔗 pydantic-settings`](https://docs.pydantic.dev/latest/concepts/pydantic_settings/)_
-
-The project configuration entry point is represented by lazy-loaded `settigns` singleton object ( `src/config/__init__` )
-
-The project is fully configurable with environment variables. With that configuration set you can load parameters to `LoggingSettings()` by using environment variables. Just run `export GUIDELLM__LOGGING__DISABLED=true` or `export GUIDELLM__LOGGING__NESTED=another_value` respectfully. The nesting delimiter is `__`.
-
-### Environment variables
-
-| Name                           | Default value           | Description                                                                                                                                             |
-| ------------------------------ | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GUIDELLM__LOGGING__DISABLED`  | `False`                 | Determines whether logger for the `guidellm` package is disabled or not                                                                                 |
-| `GUIDELLM__LOGGING__LOG_LEVEL` | `INFO`                  | The level of `guidellm` package logging                                                                                                                 |
-| `GUIDELLM__LOGGING__LOG_FILE`  | `guidellm.log`          | The name of a log file                                                                                                                                  |
-| `GUIDELLM__OPENAI__BASE_URL`   | `http://localhost:8080` | The address to the **OpenAI-compatible** server.<br><br>OpenAI live base url is `https://api.openai.com/v1`                                             |
-| `GUIDELLM__OPENAI__API_KEY`    | `invalid`               | Corresponds to the **OpenAI-compatible** server API key.<br><br>If you look for the live key - check [this link](https://platform.openai.com/api-keys). |
-
-<br>
-
-## Project configuration
-
-The project configuartion is powered by _[`🔗 pydantic-settings`](https://docs.pydantic.dev/latest/concepts/pydantic_settings/)_
-
-The project configuration entrypoint is represented by lazy-loaded `settigns` singleton object ( `src/config/__init__` )
-
-The project is fully configurable with environment variables. All the default values and
-
-```py
-class NestedIntoLogging(BaseModel):
-    nested: str = "default value"
-
-class LoggingSettings(BaseModel):
-    # ...
-    disabled: bool = False
-
-
-class Settings(BaseSettings):
-    """The entrypoint to settings."""
-
-    # ...
-    logging: LoggingSettings = LoggingSettings()
-
-
-settings = Settings()
-```
-
-With that configuration set you can load parameters to `LoggingSettings()` by using environment variables. Just run `export GUIDELLM__LOGGING__DISABLED=true` or `export GUIDELLM__LOGGING__NESTED=another_value` respectfully. The nesting delimiter is `__`
-
-## Contact and Support
-
-If you need help or have any questions, please open an issue on GitHub or contact us at support@neuralmagic.com.
+- [CONTRIBUTING.md](https://github.com/neuralmagic/speculators/blob/main/CONTRIBUTING.md): Guidelines for contributing to the project.
+- [CODE_OF_CONDUCT.md](https://github.com/neuralmagic/speculators/blob/main/CODE_OF_CONDUCT.md): Our expectations for community behavior.
+- [tox.ini](https://github.com/neuralmagic/speculators/blob/main/tox.ini): Configuration for Tox environments.
+- [.pre-commit-config.yaml](https://github.com/neuralmagic/speculators/blob/main/.pre-commit-config.yaml): Configuration for pre-commit hooks.
