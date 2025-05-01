@@ -889,7 +889,7 @@ class GenerativeBenchmarksConsole:
             "Request Stats": (1, 2),
             "Out Tok/sec": (3, 3),
             "Tot Tok/sec": (4, 4),
-            "Req Latency (ms)": (5, 7),
+            "Req Latency (sec)": (5, 7),
             "TTFT (ms)": (8, 10),
             "ITL (ms)": (11, 13),
             "TPOT (ms)": (14, 16),
