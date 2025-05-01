@@ -14,7 +14,7 @@ class ExampleModel(StandardBaseModel):
         return self.name + " " + str(self.age)
 
 
-@pytest.mark.smoke()
+@pytest.mark.smoke
 def test_standard_base_model_initialization():
     example = ExampleModel(name="John Doe", age=30)
     assert example.name == "John Doe"
@@ -22,13 +22,13 @@ def test_standard_base_model_initialization():
     assert example.computed == "John Doe 30"
 
 
-@pytest.mark.smoke()
+@pytest.mark.smoke
 def test_standard_base_model_invalid_initialization():
     with pytest.raises(ValueError):
         ExampleModel(name="John Doe", age="thirty")  # type: ignore[arg-type]
 
 
-@pytest.mark.smoke()
+@pytest.mark.smoke
 def test_standard_base_model_marshalling():
     example = ExampleModel(name="John Doe", age=30)
     serialized = example.model_dump()

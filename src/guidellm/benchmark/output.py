@@ -29,8 +29,8 @@ from guidellm.scheduler import strategy_display_str
 from guidellm.utils import Colors, split_text_list_by_length
 
 __all__ = [
-    "GenerativeBenchmarksReport",
     "GenerativeBenchmarksConsole",
+    "GenerativeBenchmarksReport",
 ]
 
 

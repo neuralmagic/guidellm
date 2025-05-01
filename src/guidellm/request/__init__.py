@@ -7,9 +7,9 @@ from .loader import (
 from .request import GenerationRequest
 
 __all__ = [
+    "GenerationRequest",
+    "GenerativeRequestLoader",
+    "GenerativeRequestLoaderDescription",
     "RequestLoader",
     "RequestLoaderDescription",
-    "GenerativeRequestLoaderDescription",
-    "GenerativeRequestLoader",
-    "GenerationRequest",
 ]

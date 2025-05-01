@@ -147,10 +147,10 @@ indent-style = "space"
 [tool.ruff.lint]
 ignore = [
     "PLR0913",
-    "TCH001",
+    "TC001",
     "COM812",
     "ISC001",
-    "TCH002",
+    "TC002",
     "PLW1514", # allow Path.open without encoding
     "RET505", # allow `else` blocks
     "RET506", # allow `else` blocks

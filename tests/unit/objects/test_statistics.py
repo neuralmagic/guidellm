@@ -44,7 +44,7 @@ def create_default_distribution_summary() -> DistributionSummary:
     )
 
 
-@pytest.mark.smoke()
+@pytest.mark.smoke
 def test_percentiles_initialization():
     percentiles = create_default_percentiles()
     assert percentiles.p001 == 0.1
@@ -59,7 +59,7 @@ def test_percentiles_initialization():
     assert percentiles.p999 == 99.9
 
 
-@pytest.mark.smoke()
+@pytest.mark.smoke
 def test_percentiles_invalid_initialization():
     test_kwargs = {
         "p001": 0.1,
@@ -81,7 +81,7 @@ def test_percentiles_invalid_initialization():
             Percentiles(**kwargs)
 
 
-@pytest.mark.smoke()
+@pytest.mark.smoke
 def test_percentiles_marshalling():
     percentiles = create_default_percentiles()
     serialized = percentiles.model_dump()
@@ -91,7 +91,7 @@ def test_percentiles_marshalling():
         assert getattr(deserialized, key) == value
 
 
-@pytest.mark.smoke()
+@pytest.mark.smoke
 def test_distribution_summary_initilaization():
     distribution_summary = create_default_distribution_summary()
     assert distribution_summary.mean == 50.0
@@ -115,7 +115,7 @@ def test_distribution_summary_initilaization():
     assert distribution_summary.percentiles.p999 == 99.9
 
 
-@pytest.mark.smoke()
+@pytest.mark.smoke
 def test_distribution_summary_invalid_initialization():
     test_kwargs = {
         "mean": 50.0,
@@ -136,7 +136,7 @@ def test_distribution_summary_invalid_initialization():
             DistributionSummary(**kwargs)  # type: ignore[arg-type]
 
 
-@pytest.mark.smoke()
+@pytest.mark.smoke
 def test_distribution_summary_marshalling():
     distribution_summary = create_default_distribution_summary()
     serialized = distribution_summary.model_dump()
@@ -146,7 +146,7 @@ def test_distribution_summary_marshalling():
         assert getattr(deserialized, key) == value
 
 
-@pytest.mark.smoke()
+@pytest.mark.smoke
 def test_distribution_summary_from_distribution_function():
     values = [val / 10.0 for val in range(1001)]
     distribution = [(val, 1.0) for val in values]

@@ -9,7 +9,7 @@ from guidellm.backend import (
 )
 
 
-@pytest.mark.smoke()
+@pytest.mark.smoke
 def test_backend_registry():
     assert Backend._registry["mock"] is not None  # type: ignore
 
@@ -23,8 +23,8 @@ def test_backend_registry():
         Backend.create("invalid_type")  # type: ignore
 
 
-@pytest.mark.smoke()
-@pytest.mark.asyncio()
+@pytest.mark.smoke
+@pytest.mark.asyncio
 async def test_backend_text_completions(mock_backend):
     index = 0
     prompt = "Test Prompt"
@@ -73,8 +73,8 @@ async def test_backend_text_completions(mock_backend):
     assert final_resp
 
 
-@pytest.mark.smoke()
-@pytest.mark.asyncio()
+@pytest.mark.smoke
+@pytest.mark.asyncio
 async def test_backend_chat_completions(mock_backend):
     index = 0
     prompt = "Test Prompt"
@@ -123,14 +123,14 @@ async def test_backend_chat_completions(mock_backend):
     assert final_resp
 
 
-@pytest.mark.smoke()
-@pytest.mark.asyncio()
+@pytest.mark.smoke
+@pytest.mark.asyncio
 async def test_backend_models(mock_backend):
     models = await mock_backend.available_models()
     assert models == ["mock-model"]
 
 
-@pytest.mark.smoke()
-@pytest.mark.asyncio()
+@pytest.mark.smoke
+@pytest.mark.asyncio
 async def test_backend_validate(mock_backend):
     await mock_backend.validate()
