@@ -30,13 +30,13 @@ from guidellm.scheduler.result import SchedulerRequestInfo
 from guidellm.scheduler.types import RequestT, ResponseT
 
 __all__ = [
-    "WorkerProcessRequest",
-    "WorkerProcessResult",
+    "GenerativeRequestsWorker",
+    "GenerativeRequestsWorkerDescription",
+    "RequestsWorker",
     "ResolveStatus",
     "WorkerDescription",
-    "RequestsWorker",
-    "GenerativeRequestsWorkerDescription",
-    "GenerativeRequestsWorker",
+    "WorkerProcessRequest",
+    "WorkerProcessResult",
 ]
 
 

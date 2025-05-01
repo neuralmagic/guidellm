@@ -17,10 +17,10 @@ from guidellm.objects import StandardBaseModel
 from guidellm.request.request import GenerationRequest
 
 __all__ = [
-    "RequestLoaderDescription",
-    "RequestLoader",
-    "GenerativeRequestLoaderDescription",
     "GenerativeRequestLoader",
+    "GenerativeRequestLoaderDescription",
+    "RequestLoader",
+    "RequestLoaderDescription",
 ]
 
 

@@ -17,13 +17,13 @@ from guidellm.scheduler import (
 )
 
 __all__ = [
-    "ProfileType",
-    "Profile",
-    "SynchronousProfile",
-    "ConcurrentProfile",
-    "ThroughputProfile",
     "AsyncProfile",
+    "ConcurrentProfile",
+    "Profile",
+    "ProfileType",
     "SweepProfile",
+    "SynchronousProfile",
+    "ThroughputProfile",
     "create_profile",
 ]
 

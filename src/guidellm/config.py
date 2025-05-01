@@ -11,8 +11,8 @@ __all__ = [
     "Environment",
     "LoggingSettings",
     "OpenAISettings",
-    "print_config",
     "Settings",
+    "print_config",
     "reload_settings",
     "settings",
 ]
