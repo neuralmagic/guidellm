@@ -15,8 +15,22 @@ from guidellm.benchmark.output import (
 )
 from guidellm.benchmark.profile import ProfileType, create_profile
 from guidellm.benchmark.progress import GenerativeTextBenchmarkerProgressDisplay
+from guidellm.benchmark.scenario import GenerativeTextScenario, Scenario
 from guidellm.request import GenerativeRequestLoader
 from guidellm.scheduler import StrategyType
+
+type benchmark_type = Literal["generative_text"]
+
+
+async def benchmark_with_scenario(scenario: Scenario, **kwargs):
+    """
+    Run a benchmark using a scenario and specify any extra arguments
+    """
+
+    if isinstance(scenario, GenerativeTextScenario):
+        return await benchmark_generative_text(**vars(scenario), **kwargs)
+    else:
+        raise ValueError(f"Unsupported Scenario type {type(scenario)}")
 
 
 async def benchmark_generative_text(
