@@ -31,6 +31,10 @@ class Scenario(StandardBaseModel):
 
 
 class GenerativeTextScenario(Scenario):
+    # FIXME: This solves an issue with Pydantic and class types
+    class Config:
+        arbitrary_types_allowed = True
+
     backend_type: BackendType = "openai_http"
     backend_args: Optional[dict[str, Any]] = None
     model: Optional[str] = None
