@@ -81,8 +81,8 @@ dev = [
     "respx~=0.22.0",
 
     # code quality
-    "mypy~=1.10.1",
-    "ruff~=0.5.2",
+    "mypy~=1.15.0",
+    "ruff~=0.11.7",
 
     # docs quality
     "mdformat~=0.7.17",
