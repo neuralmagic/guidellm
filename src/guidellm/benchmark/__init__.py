@@ -32,20 +32,15 @@ from .progress import (
 )
 
 __all__ = [
-    # Aggregator
     "AggregatorT",
-    # Profile
     "AsyncProfile",
-    # Benchmark
     "Benchmark",
     "BenchmarkAggregator",
     "BenchmarkArgs",
     "BenchmarkMetrics",
     "BenchmarkRunStats",
     "BenchmarkT",
-    # Benchmarker
     "Benchmarker",
-    # Progress
     "BenchmarkerProgressDisplay",
     "BenchmarkerResult",
     "BenchmarkerTaskProgressState",
@@ -53,7 +48,6 @@ __all__ = [
     "GenerativeBenchmark",
     "GenerativeBenchmarkAggregator",
     "GenerativeBenchmarker",
-    # Output
     "GenerativeBenchmarksConsole",
     "GenerativeBenchmarksReport",
     "GenerativeMetrics",
@@ -67,7 +61,6 @@ __all__ = [
     "SweepProfile",
     "SynchronousProfile",
     "ThroughputProfile",
-    # Entry points
     "benchmark_generative_text",
     "create_profile",
 ]
