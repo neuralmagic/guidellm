@@ -57,10 +57,5 @@ class GenerativeTextScenario(Scenario):
     max_requests: Optional[int] = None
     warmup_percent: Optional[float] = None
     cooldown_percent: Optional[float] = None
-    show_progress: bool = True
-    show_progress_scheduler_stats: bool = True
-    output_console: bool = True
-    output_path: Optional[Union[str, Path]] = None
-    output_extras: Optional[dict[str, Any]] = None
     output_sampling: Optional[int] = None
     random_seed: int = 42

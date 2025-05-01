@@ -214,19 +214,16 @@ def cli():
 @click.option(
     "--disable-progress",
     is_flag=True,
-    default=not GenerativeTextScenario.model_fields["show_progress"].default,
     help="Set this flag to disable progress updates to the console",
 )
 @click.option(
     "--display-scheduler-stats",
     is_flag=True,
-    default=GenerativeTextScenario.model_fields["show_progress_scheduler_stats"].default,
     help="Set this flag to display stats for the processes running the benchmarks",
 )
 @click.option(
     "--disable-console-outputs",
     is_flag=True,
-    default=not GenerativeTextScenario.model_fields["output_console"].default,
     help="Set this flag to disable console output",
 )
 @click.option(
@@ -243,7 +240,6 @@ def cli():
 @click.option(
     "--output-extras",
     callback=parse_json,
-    default=GenerativeTextScenario.model_fields["output_extras"].default,
     help="A JSON string of extra data to save with the output benchmarks",
 )
 @click.option(
@@ -316,18 +312,18 @@ def benchmark(
         max_requests=max_requests,
         warmup_percent=warmup_percent,
         cooldown_percent=cooldown_percent,
-        show_progress=not disable_progress,
-        show_progress_scheduler_stats=display_scheduler_stats,
-        output_console=not disable_console_outputs,
-        output_path=output_path,
-        output_extras=output_extras,
         output_sampling=output_sampling,
         random_seed=random_seed,
     ))
 
     asyncio.run(
         benchmark_with_scenario(
-            scenario=GenerativeTextScenario(**_scenario)
+            scenario=GenerativeTextScenario(**_scenario),
+            show_progress=not disable_progress,
+            show_progress_scheduler_stats=display_scheduler_stats,
+            output_console=not disable_console_outputs,
+            output_path=output_path,
+            output_extras=output_extras,
         )
     )
 
