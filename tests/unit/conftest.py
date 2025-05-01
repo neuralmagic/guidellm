@@ -12,7 +12,7 @@ from guidellm.backend import ResponseSummary, StreamingTextResponse
 from .mock_backend import MockBackend
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_auto_tokenizer():
     with patch("transformers.AutoTokenizer.from_pretrained") as mock_from_pretrained:
 
@@ -26,7 +26,7 @@ def mock_auto_tokenizer():
         yield mock_tokenizer
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_backend(request):
     params = request.param if hasattr(request, "param") else {}
     kwargs = {}
@@ -113,7 +113,7 @@ class MockCompletionsIter(AsyncIterable):
         yield b"data: [DONE]\n"
 
 
-@pytest.fixture()
+@pytest.fixture
 def httpx_openai_mock(request):
     params = request.param if hasattr(request, "param") else {}
     model = params.get("model", "mock-model")

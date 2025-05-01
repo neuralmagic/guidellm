@@ -13,13 +13,13 @@ from guidellm import data as package_data
 from guidellm.config import settings
 
 __all__ = [
-    "split_text_list_by_length",
-    "filter_text",
-    "clean_text",
-    "split_text",
-    "load_text",
-    "is_puncutation",
     "EndlessTextCreator",
+    "clean_text",
+    "filter_text",
+    "is_puncutation",
+    "load_text",
+    "split_text",
+    "split_text_list_by_length",
 ]
 
 MAX_PATH_LENGTH = 4096

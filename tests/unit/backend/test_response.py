@@ -10,13 +10,13 @@ from guidellm.backend import (
 )
 
 
-@pytest.mark.smoke()
+@pytest.mark.smoke
 def test_streaming_response_types():
     valid_types = get_args(StreamingResponseType)
     assert valid_types == ("start", "iter")
 
 
-@pytest.mark.smoke()
+@pytest.mark.smoke
 def test_streaming_text_response_default_initilization():
     response = StreamingTextResponse(
         type_="start",
@@ -30,7 +30,7 @@ def test_streaming_text_response_default_initilization():
     assert response.request_id is None
 
 
-@pytest.mark.smoke()
+@pytest.mark.smoke
 def test_streaming_text_response_initialization():
     response = StreamingTextResponse(
         type_="start",
@@ -52,7 +52,7 @@ def test_streaming_text_response_initialization():
     assert response.request_id == "123"
 
 
-@pytest.mark.smoke()
+@pytest.mark.smoke
 def test_streaming_text_response_marshalling():
     response = StreamingTextResponse(
         type_="start",
@@ -71,7 +71,7 @@ def test_streaming_text_response_marshalling():
         assert getattr(deserialized, key) == value
 
 
-@pytest.mark.smoke()
+@pytest.mark.smoke
 def test_request_args_default_initialization():
     args = RequestArgs(
         target="http://example.com",
@@ -82,7 +82,7 @@ def test_request_args_default_initialization():
     assert args.http2 is None
 
 
-@pytest.mark.smoke()
+@pytest.mark.smoke
 def test_request_args_initialization():
     args = RequestArgs(
         target="http://example.com",
@@ -102,7 +102,7 @@ def test_request_args_initialization():
     assert args.http2 is True
 
 
-@pytest.mark.smoke()
+@pytest.mark.smoke
 def test_response_args_marshalling():
     args = RequestArgs(
         target="http://example.com",
@@ -118,7 +118,7 @@ def test_response_args_marshalling():
         assert getattr(deserialized, key) == value
 
 
-@pytest.mark.smoke()
+@pytest.mark.smoke
 def test_response_summary_default_initialization():
     summary = ResponseSummary(
         value="Hello, world!",
@@ -148,7 +148,7 @@ def test_response_summary_default_initialization():
     assert summary.request_id is None
 
 
-@pytest.mark.smoke()
+@pytest.mark.smoke
 def test_response_summary_initialization():
     summary = ResponseSummary(
         value="Hello, world!",

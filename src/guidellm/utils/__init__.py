@@ -14,14 +14,14 @@ from .text import (
 )
 
 __all__ = [
-    "IntegerRangeSampler",
     "Colors",
-    "check_load_processor",
-    "filter_text",
-    "clean_text",
-    "split_text",
-    "load_text",
-    "is_puncutation",
     "EndlessTextCreator",
+    "IntegerRangeSampler",
+    "check_load_processor",
+    "clean_text",
+    "filter_text",
+    "is_puncutation",
+    "load_text",
+    "split_text",
     "split_text_list_by_length",
 ]

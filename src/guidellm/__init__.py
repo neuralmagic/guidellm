@@ -3,15 +3,12 @@ Guidellm is a package that provides an easy and intuitive interface for
 evaluating and benchmarking large language models (LLMs).
 """
 
-# flake8: noqa
-
-import os
-import logging
 import contextlib
-
+import logging
+import os
 
 with (
-    open(os.devnull, "w") as devnull,
+    open(os.devnull, "w") as devnull,  # noqa: PTH123
     contextlib.redirect_stderr(devnull),
     contextlib.redirect_stdout(devnull),
 ):
@@ -24,28 +21,26 @@ with (
     logging.getLogger("transformers").setLevel(logging.ERROR)
 
 from .config import (
-    settings,
     DatasetSettings,
     Environment,
     LoggingSettings,
     OpenAISettings,
-    print_config,
     Settings,
+    print_config,
     reload_settings,
+    settings,
 )
 from .logger import configure_logger, logger
 
 __all__ = [
-    # Config
     "DatasetSettings",
     "Environment",
     "LoggingSettings",
     "OpenAISettings",
-    "print_config",
     "Settings",
+    "configure_logger",
+    "logger",
+    "print_config",
     "reload_settings",
     "settings",
-    # Logger
-    "logger",
-    "configure_logger",
 ]

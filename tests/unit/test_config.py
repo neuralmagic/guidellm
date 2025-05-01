@@ -12,7 +12,7 @@ from guidellm.config import (
 )
 
 
-@pytest.mark.smoke()
+@pytest.mark.smoke
 def test_default_settings():
     settings = Settings()
     assert settings.env == Environment.PROD
@@ -20,7 +20,7 @@ def test_default_settings():
     assert settings.openai == OpenAISettings()
 
 
-@pytest.mark.smoke()
+@pytest.mark.smoke
 def test_settings_from_env_variables(mocker):
     mocker.patch.dict(
         "os.environ",
@@ -39,7 +39,7 @@ def test_settings_from_env_variables(mocker):
     assert settings.openai.base_url == "http://test.url"
 
 
-@pytest.mark.sanity()
+@pytest.mark.sanity
 def test_logging_settings():
     logging_settings = LoggingSettings(
         disabled=True,
@@ -53,14 +53,14 @@ def test_logging_settings():
     assert logging_settings.log_file_level == "ERROR"
 
 
-@pytest.mark.sanity()
+@pytest.mark.sanity
 def test_openai_settings():
     openai_settings = OpenAISettings(api_key="test_api_key", base_url="http://test.api")
     assert openai_settings.api_key == "test_api_key"
     assert openai_settings.base_url == "http://test.api"
 
 
-@pytest.mark.sanity()
+@pytest.mark.sanity
 def test_generate_env_file():
     settings = Settings()
     env_file_content = settings.generate_env_file()
@@ -68,7 +68,7 @@ def test_generate_env_file():
     assert "GUIDELLM__OPENAI__API_KEY" in env_file_content
 
 
-@pytest.mark.sanity()
+@pytest.mark.sanity
 def test_reload_settings(mocker):
     mocker.patch.dict(
         "os.environ",
@@ -82,7 +82,7 @@ def test_reload_settings(mocker):
     assert settings.logging.disabled is False
 
 
-@pytest.mark.sanity()
+@pytest.mark.sanity
 def test_print_config(capsys):
     print_config()
     captured = capsys.readouterr()
@@ -91,7 +91,7 @@ def test_print_config(capsys):
     assert "GUIDELLM__OPENAI__API_KEY" in captured.out
 
 
-@pytest.mark.sanity()
+@pytest.mark.sanity
 def test_dataset_settings_defaults():
     dataset_settings = DatasetSettings()
     assert dataset_settings.preferred_data_columns == [
@@ -115,7 +115,7 @@ def test_dataset_settings_defaults():
     ]
 
 
-@pytest.mark.sanity()
+@pytest.mark.sanity
 def test_openai_settings_defaults():
     openai_settings = OpenAISettings()
     assert openai_settings.api_key is None
@@ -126,7 +126,7 @@ def test_openai_settings_defaults():
     assert openai_settings.max_output_tokens == 16384
 
 
-@pytest.mark.sanity()
+@pytest.mark.sanity
 def test_table_properties_defaults():
     settings = Settings()
     assert settings.table_border_char == "="
@@ -134,7 +134,7 @@ def test_table_properties_defaults():
     assert settings.table_column_separator_char == "|"
 
 
-@pytest.mark.sanity()
+@pytest.mark.sanity
 def test_settings_with_env_variables(mocker):
     mocker.patch.dict(
         "os.environ",

@@ -15,13 +15,13 @@ from guidellm.config import settings
 from guidellm.objects import StandardBaseModel
 
 __all__ = [
-    "StrategyType",
-    "SchedulingStrategy",
-    "SynchronousStrategy",
-    "ConcurrentStrategy",
-    "ThroughputStrategy",
     "AsyncConstantStrategy",
     "AsyncPoissonStrategy",
+    "ConcurrentStrategy",
+    "SchedulingStrategy",
+    "StrategyType",
+    "SynchronousStrategy",
+    "ThroughputStrategy",
     "strategy_display_str",
 ]
 

@@ -17,7 +17,7 @@ from guidellm.backend.response import (
 )
 from guidellm.config import settings
 
-__all__ = ["OpenAIHTTPBackend", "TEXT_COMPLETIONS_PATH", "CHAT_COMPLETIONS_PATH"]
+__all__ = ["CHAT_COMPLETIONS_PATH", "TEXT_COMPLETIONS_PATH", "OpenAIHTTPBackend"]
 
 
 TEXT_COMPLETIONS_PATH = "/v1/completions"
