@@ -9,10 +9,10 @@ from guidellm.scheduler.strategy import SchedulingStrategy
 from guidellm.scheduler.types import RequestT, ResponseT
 
 __all__ = [
-    "SchedulerResult",
-    "SchedulerRequestResult",
-    "SchedulerRunInfo",
     "SchedulerRequestInfo",
+    "SchedulerRequestResult",
+    "SchedulerResult",
+    "SchedulerRunInfo",
 ]
 
 

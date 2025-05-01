@@ -6,7 +6,7 @@ from guidellm.backend import OpenAIHTTPBackend, ResponseSummary, StreamingTextRe
 from guidellm.config import settings
 
 
-@pytest.mark.smoke()
+@pytest.mark.smoke
 def test_openai_http_backend_default_initialization():
     backend = OpenAIHTTPBackend()
     assert backend.target == settings.openai.base_url
@@ -19,7 +19,7 @@ def test_openai_http_backend_default_initialization():
     assert backend.max_output_tokens == settings.openai.max_output_tokens
 
 
-@pytest.mark.smoke()
+@pytest.mark.smoke
 def test_openai_http_backend_intialization():
     backend = OpenAIHTTPBackend(
         target="http://test-target",
@@ -41,16 +41,16 @@ def test_openai_http_backend_intialization():
     assert backend.max_output_tokens == 100
 
 
-@pytest.mark.smoke()
-@pytest.mark.asyncio()
+@pytest.mark.smoke
+@pytest.mark.asyncio
 async def test_openai_http_backend_available_models(httpx_openai_mock):
     backend = OpenAIHTTPBackend(target="http://target.mock")
     models = await backend.available_models()
     assert models == ["mock-model"]
 
 
-@pytest.mark.smoke()
-@pytest.mark.asyncio()
+@pytest.mark.smoke
+@pytest.mark.asyncio
 async def test_openai_http_backend_validate(httpx_openai_mock):
     backend = OpenAIHTTPBackend(target="http://target.mock", model="mock-model")
     await backend.validate()
@@ -64,8 +64,8 @@ async def test_openai_http_backend_validate(httpx_openai_mock):
         await backend.validate()
 
 
-@pytest.mark.smoke()
-@pytest.mark.asyncio()
+@pytest.mark.smoke
+@pytest.mark.asyncio
 async def test_openai_http_backend_text_completions(httpx_openai_mock):
     backend = OpenAIHTTPBackend(target="http://target.mock", model="mock-model")
 
@@ -106,8 +106,8 @@ async def test_openai_http_backend_text_completions(httpx_openai_mock):
     assert final_resp
 
 
-@pytest.mark.smoke()
-@pytest.mark.asyncio()
+@pytest.mark.smoke
+@pytest.mark.asyncio
 async def test_openai_http_backend_text_completions_counts(httpx_openai_mock):
     backend = OpenAIHTTPBackend(
         target="http://target.mock",
@@ -132,8 +132,8 @@ async def test_openai_http_backend_text_completions_counts(httpx_openai_mock):
     assert final_resp.request_id == "test-id"
 
 
-@pytest.mark.smoke()
-@pytest.mark.asyncio()
+@pytest.mark.smoke
+@pytest.mark.asyncio
 async def test_openai_http_backend_chat_completions(httpx_openai_mock):
     backend = OpenAIHTTPBackend(target="http://target.mock", model="mock-model")
 
@@ -175,8 +175,8 @@ async def test_openai_http_backend_chat_completions(httpx_openai_mock):
     assert final_resp
 
 
-@pytest.mark.smoke()
-@pytest.mark.asyncio()
+@pytest.mark.smoke
+@pytest.mark.asyncio
 async def test_openai_http_backend_chat_completions_counts(httpx_openai_mock):
     backend = OpenAIHTTPBackend(
         target="http://target.mock",

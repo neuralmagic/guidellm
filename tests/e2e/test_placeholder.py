@@ -1,6 +1,6 @@
 import pytest
 
 
-@pytest.mark.smoke()
+@pytest.mark.smoke
 def test_placeholder():
     assert True

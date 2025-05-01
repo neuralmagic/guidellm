@@ -5,7 +5,7 @@ from typing import Any, Literal, Optional, Union
 from datasets import Dataset, DatasetDict, IterableDataset, IterableDatasetDict
 from transformers import PreTrainedTokenizerBase  # type: ignore[import]
 
-__all__ = ["DatasetCreator", "ColumnInputTypes"]
+__all__ = ["ColumnInputTypes", "DatasetCreator"]
 
 ColumnInputTypes = Literal[
     "prompt_column",
