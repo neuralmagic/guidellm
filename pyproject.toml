@@ -95,6 +95,9 @@ dev = [
     "types-PyYAML~=6.0.1",
     "types-requests~=2.32.0",
     "types-toml",
+
+    # link checking
+    "mkdocs-linkcheck~=1.0.6",
 ]
 
 [project.urls]

@@ -1,68 +1,121 @@
 # Contributing to GuideLLM
 
-If you’re reading this, hopefully we have piqued your interest to take the next step. Join us and help make GuideLLM even better! As a contributor, here are some community guidelines we would like you to follow:
+Thank you for considering contributing to GuideLLM! We welcome contributions from the community to help improve and grow this project. This document outlines the process and guidelines for contributing.
 
-- [Code of Conduct](#code-of-conduct)
-- [Ways to Contribute](#ways-to-contribute)
-- [Bugs and Feature Requests](#bugs-and-feature-requests)
-- [Question or Problem](#question-or-problem)
-- [Developing GuideLLM](DEVELOPING.md)
+## How Can You Contribute?
 
-## Code of Conduct
+There are many ways to contribute to GuideLLM:
 
-Help us keep the software inclusive. Please read and follow our [Code of Conduct](CODE_OF_CONDUCT.md) in order to promote an environment that is friendly, fair, respectful, and safe. We want to inspire collaboration, innovation, and fun!
+- **Reporting Bugs**: If you encounter a bug, please let us know by creating an issue.
+- **Suggesting Features**: Have an idea for a new feature? Open an issue to discuss it.
+- **Improving Documentation**: Help us improve our documentation by submitting pull requests.
+- **Writing Code**: Contribute code to fix bugs, add features, or improve performance.
+- **Reviewing Pull Requests**: Provide feedback on open pull requests to help maintain code quality.
 
-## Ways to Contribute
+## Getting Started
 
-Whether you’re a newbie, dabbler, or expert, we appreciate you jumping in.
+### Prerequisites
 
-### Contributing Code
+Before contributing, ensure you have the following installed:
 
-- Make pull requests for addressing bugs, open issues, and documentation
-- Neural Magic as the maintainer will do reviews and final merge
+- Python 3.9 or higher
+- pip (Python package manager)
+- Tox
+- Git
 
-### Reporting In
+### Setting Up the Repository
 
-- See something, say something: bugs, documentation
-- Propose new feature requests to Neural Magic
+You can either clone the repository directly or fork it if you plan to contribute changes back:
 
-### Helping Others
+#### Option 1: Cloning the Repository
 
-- Answer open discussion topics
-- Spread the word about GuideLLM
-- Teach and empower others. This is the way!
+1. Clone the repository to your local machine:
 
-## Bugs and Feature Requests
+   ```bash
+   git clone https://github.com/neuralmagic/guidellm.git
+   cd guidellm
+   ```
 
-Please search through existing issues and requests first to avoid duplicates. Neural Magic will work with you further to take next steps.
+#### Option 2: Forking the Repository
 
-- Go to: [GitHub Issues](https://github.com/neuralmagic/guidellm/issues)
+1. Fork the repository by clicking the "Fork" button on the repository's GitHub page.
 
-For bugs, include:
+2. Clone your forked repository to your local machine:
 
-- brief summary
-- OS/Environment details
-- steps to reproduce (s.t.r.)
-- code snippets, screenshots/casts, log content, sample models
-- add the GitHub label "bug" to your post
+   ```bash
+   git clone https://github.com/<your-username>/guidellm.git
+   cd guidellm
+   ```
 
-For feature requests, include:
+For detailed instructions on setting up your development environment, please refer to the [DEVELOPING.md](https://github.com/neuralmagic/speculators/blob/main/DEVELOPING.md) file. It includes step-by-step guidance on:
 
-- problem you’re trying to solve
-- community benefits
-- other relevant details to support your proposal
-- add the GitHub label "enhancement" to your post
+- Installing dependencies
+- Running tests
+- Using Tox for various tasks
 
-For documentation edits, include:
+## Code Style and Guidelines
 
-- current state, proposed state
-- if applicable, screenshots/casts
-- add the GitHub label "documentation" to your post
+We follow strict coding standards to ensure code quality and maintainability. Please adhere to the following guidelines:
 
-## Question or Problem
+- **Code Style**: Use [Black](https://black.readthedocs.io/en/stable/) for code formatting and [Ruff](https://github.com/charliermarsh/ruff) for linting.
+- **Type Checking**: Use [Mypy](http://mypy-lang.org/) for type checking.
+- **Testing**: Write unit tests for new features and bug fixes. Use [pytest](https://docs.pytest.org/) for testing.
+- **Documentation**: Update documentation for any changes to the codebase.
 
-Sign up or log in to our [**Neural Magic Community Slack**](https://neuralmagic.com/community/). We are growing the community member by member and happy to see you there. Don’t forget to search through existing discussions to avoid duplication! Thanks!
+To check code quality locally, use the following Tox environment:
 
-## Developing GuideLLM
+```bash
+tox -e quality
+```
 
-Made it this far? Review [Developing GuideLLM](DEVELOPING.md) to get started.
+To automatically fix style issues, use:
+
+```bash
+tox -e style
+```
+
+To run type checks, use:
+
+```bash
+tox -e types
+```
+
+## Submitting Changes
+
+1. **Create a Branch**: Create a new branch for your changes:
+
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
+
+2. **Make Changes**: Commit your changes with clear and descriptive commit messages.
+
+3. **Run Tests and Quality Checks**: Before submitting your changes, ensure all tests pass and code quality checks are satisfied:
+
+   ```bash
+   tox
+   ```
+
+4. **Push Changes**: Push your branch to your forked repository (if you forked):
+
+   ```bash
+   git push origin feature/your-feature-name
+   ```
+
+5. **Open a Pull Request**: Go to the original repository and open a pull request. Provide a clear description of your changes and link any related issues.
+
+## Reporting Issues
+
+If you encounter a bug or have a feature request, please open an issue on GitHub. Include as much detail as possible, such as:
+
+- Steps to reproduce the issue
+- Expected and actual behavior
+- Environment details (OS, Python version, etc.)
+
+## Community Standards
+
+We are committed to fostering a welcoming and inclusive community. Please read and adhere to our [Code of Conduct](https://github.com/neuralmagic/speculators/blob/main/CODE_OF_CONDUCT.md).
+
+## License
+
+By contributing to Speculators, you agree that your contributions will be licensed under the [Apache License 2.0](https://github.com/neuralmagic/speculators/blob/main/LICENSE).
