@@ -48,6 +48,7 @@ class RequestArgs(StandardBaseModel):
 
     :param target: The target URL or function for the request.
     :param headers: The headers, if any, included in the request such as authorization.
+    :param params: The query parameters, if any, included in the request.
     :param payload: The payload / arguments for the request including the prompt /
         content and other configurations.
     :param timeout: The timeout for the request in seconds, if any.
@@ -56,6 +57,7 @@ class RequestArgs(StandardBaseModel):
 
     target: str
     headers: dict[str, str]
+    params: dict[str, str]
     payload: dict[str, Any]
     timeout: Optional[float] = None
     http2: Optional[bool] = None

@@ -51,6 +51,8 @@ class OpenAIHTTPBackend(Backend):
         Defaults to True.
     :param max_output_tokens: The maximum number of tokens to request for completions.
         If not provided, the default maximum tokens provided from settings is used.
+    :param extra_query: Query parameters to include in requests to the OpenAI server.
+        If not provided, no extra query parameters are added.
     """
 
     def __init__(
@@ -63,6 +65,7 @@ class OpenAIHTTPBackend(Backend):
         timeout: Optional[float] = None,
         http2: Optional[bool] = True,
         max_output_tokens: Optional[int] = None,
+        extra_query: Optional[dict[str, str]] = None,
     ):
         super().__init__(type_="openai_http")
         self._target = target or settings.openai.base_url
@@ -93,6 +96,7 @@ class OpenAIHTTPBackend(Backend):
             if max_output_tokens is not None
             else settings.openai.max_output_tokens
         )
+        self.extra_query = extra_query
         self._async_client: Optional[httpx.AsyncClient] = None
 
     @property
@@ -165,7 +169,10 @@ class OpenAIHTTPBackend(Backend):
         """
         target = f"{self.target}/v1/models"
         headers = self._headers()
-        response = await self._get_async_client().get(target, headers=headers)
+        params = self._params()
+        response = await self._get_async_client().get(
+            target, headers=headers, params=params
+        )
         response.raise_for_status()
 
         models = []
@@ -210,6 +217,7 @@ class OpenAIHTTPBackend(Backend):
             )
 
         headers = self._headers()
+        params = self._params()
         payload = self._completions_payload(
             orig_kwargs=kwargs,
             max_output_tokens=output_token_count,
@@ -223,14 +231,16 @@ class OpenAIHTTPBackend(Backend):
                 request_prompt_tokens=prompt_token_count,
                 request_output_tokens=output_token_count,
                 headers=headers,
+                params=params,
                 payload=payload,
             ):
                 yield resp
         except Exception as ex:
             logger.error(
-                "{} request with headers: {} and payload: {} failed: {}",
+                "{} request with headers: {} and params: {} and payload: {} failed: {}",
                 self.__class__.__name__,
                 headers,
+                params,
                 payload,
                 ex,
             )
@@ -282,6 +292,7 @@ class OpenAIHTTPBackend(Backend):
         """
         logger.debug("{} invocation with args: {}", self.__class__.__name__, locals())
         headers = self._headers()
+        params = self._params()
         messages = (
             content if raw_content else self._create_chat_messages(content=content)
         )
@@ -298,14 +309,16 @@ class OpenAIHTTPBackend(Backend):
                 request_prompt_tokens=prompt_token_count,
                 request_output_tokens=output_token_count,
                 headers=headers,
+                params=params,
                 payload=payload,
             ):
                 yield resp
         except Exception as ex:
             logger.error(
-                "{} request with headers: {} and payload: {} failed: {}",
+                "{} request with headers: {} and params: {} and payload: {} failed: {}",
                 self.__class__.__name__,
                 headers,
+                params,
                 payload,
                 ex,
             )
@@ -341,6 +354,9 @@ class OpenAIHTTPBackend(Backend):
             headers["OpenAI-Project"] = self.project
 
         return headers
+
+    def _params(self) -> dict[str, str]:
+        return self.extra_query or {}
 
     def _completions_payload(
         self, orig_kwargs: Optional[dict], max_output_tokens: Optional[int], **kwargs
@@ -438,8 +454,9 @@ class OpenAIHTTPBackend(Backend):
         request_id: Optional[str],
         request_prompt_tokens: Optional[int],
         request_output_tokens: Optional[int],
-        headers: dict,
-        payload: dict,
+        headers: dict[str, str],
+        params: dict[str, str],
+        payload: dict[str, Any],
     ) -> AsyncGenerator[Union[StreamingTextResponse, ResponseSummary], None]:
         if type_ == "text_completions":
             target = f"{self.target}{TEXT_COMPLETIONS_PATH}"
@@ -450,13 +467,14 @@ class OpenAIHTTPBackend(Backend):
 
         logger.info(
             "{} making request: {} to target: {} using http2: {} for "
-            "timeout: {} with headers: {} and payload: {}",
+            "timeout: {} with headers: {} and params: {} and payload: {}",
             self.__class__.__name__,
             request_id,
             target,
             self.http2,
             self.timeout,
             headers,
+            params,
             payload,
         )
 
@@ -484,7 +502,7 @@ class OpenAIHTTPBackend(Backend):
         start_time = time.time()
 
         async with self._get_async_client().stream(
-            "POST", target, headers=headers, json=payload
+            "POST", target, headers=headers, params=params, json=payload
         ) as stream:
             stream.raise_for_status()
 
@@ -528,10 +546,11 @@ class OpenAIHTTPBackend(Backend):
                     response_output_count = usage["output"]
 
         logger.info(
-            "{} request: {} with headers: {} and payload: {} completed with: {}",
+            "{} request: {} with headers: {} and params: {} and payload: {} completed with: {}",
             self.__class__.__name__,
             request_id,
             headers,
+            params,
             payload,
             response_value,
         )
@@ -541,6 +560,7 @@ class OpenAIHTTPBackend(Backend):
             request_args=RequestArgs(
                 target=target,
                 headers=headers,
+                params=params,
                 payload=payload,
                 timeout=self.timeout,
                 http2=self.http2,
