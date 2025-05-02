@@ -546,7 +546,8 @@ class OpenAIHTTPBackend(Backend):
                     response_output_count = usage["output"]
 
         logger.info(
-            "{} request: {} with headers: {} and params: {} and payload: {} completed with: {}",
+            "{} request: {} with headers: {} and params: {} and payload: {} completed"
+            "with: {}",
             self.__class__.__name__,
             request_id,
             headers,
