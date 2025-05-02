@@ -475,6 +475,7 @@ class GenerativeRequestsWorker(RequestsWorker[GenerationRequest, ResponseSummary
                 request_args=RequestArgs(
                     target=self.backend.target,
                     headers={},
+                    params={},
                     payload={},
                 ),
                 start_time=resolve_start_time,
@@ -490,6 +491,7 @@ class GenerativeRequestsWorker(RequestsWorker[GenerationRequest, ResponseSummary
                 request_args=RequestArgs(
                     target=self.backend.target,
                     headers={},
+                    params={},
                     payload={},
                 ),
                 start_time=response.start_time,
