@@ -45,6 +45,7 @@ async def benchmark_generative_text(
     cooldown_percent: Optional[float],
     show_progress: bool,
     show_progress_scheduler_stats: bool,
+    html_report_path: Optional[Union[str, Path]],
     output_console: bool,
     output_path: Optional[Union[str, Path]],
     output_extras: Optional[dict[str, Any]],
@@ -120,6 +121,8 @@ async def benchmark_generative_text(
                 result.current_benchmark.set_sample_size(output_sampling)
             )
 
+
+
     if output_console:
         orig_enabled = console.enabled
         console.enabled = True
@@ -128,6 +131,14 @@ async def benchmark_generative_text(
         console.print_benchmarks_info()
         console.print_benchmarks_stats()
         console.enabled = orig_enabled
+
+    if html_report_path:
+        console.print_line("\nCreating html report...")
+        saved_path = report.create_html_report(html_report_path)
+        console.print_line(f"Html report saved to {saved_path}")
+    else:
+        saved_path = None
+
 
     if output_path:
         console.print_line("\nSaving benchmarks report...")

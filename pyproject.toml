@@ -39,6 +39,7 @@ dependencies = [
     "requests",
     "rich",
     "transformers",
+    "pyhumps>=3.8.0"
 ]
 
 [project.optional-dependencies]

@@ -12,6 +12,7 @@ __all__ = [
     "LoggingSettings",
     "OpenAISettings",
     "print_config",
+    "ReportGenerationSettings"
     "Settings",
     "reload_settings",
     "settings",
@@ -30,10 +31,10 @@ class Environment(str, Enum):
 
 
 ENV_REPORT_MAPPING = {
-    Environment.PROD: "https://guidellm.neuralmagic.com/local-report/index.html",
-    Environment.STAGING: "https://staging.guidellm.neuralmagic.com/local-report/index.html",
-    Environment.DEV: "https://dev.guidellm.neuralmagic.com/local-report/index.html",
-    Environment.LOCAL: "tests/dummy/report.html",
+    Environment.PROD: "https://review.neuralmagic.com/guidellm-ui/staging/index.html",
+    Environment.STAGING: "https://review.neuralmagic.com/guidellm-ui/staging/index.html",
+    Environment.DEV: "https://review.neuralmagic.com/guidellm-ui/dev/index.html",
+    Environment.LOCAL: "http://localhost:3000/index.html",
 }
 
 
@@ -87,6 +88,13 @@ class OpenAISettings(BaseModel):
     max_output_tokens: int = 16384
 
 
+class ReportGenerationSettings(BaseModel):
+    """
+    Report generation settings for the application
+    """
+
+    source: str = ""
+
 class Settings(BaseSettings):
     """
     All the settings are powered by pydantic_settings and could be
@@ -109,7 +117,7 @@ class Settings(BaseSettings):
     )
 
     # general settings
-    env: Environment = Environment.PROD
+    env: Environment = Environment.DEV
     default_async_loop_sleep: float = 10e-5
     logging: LoggingSettings = LoggingSettings()
     default_sweep_number: int = 10
@@ -139,6 +147,9 @@ class Settings(BaseSettings):
     )
     openai: OpenAISettings = OpenAISettings()
 
+    # Report settings
+    report_generation: ReportGenerationSettings = ReportGenerationSettings()
+
     # Output settings
     table_border_char: str = "="
     table_headers_border_char: str = "-"
@@ -147,6 +158,9 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     @classmethod
     def set_default_source(cls, values):
+        if not values.report_generation.source:
+            values.report_generation.source = ENV_REPORT_MAPPING.get(values.env)
+
         return values
 
     def generate_env_file(self) -> str:

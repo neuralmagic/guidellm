@@ -1,12 +1,15 @@
 import csv
 import json
 import math
+import humps
 from collections import OrderedDict
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal, Optional, Union
 
 import yaml
+from build.lib.guidellm.utils.injector import create_report
+from guidellm.presentation import UIDataBuilder
 from pydantic import Field
 from rich.console import Console
 from rich.padding import Padding
@@ -220,6 +223,39 @@ class GenerativeBenchmarksReport(StandardBaseModel):
 
         return path
 
+    def create_html_report(self, path: str | Path) -> Path:
+        """
+        Generate html report and save to a file.
+        If the file is a directory, it will create the report in a file named
+        report.html under the directory.
+
+        :param path: The path to create the report at.
+        :run_args: Some of the args from the run needed in the data for the html report
+        :return: The path to the report.
+        """
+
+        # json_data = json.dumps(data, indent=2)
+        # thing = f'window.{variable_name} = {json_data};'
+
+        data_builder = UIDataBuilder(self.benchmarks)
+        data = data_builder.to_dict()
+        camel_data = humps.camelize(data)
+        ui_api_data = {
+            f"window.{humps.decamelize(k)} = {{}};": f'window.{humps.decamelize(k)} = {json.dumps(v, indent=2)};\n'
+            for k, v in camel_data.items()
+        }
+        print("________")
+        print("________")
+        print("________")
+        print("________")
+        print("ui_api_data")
+        print(ui_api_data)
+        print("________")
+        print("________")
+        print("________")
+        print("________")
+        return create_report(ui_api_data, path)
+
     @staticmethod
     def _file_setup(
         path: Union[str, Path],
@@ -358,8 +394,7 @@ class GenerativeBenchmarksReport(StandardBaseModel):
             raise ValueError("Headers and values length mismatch.")
 
         return headers, values
-
-
+    
 class GenerativeBenchmarksConsole:
     """
     A class for outputting progress and benchmark results to the console.

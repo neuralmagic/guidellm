@@ -198,6 +198,15 @@ def cli():
     help="Set this flag to disable console output",
 )
 @click.option(
+    "--html-report-path",
+    type=click.Path(),
+    default=Path.cwd() / "report.html",
+    help=(
+        "The path to save the html report to. If it is a directory, "
+        "it will save report.html under it. "
+    ),
+)
+@click.option(
     "--output-path",
     type=click.Path(),
     default=Path.cwd() / "benchmarks.json",
@@ -247,6 +256,7 @@ def benchmark(
     disable_progress,
     display_scheduler_stats,
     disable_console_outputs,
+    html_report_path,
     output_path,
     output_extras,
     output_sampling,
@@ -272,6 +282,7 @@ def benchmark(
             show_progress=not disable_progress,
             show_progress_scheduler_stats=display_scheduler_stats,
             output_console=not disable_console_outputs,
+            html_report_path=html_report_path,
             output_path=output_path,
             output_extras=output_extras,
             output_sampling=output_sampling,
