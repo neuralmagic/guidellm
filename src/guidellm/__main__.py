@@ -6,7 +6,9 @@ from typing import get_args
 import click
 
 from guidellm.backend import BackendType
-from guidellm.benchmark import ProfileType, benchmark_generative_text
+from guidellm.benchmark import ProfileType
+from guidellm.benchmark.entrypoints import benchmark_with_scenario
+from guidellm.benchmark.scenario import GenerativeTextScenario
 from guidellm.config import print_config
 from guidellm.scheduler import StrategyType
 
@@ -38,6 +40,19 @@ def parse_number_str(ctx, param, value):  # noqa: ARG001
         ) from err
 
 
+def set_if_not_default(ctx: click.Context, **kwargs):
+    """
+    Set the value of a click option if it is not the default value.
+    This is useful for setting options that are not None by default.
+    """
+    values = {}
+    for k, v in kwargs.items():
+        if ctx.get_parameter_source(k) != click.core.ParameterSource.DEFAULT:
+            values[k] = v
+
+    return values
+
+
 @click.group()
 def cli():
     pass
@@ -45,6 +60,14 @@ def cli():
 
 @cli.command(
     help="Run a benchmark against a generative model using the specified arguments."
+)
+@click.option(
+    "--scenario",
+    type=str,
+    default=None,
+    help=(
+        "TODO: A scenario or path to config"
+    ),
 )
 @click.option(
     "--target",
@@ -59,12 +82,12 @@ def cli():
         "The type of backend to use to run requests against. Defaults to 'openai_http'."
         f" Supported types: {', '.join(get_args(BackendType))}"
     ),
-    default="openai_http",
+    default=GenerativeTextScenario.model_fields["backend_type"].default,
 )
 @click.option(
     "--backend-args",
     callback=parse_json,
-    default=None,
+    default=GenerativeTextScenario.model_fields["backend_args"].default,
     help=(
         "A JSON string containing any arguments to pass to the backend as a "
         "dict with **kwargs."
@@ -72,7 +95,7 @@ def cli():
 )
 @click.option(
     "--model",
-    default=None,
+    default=GenerativeTextScenario.model_fields["model"].default,
     type=str,
     help=(
         "The ID of the model to benchmark within the backend. "
@@ -81,7 +104,7 @@ def cli():
 )
 @click.option(
     "--processor",
-    default=None,
+    default=GenerativeTextScenario.model_fields["processor"].default,
     type=str,
     help=(
         "The processor or tokenizer to use to calculate token counts for statistics "
@@ -91,7 +114,7 @@ def cli():
 )
 @click.option(
     "--processor-args",
-    default=None,
+    default=GenerativeTextScenario.model_fields["processor_args"].default,
     callback=parse_json,
     help=(
         "A JSON string containing any arguments to pass to the processor constructor "
@@ -110,6 +133,7 @@ def cli():
 )
 @click.option(
     "--data-args",
+    default=GenerativeTextScenario.model_fields["data_args"].default,
     callback=parse_json,
     help=(
         "A JSON string containing any arguments to pass to the dataset creation "
@@ -118,7 +142,7 @@ def cli():
 )
 @click.option(
     "--data-sampler",
-    default=None,
+    default=GenerativeTextScenario.model_fields["data_sampler"].default,
     type=click.Choice(["random"]),
     help=(
         "The data sampler type to use. 'random' will add a random shuffle on the data. "
@@ -136,7 +160,7 @@ def cli():
 )
 @click.option(
     "--rate",
-    default=None,
+    default=GenerativeTextScenario.model_fields["rate"].default,
     callback=parse_number_str,
     help=(
         "The rates to run the benchmark at. "
@@ -150,6 +174,7 @@ def cli():
 @click.option(
     "--max-seconds",
     type=float,
+    default=GenerativeTextScenario.model_fields["max_seconds"].default,
     help=(
         "The maximum number of seconds each benchmark can run for. "
         "If None, will run until max_requests or the data is exhausted."
@@ -158,6 +183,7 @@ def cli():
 @click.option(
     "--max-requests",
     type=int,
+    default=GenerativeTextScenario.model_fields["max_requests"].default,
     help=(
         "The maximum number of requests each benchmark can run for. "
         "If None, will run until max_seconds or the data is exhausted."
@@ -166,7 +192,7 @@ def cli():
 @click.option(
     "--warmup-percent",
     type=float,
-    default=None,
+    default=GenerativeTextScenario.model_fields["warmup_percent"].default,
     help=(
         "The percent of the benchmark (based on max-seconds, max-requets, "
         "or lenth of dataset) to run as a warmup and not include in the final results. "
@@ -176,6 +202,7 @@ def cli():
 @click.option(
     "--cooldown-percent",
     type=float,
+    default=GenerativeTextScenario.model_fields["cooldown_percent"].default,
     help=(
         "The percent of the benchmark (based on max-seconds, max-requets, or lenth "
         "of dataset) to run as a cooldown and not include in the final results. "
@@ -220,15 +247,16 @@ def cli():
         "The number of samples to save in the output file. "
         "If None (default), will save all samples."
     ),
-    default=None,
+    default=GenerativeTextScenario.model_fields["output_sampling"].default,
 )
 @click.option(
     "--random-seed",
-    default=42,
+    default=GenerativeTextScenario.model_fields["random_seed"].default,
     type=int,
     help="The random seed to use for benchmarking to ensure reproducibility.",
 )
 def benchmark(
+    scenario,
     target,
     backend_type,
     backend_args,
@@ -252,30 +280,48 @@ def benchmark(
     output_sampling,
     random_seed,
 ):
+    click_ctx = click.get_current_context()
+
+    # If a scenario file was specified read from it
+    # TODO: This should probably be a factory method
+    if scenario is None:
+        _scenario = {}
+    else:
+        # TODO: Support pre-defined scenarios
+        # TODO: Support other formats
+        with Path(scenario).open() as f:
+            _scenario = json.load(f)
+
+    # If any command line arguments are specified, override the scenario
+    _scenario.update(set_if_not_default(
+        click_ctx,
+        target=target,
+        backend_type=backend_type,
+        backend_args=backend_args,
+        model=model,
+        processor=processor,
+        processor_args=processor_args,
+        data=data,
+        data_args=data_args,
+        data_sampler=data_sampler,
+        rate_type=rate_type,
+        rate=rate,
+        max_seconds=max_seconds,
+        max_requests=max_requests,
+        warmup_percent=warmup_percent,
+        cooldown_percent=cooldown_percent,
+        output_sampling=output_sampling,
+        random_seed=random_seed,
+    ))
+
     asyncio.run(
-        benchmark_generative_text(
-            target=target,
-            backend_type=backend_type,
-            backend_args=backend_args,
-            model=model,
-            processor=processor,
-            processor_args=processor_args,
-            data=data,
-            data_args=data_args,
-            data_sampler=data_sampler,
-            rate_type=rate_type,
-            rate=rate,
-            max_seconds=max_seconds,
-            max_requests=max_requests,
-            warmup_percent=warmup_percent,
-            cooldown_percent=cooldown_percent,
+        benchmark_with_scenario(
+            scenario=GenerativeTextScenario(**_scenario),
             show_progress=not disable_progress,
             show_progress_scheduler_stats=display_scheduler_stats,
             output_console=not disable_console_outputs,
             output_path=output_path,
             output_extras=output_extras,
-            output_sampling=output_sampling,
-            random_seed=random_seed,
         )
     )
 
