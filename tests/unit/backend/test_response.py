@@ -81,6 +81,7 @@ def test_request_args_default_initialization():
     )
     assert args.timeout is None
     assert args.http2 is None
+    assert args.follow_redirects is None
 
 
 @pytest.mark.smoke
@@ -96,12 +97,14 @@ def test_request_args_initialization():
         },
         timeout=10.0,
         http2=True,
+        follow_redirects=True,
     )
     assert args.target == "http://example.com"
     assert args.headers == {"Authorization": "Bearer token"}
     assert args.payload == {"query": "Hello, world!"}
     assert args.timeout == 10.0
     assert args.http2 is True
+    assert args.follow_redirects is True
 
 
 @pytest.mark.smoke

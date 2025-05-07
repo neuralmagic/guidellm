@@ -53,6 +53,7 @@ class RequestArgs(StandardBaseModel):
         content and other configurations.
     :param timeout: The timeout for the request in seconds, if any.
     :param http2: Whether HTTP/2 was used for the request, if applicable.
+    :param follow_redirects: Whether the request should follow redirect responses.
     """
 
     target: str
@@ -61,6 +62,7 @@ class RequestArgs(StandardBaseModel):
     payload: dict[str, Any]
     timeout: Optional[float] = None
     http2: Optional[bool] = None
+    follow_redirects: Optional[bool] = None
 
 
 class ResponseSummary(StandardBaseModel):

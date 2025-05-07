@@ -60,6 +60,8 @@ class OpenAIHTTPBackend(Backend):
         If not provided, the default timeout provided from settings is used.
     :param http2: If True, uses HTTP/2 for requests to the OpenAI server.
         Defaults to True.
+    :param follow_redirects: If True, the HTTP client will follow redirect responses.
+        If not provided, the default value from settings is used.
     :param max_output_tokens: The maximum number of tokens to request for completions.
         If not provided, the default maximum tokens provided from settings is used.
     :param extra_query: Query parameters to include in requests to the OpenAI server.
@@ -78,6 +80,7 @@ class OpenAIHTTPBackend(Backend):
         project: Optional[str] = None,
         timeout: Optional[float] = None,
         http2: Optional[bool] = True,
+        follow_redirects: Optional[bool] = None,
         max_output_tokens: Optional[int] = None,
         extra_query: Optional[Union[dict[str, str], dict[str, dict[str, str]]]] = None,
     ):
@@ -105,6 +108,11 @@ class OpenAIHTTPBackend(Backend):
         self.project = project or settings.openai.project
         self.timeout = timeout if timeout is not None else settings.request_timeout
         self.http2 = http2 if http2 is not None else settings.request_http2
+        self.follow_redirects = (
+            follow_redirects
+            if follow_redirects is not None
+            else settings.request_follow_redirects
+        )
         self.max_output_tokens = (
             max_output_tokens
             if max_output_tokens is not None
@@ -138,6 +146,7 @@ class OpenAIHTTPBackend(Backend):
             "max_output_tokens": self.max_output_tokens,
             "timeout": self.timeout,
             "http2": self.http2,
+            "follow_redirects": self.follow_redirects,
             "authorization": bool(self.authorization),
             "organization": self.organization,
             "project": self.project,
@@ -346,7 +355,11 @@ class OpenAIHTTPBackend(Backend):
         :return: The async HTTP client.
         """
         if self._async_client is None:
-            client = httpx.AsyncClient(http2=self.http2, timeout=self.timeout)
+            client = httpx.AsyncClient(
+                http2=self.http2,
+                timeout=self.timeout,
+                follow_redirects=self.follow_redirects,
+            )
             self._async_client = client
         else:
             client = self._async_client
@@ -492,12 +505,14 @@ class OpenAIHTTPBackend(Backend):
             raise ValueError(f"Unsupported type: {type_}")
 
         logger.info(
-            "{} making request: {} to target: {} using http2: {} for "
-            "timeout: {} with headers: {} and params: {} and payload: {}",
+            "{} making request: {} to target: {} using http2: {} following "
+            "redirects: {} for timeout: {} with headers: {} and params: {} and ",
+            "payload: {}",
             self.__class__.__name__,
             request_id,
             target,
             self.http2,
+            self.follow_redirects,
             self.timeout,
             headers,
             params,
@@ -591,6 +606,7 @@ class OpenAIHTTPBackend(Backend):
                 payload=payload,
                 timeout=self.timeout,
                 http2=self.http2,
+                follow_redirects=self.follow_redirects,
             ),
             start_time=start_time,
             end_time=iter_time,

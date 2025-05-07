@@ -115,6 +115,7 @@ class Settings(BaseSettings):
     default_sweep_number: int = 10
 
     # HTTP settings
+    request_follow_redirects: bool = True
     request_timeout: int = 60 * 5  # 5 minutes
     request_http2: bool = True
 
