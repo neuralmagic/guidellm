@@ -17,11 +17,22 @@ from guidellm.backend.response import (
 )
 from guidellm.config import settings
 
-__all__ = ["CHAT_COMPLETIONS_PATH", "TEXT_COMPLETIONS_PATH", "OpenAIHTTPBackend"]
+__all__ = [
+    "CHAT_COMPLETIONS",
+    "CHAT_COMPLETIONS_PATH",
+    "MODELS",
+    "TEXT_COMPLETIONS",
+    "TEXT_COMPLETIONS_PATH",
+    "OpenAIHTTPBackend",
+]
 
 
 TEXT_COMPLETIONS_PATH = "/v1/completions"
 CHAT_COMPLETIONS_PATH = "/v1/chat/completions"
+
+CHAT_COMPLETIONS = "chat_completions"
+MODELS = "models"
+TEXT_COMPLETIONS = "text_completions"
 
 
 @Backend.register("openai_http")
@@ -52,6 +63,9 @@ class OpenAIHTTPBackend(Backend):
     :param max_output_tokens: The maximum number of tokens to request for completions.
         If not provided, the default maximum tokens provided from settings is used.
     :param extra_query: Query parameters to include in requests to the OpenAI server.
+        If "chat_completions", "models", or "text_completions" are included as keys,
+        the values of these keys will be used as the parameters for the respective
+        endpoint.
         If not provided, no extra query parameters are added.
     """
 
@@ -65,7 +79,7 @@ class OpenAIHTTPBackend(Backend):
         timeout: Optional[float] = None,
         http2: Optional[bool] = True,
         max_output_tokens: Optional[int] = None,
-        extra_query: Optional[dict[str, str]] = None,
+        extra_query: Optional[Union[dict[str, str], dict[str, dict[str, str]]]] = None,
     ):
         super().__init__(type_="openai_http")
         self._target = target or settings.openai.base_url
@@ -169,7 +183,7 @@ class OpenAIHTTPBackend(Backend):
         """
         target = f"{self.target}/v1/models"
         headers = self._headers()
-        params = self._params()
+        params = self._params(MODELS)
         response = await self._get_async_client().get(
             target, headers=headers, params=params
         )
@@ -217,7 +231,7 @@ class OpenAIHTTPBackend(Backend):
             )
 
         headers = self._headers()
-        params = self._params()
+        params = self._params(TEXT_COMPLETIONS)
         payload = self._completions_payload(
             orig_kwargs=kwargs,
             max_output_tokens=output_token_count,
@@ -292,7 +306,7 @@ class OpenAIHTTPBackend(Backend):
         """
         logger.debug("{} invocation with args: {}", self.__class__.__name__, locals())
         headers = self._headers()
-        params = self._params()
+        params = self._params(CHAT_COMPLETIONS)
         messages = (
             content if raw_content else self._create_chat_messages(content=content)
         )
@@ -355,8 +369,20 @@ class OpenAIHTTPBackend(Backend):
 
         return headers
 
-    def _params(self) -> dict[str, str]:
-        return self.extra_query or {}
+    def _params(
+        self, endpoint_type: Literal["chat_completions", "models", "text_completions"]
+    ) -> dict[str, str]:
+        if self.extra_query is None:
+            return {}
+
+        if (
+            CHAT_COMPLETIONS in self.extra_query
+            or MODELS in self.extra_query
+            or TEXT_COMPLETIONS in self.extra_query
+        ):
+            return self.extra_query.get(endpoint_type, {})
+
+        return self.extra_query
 
     def _completions_payload(
         self, orig_kwargs: Optional[dict], max_output_tokens: Optional[int], **kwargs
