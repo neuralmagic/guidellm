@@ -50,7 +50,7 @@ class OpenAIHTTPBackend(Backend):
     :param http2: If True, uses HTTP/2 for requests to the OpenAI server.
         Defaults to True.
     :param follow_redirects: If True, the HTTP client will follow redirect responses.
-        If not procided, the default value from settings is used.
+        If not provided, the default value from settings is used.
     :param max_output_tokens: The maximum number of tokens to request for completions.
         If not provided, the default maximum tokens provided from settings is used.
     """
