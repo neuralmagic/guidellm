@@ -18,6 +18,7 @@ def test_openai_http_backend_default_initialization():
     assert backend.http2 is True
     assert backend.follow_redirects is True
     assert backend.max_output_tokens == settings.openai.max_output_tokens
+    assert backend.extra_query is None
 
 
 @pytest.mark.smoke
@@ -32,6 +33,7 @@ def test_openai_http_backend_intialization():
         http2=False,
         follow_redirects=False,
         max_output_tokens=100,
+        extra_query={"foo": "bar"},
     )
     assert backend.target == "http://test-target"
     assert backend.model == "test-model"
@@ -42,6 +44,7 @@ def test_openai_http_backend_intialization():
     assert backend.http2 is False
     assert backend.follow_redirects is False
     assert backend.max_output_tokens == 100
+    assert backend.extra_query == {"foo": "bar"}
 
 
 @pytest.mark.smoke

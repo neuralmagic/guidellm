@@ -200,7 +200,9 @@ class SyntheticTextItemsGenerator(
 
 class SyntheticDatasetCreator(DatasetCreator):
     @classmethod
-    def is_supported(cls, data: Any, data_args: Optional[dict[str, Any]]) -> bool:  # noqa: ARG003
+    def is_supported(
+        cls, data: Any, data_args: Optional[dict[str, Any]]  # noqa: ARG003
+    ) -> bool:
         if (
             isinstance(data, Path)
             and data.exists()

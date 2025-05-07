@@ -142,6 +142,7 @@ class MockBackend(Backend):
             request_args=RequestArgs(
                 target=self.target,
                 headers={},
+                params={},
                 payload={"prompt": prompt, "output_token_count": output_token_count},
             ),
             iterations=len(tokens),

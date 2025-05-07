@@ -76,6 +76,7 @@ def test_request_args_default_initialization():
     args = RequestArgs(
         target="http://example.com",
         headers={},
+        params={},
         payload={},
     )
     assert args.timeout is None
@@ -90,6 +91,7 @@ def test_request_args_initialization():
         headers={
             "Authorization": "Bearer token",
         },
+        params={},
         payload={
             "query": "Hello, world!",
         },
@@ -110,6 +112,7 @@ def test_response_args_marshalling():
     args = RequestArgs(
         target="http://example.com",
         headers={"Authorization": "Bearer token"},
+        params={},
         payload={"query": "Hello, world!"},
         timeout=10.0,
         http2=True,
@@ -128,6 +131,7 @@ def test_response_summary_default_initialization():
         request_args=RequestArgs(
             target="http://example.com",
             headers={},
+            params={},
             payload={},
         ),
         start_time=0.0,
@@ -158,6 +162,7 @@ def test_response_summary_initialization():
         request_args=RequestArgs(
             target="http://example.com",
             headers={},
+            params={},
             payload={},
         ),
         start_time=1.0,
