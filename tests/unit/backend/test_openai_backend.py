@@ -16,6 +16,7 @@ def test_openai_http_backend_default_initialization():
     assert backend.project == settings.openai.project
     assert backend.timeout == settings.request_timeout
     assert backend.http2 is True
+    assert backend.follow_redirects is True
     assert backend.max_output_tokens == settings.openai.max_output_tokens
 
 
@@ -29,6 +30,7 @@ def test_openai_http_backend_intialization():
         project="test-proj",
         timeout=10,
         http2=False,
+        follow_redirects=False,
         max_output_tokens=100,
     )
     assert backend.target == "http://test-target"
@@ -38,6 +40,7 @@ def test_openai_http_backend_intialization():
     assert backend.project == "test-proj"
     assert backend.timeout == 10
     assert backend.http2 is False
+    assert backend.follow_redirects is False
     assert backend.max_output_tokens == 100
 
 
