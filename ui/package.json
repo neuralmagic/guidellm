@@ -7,7 +7,7 @@
     "start": "next start",
     "lint": "next lint",
     "format": "prettier --ignore-path .prettierignore --write \"**/*.+(js|ts|jsx|tsx|json)\"",
-    "prepare": "husky install",
+    "prepare": "cd .. && husky ui/.husky",
     "test": "jest --passWithNoTests",
     "test:unit": "jest --passWithNoTests tests/unit",
     "test:integration": "jest --passWithNoTests tests/integration"
