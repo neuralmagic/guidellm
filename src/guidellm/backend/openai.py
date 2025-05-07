@@ -30,9 +30,10 @@ __all__ = [
 TEXT_COMPLETIONS_PATH = "/v1/completions"
 CHAT_COMPLETIONS_PATH = "/v1/chat/completions"
 
-CHAT_COMPLETIONS = "chat_completions"
-MODELS = "models"
-TEXT_COMPLETIONS = "text_completions"
+EndpointType = Literal["chat_completions", "models", "text_completions"]
+CHAT_COMPLETIONS: EndpointType = "chat_completions"
+MODELS: EndpointType = "models"
+TEXT_COMPLETIONS: EndpointType = "text_completions"
 
 
 @Backend.register("openai_http")
@@ -82,7 +83,7 @@ class OpenAIHTTPBackend(Backend):
         http2: Optional[bool] = True,
         follow_redirects: Optional[bool] = None,
         max_output_tokens: Optional[int] = None,
-        extra_query: Optional[Union[dict[str, str], dict[str, dict[str, str]]]] = None,
+        extra_query: Optional[dict] = None,
     ):
         super().__init__(type_="openai_http")
         self._target = target or settings.openai.base_url
@@ -382,9 +383,7 @@ class OpenAIHTTPBackend(Backend):
 
         return headers
 
-    def _params(
-        self, endpoint_type: Literal["chat_completions", "models", "text_completions"]
-    ) -> dict[str, str]:
+    def _params(self, endpoint_type: EndpointType) -> dict[str, str]:
         if self.extra_query is None:
             return {}
 
