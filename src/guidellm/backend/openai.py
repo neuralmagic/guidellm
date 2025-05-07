@@ -84,6 +84,7 @@ class OpenAIHTTPBackend(Backend):
         follow_redirects: Optional[bool] = None,
         max_output_tokens: Optional[int] = None,
         extra_query: Optional[dict] = None,
+        extra_body: Optional[dict] = None,
     ):
         super().__init__(type_="openai_http")
         self._target = target or settings.openai.base_url
@@ -120,6 +121,7 @@ class OpenAIHTTPBackend(Backend):
             else settings.openai.max_output_tokens
         )
         self.extra_query = extra_query
+        self.extra_body = extra_body
         self._async_client: Optional[httpx.AsyncClient] = None
 
     @property
@@ -242,7 +244,9 @@ class OpenAIHTTPBackend(Backend):
 
         headers = self._headers()
         params = self._params(TEXT_COMPLETIONS)
+        body = self._body(TEXT_COMPLETIONS)
         payload = self._completions_payload(
+            body=body,
             orig_kwargs=kwargs,
             max_output_tokens=output_token_count,
             prompt=prompt,
@@ -317,10 +321,12 @@ class OpenAIHTTPBackend(Backend):
         logger.debug("{} invocation with args: {}", self.__class__.__name__, locals())
         headers = self._headers()
         params = self._params(CHAT_COMPLETIONS)
+        body = self._body(CHAT_COMPLETIONS)
         messages = (
             content if raw_content else self._create_chat_messages(content=content)
         )
         payload = self._completions_payload(
+            body=body,
             orig_kwargs=kwargs,
             max_output_tokens=output_token_count,
             messages=messages,
@@ -396,10 +402,28 @@ class OpenAIHTTPBackend(Backend):
 
         return self.extra_query
 
+    def _body(self, endpoint_type: EndpointType) -> dict[str, str]:
+        if self.extra_body is None:
+            return {}
+
+        if (
+            CHAT_COMPLETIONS in self.extra_body
+            or MODELS in self.extra_body
+            or TEXT_COMPLETIONS in self.extra_body
+        ):
+            return self.extra_body.get(endpoint_type, {})
+
+        return self.extra_body
+
     def _completions_payload(
-        self, orig_kwargs: Optional[dict], max_output_tokens: Optional[int], **kwargs
+        self,
+        body: Optional[dict],
+        orig_kwargs: Optional[dict],
+        max_output_tokens: Optional[int],
+        **kwargs,
     ) -> dict:
-        payload = orig_kwargs or {}
+        payload = body or {}
+        payload.update(orig_kwargs or {})
         payload.update(kwargs)
         payload["model"] = self.model
         payload["stream"] = True
