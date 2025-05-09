@@ -1,0 +1,84 @@
+name: Development
+
+on:
+  pull_request:
+    branches:
+      - '**'
+    types:
+      - opened
+      - reopened
+      - synchronize
+  workflow_dispatch:
+
+jobs:
+  quality-check:
+    # Permissions needed to get ID token for OIDC auth
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: ui
+
+      - name: Run quality and typing checks
+        run: make quality
+        working-directory: ui
+
+  precommit-check:
+    # Permissions needed to get ID token for OIDC auth
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: ui
+
+      - name: Run pre-commit checks
+        run: npx husky run pre-commit
+        working-directory: ui
+
+  unit-tests:
+    # Permissions needed to get ID token for OIDC auth
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: ui
+
+      - name: Run unit tests
+        run: make test-unit
+        working-directory: ui
+
+  integration-tests:
+    # Permissions needed to get ID token for OIDC auth
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: ui
+
+      - name: Run integration tests
+        run: make test-integration
+        working-directory: ui

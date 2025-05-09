@@ -1,0 +1,49 @@
+name: GH Pages
+
+on:
+  pull_request:
+    branches:
+      - '**'
+    types:
+      - opened
+      - reopened
+      - synchronize
+
+  workflow_dispatch:
+
+jobs:
+  publish-gh-pages:
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: ui
+
+      - name: Build app to root
+        id: build
+        run: |
+          # Export vars to ensure they are loaded before build
+          export $(grep -v '^#' .env.development | xargs)
+
+          # Set asset prefix and base path
+          ASSET_PREFIX=https://didactic-adventure-rww9l86.pages.github.io
+          BASE_PATH=/
+          GIT_SHA=${{ github.sha }}
+          export ASSET_PREFIX=${ASSET_PREFIX}
+          export BASE_PATH=${BASE_PATH}
+          export GIT_SHA=${GIT_SHA}
+
+          npm run build
+        working-directory: ui
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ui/out
+          publish_branch: gh-pages
