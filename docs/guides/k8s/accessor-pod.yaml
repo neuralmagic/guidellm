@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: guidellm-accessor
+spec:
+  containers:
+  - command:
+    - sleep
+    - "3600"
+    image: registry.access.redhat.com/ubi9/ubi
+    name: accessor
+    volumeMounts:
+    - mountPath: /app/data
+      name: output
+      readOnly: true
+  volumes:
+  - name: output
+    persistentVolumeClaim:
+      claimName: guidellm-output-pvc
+      readOnly: true

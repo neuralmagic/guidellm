@@ -178,3 +178,6 @@ cython_debug/
 # Project specific files
 *.json
 *.yaml
+
+# Allow specific YAML files
+!docs/guides/k8s/*.yaml
