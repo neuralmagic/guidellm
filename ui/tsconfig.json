@@ -24,18 +24,8 @@
     "resolveJsonModule": true,
     "skipLibCheck": true,
     "strict": true,
-    "target": "es5",
-    "types": ["jest", "@testing-library/jest-dom"]
+    "target": "es5"
   },
-  "include": [
-    "jest.setup.ts",
-    "src",
-    "next-env.d.ts",
-    "**/*.ts",
-    "**/*.tsx",
-    ".next/types/**/*.ts",
-    "cypress.config.ts",
-    "declaration.d.ts"
-  ],
+  "include": ["src", "next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
   "exclude": ["node_modules", ".vscode", ".meta/**/*", ".next/**/*"]
 }
