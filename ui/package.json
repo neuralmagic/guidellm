@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "format": "prettier --ignore-path .prettierignore --write \"**/*.+(js|ts|jsx|tsx|json)\"",
-    "prepare": "husky"
+    "prepare": "husky install"
   },
   "dependencies": {
     "next": "15.3.2",
