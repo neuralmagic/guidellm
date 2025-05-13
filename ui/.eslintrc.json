@@ -6,10 +6,10 @@
   },
   "extends": [
     "eslint:recommended",
+    "next/core-web-vitals",
     "plugin:@typescript-eslint/eslint-recommended",
     "plugin:@typescript-eslint/recommended",
-    "plugin:prettier/recommended",
-    "next/core-web-vitals"
+    "plugin:prettier/recommended"
   ],
   "ignorePatterns": [".vscode"],
   "overrides": [
@@ -27,14 +27,14 @@
       "jsx": true
     },
     "ecmaVersion": 2018,
-    "sourceType": "module",
-    "project": "./tsconfig.json"
+    "project": "./tsconfig.json",
+    "sourceType": "module"
   },
-  "plugins": ["@typescript-eslint", "react", "import", "no-secrets"],
+  "plugins": ["@typescript-eslint", "import", "no-secrets", "react"],
   "root": true,
   "rules": {
-    "curly": ["error", "all"],
     "complexity": ["warn", { "max": 8 }],
+    "curly": ["error", "all"],
     "import/order": [
       "error",
       {
