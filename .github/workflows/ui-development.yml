@@ -14,14 +14,15 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v3
 
-      - name: Navigate to ui directory
-        run: cd ui
-
       - name: Install dependencies
-        run: npm ci
+        run: |
+          cd ui
+          npm ci
 
       - name: Run quality and typing checks
-        run: make quality
+        run: |
+          cd ui
+          make quality
 
   precommit-check:
     permissions:
@@ -31,11 +32,12 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v3
 
-      - name: Navigate to ui directory
-        run: cd ui
-
       - name: Install dependencies
-        run: npm ci
+        run: |
+          cd ui
+          npm ci
 
       - name: Run pre-commit checks
-        run: npx husky run pre-commit
+        run: |
+          cd ui
+          npx husky run pre-commit
