@@ -1,5 +1,4 @@
 {
-  "root": true,
   "env": {
     "browser": true,
     "es2021": true,
@@ -17,5 +16,6 @@
     "sourceType": "module"
   },
   "plugins": ["@typescript-eslint"],
+  "root": true,
   "rules": {}
 }
