@@ -14,3 +14,13 @@ style:
 	@echo "Running styling";
 	@# Auto fix any eslint issues
 	npx eslint --fix $(CHECKDIRS)
+
+test-unit:
+	@echo "Running unit tests";
+	@# Run react tests
+	npm run test:unit
+
+test-integration:
+	@echo "Running integration tests";
+	@# Run react tests
+	npm run test:integration

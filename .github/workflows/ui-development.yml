@@ -41,3 +41,35 @@ jobs:
         run: |
           cd ui
           npx husky run pre-commit
+
+  unit-tests:
+    permissions:
+      contents: "read"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: |
+          cd ui
+          npm ci
+
+      - name: Run unit tests
+        run: make test-unit
+
+  integration-tests:
+    permissions:
+      contents: "read"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: |
+          cd ui
+          npm ci
+
+      - name: Run integration tests
+        run: make test-integration
