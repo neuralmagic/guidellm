@@ -56,7 +56,9 @@ jobs:
           npm ci
 
       - name: Run unit tests
-        run: make test-unit
+        run: |
+          cd ui
+          make test-unit
 
   integration-tests:
     permissions:
@@ -72,7 +74,9 @@ jobs:
           npm ci
 
       - name: Run integration tests
-        run: make test-integration
+        run: |
+          cd ui
+          make test-integration
 
   e2e-tests:
     # Permissions needed to get ID token for OIDC auth
@@ -96,8 +100,11 @@ jobs:
 
       - name: Start the Next.js app
         run: |
+          cd ui
           npx serve@latest out &
           npx wait-on http://localhost:3000  # Wait until the app is ready
 
       - name: Run Cypress tests
-        run: npx cypress run --headless
+        run: |
+          cd ui
+          npx cypress run --headless
