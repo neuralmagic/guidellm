@@ -43,7 +43,22 @@
         "newlines-between": "always"
       }
     ],
-    "import/no-extraneous-dependencies": ["error"],
+    "import/no-extraneous-dependencies": [
+      "error",
+      {
+        "devDependencies": [
+          "**/*.test.ts",
+          "**/*.test.tsx",
+          "**/*.d.ts",
+          "**/*.interfaces.ts",
+          "**/*.setup.ts",
+          "**/*.config.js",
+          "**/*.config.mjs"
+        ],
+        "optionalDependencies": false,
+        "peerDependencies": false
+      }
+    ],
     "no-secrets/no-secrets": ["error", { "additionalRegexes": {}, "ignoreContent": [] }]
   }
 }

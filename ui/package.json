@@ -26,14 +26,15 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@typescript-eslint/eslint-plugin": "^5.43.0",
-    "@typescript-eslint/parser": "^5.43.0",
+    "@types/testing-library__jest-dom": "^5.14.9",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
     "cypress": "^13.13.3",
     "eslint": "^8.27.0",
     "eslint-config-next": "14.2.5",
     "eslint-config-prettier": "^8.5.0",
     "eslint-plugin-import": "^2.29.1",
-    "eslint-plugin-jest": "^27.1.5",
+    "eslint-plugin-jest": "^28.11.0",
     "eslint-plugin-jsx-a11y": "^6.6.1",
     "eslint-plugin-no-secrets": "^1.0.2",
     "eslint-plugin-prettier": "^5.4.0",
@@ -47,8 +48,7 @@
     "jest-transform-stub": "^2.0.0",
     "prettier": "^3.5.3",
     "ts-jest": "^29.2.4",
-    "tslint-config-prettier": "^1.18.0",
-    "typescript": "^5"
+    "typescript": "5"
   },
   "lint-staged": {
     "*.js": "eslint --cache --fix",

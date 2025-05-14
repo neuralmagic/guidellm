@@ -73,3 +73,31 @@ jobs:
 
       - name: Run integration tests
         run: make test-integration
+
+  e2e-tests:
+    # Permissions needed to get ID token for OIDC auth
+    permissions:
+      contents: "read"
+      id-token: "write"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: |
+          cd ui
+          npm ci
+
+      - name: Generate Build
+        run: |
+          cd ui
+          npm run build
+
+      - name: Start the Next.js app
+        run: |
+          npx serve@latest out &
+          npx wait-on http://localhost:3000  # Wait until the app is ready
+
+      - name: Run Cypress tests
+        run: npx cypress run --headless

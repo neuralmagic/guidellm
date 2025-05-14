@@ -7,7 +7,9 @@ quality:
 	@# Run eslint checks
 	npx eslint --max-warnings 10 $(CHECKDIRS)
 	@# Run TypeScript checks
-	npx tsc --noEmit
+	npx tsc -p tsconfig.json        --noEmit   # app code
+	npx tsc -p tsconfig.test.json   --noEmit   # unit + integration tests
+	npx tsc -p tsconfig.cypress.json --noEmit 
 
 # Style the code according to accepted standards for the repo
 style:
