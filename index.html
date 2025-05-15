@@ -1,18 +1,69 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="utf-8">
-  <title>Redirecting</title>
-  <noscript>
-    <meta http-equiv="refresh" content="1; url=latest/" />
-  </noscript>
-  <script>
-    window.location.replace(
-      "latest/" + window.location.search + window.location.hash
-    );
-  </script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GuideLLM - Neural Magic</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        h1 {
+            color: #0366d6;
+        }
+        .container {
+            background-color: #f6f8fa;
+            border-radius: 6px;
+            padding: 2rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+        }
+        footer {
+            text-align: center;
+            margin-top: 3rem;
+            font-size: 0.9rem;
+            color: #6a737d;
+        }
+        a {
+            color: #0366d6;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
 </head>
 <body>
-  Redirecting to <a href="latest/">latest/</a>...
+    <header>
+        <h1>GuideLLM</h1>
+        <p>A framework for efficient large language model evaluation and benchmarking</p>
+    </header>
+    
+    <div class="container">
+        <h2>Welcome to GuideLLM</h2>
+        <p>This is a placeholder for the GuideLLM project documentation site. The actual content will be added soon.</p>
+        
+        <h3>About GuideLLM</h3>
+        <p>GuideLLM is a framework developed by Neural Magic for effective evaluation and benchmarking of large language models.</p>
+        
+        <h3>Resources</h3>
+        <ul>
+            <li><a href="https://github.com/neuralmagic/guidellm">GitHub Repository</a></li>
+            <li><a href="https://neuralmagic.com">Neural Magic</a></li>
+        </ul>
+    </div>
+    
+    <footer>
+        <p>&copy; <span id="year">2025</span> Neural Magic | GuideLLM</p>
+        <script>document.getElementById('year').textContent = new Date().getFullYear();</script>
+    </footer>
 </body>
 </html>
