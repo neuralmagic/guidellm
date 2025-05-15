@@ -95,13 +95,11 @@ def test_process_dataset_non_empty(
 
     process_dataset("input", "output_dir", tokenizer_mock)
 
-    # Validate
     mock_load_dataset.assert_called_once()
     mock_check_processor.assert_called_once()
     mock_dataset_class.from_list.assert_called_once()
     mock_dataset_obj.save_to_disk.assert_called_once_with(mock.ANY)
 
-    # Check that generated dataset is correct (extracted from the mock call)
     args, kwargs = mock_dataset_class.from_list.call_args
     processed_list = args[0]
     assert len(processed_list) == 2
