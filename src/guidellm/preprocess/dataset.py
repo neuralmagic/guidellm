@@ -1,0 +1,171 @@
+import os
+from enum import Enum
+from pathlib import Path
+from typing import Any, Optional, Union, Dict, Callable, Iterator
+
+from datasets import Dataset
+from loguru import logger
+from transformers import PreTrainedTokenizerBase
+
+from guidellm.dataset import load_dataset as guidellm_load_dataset
+from guidellm.utils import check_load_processor, IntegerRangeSampler
+
+
+class ShortPromptStrategy(str, Enum):
+    IGNORE = "ignore"
+    CONCATENATE = "concatenate"
+    PAD = "pad"
+
+
+def handle_ignore_strategy(
+        current_prompt: str,
+        min_prompt_tokens: int,
+        tokenizer: PreTrainedTokenizerBase,
+        **kwargs
+) -> Optional[str]:
+    if len(tokenizer.encode(current_prompt)) < min_prompt_tokens:
+        logger.warning("Prompt too short, ignoring")
+        return None
+    return current_prompt
+
+
+def handle_concatenate_strategy(
+        current_prompt: str,
+        min_prompt_tokens: int,
+        dataset_iterator: Iterator[Dict[str, Any]],
+        prompt_column: str,
+        tokenizer: PreTrainedTokenizerBase,
+        **kwargs
+) -> Optional[str]:
+    tokens_len = len(tokenizer.encode(current_prompt))
+    while tokens_len < min_prompt_tokens:
+        try:
+            next_row = next(dataset_iterator)
+        except StopIteration:
+            logger.warning("Could not concatenate enough prompts to reach minimum length, ignoring")
+            return None
+        current_prompt += next_row[prompt_column]
+        tokens_len = len(tokenizer.encode(current_prompt))
+    return current_prompt
+
+
+def handle_pad_strategy(
+        current_prompt: str,
+        min_prompt_tokens: int,
+        tokenizer: PreTrainedTokenizerBase,
+        pad_token: str,
+        **kwargs
+) -> str:
+    while len(tokenizer.encode(current_prompt)) < min_prompt_tokens:
+        current_prompt += pad_token
+    return current_prompt
+
+
+STRATEGY_HANDLERS: Dict[ShortPromptStrategy, Callable] = {
+    ShortPromptStrategy.IGNORE: handle_ignore_strategy,
+    ShortPromptStrategy.CONCATENATE: handle_concatenate_strategy,
+    ShortPromptStrategy.PAD: handle_pad_strategy,
+}
+
+
+def process_dataset(
+        input_data: Union[str, Path],
+        output_path: Union[str, Path],
+        processor: Union[str, Path, PreTrainedTokenizerBase],
+        processor_args: Optional[dict[str, Any]] = None,
+        data_args: Optional[dict[str, Any]] = None,
+        short_prompt_strategy: ShortPromptStrategy = ShortPromptStrategy.IGNORE,
+        pad_token: Optional[str] = None,
+        prompt_tokens_average: int = 10,
+        prompt_tokens_stdev: Optional[int] = None,
+        prompt_tokens_min: Optional[int] = None,
+        prompt_tokens_max: Optional[int] = None,
+        prompt_random_seed: int = 42,
+        output_tokens_average: int = 10,
+        output_tokens_stdev: Optional[int] = None,
+        output_tokens_min: Optional[int] = None,
+        output_tokens_max: Optional[int] = None,
+        output_random_seed: int = 123,
+        push_to_hub: bool = False,
+        hub_dataset_id: Optional[str] = None,
+) -> None:
+    logger.info(f"Starting dataset conversion | Input: {input_data} | Output directory: {output_path}")
+
+    dataset, column_mappings = guidellm_load_dataset(input_data, data_args, processor, processor_args)
+    tokenizer = check_load_processor(processor, processor_args, "Processor/tokenizer required for dataset conversion.")
+    prompt_column = column_mappings.get("prompt_column")
+    output_column = column_mappings.get("output_tokens_count_column", "output_tokens_count")
+
+    prompt_token_sampler = iter(
+        IntegerRangeSampler(
+            average=prompt_tokens_average,
+            variance=prompt_tokens_stdev,
+            min_value=prompt_tokens_min,
+            max_value=prompt_tokens_max,
+            random_seed=prompt_random_seed,
+        )
+    )
+
+    output_token_sampler = iter(
+        IntegerRangeSampler(
+            average=output_tokens_average,
+            variance=output_tokens_stdev,
+            min_value=output_tokens_min,
+            max_value=output_tokens_max,
+            random_seed=output_random_seed,
+        )
+    )
+
+    dataset_iterator = iter(dataset)
+    processed_prompts = []
+    handler = STRATEGY_HANDLERS[short_prompt_strategy]
+
+    for prompt_row in dataset_iterator:
+        prompt_text = prompt_row[prompt_column]
+        target_prompt_len = next(prompt_token_sampler)
+
+        if len(tokenizer.encode(prompt_text)) < target_prompt_len:
+            prompt_text = handler(
+                current_prompt=prompt_text,
+                min_prompt_tokens=target_prompt_len,
+                dataset_iterator=dataset_iterator,
+                prompt_column=prompt_column,
+                tokenizer=tokenizer,
+                pad_token=pad_token,
+            )
+            if prompt_text is None:
+                continue
+
+        if len(tokenizer.encode(prompt_text)) > target_prompt_len:
+            tokens = tokenizer.encode(prompt_text)
+            prompt_text = tokenizer.decode(tokens[:target_prompt_len])
+
+        processed_prompt = prompt_row.copy()
+        processed_prompt[prompt_column] = prompt_text
+        processed_prompt["prompt_tokens_count"] = target_prompt_len
+        processed_prompt[output_column] = next(output_token_sampler)
+
+        processed_prompts.append(processed_prompt)
+
+    if not processed_prompts:
+        logger.error("No prompts remained after processing")
+        return
+
+    logger.info(f"Generated processed dataset with {len(processed_prompts)} prompts")
+
+    processed_dataset = Dataset.from_list(processed_prompts)
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    processed_dataset.save_to_disk(output_path)
+    logger.info(f"Conversion complete. Dataset saved to: {output_path}")
+
+    if push_to_hub:
+        push_dataset_to_hub(hub_dataset_id, processed_dataset)
+        logger.info(f"Pushed dataset to: {hub_dataset_id}")
+
+
+def push_dataset_to_hub(hub_dataset_id: str, processed_dataset: Dataset) -> None:
+    hf_token = os.environ.get("HF_TOKEN")
+    if not hub_dataset_id or not hf_token:
+        raise ValueError("hub_dataset_id and HF_TOKEN env var must be provided when push_to_hub is True")
+    processed_dataset.push_to_hub(hub_dataset_id, token=hf_token)
