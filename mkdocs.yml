@@ -88,6 +88,7 @@ plugins:
   - gen-files:
       scripts:
         - docs/scripts/gen_files.py
+  - mike
   - minify:
       minify_html: true
   - mkdocs-nav-weight
