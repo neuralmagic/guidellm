@@ -41,7 +41,6 @@ def parse_number_str(ctx, param, value):  # noqa: ARG001
 
 @click.group()
 def cli():
-    """GuideLLM CLI tools."""
     pass
 
 
@@ -58,8 +57,8 @@ def cli():
     "--backend-type",
     type=click.Choice(list(get_args(BackendType))),
     help=(
-            "The type of backend to use to run requests against. Defaults to 'openai_http'."
-            f" Supported types: {', '.join(get_args(BackendType))}"
+        "The type of backend to use to run requests against. Defaults to 'openai_http'."
+        f" Supported types: {', '.join(get_args(BackendType))}"
     ),
     default="openai_http",
 )
@@ -68,8 +67,8 @@ def cli():
     callback=parse_json,
     default=None,
     help=(
-            "A JSON string containing any arguments to pass to the backend as a "
-            "dict with **kwargs."
+        "A JSON string containing any arguments to pass to the backend as a "
+        "dict with **kwargs."
     ),
 )
 @click.option(
@@ -77,8 +76,8 @@ def cli():
     default=None,
     type=str,
     help=(
-            "The ID of the model to benchmark within the backend. "
-            "If None provided (default), then it will use the first model available."
+        "The ID of the model to benchmark within the backend. "
+        "If None provided (default), then it will use the first model available."
     ),
 )
 @click.option(
@@ -86,9 +85,9 @@ def cli():
     default=None,
     type=str,
     help=(
-            "The processor or tokenizer to use to calculate token counts for statistics "
-            "and synthetic data generation. If None provided (default), will load "
-            "using the model arg, if needed."
+        "The processor or tokenizer to use to calculate token counts for statistics "
+        "and synthetic data generation. If None provided (default), will load "
+        "using the model arg, if needed."
     ),
 )
 @click.option(
@@ -96,8 +95,8 @@ def cli():
     default=None,
     callback=parse_json,
     help=(
-            "A JSON string containing any arguments to pass to the processor constructor "
-            "as a dict with **kwargs."
+        "A JSON string containing any arguments to pass to the processor constructor "
+        "as a dict with **kwargs."
     ),
 )
 @click.option(
@@ -105,17 +104,17 @@ def cli():
     required=True,
     type=str,
     help=(
-            "The HuggingFace dataset ID, a path to a HuggingFace dataset, "
-            "a path to a data file csv, json, jsonl, or txt, "
-            "or a synthetic data config as a json or key=value string."
+        "The HuggingFace dataset ID, a path to a HuggingFace dataset, "
+        "a path to a data file csv, json, jsonl, or txt, "
+        "or a synthetic data config as a json or key=value string."
     ),
 )
 @click.option(
     "--data-args",
     callback=parse_json,
     help=(
-            "A JSON string containing any arguments to pass to the dataset creation "
-            "as a dict with **kwargs."
+        "A JSON string containing any arguments to pass to the dataset creation "
+        "as a dict with **kwargs."
     ),
 )
 @click.option(
@@ -123,8 +122,8 @@ def cli():
     default=None,
     type=click.Choice(["random"]),
     help=(
-            "The data sampler type to use. 'random' will add a random shuffle on the data. "
-            "Defaults to None"
+        "The data sampler type to use. 'random' will add a random shuffle on the data. "
+        "Defaults to None"
     ),
 )
 @click.option(
@@ -132,8 +131,8 @@ def cli():
     required=True,
     type=click.Choice(STRATEGY_PROFILE_CHOICES),
     help=(
-            "The type of benchmark to run. "
-            f"Supported types {', '.join(STRATEGY_PROFILE_CHOICES)}. "
+        "The type of benchmark to run. "
+        f"Supported types {', '.join(STRATEGY_PROFILE_CHOICES)}. "
     ),
 )
 @click.option(
@@ -141,28 +140,28 @@ def cli():
     default=None,
     callback=parse_number_str,
     help=(
-            "The rates to run the benchmark at. "
-            "Can be a single number or a comma-separated list of numbers. "
-            "For rate-type=sweep, this is the number of benchmarks it runs in the sweep. "
-            "For rate-type=concurrent, this is the number of concurrent requests. "
-            "For rate-type=async,constant,poisson, this is the rate requests per second. "
-            "For rate-type=synchronous,throughput, this must not be set."
+        "The rates to run the benchmark at. "
+        "Can be a single number or a comma-separated list of numbers. "
+        "For rate-type=sweep, this is the number of benchmarks it runs in the sweep. "
+        "For rate-type=concurrent, this is the number of concurrent requests. "
+        "For rate-type=async,constant,poisson, this is the rate requests per second. "
+        "For rate-type=synchronous,throughput, this must not be set."
     ),
 )
 @click.option(
     "--max-seconds",
     type=float,
     help=(
-            "The maximum number of seconds each benchmark can run for. "
-            "If None, will run until max_requests or the data is exhausted."
+        "The maximum number of seconds each benchmark can run for. "
+        "If None, will run until max_requests or the data is exhausted."
     ),
 )
 @click.option(
     "--max-requests",
     type=int,
     help=(
-            "The maximum number of requests each benchmark can run for. "
-            "If None, will run until max_seconds or the data is exhausted."
+        "The maximum number of requests each benchmark can run for. "
+        "If None, will run until max_seconds or the data is exhausted."
     ),
 )
 @click.option(
@@ -170,18 +169,18 @@ def cli():
     type=float,
     default=None,
     help=(
-            "The percent of the benchmark (based on max-seconds, max-requets, "
-            "or lenth of dataset) to run as a warmup and not include in the final results. "
-            "Defaults to None."
+        "The percent of the benchmark (based on max-seconds, max-requets, "
+        "or lenth of dataset) to run as a warmup and not include in the final results. "
+        "Defaults to None."
     ),
 )
 @click.option(
     "--cooldown-percent",
     type=float,
     help=(
-            "The percent of the benchmark (based on max-seconds, max-requets, or lenth "
-            "of dataset) to run as a cooldown and not include in the final results. "
-            "Defaults to None."
+        "The percent of the benchmark (based on max-seconds, max-requets, or lenth "
+        "of dataset) to run as a cooldown and not include in the final results. "
+        "Defaults to None."
     ),
 )
 @click.option(
@@ -204,10 +203,10 @@ def cli():
     type=click.Path(),
     default=Path.cwd() / "benchmarks.json",
     help=(
-            "The path to save the output to. If it is a directory, "
-            "it will save benchmarks.json under it. "
-            "Otherwise, json, yaml, or csv files are supported for output types "
-            "which will be read from the extension for the file path."
+        "The path to save the output to. If it is a directory, "
+        "it will save benchmarks.json under it. "
+        "Otherwise, json, yaml, or csv files are supported for output types "
+        "which will be read from the extension for the file path."
     ),
 )
 @click.option(
@@ -219,8 +218,8 @@ def cli():
     "--output-sampling",
     type=int,
     help=(
-            "The number of samples to save in the output file. "
-            "If None (default), will save all samples."
+        "The number of samples to save in the output file. "
+        "If None (default), will save all samples."
     ),
     default=None,
 )
@@ -231,28 +230,28 @@ def cli():
     help="The random seed to use for benchmarking to ensure reproducibility.",
 )
 def benchmark(
-        target,
-        backend_type,
-        backend_args,
-        model,
-        processor,
-        processor_args,
-        data,
-        data_args,
-        data_sampler,
-        rate_type,
-        rate,
-        max_seconds,
-        max_requests,
-        warmup_percent,
-        cooldown_percent,
-        disable_progress,
-        display_scheduler_stats,
-        disable_console_outputs,
-        output_path,
-        output_extras,
-        output_sampling,
-        random_seed,
+    target,
+    backend_type,
+    backend_args,
+    model,
+    processor,
+    processor_args,
+    data,
+    data_args,
+    data_sampler,
+    rate_type,
+    rate,
+    max_seconds,
+    max_requests,
+    warmup_percent,
+    cooldown_percent,
+    disable_progress,
+    display_scheduler_stats,
+    disable_console_outputs,
+    output_path,
+    output_extras,
+    output_sampling,
+    random_seed,
 ):
     asyncio.run(
         benchmark_generative_text(
@@ -284,8 +283,8 @@ def benchmark(
 
 @cli.command(
     help=(
-            "Print out the available configuration settings that can be set "
-            "through environment variables."
+        "Print out the available configuration settings that can be set "
+        "through environment variables."
     )
 )
 def config():
