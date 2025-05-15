@@ -34,7 +34,7 @@ def parse_number_str(ctx, param, value):  # noqa: ARG001
         return [float(val) for val in values]
     except ValueError as err:
         raise click.BadParameter(
-            f"{param.name} must be a number or comma-separated list of numbers."
+            f"{param.name} must be a floating-point number or comma-separated list of floating-point numbers."
         ) from err
 
 
