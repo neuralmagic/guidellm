@@ -1,4 +1,4 @@
-# Supported Output Types for GuideLLM
+# Output Types
 
 GuideLLM provides flexible options for outputting benchmark results, catering to both console-based summaries and file-based detailed reports. This document outlines the supported output types, their configurations, and how to utilize them effectively.
 

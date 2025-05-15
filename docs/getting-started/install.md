@@ -1,4 +1,8 @@
-# Installation Guide for GuideLLM
+---
+weight: -10
+---
+
+# Install
 
 GuideLLM can be installed using several methods depending on your requirements. Below are the detailed instructions for each installation pathway.
 

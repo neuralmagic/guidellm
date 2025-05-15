@@ -98,6 +98,18 @@ dev = [
 
     # link checking
     "mkdocs-linkcheck~=1.0.6",
+
+    # docs
+    "mkdocs",
+    "mkdocs-material[imaging]",
+    "mike",
+    "markdown",
+    "pymdown-extensions",
+    "mkdocs-section-index",
+    "mkdocs-minify-plugin",
+    "mkdocs-api-autonav",
+    "mkdocstrings-python",
+    "mkdocs-gen-files",
 ]
 
 [project.urls]

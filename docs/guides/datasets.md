@@ -1,4 +1,4 @@
-# Dataset Configurations
+# Datasets
 
 GuideLLM supports various dataset configurations to enable benchmarking and evaluation of large language models (LLMs). This document provides a comprehensive guide to configuring datasets for different use cases, along with detailed examples and rationale for choosing specific pathways.
 

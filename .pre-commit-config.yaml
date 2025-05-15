@@ -34,6 +34,7 @@ repos:
         # dev dependencies
         pytest,
         pydantic_settings,
+        mkdocs_gen_files,
 
         # types
         types-click,
