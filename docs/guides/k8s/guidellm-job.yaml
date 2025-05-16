@@ -1,0 +1,84 @@
+# This job takes ~25min to complete.
+# This will create a very large yaml file. To extract the file, run:
+# oc apply -f accessor-pod.yaml
+# mkdir ./guidellm-reports
+# kubectl cp guidellm-accessor:/app/data/guidellm-reports.tgz ./guidellm-reports/guidellm-reports.tgz
+# You will now have a local ./guidellm-reports/guidellm-reports.tgz, to extract it run:
+# tar -xvf guidellm-reports.tgz
+# You will now have a local file ./guidellm-reports/llama32-3b.yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: run-guidellm
+spec:
+  template:
+    spec:
+      containers:
+      - name: guidellm
+        # TODO: replace this image
+        image: quay.io/sallyom/guidellm:latest
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
+        args:
+        - benchmark
+        - --target=$(TARGET)
+        - --data=$(DATA)
+        - --rate-type=sweep
+        - --model=$(MODEL)
+        - --output-path=/app/data/llama32-3b.yaml
+        env:
+        # HF_TOKEN is not necessary if you share/use the model PVC. Guidellm needs to access the tokenizer file.
+        # You can provide a path to the tokenizer file by passing `--tokenizer=/path/to/model`. If you do not
+        # pass the tokenizer path, Guidellm will get the tokenizer file(s) from Huggingface.
+        - name: HF_TOKEN
+          valueFrom:
+            secretKeyRef:
+              key: HF_TOKEN
+              name: huggingface-secret
+        - name: TARGET
+          value: "http://llm-d-inference-gateway.llm-d.svc.cluster.local:80/v1"
+        - name: DATA_TYPE
+          value: "emulated"
+        - name: DATA
+          value: "prompt_tokens=512,output_tokens=128"
+        - name: MODEL
+          value: "meta-llama/Llama-3.2-3B-Instruct"
+        volumeMounts:
+        - name: output
+          mountPath: /app/data
+      - name: extract
+        image: registry.access.redhat.com/ubi9/ubi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
+        command: ["sh", "-c"]
+        args:
+        - |
+          echo "Waiting for guidellm container to complete...";
+          while [ ! -f /app/data/llama32-3b.yaml ]; do
+            sleep 60;
+          done;
+          echo "Guidellm completed, packing reports...";
+          cd /app/data && \
+          tar czf guidellm-reports.tgz *.yaml && \
+          rm /app/data/llama32-3b.yaml
+        volumeMounts:
+        - name: output
+          mountPath: /app/data
+      restartPolicy: Never
+      volumes:
+      - name: output
+        persistentVolumeClaim:
+          claimName: guidellm-output-pvc
