@@ -1,6 +1,3 @@
-from .dataset import process_dataset, ShortPromptStrategy
+from .dataset import ShortPromptStrategy, process_dataset
 
-__all__ = [
-    "process_dataset",
-    "ShortPromptStrategy"
-]
+__all__ = ["ShortPromptStrategy", "process_dataset"]

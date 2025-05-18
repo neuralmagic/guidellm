@@ -1,14 +1,15 @@
 import os
+from collections.abc import Iterator
 from enum import Enum
 from pathlib import Path
-from typing import Any, Optional, Union, Dict, Callable, Iterator
+from typing import Any, Callable, Optional, Union
 
 from datasets import Dataset
 from loguru import logger
 from transformers import PreTrainedTokenizerBase
 
 from guidellm.dataset import load_dataset as guidellm_load_dataset
-from guidellm.utils import check_load_processor, IntegerRangeSampler
+from guidellm.utils import IntegerRangeSampler, check_load_processor
 
 SUPPORTED_TYPES = {
     ".json",
@@ -24,10 +25,10 @@ class ShortPromptStrategy(str, Enum):
 
 
 def handle_ignore_strategy(
-        current_prompt: str,
-        min_prompt_tokens: int,
-        tokenizer: PreTrainedTokenizerBase,
-        **kwargs
+    current_prompt: str,
+    min_prompt_tokens: int,
+    tokenizer: PreTrainedTokenizerBase,
+    **_kwargs,
 ) -> Optional[str]:
     if len(tokenizer.encode(current_prompt)) < min_prompt_tokens:
         logger.warning("Prompt too short, ignoring")
@@ -36,19 +37,21 @@ def handle_ignore_strategy(
 
 
 def handle_concatenate_strategy(
-        current_prompt: str,
-        min_prompt_tokens: int,
-        dataset_iterator: Iterator[Dict[str, Any]],
-        prompt_column: str,
-        tokenizer: PreTrainedTokenizerBase,
-        **kwargs
+    current_prompt: str,
+    min_prompt_tokens: int,
+    dataset_iterator: Iterator[dict[str, Any]],
+    prompt_column: str,
+    tokenizer: PreTrainedTokenizerBase,
+    **_kwargs,
 ) -> Optional[str]:
     tokens_len = len(tokenizer.encode(current_prompt))
     while tokens_len < min_prompt_tokens:
         try:
             next_row = next(dataset_iterator)
         except StopIteration:
-            logger.warning("Could not concatenate enough prompts to reach minimum length, ignoring")
+            logger.warning(
+                "Could not concatenate enough prompts to reach minimum length, ignoring"
+            )
             return None
         current_prompt += next_row[prompt_column]
         tokens_len = len(tokenizer.encode(current_prompt))
@@ -56,25 +59,25 @@ def handle_concatenate_strategy(
 
 
 def handle_pad_strategy(
-        current_prompt: str,
-        min_prompt_tokens: int,
-        tokenizer: PreTrainedTokenizerBase,
-        pad_token: str,
-        **kwargs
+    current_prompt: str,
+    min_prompt_tokens: int,
+    tokenizer: PreTrainedTokenizerBase,
+    pad_token: str,
+    **_kwargs,
 ) -> str:
     while len(tokenizer.encode(current_prompt)) < min_prompt_tokens:
         current_prompt += pad_token
     return current_prompt
 
 
-STRATEGY_HANDLERS: Dict[ShortPromptStrategy, Callable] = {
+STRATEGY_HANDLERS: dict[ShortPromptStrategy, Callable] = {
     ShortPromptStrategy.IGNORE: handle_ignore_strategy,
     ShortPromptStrategy.CONCATENATE: handle_concatenate_strategy,
     ShortPromptStrategy.PAD: handle_pad_strategy,
 }
 
 
-def save_dataset_to_file(dataset: Dataset, output_path: Path) -> None:
+def save_dataset_to_file(dataset: Dataset, output_path: Union[str, Path]) -> None:
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -86,12 +89,12 @@ def save_dataset_to_file(dataset: Dataset, output_path: Path) -> None:
         dataset.to_parquet(str(output_path))
     else:
         raise ValueError(
-            f"Unsupported file suffix '{output_path.suffix}' in output_path '{output_path}'. "
-            f"Only {SUPPORTED_TYPES} are supported."
+            f"Unsupported file suffix '{output_path.suffix}' in output_path "
+            f"'{output_path}'. Only {SUPPORTED_TYPES} are supported."
         )
 
 
-def _validate_output_suffix(output_path: str) -> None:
+def _validate_output_suffix(output_path: Union[str, Path]) -> None:
     output_path = Path(output_path)
     suffix = output_path.suffix.lower()
     if suffix not in SUPPORTED_TYPES:
@@ -102,33 +105,44 @@ def _validate_output_suffix(output_path: str) -> None:
 
 
 def process_dataset(
-        input_data: Union[str, Path],
-        output_path: Union[str, Path],
-        processor: Union[str, Path, PreTrainedTokenizerBase],
-        processor_args: Optional[dict[str, Any]] = None,
-        data_args: Optional[dict[str, Any]] = None,
-        short_prompt_strategy: ShortPromptStrategy = ShortPromptStrategy.IGNORE,
-        pad_token: Optional[str] = None,
-        prompt_tokens_average: int = 10,
-        prompt_tokens_stdev: Optional[int] = None,
-        prompt_tokens_min: Optional[int] = None,
-        prompt_tokens_max: Optional[int] = None,
-        prompt_random_seed: int = 42,
-        output_tokens_average: int = 10,
-        output_tokens_stdev: Optional[int] = None,
-        output_tokens_min: Optional[int] = None,
-        output_tokens_max: Optional[int] = None,
-        output_random_seed: int = 123,
-        push_to_hub: bool = False,
-        hub_dataset_id: Optional[str] = None,
+    input_data: Union[str, Path],
+    output_path: Union[str, Path],
+    processor: Union[str, Path, PreTrainedTokenizerBase],
+    processor_args: Optional[dict[str, Any]] = None,
+    data_args: Optional[dict[str, Any]] = None,
+    short_prompt_strategy: ShortPromptStrategy = ShortPromptStrategy.IGNORE,
+    pad_token: Optional[str] = None,
+    prompt_tokens_average: int = 10,
+    prompt_tokens_stdev: Optional[int] = None,
+    prompt_tokens_min: Optional[int] = None,
+    prompt_tokens_max: Optional[int] = None,
+    prompt_random_seed: int = 42,
+    output_tokens_average: int = 10,
+    output_tokens_stdev: Optional[int] = None,
+    output_tokens_min: Optional[int] = None,
+    output_tokens_max: Optional[int] = None,
+    output_random_seed: int = 123,
+    push_to_hub: bool = False,
+    hub_dataset_id: Optional[str] = None,
 ) -> None:
     _validate_output_suffix(output_path)
-    logger.info(f"Starting dataset conversion | Input: {input_data} | Output directory: {output_path}")
+    logger.info(
+        f"Starting dataset conversion | Input: {input_data} | "
+        f"Output directory: {output_path}"
+    )
 
-    dataset, column_mappings = guidellm_load_dataset(input_data, data_args, processor, processor_args)
-    tokenizer = check_load_processor(processor, processor_args, "Processor/tokenizer required for dataset conversion.")
+    dataset, column_mappings = guidellm_load_dataset(
+        input_data, data_args, processor, processor_args
+    )
+    tokenizer = check_load_processor(
+        processor,
+        processor_args,
+        "Processor/tokenizer required for dataset conversion.",
+    )
     prompt_column = column_mappings.get("prompt_column")
-    output_column = column_mappings.get("output_tokens_count_column", "output_tokens_count")
+    output_column = column_mappings.get(
+        "output_tokens_count_column", "output_tokens_count"
+    )
 
     prompt_token_sampler = iter(
         IntegerRangeSampler(
@@ -172,7 +186,9 @@ def process_dataset(
 
         if len(tokenizer.encode(prompt_text)) > target_prompt_len:
             tokens = tokenizer.encode(prompt_text)
-            prompt_text = tokenizer.decode(tokens[:target_prompt_len], skip_special_tokens=True)
+            prompt_text = tokenizer.decode(
+                tokens[:target_prompt_len], skip_special_tokens=True
+            )
 
         processed_prompt = prompt_row.copy()
         processed_prompt[prompt_column] = prompt_text
@@ -196,8 +212,11 @@ def process_dataset(
         logger.info(f"Pushed dataset to: {hub_dataset_id}")
 
 
-def push_dataset_to_hub(hub_dataset_id: str, processed_dataset: Dataset) -> None:
+def push_dataset_to_hub(hub_dataset_id: Optional[str], processed_dataset: Dataset) -> None:
     hf_token = os.environ.get("HF_TOKEN")
     if not hub_dataset_id or not hf_token:
-        raise ValueError("hub_dataset_id and HF_TOKEN env var must be provided when push_to_hub is True")
+        raise ValueError(
+            "hub_dataset_id and HF_TOKEN env var must be provided when push_to_hub"
+            " is True"
+        )
     processed_dataset.push_to_hub(hub_dataset_id, token=hf_token)

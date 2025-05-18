@@ -1,19 +1,21 @@
 import os
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from typing import Iterator
+from unittest.mock import MagicMock, patch
 
 import pytest
 from datasets import Dataset
 from transformers import PreTrainedTokenizerBase
 
 from guidellm.preprocess.dataset import (
-    handle_ignore_strategy,
+    STRATEGY_HANDLERS,
+    ShortPromptStrategy,
     handle_concatenate_strategy,
+    handle_ignore_strategy,
     handle_pad_strategy,
     process_dataset,
     push_dataset_to_hub,
-    ShortPromptStrategy,
-    STRATEGY_HANDLERS, save_dataset_to_file,
+    save_dataset_to_file,
 )
 
 
@@ -21,32 +23,48 @@ from guidellm.preprocess.dataset import (
 def tokenizer_mock():
     tokenizer = MagicMock(spec=PreTrainedTokenizerBase)
     tokenizer.encode.side_effect = lambda x: [1] * len(x)
-    tokenizer.decode.side_effect = lambda x, *args, **kwargs: ''.join(str(item) for item in x)
+    tokenizer.decode.side_effect = lambda x, *args, **kwargs: "".join(
+        str(item) for item in x
+    )
     return tokenizer
 
 
-@patch.dict(STRATEGY_HANDLERS, {ShortPromptStrategy.IGNORE: MagicMock(return_value="processed_prompt")})
+from unittest.mock import MagicMock, patch
+from guidellm.preprocess.dataset import process_dataset, STRATEGY_HANDLERS, ShortPromptStrategy
+from datasets import Dataset
+
+
 @patch(f"{process_dataset.__module__}.guidellm_load_dataset")
 @patch(f"{process_dataset.__module__}.check_load_processor")
 @patch(f"{process_dataset.__module__}.Dataset")
 @patch(f"{process_dataset.__module__}.IntegerRangeSampler")
 def test_strategy_handler_called(
-        mock_sampler, mock_dataset_class, mock_check_processor, mock_load_dataset, tokenizer_mock
+    mock_sampler,
+    mock_dataset_class,
+    mock_check_processor,
+    mock_load_dataset,
+    tokenizer_mock,
 ):
-    mock_handler = STRATEGY_HANDLERS[ShortPromptStrategy.IGNORE]
-    mock_dataset = [{"prompt": "abc"}, {"prompt": "def"}]
-    mock_load_dataset.return_value = (mock_dataset, {"prompt_column": "prompt"})
-    mock_check_processor.return_value = tokenizer_mock
-    mock_sampler.side_effect = lambda **kwargs: [10, 10]
+    mock_handler = MagicMock(return_value="processed_prompt")
+    with patch.dict(STRATEGY_HANDLERS, {ShortPromptStrategy.IGNORE: mock_handler}):
+        mock_dataset = [{"prompt": "abc"}, {"prompt": "def"}]
+        mock_load_dataset.return_value = (mock_dataset, {"prompt_column": "prompt"})
+        mock_check_processor.return_value = tokenizer_mock
+        mock_sampler.side_effect = lambda **kwargs: [10, 10]
 
-    mock_dataset_obj = MagicMock(spec=Dataset)
-    mock_dataset_class.from_list.return_value = mock_dataset_obj
+        mock_dataset_obj = MagicMock(spec=Dataset)
+        mock_dataset_class.from_list.return_value = mock_dataset_obj
 
-    process_dataset("input", "output_dir/data.json", tokenizer_mock, short_prompt_strategy=ShortPromptStrategy.IGNORE)
+        process_dataset(
+            "input",
+            "output_dir/data.json",
+            tokenizer_mock,
+            short_prompt_strategy=ShortPromptStrategy.IGNORE,
+        )
 
-    assert mock_handler.call_count == 2
-    mock_load_dataset.assert_called_once()
-    mock_check_processor.assert_called_once()
+        assert mock_handler.call_count == 2
+        mock_load_dataset.assert_called_once()
+        mock_check_processor.assert_called_once()
 
 
 def test_handle_ignore_strategy_too_short(tokenizer_mock):
@@ -63,13 +81,17 @@ def test_handle_ignore_strategy_sufficient_length(tokenizer_mock):
 
 def test_handle_concatenate_strategy_enough_prompts(tokenizer_mock):
     dataset_iter = iter([{"prompt": "longer"}])
-    result = handle_concatenate_strategy("short", 10, dataset_iter, "prompt", tokenizer_mock)
+    result = handle_concatenate_strategy(
+        "short", 10, dataset_iter, "prompt", tokenizer_mock
+    )
     assert result == "shortlonger"
 
 
 def test_handle_concatenate_strategy_not_enough_prompts(tokenizer_mock):
-    dataset_iter = iter([])
-    result = handle_concatenate_strategy("short", 10, dataset_iter, "prompt", tokenizer_mock)
+    dataset_iter: Iterator = iter([])
+    result = handle_concatenate_strategy(
+        "short", 10, dataset_iter, "prompt", tokenizer_mock
+    )
     assert result is None
 
 
@@ -84,12 +106,12 @@ def test_handle_pad_strategy(tokenizer_mock):
 @patch("guidellm.preprocess.dataset.check_load_processor")
 @patch("guidellm.preprocess.dataset.IntegerRangeSampler")
 def test_process_dataset_non_empty(
-        mock_sampler,
-        mock_check_processor,
-        mock_load_dataset,
-        mock_dataset_class,
-        mock_save_to_file,
-        tokenizer_mock,
+    mock_sampler,
+    mock_check_processor,
+    mock_load_dataset,
+    mock_dataset_class,
+    mock_save_to_file,
+    tokenizer_mock,
 ):
     from guidellm.preprocess.dataset import process_dataset
 
@@ -124,7 +146,11 @@ def test_process_dataset_non_empty(
 @patch(f"{process_dataset.__module__}.check_load_processor")
 @patch(f"{process_dataset.__module__}.IntegerRangeSampler")
 def test_process_dataset_empty_after_processing(
-        mock_sampler, mock_check_processor, mock_load_dataset, mock_dataset_class, tokenizer_mock
+    mock_sampler,
+    mock_check_processor,
+    mock_load_dataset,
+    mock_dataset_class,
+    tokenizer_mock,
 ):
     mock_dataset = [{"prompt": ""}]
     mock_load_dataset.return_value = (mock_dataset, {"prompt_column": "prompt"})
@@ -144,7 +170,12 @@ def test_process_dataset_empty_after_processing(
 @patch(f"{process_dataset.__module__}.check_load_processor")
 @patch(f"{process_dataset.__module__}.IntegerRangeSampler")
 def test_process_dataset_push_to_hub_called(
-        mock_sampler, mock_check_processor, mock_load_dataset, mock_dataset_class, mock_push, tokenizer_mock
+    mock_sampler,
+    mock_check_processor,
+    mock_load_dataset,
+    mock_dataset_class,
+    mock_push,
+    tokenizer_mock,
 ):
     mock_dataset = [{"prompt": "abc"}]
     mock_load_dataset.return_value = (mock_dataset, {"prompt_column": "prompt"})
@@ -154,7 +185,13 @@ def test_process_dataset_push_to_hub_called(
     mock_dataset_obj = MagicMock(spec=Dataset)
     mock_dataset_class.from_list.return_value = mock_dataset_obj
 
-    process_dataset("input", "output_dir/data.json", tokenizer_mock, push_to_hub=True, hub_dataset_id="id123")
+    process_dataset(
+        "input",
+        "output_dir/data.json",
+        tokenizer_mock,
+        push_to_hub=True,
+        hub_dataset_id="id123",
+    )
     mock_push.assert_called_once_with("id123", mock_dataset_obj)
 
 
@@ -164,7 +201,12 @@ def test_process_dataset_push_to_hub_called(
 @patch(f"{process_dataset.__module__}.check_load_processor")
 @patch(f"{process_dataset.__module__}.IntegerRangeSampler")
 def test_process_dataset_push_to_hub_not_called(
-        mock_sampler, mock_check_processor, mock_load_dataset, mock_dataset_class, mock_push, tokenizer_mock
+    mock_sampler,
+    mock_check_processor,
+    mock_load_dataset,
+    mock_dataset_class,
+    mock_push,
+    tokenizer_mock,
 ):
     mock_dataset = [{"prompt": "abc"}]
     mock_load_dataset.return_value = (mock_dataset, {"prompt_column": "prompt"})

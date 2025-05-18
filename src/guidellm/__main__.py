@@ -8,7 +8,7 @@ import click
 from guidellm.backend import BackendType
 from guidellm.benchmark import ProfileType, benchmark_generative_text
 from guidellm.config import print_config
-from guidellm.preprocess.dataset import process_dataset, ShortPromptStrategy
+from guidellm.preprocess.dataset import ShortPromptStrategy, process_dataset
 from guidellm.scheduler import StrategyType
 
 STRATEGY_PROFILE_CHOICES = set(
@@ -298,9 +298,9 @@ def preprocess():
 
 @preprocess.command(
     help="Convert a dataset to have specific prompt and output token sizes.\n\n"
-         "INPUT_DATA: Path to the input dataset or dataset ID.\n"
-         "OUTPUT_PATH: Directory to save the converted dataset. "
-         "The dataset will be saved as an Arrow dataset (.arrow) inside the directory."
+    "INPUT_DATA: Path to the input dataset or dataset ID.\n"
+    "OUTPUT_PATH: Directory to save the converted dataset. "
+    "The dataset will be saved as an Arrow dataset (.arrow) inside the directory."
 )
 @click.argument(
     "input_data",
@@ -319,8 +319,8 @@ def preprocess():
     type=str,
     required=True,
     help=(
-            "The processor or tokenizer to use to calculate token counts for statistics "
-            "and synthetic data generation."
+        "The processor or tokenizer to use to calculate token counts for statistics "
+        "and synthetic data generation."
     ),
 )
 @click.option(
@@ -328,16 +328,16 @@ def preprocess():
     default=None,
     callback=parse_json,
     help=(
-            "A JSON string containing any arguments to pass to the processor constructor "
-            "as a dict with **kwargs."
+        "A JSON string containing any arguments to pass to the processor constructor "
+        "as a dict with **kwargs."
     ),
 )
 @click.option(
     "--data-args",
     callback=parse_json,
     help=(
-            "A JSON string containing any arguments to pass to the dataset creation "
-            "as a dict with **kwargs."
+        "A JSON string containing any arguments to pass to the dataset creation "
+        "as a dict with **kwargs."
     ),
 )
 @click.option(
@@ -345,110 +345,110 @@ def preprocess():
     type=click.Choice([s.value for s in ShortPromptStrategy]),
     default=ShortPromptStrategy.IGNORE.value,
     show_default=True,
-    help="Strategy to handle prompts shorter than the target length. "
+    help="Strategy to handle prompts shorter than the target length. ",
 )
 @click.option(
     "--pad-token",
     type=str,
     default=None,
-    help="The token to pad short prompts with when using the 'pad' strategy."
+    help="The token to pad short prompts with when using the 'pad' strategy.",
 )
 @click.option(
     "--prompt-tokens-average",
     type=int,
     default=10,
     show_default=True,
-    help="Average target number of tokens for prompts."
+    help="Average target number of tokens for prompts.",
 )
 @click.option(
     "--prompt-tokens-stdev",
     type=int,
     default=None,
-    help="Standard deviation for prompt tokens sampling."
+    help="Standard deviation for prompt tokens sampling.",
 )
 @click.option(
     "--prompt-tokens-min",
     type=int,
     default=None,
-    help="Minimum number of prompt tokens."
+    help="Minimum number of prompt tokens.",
 )
 @click.option(
     "--prompt-tokens-max",
     type=int,
     default=None,
-    help="Maximum number of prompt tokens."
+    help="Maximum number of prompt tokens.",
 )
 @click.option(
     "--prompt-random-seed",
     type=int,
     default=42,
     show_default=True,
-    help="Random seed for prompt token sampling."
+    help="Random seed for prompt token sampling.",
 )
 @click.option(
     "--output-tokens-average",
     type=int,
     default=10,
     show_default=True,
-    help="Average target number of tokens for outputs."
+    help="Average target number of tokens for outputs.",
 )
 @click.option(
     "--output-tokens-stdev",
     type=int,
     default=None,
-    help="Standard deviation for output tokens sampling."
+    help="Standard deviation for output tokens sampling.",
 )
 @click.option(
     "--output-tokens-min",
     type=int,
     default=None,
-    help="Minimum number of output tokens."
+    help="Minimum number of output tokens.",
 )
 @click.option(
     "--output-tokens-max",
     type=int,
     default=None,
-    help="Maximum number of output tokens."
+    help="Maximum number of output tokens.",
 )
 @click.option(
     "--output-random-seed",
     type=int,
     default=123,
     show_default=True,
-    help="Random seed for output token sampling."
+    help="Random seed for output token sampling.",
 )
 @click.option(
     "--push-to-hub",
     is_flag=True,
-    help="Set this flag to push the converted dataset to the Hugging Face Hub."
+    help="Set this flag to push the converted dataset to the Hugging Face Hub.",
 )
 @click.option(
     "--hub-dataset-id",
     type=str,
     default=None,
     help="The Hugging Face Hub dataset ID to push to. "
-         "Required if --push-to-hub is used."
+    "Required if --push-to-hub is used.",
 )
 def dataset(
-        input_data,
-        output_path,
-        processor,
-        processor_args,
-        data_args,
-        short_prompt_strategy,
-        pad_token,
-        prompt_tokens_average,
-        prompt_tokens_stdev,
-        prompt_tokens_min,
-        prompt_tokens_max,
-        prompt_random_seed,
-        output_tokens_average,
-        output_tokens_stdev,
-        output_tokens_min,
-        output_tokens_max,
-        output_random_seed,
-        push_to_hub,
-        hub_dataset_id,
+    input_data,
+    output_path,
+    processor,
+    processor_args,
+    data_args,
+    short_prompt_strategy,
+    pad_token,
+    prompt_tokens_average,
+    prompt_tokens_stdev,
+    prompt_tokens_min,
+    prompt_tokens_max,
+    prompt_random_seed,
+    output_tokens_average,
+    output_tokens_stdev,
+    output_tokens_min,
+    output_tokens_max,
+    output_random_seed,
+    push_to_hub,
+    hub_dataset_id,
 ):
     process_dataset(
         input_data=input_data,
