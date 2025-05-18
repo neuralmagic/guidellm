@@ -46,12 +46,14 @@ class SchedulerRunInfo(StandardBaseModel):
     end_number: float
     processes: int
     strategy: SchedulingStrategy
+    max_error_rate: float
 
     created_requests: int = 0
     queued_requests: int = 0
     scheduled_requests: int = 0
     processing_requests: int = 0
     completed_requests: int = 0
+    errored_requests: int = 0
 
 
 class SchedulerRequestInfo(StandardBaseModel):

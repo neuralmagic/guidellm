@@ -64,12 +64,14 @@ class Scheduler(Generic[RequestT, ResponseT]):
 
         self.worker = worker
         self.request_loader = request_loader
+        self.error_rate: Optional[float] = None
 
     async def run(
         self,
         scheduling_strategy: SchedulingStrategy,
         max_number: Optional[int] = None,
         max_duration: Optional[float] = None,
+        max_error_rate: Optional[float] = 0.05,
     ) -> AsyncGenerator[
         Union[SchedulerResult, SchedulerRequestResult[RequestT, ResponseT]], None
     ]:
@@ -98,6 +100,8 @@ class Scheduler(Generic[RequestT, ResponseT]):
         :param max_duration: The maximum duration for the scheduling run.
             If None, then no limit is set and either the iterator must be exhaustible
             or the max_number must be set.
+        :param max_error_rate: The maximum error rate after which the scheduler shuts down.
+            If not provided a default of 5% i.e 0.05 is used.
         :return: An asynchronous generator that yields SchedulerResult objects.
             Each SchedulerResult object contains information about the request,
             the response, and the run information.
@@ -109,9 +113,12 @@ class Scheduler(Generic[RequestT, ResponseT]):
 
         if max_number is not None and max_number < 1:
             raise ValueError(f"Invalid max_number: {max_number}")
-
         if max_duration is not None and max_duration < 0:
             raise ValueError(f"Invalid max_duration: {max_duration}")
+        if max_error_rate is not None and (max_error_rate < 0 or max_error_rate > 1):
+            raise ValueError(f"Invalid max_error_rate: {max_error_rate}")
+
+        shutdown_event = multiprocessing.Event()
 
         with (
             multiprocessing.Manager() as manager,
@@ -124,7 +131,7 @@ class Scheduler(Generic[RequestT, ResponseT]):
                 manager, executor, scheduling_strategy
             )
             run_info, requests_iter, times_iter = self._run_setup(
-                futures, scheduling_strategy, max_number, max_duration
+                futures, scheduling_strategy, max_number, max_duration, max_error_rate
             )
             yield SchedulerResult(
                 type_="run_start",
@@ -159,6 +166,8 @@ class Scheduler(Generic[RequestT, ResponseT]):
                         run_info,
                     )
                     if iter_result is not None:
+                        if self._is_max_error_rate_reached(iter_result.run_info):
+                            logger.info(f"Max_error rate of ({iter_result.run_info.max_error_rate}) reached!")
                         yield iter_result
 
                     # yield control to the event loop
@@ -249,6 +258,7 @@ class Scheduler(Generic[RequestT, ResponseT]):
         scheduling_strategy: SchedulingStrategy,
         max_number: Optional[int],
         max_duration: Optional[float],
+        max_error_rate: Optional[float],
     ) -> tuple[SchedulerRunInfo, Iterator[Any], Iterator[float]]:
         requests_iter = iter(self.request_loader)
         start_time = time.time()
@@ -276,6 +286,7 @@ class Scheduler(Generic[RequestT, ResponseT]):
             end_number=end_number,
             processes=len(processes),
             strategy=scheduling_strategy,
+            max_error_rate=max_error_rate
         )
 
         return info, requests_iter, times_iter
@@ -362,6 +373,9 @@ class Scheduler(Generic[RequestT, ResponseT]):
             run_info.processing_requests -= 1
             run_info.completed_requests += 1
 
+            if process_response.info.errored:
+                run_info.errored_requests += 1
+
             return SchedulerRequestResult(
                 type_="request_complete",
                 run_info=run_info,
@@ -370,6 +384,11 @@ class Scheduler(Generic[RequestT, ResponseT]):
                 response=process_response.response,
             )
         raise ValueError(f"Invalid process response type: {process_response}")
+
+    @staticmethod
+    def _is_max_error_rate_reached(run_info: SchedulerRunInfo) -> bool:
+        current_error_rate = run_info.errored_requests / run_info.end_number
+        return current_error_rate > run_info.max_error_rate
 
     async def _stop_processes(
         self,
