@@ -137,7 +137,7 @@ def process_dataset(
     tokenizer = check_load_processor(
         processor,
         processor_args,
-        "Processor/tokenizer required for dataset conversion.",
+        "dataset conversion.",
     )
     prompt_column = column_mappings.get("prompt_column")
     output_column = column_mappings.get(
@@ -185,7 +185,7 @@ def process_dataset(
                 continue
 
         if len(tokenizer.encode(prompt_text)) > target_prompt_len:
-            tokens = tokenizer.encode(prompt_text)
+            tokens = tokenizer.encode(prompt_text, add_special_tokens=True)
             prompt_text = tokenizer.decode(
                 tokens[:target_prompt_len], skip_special_tokens=True
             )
