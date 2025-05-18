@@ -10,6 +10,12 @@ from transformers import PreTrainedTokenizerBase
 from guidellm.dataset import load_dataset as guidellm_load_dataset
 from guidellm.utils import check_load_processor, IntegerRangeSampler
 
+SUPPORTED_TYPES = {
+    ".json",
+    ".csv",
+    ".parquet",
+}
+
 
 class ShortPromptStrategy(str, Enum):
     IGNORE = "ignore"
@@ -68,6 +74,33 @@ STRATEGY_HANDLERS: Dict[ShortPromptStrategy, Callable] = {
 }
 
 
+def save_dataset_to_file(dataset: Dataset, output_path: Path) -> None:
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if output_path.suffix == ".csv":
+        dataset.to_csv(str(output_path))
+    elif output_path.suffix == ".json":
+        dataset.to_json(str(output_path))
+    elif output_path.suffix == ".parquet":
+        dataset.to_parquet(str(output_path))
+    else:
+        raise ValueError(
+            f"Unsupported file suffix '{output_path.suffix}' in output_path '{output_path}'. "
+            f"Only {SUPPORTED_TYPES} are supported."
+        )
+
+
+def _validate_output_suffix(output_path: str) -> None:
+    output_path = Path(output_path)
+    suffix = output_path.suffix.lower()
+    if suffix not in SUPPORTED_TYPES:
+        raise ValueError(
+            f"Unsupported file suffix '{suffix}' in output_path '{output_path}'. "
+            f"Only {SUPPORTED_TYPES} are supported."
+        )
+
+
 def process_dataset(
         input_data: Union[str, Path],
         output_path: Union[str, Path],
@@ -89,6 +122,7 @@ def process_dataset(
         push_to_hub: bool = False,
         hub_dataset_id: Optional[str] = None,
 ) -> None:
+    _validate_output_suffix(output_path)
     logger.info(f"Starting dataset conversion | Input: {input_data} | Output directory: {output_path}")
 
     dataset, column_mappings = guidellm_load_dataset(input_data, data_args, processor, processor_args)
@@ -138,7 +172,7 @@ def process_dataset(
 
         if len(tokenizer.encode(prompt_text)) > target_prompt_len:
             tokens = tokenizer.encode(prompt_text)
-            prompt_text = tokenizer.decode(tokens[:target_prompt_len])
+            prompt_text = tokenizer.decode(tokens[:target_prompt_len], skip_special_tokens=True)
 
         processed_prompt = prompt_row.copy()
         processed_prompt[prompt_column] = prompt_text
@@ -154,9 +188,7 @@ def process_dataset(
     logger.info(f"Generated processed dataset with {len(processed_prompts)} prompts")
 
     processed_dataset = Dataset.from_list(processed_prompts)
-    output_path = Path(output_path)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    processed_dataset.save_to_disk(output_path)
+    save_dataset_to_file(processed_dataset, output_path)
     logger.info(f"Conversion complete. Dataset saved to: {output_path}")
 
     if push_to_hub:

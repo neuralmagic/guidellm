@@ -1,5 +1,5 @@
 import os
-from unittest import mock
+from pathlib import Path
 from unittest.mock import patch, MagicMock
 
 import pytest
@@ -13,7 +13,7 @@ from guidellm.preprocess.dataset import (
     process_dataset,
     push_dataset_to_hub,
     ShortPromptStrategy,
-    STRATEGY_HANDLERS,
+    STRATEGY_HANDLERS, save_dataset_to_file,
 )
 
 
@@ -21,7 +21,7 @@ from guidellm.preprocess.dataset import (
 def tokenizer_mock():
     tokenizer = MagicMock(spec=PreTrainedTokenizerBase)
     tokenizer.encode.side_effect = lambda x: [1] * len(x)
-    tokenizer.decode.side_effect = lambda x: ''.join(str(item) for item in x)
+    tokenizer.decode.side_effect = lambda x, *args, **kwargs: ''.join(str(item) for item in x)
     return tokenizer
 
 
@@ -42,7 +42,7 @@ def test_strategy_handler_called(
     mock_dataset_obj = MagicMock(spec=Dataset)
     mock_dataset_class.from_list.return_value = mock_dataset_obj
 
-    process_dataset("input", "output_dir", tokenizer_mock, short_prompt_strategy=ShortPromptStrategy.IGNORE)
+    process_dataset("input", "output_dir/data.json", tokenizer_mock, short_prompt_strategy=ShortPromptStrategy.IGNORE)
 
     assert mock_handler.call_count == 2
     mock_load_dataset.assert_called_once()
@@ -78,13 +78,21 @@ def test_handle_pad_strategy(tokenizer_mock):
     assert result == "shortppppp"
 
 
-@patch(f"{process_dataset.__module__}.Dataset")
-@patch(f"{process_dataset.__module__}.guidellm_load_dataset")
-@patch(f"{process_dataset.__module__}.check_load_processor")
-@patch(f"{process_dataset.__module__}.IntegerRangeSampler")
+@patch("guidellm.preprocess.dataset.save_dataset_to_file")
+@patch("guidellm.preprocess.dataset.Dataset")
+@patch("guidellm.preprocess.dataset.guidellm_load_dataset")
+@patch("guidellm.preprocess.dataset.check_load_processor")
+@patch("guidellm.preprocess.dataset.IntegerRangeSampler")
 def test_process_dataset_non_empty(
-        mock_sampler, mock_check_processor, mock_load_dataset, mock_dataset_class, tokenizer_mock
+        mock_sampler,
+        mock_check_processor,
+        mock_load_dataset,
+        mock_dataset_class,
+        mock_save_to_file,
+        tokenizer_mock,
 ):
+    from guidellm.preprocess.dataset import process_dataset
+
     mock_dataset = [{"prompt": "Hello"}, {"prompt": "How are you?"}]
     mock_load_dataset.return_value = (mock_dataset, {"prompt_column": "prompt"})
     mock_check_processor.return_value = tokenizer_mock
@@ -93,14 +101,15 @@ def test_process_dataset_non_empty(
     mock_dataset_obj = MagicMock(spec=Dataset)
     mock_dataset_class.from_list.return_value = mock_dataset_obj
 
-    process_dataset("input", "output_dir", tokenizer_mock)
+    output_path = "output_dir/data.json"
+    process_dataset("input", output_path, tokenizer_mock)
 
     mock_load_dataset.assert_called_once()
     mock_check_processor.assert_called_once()
     mock_dataset_class.from_list.assert_called_once()
-    mock_dataset_obj.save_to_disk.assert_called_once_with(mock.ANY)
+    mock_save_to_file.assert_called_once_with(mock_dataset_obj, output_path)
 
-    args, kwargs = mock_dataset_class.from_list.call_args
+    args, _ = mock_dataset_class.from_list.call_args
     processed_list = args[0]
     assert len(processed_list) == 2
     for item in processed_list:
@@ -122,7 +131,7 @@ def test_process_dataset_empty_after_processing(
     mock_check_processor.return_value = tokenizer_mock
     mock_sampler.side_effect = lambda **kwargs: [10]
 
-    process_dataset("input", "output_dir", tokenizer_mock)
+    process_dataset("input", "output_dir/data.json", tokenizer_mock)
 
     mock_load_dataset.assert_called_once()
     mock_check_processor.assert_called_once()
@@ -145,7 +154,7 @@ def test_process_dataset_push_to_hub_called(
     mock_dataset_obj = MagicMock(spec=Dataset)
     mock_dataset_class.from_list.return_value = mock_dataset_obj
 
-    process_dataset("input", "output_dir", tokenizer_mock, push_to_hub=True, hub_dataset_id="id123")
+    process_dataset("input", "output_dir/data.json", tokenizer_mock, push_to_hub=True, hub_dataset_id="id123")
     mock_push.assert_called_once_with("id123", mock_dataset_obj)
 
 
@@ -165,7 +174,7 @@ def test_process_dataset_push_to_hub_not_called(
     mock_dataset_obj = MagicMock(spec=Dataset)
     mock_dataset_class.from_list.return_value = mock_dataset_obj
 
-    process_dataset("input", "output_dir", tokenizer_mock, push_to_hub=False)
+    process_dataset("input", "output_dir/data.json", tokenizer_mock, push_to_hub=False)
     mock_push.assert_not_called()
 
 
@@ -189,3 +198,39 @@ def test_push_dataset_to_hub_error_no_id():
     mock_dataset = MagicMock(spec=Dataset)
     with pytest.raises(ValueError, match="hub_dataset_id and HF_TOKEN"):
         push_dataset_to_hub(None, mock_dataset)
+
+
+@patch.object(Path, "mkdir")
+def test_save_dataset_to_file_csv(mock_mkdir):
+    mock_dataset = MagicMock(spec=Dataset)
+    output_path = Path("some/path/output.csv")
+    save_dataset_to_file(mock_dataset, output_path)
+    mock_dataset.to_csv.assert_called_once_with(str(output_path))
+    mock_mkdir.assert_called_once()
+
+
+@patch.object(Path, "mkdir")
+def test_save_dataset_to_file_json(mock_mkdir):
+    mock_dataset = MagicMock(spec=Dataset)
+    output_path = Path("some/path/output.json")
+    save_dataset_to_file(mock_dataset, output_path)
+    mock_dataset.to_json.assert_called_once_with(str(output_path))
+    mock_mkdir.assert_called_once()
+
+
+@patch.object(Path, "mkdir")
+def test_save_dataset_to_file_parquet(mock_mkdir):
+    mock_dataset = MagicMock(spec=Dataset)
+    output_path = Path("some/path/output.parquet")
+    save_dataset_to_file(mock_dataset, output_path)
+    mock_dataset.to_parquet.assert_called_once_with(str(output_path))
+    mock_mkdir.assert_called_once()
+
+
+@patch.object(Path, "mkdir")
+def test_save_dataset_to_file_unsupported_type(mock_mkdir):
+    mock_dataset = MagicMock(spec=Dataset)
+    output_path = Path("some/path/output.txt")
+    with pytest.raises(ValueError, match=r"Unsupported file suffix '.txt'.*"):
+        save_dataset_to_file(mock_dataset, output_path)
+    mock_mkdir.assert_called_once()

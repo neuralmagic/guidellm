@@ -310,7 +310,7 @@ def preprocess():
 )
 @click.argument(
     "output_path",
-    type=click.Path(file_okay=False, dir_okay=True, writable=True, resolve_path=True),
+    type=click.Path(file_okay=True, dir_okay=False, writable=True, resolve_path=True),
     metavar="OUTPUT_PATH",
     required=True,
 )
