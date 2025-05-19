@@ -64,7 +64,6 @@ class Scheduler(Generic[RequestT, ResponseT]):
 
         self.worker = worker
         self.request_loader = request_loader
-        self.error_rate: Optional[float] = None
 
     async def run(
         self,
@@ -118,8 +117,6 @@ class Scheduler(Generic[RequestT, ResponseT]):
         if max_error_rate is not None and (max_error_rate < 0 or max_error_rate > 1):
             raise ValueError(f"Invalid max_error_rate: {max_error_rate}")
 
-        shutdown_event = multiprocessing.Event()
-
         with (
             multiprocessing.Manager() as manager,
             ProcessPoolExecutor(
@@ -127,7 +124,7 @@ class Scheduler(Generic[RequestT, ResponseT]):
             ) as executor,
         ):
             requests_iter: Optional[Iterator[Any]] = None
-            futures, requests_queue, responses_queue = await self._start_processes(
+            futures, requests_queue, responses_queue, shutdown_event = await self._start_processes(
                 manager, executor, scheduling_strategy
             )
             run_info, requests_iter, times_iter = self._run_setup(
@@ -167,7 +164,9 @@ class Scheduler(Generic[RequestT, ResponseT]):
                     )
                     if iter_result is not None:
                         if self._is_max_error_rate_reached(iter_result.run_info):
-                            logger.info(f"Max_error rate of ({iter_result.run_info.max_error_rate}) reached!")
+                            logger.info(f"Max_error rate of ({iter_result.run_info.max_error_rate}) reached, sending "
+                                        f"shutdown signal")
+                            shutdown_event.set()
                         yield iter_result
 
                     # yield control to the event loop
@@ -191,8 +190,10 @@ class Scheduler(Generic[RequestT, ResponseT]):
         list[asyncio.Future],
         multiprocessing.Queue,
         multiprocessing.Queue,
+        multiprocessing.Event
     ]:
         await self.worker.prepare_multiprocessing()
+        shutdown_event = multiprocessing.Event()
         requests_queue = manager.Queue(
             maxsize=scheduling_strategy.queued_requests_limit
         )
@@ -229,6 +230,7 @@ class Scheduler(Generic[RequestT, ResponseT]):
                         requests_queue,
                         responses_queue,
                         id_,
+                        shutdown_event,
                     )
                 )
             elif scheduling_strategy.processing_mode == "async":
@@ -240,6 +242,7 @@ class Scheduler(Generic[RequestT, ResponseT]):
                         responses_queue,
                         requests_limit,
                         id_,
+                        shutdown_event,
                     )
                 )
             else:
@@ -250,7 +253,7 @@ class Scheduler(Generic[RequestT, ResponseT]):
 
         await asyncio.sleep(0.1)  # give time for processes to start
 
-        return futures, requests_queue, responses_queue
+        return futures, requests_queue, responses_queue, shutdown_event
 
     def _run_setup(
         self,
@@ -385,8 +388,7 @@ class Scheduler(Generic[RequestT, ResponseT]):
             )
         raise ValueError(f"Invalid process response type: {process_response}")
 
-    @staticmethod
-    def _is_max_error_rate_reached(run_info: SchedulerRunInfo) -> bool:
+    def _is_max_error_rate_reached(self, run_info: SchedulerRunInfo) -> bool:
         current_error_rate = run_info.errored_requests / run_info.end_number
         return current_error_rate > run_info.max_error_rate
 

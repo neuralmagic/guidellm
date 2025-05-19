@@ -121,9 +121,13 @@ class RequestsWorker(ABC, Generic[RequestT, ResponseT]):
         ...
 
     async def get_request(
-        self, requests_queue: multiprocessing.Queue
+        self, requests_queue: multiprocessing.Queue, shutdown_event: multiprocessing.Event, shutdonen_check_
     ) -> Optional[WorkerProcessRequest[RequestT]]:
-        return await asyncio.to_thread(requests_queue.get)  # type: ignore[attr-defined]
+        def _get_queue_intermittently(request_queue: multiprocessing.Queue, shutdown_event):
+            try:
+                
+
+        return await asyncio.to_thread(_get_queue_intermittently())  # type: ignore[attr-defined]
 
     async def send_result(
         self,
@@ -222,6 +226,7 @@ class RequestsWorker(ABC, Generic[RequestT, ResponseT]):
         results_queue: multiprocessing.Queue,
         max_concurrency: int,
         process_id: int,
+        shutdown_event: multiprocessing.Event,
     ):
         async def _process_runner():
             pending = asyncio.Semaphore(max_concurrency)
