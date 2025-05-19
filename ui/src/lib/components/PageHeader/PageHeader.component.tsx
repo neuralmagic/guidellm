@@ -22,7 +22,7 @@ const Component = () => {
         GuideLLM
       </Typography>
       <Typography variant="h4" color="surface.onSurface" my={'12px'}>
-        Workload Report: Single Experiment
+        Workload Report
       </Typography>
       <HeaderWrapper container>
         <HeaderCell item xs={5} withDivider sx={{ paddingLeft: 0 }}>
