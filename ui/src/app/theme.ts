@@ -1,13 +1,6 @@
 import { Palette, createTheme } from '@mui/material/styles';
 import { TypographyOptions, TypographyStyleOptions } from '@mui/material/styles/createTypography';
 
-// Spezia
-import SpeziaMedium from '../app/assets/fonts/spezia/Spezia-Medium.otf';
-import SpeziaRegular from '../app/assets/fonts/spezia/Spezia-Regular.otf';
-import SpeziaMonoMedium from '../app/assets/fonts/spezia/SpeziaMono-Medium.otf';
-export const FONT_FAMILY_SPEZIA = 'Spezia, sans-serif';
-export const FONT_FAMILY_SPEZIA_MONO = 'Spezia Mono, sans-serif';
-
 import {
   BLACK,
   WHITE,
@@ -55,6 +48,13 @@ import {
   RED_SHADES,
   OUTER_SPACE_GRAY,
 } from '../lib/utils/Colors';
+
+// Spezia
+import SpeziaMedium from './assets/fonts/spezia/Spezia-Medium.otf';
+import SpeziaRegular from './assets/fonts/spezia/Spezia-Regular.otf';
+import SpeziaMonoMedium from './assets/fonts/spezia/SpeziaMono-Medium.otf';
+export const FONT_FAMILY_SPEZIA = 'Spezia, sans-serif';
+export const FONT_FAMILY_SPEZIA_MONO = 'Spezia Mono, sans-serif';
 
 // Update the Typography's variant prop options
 declare module '@mui/material/Typography' {
