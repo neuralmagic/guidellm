@@ -15,6 +15,7 @@ from typing import (
 from loguru import logger
 
 from guidellm.config import settings
+from guidellm.request.loader import InfiniteDatasetError
 from guidellm.scheduler.result import (
     SchedulerRequestResult,
     SchedulerResult,
@@ -166,8 +167,12 @@ class Scheduler(Generic[RequestT, ResponseT]):
                         run_info,
                     )
                     if iter_result is not None:
-                        if self._is_max_error_rate_reached(iter_result.run_info):
-                            logger.info(f"Max_error rate of ({iter_result.run_info.max_error_rate}) reached!")
+                        if iter_result.request_info.errored:
+                            if self._is_max_error_rate_reached(iter_result.run_info):
+                                logger.info(f"Max_error rate of ({iter_result.run_info.max_error_rate}) reached!")
+                            else:
+                                cur_error_rate = iter_result.run_info.errored_requests / iter_result.run_info.end_number
+                                logger.debug(f"Current error rate {cur_error_rate}")
                         yield iter_result
 
                     # yield control to the event loop
@@ -271,7 +276,13 @@ class Scheduler(Generic[RequestT, ResponseT]):
             iter_length = len(self.request_loader)  # type: ignore[arg-type]
             if 0 < iter_length < end_number:
                 end_number = iter_length
-        except Exception:  # noqa: BLE001, S110
+        except InfiniteDatasetError:  # noqa: BLE001, S110
+            if scheduling_strategy.type_ == "constant" and max_duration is not None:
+                end_number = scheduling_strategy.rate * max_duration
+            else:
+                # ToDo: Maybe add poison?
+                raise
+        except Exception:
             pass
 
         if end_number == math.inf and end_time is None:

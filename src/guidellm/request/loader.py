@@ -21,7 +21,12 @@ __all__ = [
     "GenerativeRequestLoaderDescription",
     "RequestLoader",
     "RequestLoaderDescription",
+    "InfiniteDatasetError"
 ]
+
+
+class InfiniteDatasetError(Exception):
+    pass
 
 
 class RequestLoaderDescription(StandardBaseModel):
@@ -120,7 +125,8 @@ class GenerativeRequestLoader(RequestLoader):
         if self.iter_type == "finite":
             return self.num_unique_items()
 
-        raise ValueError(f"Unable to determine length of dataset: {self.data}")
+        assert self.iter_type == "infinite"
+        raise InfiniteDatasetError(f"Dataset {self.data} is infinite and thus unable to determine length")
 
     @property
     def description(self) -> GenerativeRequestLoaderDescription:

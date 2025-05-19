@@ -43,7 +43,7 @@ class SchedulerRunInfo(StandardBaseModel):
 
     start_time: float
     end_time: float
-    end_number: float
+    end_number: float  # ToDo: Rename to max_requests & change to int (check all references before)
     processes: int
     strategy: SchedulingStrategy
     max_error_rate: float
