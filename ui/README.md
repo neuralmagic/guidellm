@@ -1,37 +1,52 @@
-# GuideLLM UI
+### GuideLLM UI
 
-The GuideLLM UI is a companion to GuideLLM that allows you to visualize the peformance of your model in regards to a specific benchmark run.
+GuideLLM UI is a companion frontend for visualizing the results of a GuideLLM benchmark run.
 
-## Getting Started
+### 🛠 Running the UI
 
-The two pathways to running the UI for your benchmark report are:
+1. Use the Hosted Build (Recommended for Most Users)
 
-1. Rely on the hosted build.
+After running a benchmark with GuideLLM, a report.html file will be generated (by default at guidellm_report/report.html). This file references the latest stable version of the UI hosted at:
 
-If you choose this option, then you can just run your benchmarks and a report.html will be generated automatically. Assets will pull from the latest compatible version of GuideLLM UI. By default the report will be located
+```
+https://neuralmagic.github.io/guidellm/ui/dev/
+```
 
-2. Build locally.
+Open the file in your browser and you're done—no setup required.
 
-For this option:
+2. Build and Serve the UI Locally (For Development)
+   This option is useful if:
 
-First, install dependencies:
+- You are actively developing the UI
+
+- You want to test changes to the UI before publishing
+
+- You want full control over how the report is displayed
 
 ```bash
 npm install
-```
-
-Then
-
-```bash
 npm run build
-```
-
-This builds the app for production to the `out` folder.\
-
-Following this step you can serve the build however you like, for example:
-
-```bash
 npx serve out
 ```
 
-Tell GuideLLM you are running things locally
+This will start a local server (e.g., at http://localhost:3000). Then, in your GuideLLM config or CLI flags, point to this local server as the asset base for report generation.
+
+### 🧪 Development Notes
+
+During UI development, it can be helpful to view sample data. We include a sample benchmark run wired into the Redux store under:
+
+```
+src/lib/store/[runInfo/workloadDetails/benchmarks]WindowData.ts
+```
+
+In the future this will be replaced by a configurable untracked file for dev use.
+
+### 🚧 Future Possibilities
+
+We're evaluating options for hosting dev/staging/prod builds on GitHub Pages. For now, production builds will be published at:
+
+```
+https://neuralmagic.github.io/guidellm/ui/dev/
+```
+
+If needed, alternative hosting (e.g., Vercel, Netlify) may be explored, but simplicity and transparency remain key priorities for this open-source tool.
