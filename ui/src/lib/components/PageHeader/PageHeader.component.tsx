@@ -18,11 +18,8 @@ const Component = () => {
 
   return (
     <Box py={2}>
-      <Typography variant="h1" color="white">
-        Header
-      </Typography>
       <Typography variant="subtitle2" color="surface.onSurfaceAccent">
-        Guidellm
+        GuideLLM
       </Typography>
       <Typography variant="h4" color="surface.onSurface" my={'12px'}>
         Workload Report: Single Experiment
