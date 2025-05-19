@@ -1,5 +1,9 @@
 import React from 'react';
 
+import { benchmarksScript } from '@/lib/store/benchmarksWindowData';
+import { runInfoScript } from '@/lib/store/runInfoWindowData';
+import { workloadDetailsScript } from '@/lib/store/workloadDetailsWindowData';
+
 import './globals.css';
 
 export default function RootLayout({
@@ -21,6 +25,26 @@ export default function RootLayout({
         <meta name="title" content="GuideLLM" />
         <link rel="manifest" href={`${assetPrefix}/manifest.json`} />
         <title>Guide LLM</title>
+        {/* <script
+          dangerouslySetInnerHTML={{
+            __html: 'window.run_info = {}; window.workload_details = {}; window.benchmarks = {};',
+          }}
+        /> */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: runInfoScript,
+          }}
+        />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: workloadDetailsScript,
+          }}
+        />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: benchmarksScript,
+          }}
+        />
       </head>
       <body>{children}</body>
     </html>
