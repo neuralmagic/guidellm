@@ -1,7 +1,10 @@
 import os
 from pathlib import Path
-from typing import Iterator
+from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 import pytest
 from datasets import Dataset
@@ -29,21 +32,16 @@ def tokenizer_mock():
     return tokenizer
 
 
-from unittest.mock import MagicMock, patch
-from guidellm.preprocess.dataset import process_dataset, STRATEGY_HANDLERS, ShortPromptStrategy
-from datasets import Dataset
-
-
 @patch(f"{process_dataset.__module__}.guidellm_load_dataset")
 @patch(f"{process_dataset.__module__}.check_load_processor")
 @patch(f"{process_dataset.__module__}.Dataset")
 @patch(f"{process_dataset.__module__}.IntegerRangeSampler")
 def test_strategy_handler_called(
-    mock_sampler,
-    mock_dataset_class,
-    mock_check_processor,
-    mock_load_dataset,
-    tokenizer_mock,
+        mock_sampler,
+        mock_dataset_class,
+        mock_check_processor,
+        mock_load_dataset,
+        tokenizer_mock,
 ):
     mock_handler = MagicMock(return_value="processed_prompt")
     with patch.dict(STRATEGY_HANDLERS, {ShortPromptStrategy.IGNORE: mock_handler}):
@@ -106,12 +104,12 @@ def test_handle_pad_strategy(tokenizer_mock):
 @patch("guidellm.preprocess.dataset.check_load_processor")
 @patch("guidellm.preprocess.dataset.IntegerRangeSampler")
 def test_process_dataset_non_empty(
-    mock_sampler,
-    mock_check_processor,
-    mock_load_dataset,
-    mock_dataset_class,
-    mock_save_to_file,
-    tokenizer_mock,
+        mock_sampler,
+        mock_check_processor,
+        mock_load_dataset,
+        mock_dataset_class,
+        mock_save_to_file,
+        tokenizer_mock,
 ):
     from guidellm.preprocess.dataset import process_dataset
 
@@ -146,11 +144,11 @@ def test_process_dataset_non_empty(
 @patch(f"{process_dataset.__module__}.check_load_processor")
 @patch(f"{process_dataset.__module__}.IntegerRangeSampler")
 def test_process_dataset_empty_after_processing(
-    mock_sampler,
-    mock_check_processor,
-    mock_load_dataset,
-    mock_dataset_class,
-    tokenizer_mock,
+        mock_sampler,
+        mock_check_processor,
+        mock_load_dataset,
+        mock_dataset_class,
+        tokenizer_mock,
 ):
     mock_dataset = [{"prompt": ""}]
     mock_load_dataset.return_value = (mock_dataset, {"prompt_column": "prompt"})
@@ -170,12 +168,12 @@ def test_process_dataset_empty_after_processing(
 @patch(f"{process_dataset.__module__}.check_load_processor")
 @patch(f"{process_dataset.__module__}.IntegerRangeSampler")
 def test_process_dataset_push_to_hub_called(
-    mock_sampler,
-    mock_check_processor,
-    mock_load_dataset,
-    mock_dataset_class,
-    mock_push,
-    tokenizer_mock,
+        mock_sampler,
+        mock_check_processor,
+        mock_load_dataset,
+        mock_dataset_class,
+        mock_push,
+        tokenizer_mock,
 ):
     mock_dataset = [{"prompt": "abc"}]
     mock_load_dataset.return_value = (mock_dataset, {"prompt_column": "prompt"})
@@ -201,12 +199,12 @@ def test_process_dataset_push_to_hub_called(
 @patch(f"{process_dataset.__module__}.check_load_processor")
 @patch(f"{process_dataset.__module__}.IntegerRangeSampler")
 def test_process_dataset_push_to_hub_not_called(
-    mock_sampler,
-    mock_check_processor,
-    mock_load_dataset,
-    mock_dataset_class,
-    mock_push,
-    tokenizer_mock,
+        mock_sampler,
+        mock_check_processor,
+        mock_load_dataset,
+        mock_dataset_class,
+        mock_push,
+        tokenizer_mock,
 ):
     mock_dataset = [{"prompt": "abc"}]
     mock_load_dataset.return_value = (mock_dataset, {"prompt_column": "prompt"})

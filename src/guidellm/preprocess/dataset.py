@@ -212,7 +212,9 @@ def process_dataset(
         logger.info(f"Pushed dataset to: {hub_dataset_id}")
 
 
-def push_dataset_to_hub(hub_dataset_id: Optional[str], processed_dataset: Dataset) -> None:
+def push_dataset_to_hub(
+        hub_dataset_id: Optional[str], processed_dataset: Dataset,
+) -> None:
     hf_token = os.environ.get("HF_TOKEN")
     if not hub_dataset_id or not hf_token:
         raise ValueError(
