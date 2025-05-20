@@ -15,11 +15,15 @@ from pydantic import BaseModel, Field
 from transformers import PreTrainedTokenizerBase  # type: ignore[import]
 
 from guidellm.dataset.creator import ColumnInputTypes, DatasetCreator
-from guidellm.utils import EndlessTextCreator, IntegerRangeSampler, check_load_processor
+from guidellm.utils import (
+    EndlessTextCreator,
+    IntegerDistributionSampler,
+    check_load_processor,
+)
 
 __all__ = [
-    "SyntheticDatasetCreator",
     "SyntheticDatasetConfig",
+    "SyntheticDatasetCreator",
     "SyntheticTextItemsGenerator",
 ]
 
@@ -147,16 +151,16 @@ class SyntheticTextItemsGenerator(
             Union[str, int],
         ]
     ]:
-        prompt_tokens_sampler = IntegerRangeSampler(
-            average=self.config.prompt_tokens,
-            variance=self.config.prompt_tokens_stdev,
+        prompt_tokens_sampler = IntegerDistributionSampler(
+            mean=self.config.prompt_tokens,
+            variance=self.config.prompt_tokens_stdev**2,
             min_value=self.config.prompt_tokens_min,
             max_value=self.config.prompt_tokens_max,
             random_seed=self.random_seed,
         )
-        output_tokens_sampler = IntegerRangeSampler(
-            average=self.config.output_tokens,
-            variance=self.config.output_tokens_stdev,
+        output_tokens_sampler = IntegerDistributionSampler(
+            mean=self.config.output_tokens,
+            variance=self.config.output_tokens_stdev**2,
             min_value=self.config.output_tokens_min,
             max_value=self.config.output_tokens_max,
             random_seed=self.random_seed + 1,  # ensure diff dist from prompts
