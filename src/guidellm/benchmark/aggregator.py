@@ -599,8 +599,8 @@ class GenerativeBenchmarkAggregator(
         and return the compiled object.
         """
         successful, incomplete, errored = self._compile_results()
-        error_rate = self.requests_stats.totals.errored.total / \
-            (self.requests_stats.totals.successful.total + self.requests_stats.totals.errored.total)
+
+        error_rate = self._calculate_error_rate()
 
         return GenerativeBenchmark.from_stats(
             run_id=self.run_id,
@@ -633,6 +633,12 @@ class GenerativeBenchmarkAggregator(
             requests_loader=self.request_loader_description,
             extras=self.extras,
         )
+
+    def _calculate_error_rate(self) -> float:
+        total_successful = self.requests_stats.totals.successful.total
+        total_errored = self.requests_stats.totals.errored.total
+        total_sent = total_errored + total_successful
+        return total_errored / total_sent
 
     def _compile_results(
         self,

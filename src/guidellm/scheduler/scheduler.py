@@ -15,7 +15,7 @@ from typing import (
 from loguru import logger
 
 from guidellm.config import settings
-from guidellm.request.loader import InfiniteDatasetError
+from guidellm.request.loader import GetInfiniteDatasetLengthError
 from guidellm.scheduler.result import (
     SchedulerRequestResult,
     SchedulerResult,
@@ -101,24 +101,15 @@ class Scheduler(Generic[RequestT, ResponseT]):
         :param max_duration: The maximum duration for the scheduling run.
             If None, then no limit is set and either the iterator must be exhaustible
             or the max_number must be set.
-        :param max_error_rate: The maximum error rate after which the scheduler shuts down.
+        :param max_error_rate: The maximum error rate after which the
+            scheduler shuts down.
             Only applicable in benchmarks with finite deterministic number of requests.
             If None or not applicable then scheduler will continue regardless of errors.
         :return: An asynchronous generator that yields SchedulerResult objects.
             Each SchedulerResult object contains information about the request,
             the response, and the run information.
         """
-        if scheduling_strategy is None or not isinstance(
-            scheduling_strategy, SchedulingStrategy
-        ):
-            raise ValueError(f"Invalid scheduling strategy: {scheduling_strategy}")
-
-        if max_number is not None and max_number < 1:
-            raise ValueError(f"Invalid max_number: {max_number}")
-        if max_duration is not None and max_duration < 0:
-            raise ValueError(f"Invalid max_duration: {max_duration}")
-        if max_error_rate is not None and (max_error_rate < 0 or max_error_rate > 1):
-            raise ValueError(f"Invalid max_error_rate: {max_error_rate}")
+        self._validate_scheduler_params(scheduling_strategy, max_duration, max_error_rate, max_number)
 
         with (
             multiprocessing.Manager() as manager,
@@ -127,11 +118,13 @@ class Scheduler(Generic[RequestT, ResponseT]):
             ) as executor,
         ):
             requests_iter: Optional[Iterator[Any]] = None
-            futures, requests_queue, responses_queue, shutdown_event = await self._start_processes(
-                manager, executor, scheduling_strategy, max_error_rate is not None
-            )
-            if shutdown_event:
-                assert not shutdown_event.is_set(),  "shutdown_event is set before starting scheduling"
+            futures, requests_queue, responses_queue, shutdown_event = \
+                await self._start_processes(
+                    manager, executor, scheduling_strategy, max_error_rate is not None)
+            if shutdown_event and shutdown_event.is_set():
+                raise RuntimeError(
+                    "shutdown_event is set before starting scheduling"
+                )
             run_info, requests_iter, times_iter = self._run_setup(
                 futures, scheduling_strategy, max_number, max_duration, max_error_rate
             )
@@ -169,17 +162,14 @@ class Scheduler(Generic[RequestT, ResponseT]):
                         run_info,
                     )
                     if iter_result is not None:
-                        if iter_result.request_info.errored and not iter_result.request_info.canceled:
-                            current_error_rate = run_info.errored_requests / run_info.end_number
-                            is_over_max_error_rate = run_info.max_error_rate < current_error_rate
-
-                            if is_over_max_error_rate:
-                                shutdown_event.set()
-                                max_error_rate_reached = True
-                                logger.info(f"Max error rate of ({iter_result.run_info.max_error_rate}) "
-                                            f"reached, sending shutdown signal")
-                            else:
-                                logger.debug(f"Current error rate: {current_error_rate}")
+                        if iter_result.request_info.errored \
+                            and not iter_result.request_info.canceled \
+                                and self._is_max_error_rate_reached(iter_result.run_info):
+                            shutdown_event.set()
+                            max_error_rate_reached = True
+                            logger.info(f"Max error rate of "
+                                        f"({iter_result.run_info.max_error_rate}) "
+                                        f"reached, sending shutdown signal")
                         yield iter_result
 
                     # yield control to the event loop
@@ -193,6 +183,28 @@ class Scheduler(Generic[RequestT, ResponseT]):
             )
 
             await self._stop_processes(futures, requests_queue)
+
+    def _validate_scheduler_params(
+            self,
+            scheduling_strategy: SchedulingStrategy,
+            max_duration: Optional[float],
+            max_error_rate: Optional[float],
+            max_number: Optional[int]
+    ) -> None:
+        if scheduling_strategy is None or not isinstance(
+                scheduling_strategy, SchedulingStrategy
+        ):
+            raise ValueError(f"Invalid scheduling strategy: {scheduling_strategy}")
+        if max_number is not None and max_number < 1:
+            raise ValueError(f"Invalid max_number: {max_number}")
+        if max_duration is not None and max_duration < 0:
+            raise ValueError(f"Invalid max_duration: {max_duration}")
+        if max_error_rate is not None and (max_error_rate < 0 or max_error_rate > 1):
+            raise ValueError(f"Invalid max_error_rate: {max_error_rate}")
+
+    def _is_max_error_rate_reached(self, run_info) -> bool:
+        current_error_rate = run_info.errored_requests / run_info.end_number
+        return run_info.max_error_rate < current_error_rate
 
     async def _start_processes(
         self,
@@ -282,10 +294,13 @@ class Scheduler(Generic[RequestT, ResponseT]):
         start_time = time.time()
         times_iter = iter(scheduling_strategy.request_times())
         end_time = time.time() + (max_duration or math.inf)
-        end_number = self._determine_total_requests_count(scheduling_strategy, max_duration, max_number)
+        end_number = self._determine_total_requests_count(
+            scheduling_strategy, max_duration, max_number
+        )
 
         if end_number == math.inf and max_error_rate is not None:
-            logger.warning("max_error_rate will be ignored because end_number can not be determined.")
+            logger.warning("max_error_rate will be ignored "
+                           "because end_number can not be determined.")
 
         if end_number == math.inf and end_time is None:
             logger.warning(
@@ -312,17 +327,19 @@ class Scheduler(Generic[RequestT, ResponseT]):
     ) -> int:
         end_number = max_number or math.inf
         try:
-            # update end number if the request loader is finite and less than max
+            # update end_number if the request_loader is finite and less than max_number
             iter_length = len(self.request_loader)  # type: ignore[arg-type]
             if 0 < iter_length < end_number:
                 end_number = iter_length
-        except InfiniteDatasetError:
-            # Only when RPS is constant and duration is capped we can determine the total
-            # amount of requests that are supposed to be sent
+        except GetInfiniteDatasetLengthError:
+            # Only when RPS is constant and duration is
+            # capped we can determine the total amount of requests
+            # that are supposed to be sent
             if scheduling_strategy.type_ == "constant" and max_duration is not None:
-                total_requests_in_max_duration = int(scheduling_strategy.rate * max_duration)
-                if total_requests_in_max_duration < end_number:
-                    assert total_requests_in_max_duration > 0
+                total_requests_in_max_duration = int(
+                    scheduling_strategy.rate * max_duration
+                )
+                if 0 < total_requests_in_max_duration < end_number:
                     end_number = total_requests_in_max_duration
         except Exception:  # noqa: BLE001, S110
             pass

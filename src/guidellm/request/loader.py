@@ -19,13 +19,13 @@ from guidellm.request.request import GenerationRequest
 __all__ = [
     "GenerativeRequestLoader",
     "GenerativeRequestLoaderDescription",
+    "GetInfiniteDatasetLengthError",
     "RequestLoader",
     "RequestLoaderDescription",
-    "InfiniteDatasetError"
 ]
 
 
-class InfiniteDatasetError(Exception):
+class GetInfiniteDatasetLengthError(Exception):
     pass
 
 
@@ -125,8 +125,11 @@ class GenerativeRequestLoader(RequestLoader):
         if self.iter_type == "finite":
             return self.num_unique_items()
 
-        assert self.iter_type == "infinite"
-        raise InfiniteDatasetError(f"Dataset {self.data} is infinite and thus unable to determine length")
+        if self.iter_type != "infinite":
+            raise ValueError(f"Invalid iter_type {self.iter_type}")
+        raise GetInfiniteDatasetLengthError(f"Dataset {self.data} is "
+                                            f"infinite and thus "
+                                            f"unable to determine length")
 
     @property
     def description(self) -> GenerativeRequestLoaderDescription:

@@ -168,7 +168,8 @@ def cli():
     type=float,
     help=(
         "The maximum error rate after which a benchmark will stop. "
-        "Applicable only for finite deterministic scenarios i.e rate_type is 'constant' and 'max_seconds' exists OR "
+        "Applicable only for finite deterministic scenarios i.e "
+        "rate_type is 'constant' and 'max_seconds' exists OR "
         "'max_requests' exists OR the dataset is finite. "
         "If None or not applicable, benchmarks will continue regardless of error rate."
     ),

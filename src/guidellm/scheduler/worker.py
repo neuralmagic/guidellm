@@ -128,18 +128,26 @@ class RequestsWorker(ABC, Generic[RequestT, ResponseT]):
             process_id: Optional[int] = None,
     ) -> Optional[WorkerProcessRequest[RequestT]]:
         if shutdown_event is not None and process_id is None:
-            logger.warning("shutdown_event is not None and process_id is None which makes it hard to debug")
+            logger.warning("shutdown_event is not None and process_id "
+                           "is None which makes it hard to debug")
 
         def _get_queue_intermittently():
-            assert shutdown_event is not None
+            if shutdown_event is None:
+                raise ValueError("Shouldn't use _get_queue_intermittently "
+                                 "if there's no shutdown_even")
             while True:
                 try:
-                    return requests_queue.get(timeout=timedelta(seconds=1).total_seconds())
+                    get_timeout = timedelta(seconds=1).total_seconds()
+                    return requests_queue.get(timeout=get_timeout)
                 except queue.Empty:
                     if shutdown_event.is_set():
                         logger.info(f"Shutdown signal received in future {process_id}")
-                        return
-        return await asyncio.to_thread(_get_queue_intermittently if shutdown_event is not None else requests_queue.get)  # type: ignore[attr-defined]
+                        return None
+
+        get_method = _get_queue_intermittently \
+            if shutdown_event is not None \
+            else requests_queue.get
+        return await asyncio.to_thread(get_method)  # type: ignore[attr-defined]
 
     async def send_result(
         self,
@@ -165,7 +173,8 @@ class RequestsWorker(ABC, Generic[RequestT, ResponseT]):
             scheduled_time=time.time(),
             process_id=process_id,
         )
-        request_scheduled_result: WorkerProcessResult[RequestT, ResponseT] = WorkerProcessResult(
+        request_scheduled_result: WorkerProcessResult[RequestT, ResponseT] = \
+            WorkerProcessResult(
             type_="request_scheduled",
             request=request,
             response=None,
