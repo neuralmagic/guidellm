@@ -600,7 +600,7 @@ class GenerativeBenchmarkAggregator(
         """
         successful, incomplete, errored = self._compile_results()
         error_rate = self.requests_stats.totals.errored.total / \
-            (self.requests_stats.totals.successful + self.requests_stats.totals.errored.total)
+            (self.requests_stats.totals.successful.total + self.requests_stats.totals.errored.total)
 
         return GenerativeBenchmark.from_stats(
             run_id=self.run_id,
