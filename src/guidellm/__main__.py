@@ -29,20 +29,6 @@ def parse_json(ctx, param, value):  # noqa: ARG001
         raise click.BadParameter(f"{param.name} must be a valid JSON string.") from err
 
 
-def parse_number_str(ctx, param, value):  # noqa: ARG001
-    if value is None:
-        return None
-
-    values = value.split(",") if "," in value else [value]
-
-    try:
-        return [float(val) for val in values]
-    except ValueError as err:
-        raise click.BadParameter(
-            f"{param.name} must be a number or comma-separated list of numbers."
-        ) from err
-
-
 def set_if_not_default(ctx: click.Context, **kwargs):
     """
     Set the value of a click option if it is not the default value.
@@ -159,7 +145,6 @@ def cli():
 @click.option(
     "--rate",
     default=GenerativeTextScenario.model_fields["rate"].default,
-    callback=parse_number_str,
     help=(
         "The rates to run the benchmark at. "
         "Can be a single number or a comma-separated list of numbers. "
