@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import get_args
 
 import click
+from pydantic import ValidationError
 
 from guidellm.backend import BackendType
 from guidellm.benchmark import ProfileType
@@ -67,13 +68,10 @@ def cli():
     "--scenario",
     type=str,
     default=None,
-    help=(
-        "TODO: A scenario or path to config"
-    ),
+    help=("TODO: A scenario or path to config"),
 )
 @click.option(
     "--target",
-    required=True,
     type=str,
     help="The target path for the backend to run benchmarks against. For example, http://localhost:8000",
 )
@@ -125,7 +123,6 @@ def cli():
 )
 @click.option(
     "--data",
-    required=True,
     type=str,
     help=(
         "The HuggingFace dataset ID, a path to a HuggingFace dataset, "
@@ -153,7 +150,6 @@ def cli():
 )
 @click.option(
     "--rate-type",
-    required=True,
     type=click.Choice(STRATEGY_PROFILE_CHOICES),
     help=(
         "The type of benchmark to run. "
@@ -305,12 +301,19 @@ def benchmark(
         random_seed=random_seed,
     )
 
-    # If a scenario file was specified read from it
-    if scenario is None:
-        _scenario = GenerativeTextScenario.model_validate(overrides)
-    else:
-        # TODO: Support pre-defined scenarios
-        _scenario = GenerativeTextScenario.from_file(scenario, overrides)
+    try:
+        # If a scenario file was specified read from it
+        if scenario is None:
+            _scenario = GenerativeTextScenario.model_validate(overrides)
+        else:
+            # TODO: Support pre-defined scenarios
+            _scenario = GenerativeTextScenario.from_file(scenario, overrides)
+    except ValidationError as e:
+        errs = e.errors(include_url=False, include_context=True, include_input=True)
+        param_name = "--" + str(errs[0]["loc"][0]).replace("_", "-")
+        raise click.BadParameter(
+            errs[0]["msg"], ctx=click_ctx, param_hint=param_name
+        ) from e
 
     asyncio.run(
         benchmark_with_scenario(
