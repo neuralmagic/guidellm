@@ -1,0 +1,11 @@
+# Example PVC - update to match your cluster
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: guidellm-output-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
