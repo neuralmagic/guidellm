@@ -284,18 +284,7 @@ def benchmark(
 ):
     click_ctx = click.get_current_context()
 
-    # If a scenario file was specified read from it
-    # TODO: This should probably be a factory method
-    if scenario is None:
-        _scenario = {}
-    else:
-        # TODO: Support pre-defined scenarios
-        # TODO: Support other formats
-        with Path(scenario).open() as f:
-            _scenario = json.load(f)
-
-    # If any command line arguments are specified, override the scenario
-    _scenario.update(set_if_not_default(
+    overrides = set_if_not_default(
         click_ctx,
         target=target,
         backend_type=backend_type,
@@ -314,11 +303,18 @@ def benchmark(
         cooldown_percent=cooldown_percent,
         output_sampling=output_sampling,
         random_seed=random_seed,
-    ))
+    )
+
+    # If a scenario file was specified read from it
+    if scenario is None:
+        _scenario = GenerativeTextScenario.model_validate(overrides)
+    else:
+        # TODO: Support pre-defined scenarios
+        _scenario = GenerativeTextScenario.from_file(scenario, overrides)
 
     asyncio.run(
         benchmark_with_scenario(
-            scenario=GenerativeTextScenario(**_scenario),
+            scenario=_scenario,
             show_progress=not disable_progress,
             show_progress_scheduler_stats=display_scheduler_stats,
             output_console=not disable_console_outputs,
