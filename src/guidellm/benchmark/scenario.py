@@ -52,7 +52,7 @@ class GenerativeTextScenario(Scenario):
     data_args: Optional[dict[str, Any]] = None
     data_sampler: Optional[Literal["random"]] = None
     rate_type: Union[StrategyType, ProfileType]
-    rate: Optional[Union[int, float, list[Union[int, float]]]] = None
+    rate: Optional[Union[float, list[float]]] = None
     max_seconds: Optional[float] = None
     max_requests: Optional[int] = None
     warmup_percent: Optional[float] = None
