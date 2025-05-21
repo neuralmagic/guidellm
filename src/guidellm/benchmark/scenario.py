@@ -6,7 +6,7 @@ from typing import Annotated, Any, Literal, Optional, TypeVar, Union
 import yaml
 from datasets import Dataset, DatasetDict, IterableDataset, IterableDatasetDict
 from loguru import logger
-from pydantic import BeforeValidator
+from pydantic import BeforeValidator, Field, NonNegativeInt, PositiveFloat, PositiveInt
 from transformers.tokenization_utils_base import (  # type: ignore[import]
     PreTrainedTokenizerBase,
 )
@@ -81,10 +81,12 @@ class GenerativeTextScenario(Scenario):
     data_args: Optional[dict[str, Any]] = None
     data_sampler: Optional[Literal["random"]] = None
     rate_type: Union[StrategyType, ProfileType]
-    rate: Annotated[Optional[list[float]], BeforeValidator(parse_float_list)] = None
-    max_seconds: Optional[float] = None
-    max_requests: Optional[int] = None
-    warmup_percent: Optional[float] = None
-    cooldown_percent: Optional[float] = None
-    output_sampling: Optional[int] = None
+    rate: Annotated[
+        Optional[list[PositiveFloat]], BeforeValidator(parse_float_list)
+    ] = None
+    max_seconds: Optional[PositiveFloat] = None
+    max_requests: Optional[PositiveInt] = None
+    warmup_percent: Annotated[Optional[float], Field(gt=0, le=1)] = None
+    cooldown_percent: Annotated[Optional[float], Field(gt=0, le=1)] = None
+    output_sampling: Optional[NonNegativeInt] = None
     random_seed: int = 42
