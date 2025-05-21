@@ -168,13 +168,17 @@ class Scheduler(Generic[RequestT, ResponseT]):
                         run_info,
                     )
                     if iter_result is not None:
-                        if iter_result.request_info.errored \
-                                and not iter_result.request_info.canceled \
-                                and self._is_max_error_rate_reached(iter_result.run_info):
-                            shutdown_event.set()
-                            max_error_rate_reached = True
-                            logger.info(f"Max_error rate of ({iter_result.run_info.max_error_rate}) "
-                                        f"reached, sending shutdown signal")
+                        if iter_result.request_info.errored and not iter_result.request_info.canceled:
+                            current_error_rate = run_info.errored_requests / run_info.end_number
+                            is_over_max_error_rate = run_info.max_error_rate < current_error_rate
+
+                            if is_over_max_error_rate:
+                                shutdown_event.set()
+                                max_error_rate_reached = True
+                                logger.info(f"Max error rate of ({iter_result.run_info.max_error_rate}) "
+                                            f"reached, sending shutdown signal")
+                            else:
+                                logger.debug(f"Current error rate: {current_error_rate}")
                         yield iter_result
 
                     # yield control to the event loop
@@ -414,11 +418,6 @@ class Scheduler(Generic[RequestT, ResponseT]):
                 response=process_response.response,
             )
         raise ValueError(f"Invalid process response type: {process_response}")
-
-    @staticmethod
-    def _is_max_error_rate_reached(run_info: SchedulerRunInfo) -> bool:
-        current_error_rate = run_info.errored_requests / run_info.end_number
-        return current_error_rate > run_info.max_error_rate
 
     async def _stop_processes(
         self,
