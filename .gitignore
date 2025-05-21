@@ -178,4 +178,6 @@ cython_debug/
 # Project specific files
 *.json
 *.yaml
+
+# Turn off UI related ignores, defer to ui/.gitignore
 !ui/**/*.json
