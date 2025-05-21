@@ -147,7 +147,7 @@ The `guidellm benchmark` command is used to run benchmarks against a generative 
 
 - `--max-requests`: Sets the maximum number of requests for each benchmark run. If not provided, the benchmark will run until `--max-seconds` is reached or the dataset is exhausted.
 
-- `--max-error-rate`: The maximum error rate after which a benchmark will stop. Applicable only for finite deterministic scenarios i.e `rate_type` is `constant` and `--max-seconds` exists OR `--max-requests` exists OR the dataset is finite. If `--max-error-rate` is `None`, benchmarks will continue regardless of error rate.
+- `--max-error-rate`: The maximum error rate after which a benchmark will stop. Applicable only for finite deterministic scenarios i.e `rate_type` is `constant` and `--max-seconds` exists OR `--max-requests` exists OR the dataset is finite. If `--max-error-rate` is `None` or not applicable, benchmarks will continue regardless of error rate.
 
 - `--warmup-percent`: Specifies the percentage of the benchmark to treat as a warmup phase. Requests during this phase are excluded from the final results.
 

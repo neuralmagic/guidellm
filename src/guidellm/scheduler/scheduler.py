@@ -102,7 +102,8 @@ class Scheduler(Generic[RequestT, ResponseT]):
             If None, then no limit is set and either the iterator must be exhaustible
             or the max_number must be set.
         :param max_error_rate: The maximum error rate after which the scheduler shuts down.
-            If not provided a default of 5% i.e 0.05 is used.
+            Only applicable in benchmarks with finite deterministic number of requests.
+            If None or not applicable then scheduler will continue regardless of errors.
         :return: An asynchronous generator that yields SchedulerResult objects.
             Each SchedulerResult object contains information about the request,
             the response, and the run information.
@@ -130,7 +131,7 @@ class Scheduler(Generic[RequestT, ResponseT]):
                 manager, executor, scheduling_strategy, max_error_rate is not None
             )
             if shutdown_event:
-                assert not shutdown_event.is_set()
+                assert not shutdown_event.is_set(),  "shutdown_event is set before starting scheduling"
             run_info, requests_iter, times_iter = self._run_setup(
                 futures, scheduling_strategy, max_number, max_duration, max_error_rate
             )

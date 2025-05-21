@@ -710,7 +710,7 @@ class GenerativeBenchmark(Benchmark):
             *["incomplete"] * len(incomplete),  # type: ignore[list-item]
             *["error"] * len(errored),  # type: ignore[list-item]
         ]
-        start_time = min(req.start_time for req in total) # ToDo: Fix if total is empty
+        start_time = min(req.start_time for req in total)
         end_time = max(req.end_time for req in total)
 
         total_with_prompt, total_types_with_prompt = (

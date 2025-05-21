@@ -170,7 +170,7 @@ def cli():
         "The maximum error rate after which a benchmark will stop. "
         "Applicable only for finite deterministic scenarios i.e rate_type is 'constant' and 'max_seconds' exists OR "
         "'max_requests' exists OR the dataset is finite. "
-        "If None, benchmarks will continue regardless of error rate."
+        "If None or not applicable, benchmarks will continue regardless of error rate."
     ),
 )
 @click.option(
