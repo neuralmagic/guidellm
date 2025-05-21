@@ -1,11 +1,12 @@
 import json
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, Literal, Optional, TypeVar, Union
+from typing import Annotated, Any, Literal, Optional, TypeVar, Union
 
 import yaml
 from datasets import Dataset, DatasetDict, IterableDataset, IterableDatasetDict
 from loguru import logger
+from pydantic import BeforeValidator
 from transformers.tokenization_utils_base import (  # type: ignore[import]
     PreTrainedTokenizerBase,
 )
@@ -16,6 +17,23 @@ from guidellm.objects.pydantic import StandardBaseModel
 from guidellm.scheduler.strategy import StrategyType
 
 __ALL__ = ["Scenario", "GenerativeTextScenario"]
+
+
+def parse_float_list(value: Union[str, float, list[float]]) -> list[float]:
+    if isinstance(value, (int, float)):
+        return [value]
+    elif isinstance(value, list):
+        return value
+
+    values = value.split(",") if "," in value else [value]
+
+    try:
+        return [float(val) for val in values]
+    except ValueError as err:
+        raise ValueError(
+            "must be a number or comma-separated list of numbers."
+        ) from err
+
 
 T = TypeVar("T", bound="Scenario")
 
@@ -63,7 +81,7 @@ class GenerativeTextScenario(Scenario):
     data_args: Optional[dict[str, Any]] = None
     data_sampler: Optional[Literal["random"]] = None
     rate_type: Union[StrategyType, ProfileType]
-    rate: Optional[Union[float, list[float]]] = None
+    rate: Annotated[Optional[list[float]], BeforeValidator(parse_float_list)] = None
     max_seconds: Optional[float] = None
     max_requests: Optional[int] = None
     warmup_percent: Optional[float] = None
