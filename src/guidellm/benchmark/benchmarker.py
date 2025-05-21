@@ -75,7 +75,7 @@ class BenchmarkerStrategyLimits(StandardBaseModel):
         ge=0,
     )
     max_error_rate: Optional[float] = Field(
-        description="Maximum error rate after which a sync benchmark will stop",
+        description="Maximum error rate after which a benchmark will stop",
         ge=0,
         le=1,
     )
