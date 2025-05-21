@@ -72,7 +72,7 @@ class Scheduler(Generic[RequestT, ResponseT]):
         scheduling_strategy: SchedulingStrategy,
         max_number: Optional[int] = None,
         max_duration: Optional[float] = None,
-        max_error_rate: Optional[float] = 0,
+        max_error_rate: Optional[float] = None,
     ) -> AsyncGenerator[
         Union[SchedulerResult, SchedulerRequestResult[RequestT, ResponseT]], None
     ]:
@@ -140,7 +140,8 @@ class Scheduler(Generic[RequestT, ResponseT]):
             )
 
             try:
-                while True:
+                max_error_rate_reached = False
+                while not max_error_rate_reached:
                     # check errors and raise them
                     for future in futures:
                         if future.done() and (err := future.exception()) is not None:
@@ -167,17 +168,13 @@ class Scheduler(Generic[RequestT, ResponseT]):
                         run_info,
                     )
                     if iter_result is not None:
-                        if iter_result.request_info.errored:
-                            if self._is_max_error_rate_reached(iter_result.run_info):
-                                logger.info(f"Max_error rate of ({iter_result.run_info.max_error_rate}) "
-                                            f"reached, sending shutdown signal")
-                                shutdown_event.set()
-                                break
-                            # else:
-                            #     # ToDo: Delete this else clause
-                            #     cur_error_rate = iter_result.run_info.errored_requests / iter_result.run_info.end_number
-                            #     logger.info(f"Current error rate {cur_error_rate}")
-
+                        if iter_result.request_info.errored \
+                                and not iter_result.request_info.canceled \
+                                and self._is_max_error_rate_reached(iter_result.run_info):
+                            shutdown_event.set()
+                            max_error_rate_reached = True
+                            logger.info(f"Max_error rate of ({iter_result.run_info.max_error_rate}) "
+                                        f"reached, sending shutdown signal")
                         yield iter_result
 
                     # yield control to the event loop
@@ -280,27 +277,10 @@ class Scheduler(Generic[RequestT, ResponseT]):
         start_time = time.time()
         times_iter = iter(scheduling_strategy.request_times())
         end_time = time.time() + (max_duration or math.inf)
-        end_number = max_number or math.inf
-
-        try:
-            # update end number if the request loader is finite and less than max
-            iter_length = len(self.request_loader)  # type: ignore[arg-type]
-            if 0 < iter_length < end_number:
-                end_number = iter_length
-        except InfiniteDatasetError:  # noqa: BLE001, S110
-            if scheduling_strategy.type_ == "constant" and max_duration is not None:
-                total_requests_in_max_duration = int(scheduling_strategy.rate * max_duration)
-                if total_requests_in_max_duration < end_number:
-                    assert total_requests_in_max_duration > 0
-                    end_number = total_requests_in_max_duration
-            else:
-                # ToDo: Add poison
-                raise
-        except Exception:
-            pass
+        end_number = self._determine_total_requests_count(scheduling_strategy, max_duration, max_error_rate, max_number)
 
         if end_number == math.inf and max_error_rate is not None:
-            raise RuntimeError("Can't ensure max_error_rate since can't calculate total requests count")
+            logger.warning("max_error_rate will be ignored because end_number can not be determined.")
 
         if end_number == math.inf and end_time is None:
             logger.warning(
@@ -318,6 +298,33 @@ class Scheduler(Generic[RequestT, ResponseT]):
         )
 
         return info, requests_iter, times_iter
+
+    def _determine_total_requests_count(
+            self,
+            scheduling_strategy: SchedulingStrategy,
+            max_duration: Optional[float],
+            max_error_rate: Optional[float],
+            max_number: Optional[int],
+    ) -> int:
+        end_number = max_number or math.inf
+        try:
+            # update end number if the request loader is finite and less than max
+            iter_length = len(self.request_loader)  # type: ignore[arg-type]
+            if 0 < iter_length < end_number:
+                end_number = iter_length
+        except InfiniteDatasetError:  # noqa: BLE001, S110
+            if scheduling_strategy.type_ == "constant" and max_duration is not None:
+                total_requests_in_max_duration = int(scheduling_strategy.rate * max_duration)
+                if total_requests_in_max_duration < end_number:
+                    assert total_requests_in_max_duration > 0
+                    end_number = total_requests_in_max_duration
+            else:
+                if max_error_rate:
+                    logger.warning()
+                raise
+        except Exception:
+            pass
+        return end_number
 
     def _add_requests(
         self,
