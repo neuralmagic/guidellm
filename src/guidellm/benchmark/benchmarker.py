@@ -74,6 +74,11 @@ class BenchmarkerStrategyLimits(StandardBaseModel):
         description="Maximum duration (in seconds) to process requests per strategy.",
         ge=0,
     )
+    max_error_rate: Optional[float] = Field(
+        description="Maximum error rate after which a sync benchmark will stop",
+        ge=0,
+        le=1,
+    )
     warmup_percent_per_strategy: Optional[float] = Field(
         description="Percentage of requests to use for warmup.",
         ge=0,
@@ -148,6 +153,7 @@ class Benchmarker(Generic[AggregatorT, BenchmarkT, RequestT, ResponseT], ABC):
         profile: Profile,
         max_number_per_strategy: Optional[int],
         max_duration_per_strategy: Optional[float],
+        max_error_rate: Optional[float],
         warmup_percent_per_strategy: Optional[float],
         cooldown_percent_per_strategy: Optional[float],
     ) -> AsyncGenerator[
@@ -162,6 +168,7 @@ class Benchmarker(Generic[AggregatorT, BenchmarkT, RequestT, ResponseT], ABC):
             requests_loader_size=requests_loader_size,
             max_number_per_strategy=max_number_per_strategy,
             max_duration_per_strategy=max_duration_per_strategy,
+            max_error_rate=max_error_rate,
             warmup_percent_per_strategy=warmup_percent_per_strategy,
             cooldown_percent_per_strategy=cooldown_percent_per_strategy,
         )
@@ -196,6 +203,7 @@ class Benchmarker(Generic[AggregatorT, BenchmarkT, RequestT, ResponseT], ABC):
                 scheduling_strategy=scheduling_strategy,
                 max_number=max_number_per_strategy,
                 max_duration=max_duration_per_strategy,
+                max_error_rate=max_error_rate,
             ):
                 if result.type_ == "run_start":
                     yield BenchmarkerResult(
@@ -321,6 +329,7 @@ class GenerativeBenchmarker(
                 strategy=strategy,
                 max_number=limits.max_number,
                 max_duration=limits.max_duration,
+                max_error_rate=limits.max_error_rate,
                 warmup_number=limits.warmup_number,
                 warmup_duration=limits.warmup_duration,
                 cooldown_number=limits.cooldown_number,

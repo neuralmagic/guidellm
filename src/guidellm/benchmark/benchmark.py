@@ -90,6 +90,9 @@ class BenchmarkArgs(StandardBaseModel):
     max_duration: Optional[float] = Field(
         description="The maximum duration in seconds to run this benchmark, if any."
     )
+    max_error_rate: Optional[float] = Field(
+        description="Maximum error rate after which a benchmark will stop."
+    )
     warmup_number: Optional[int] = Field(
         description=(
             "The number of requests to run for the warmup phase of this benchmark, "
@@ -211,6 +214,12 @@ class BenchmarkRunStats(StandardBaseModel):
             "The average time spent processing all requests in the benchmark run. "
             "This is the time from when the actual request was started to when "
             "it was completed."
+        )
+    )
+    error_rate: float = Field(
+        description=(
+            "The number of errored requests divided by the number of errored requests. This can be higher "
+            "than max_error_rate (if applicable) cause it does not take into account incomplete requests."
         )
     )
 

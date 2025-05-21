@@ -164,6 +164,16 @@ def cli():
     ),
 )
 @click.option(
+    "--max-error-rate",
+    type=float,
+    help=(
+        "The maximum error rate after which a benchmark will stop. "
+        "Applicable only for finite deterministic scenarios i.e rate_type is 'constant' and 'max_seconds' exists OR "
+        "'max_requests' exists OR the dataset is finite. "
+        "If None, benchmarks will continue regardless of error rate."
+    ),
+)
+@click.option(
     "--warmup-percent",
     type=float,
     default=None,
@@ -242,6 +252,7 @@ def benchmark(
     rate,
     max_seconds,
     max_requests,
+    max_error_rate,
     warmup_percent,
     cooldown_percent,
     disable_progress,
@@ -267,6 +278,7 @@ def benchmark(
             rate=rate,
             max_seconds=max_seconds,
             max_requests=max_requests,
+            max_error_rate=max_error_rate,
             warmup_percent=warmup_percent,
             cooldown_percent=cooldown_percent,
             show_progress=not disable_progress,

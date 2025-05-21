@@ -599,6 +599,8 @@ class GenerativeBenchmarkAggregator(
         and return the compiled object.
         """
         successful, incomplete, errored = self._compile_results()
+        error_rate = self.requests_stats.totals.errored.total / \
+            (self.requests_stats.totals.successful + self.requests_stats.totals.errored.total)
 
         return GenerativeBenchmark.from_stats(
             run_id=self.run_id,
@@ -625,6 +627,7 @@ class GenerativeBenchmarkAggregator(
                 request_start_time_targeted_delay_avg=self.requests_stats.request_start_time_targeted_delay.mean,
                 request_time_delay_avg=self.requests_stats.request_time_delay.mean,
                 request_time_avg=self.requests_stats.request_time.mean,
+                error_rate=error_rate,
             ),
             worker=self.worker_description,
             requests_loader=self.request_loader_description,
