@@ -277,7 +277,7 @@ class Scheduler(Generic[RequestT, ResponseT]):
         start_time = time.time()
         times_iter = iter(scheduling_strategy.request_times())
         end_time = time.time() + (max_duration or math.inf)
-        end_number = self._determine_total_requests_count(scheduling_strategy, max_duration, max_error_rate, max_number)
+        end_number = self._determine_total_requests_count(scheduling_strategy, max_duration, max_number)
 
         if end_number == math.inf and max_error_rate is not None:
             logger.warning("max_error_rate will be ignored because end_number can not be determined.")
@@ -303,7 +303,6 @@ class Scheduler(Generic[RequestT, ResponseT]):
             self,
             scheduling_strategy: SchedulingStrategy,
             max_duration: Optional[float],
-            max_error_rate: Optional[float],
             max_number: Optional[int],
     ) -> int:
         end_number = max_number or math.inf
@@ -318,10 +317,6 @@ class Scheduler(Generic[RequestT, ResponseT]):
                 if total_requests_in_max_duration < end_number:
                     assert total_requests_in_max_duration > 0
                     end_number = total_requests_in_max_duration
-            else:
-                if max_error_rate:
-                    logger.warning()
-                raise
         except Exception:
             pass
         return end_number
