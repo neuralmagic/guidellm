@@ -315,13 +315,15 @@ class Scheduler(Generic[RequestT, ResponseT]):
             iter_length = len(self.request_loader)  # type: ignore[arg-type]
             if 0 < iter_length < end_number:
                 end_number = iter_length
-        except InfiniteDatasetError:  # noqa: BLE001, S110
+        except InfiniteDatasetError:
+            # Only when RPS is constant and duration is capped we can determine the total
+            # amount of requests that are supposed to be sent
             if scheduling_strategy.type_ == "constant" and max_duration is not None:
                 total_requests_in_max_duration = int(scheduling_strategy.rate * max_duration)
                 if total_requests_in_max_duration < end_number:
                     assert total_requests_in_max_duration > 0
                     end_number = total_requests_in_max_duration
-        except Exception:
+        except Exception:  # noqa: BLE001, S110
             pass
         return end_number
 
