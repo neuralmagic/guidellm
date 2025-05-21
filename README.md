@@ -92,7 +92,7 @@ After the evaluation is completed, GuideLLM will summarize the results into thre
 
 The sections will look similar to the following: <img alt="Sample GuideLLM benchmark output" src="https://raw.githubusercontent.com/neuralmagic/guidellm/main/docs/assets/sample-output.png" />
 
-For more details about the metrics and definitions, please refer to the [Metrics documentation](https://raw.githubusercontent.com/neuralmagic/guidellm/main/docs/metrics.md).
+For more details about the metrics and definitions, please refer to the [Metrics documentation](https://github.com/neuralmagic/guidellm/blob/main/docs/metrics.md).
 
 #### 4. Explore the Results File
 
@@ -106,7 +106,7 @@ The results from GuideLLM are used to optimize your LLM deployment for performan
 
 For example, when deploying a chat application, we likely want to ensure that our time to first token (TTFT) and inter-token latency (ITL) are under certain thresholds to meet our service level objectives (SLOs) or service level agreements (SLAs). For example, setting TTFT to 200ms and ITL 25ms for the sample data provided in the example above, we can see that even though the server is capable of handling up to 13 requests per second, we would only be able to meet our SLOs for 99% of users at a request rate of 3.5 requests per second. If we relax our constraints on ITL to 50 ms, then we can meet the TTFT SLA for 99% of users at a request rate of approximately 10 requests per second.
 
-For further details on determining the optimal request rate and SLOs, refer to the [SLOs documentation](https://raw.githubusercontent.com/neuralmagic/guidellm/main/docs/service_level_objectives.md).
+For further details on determining the optimal request rate and SLOs, refer to the [SLOs documentation](https://github.com/neuralmagic/guidellm/blob/main/docs/service_level_objectives.md).
 
 ### Configurations
 
