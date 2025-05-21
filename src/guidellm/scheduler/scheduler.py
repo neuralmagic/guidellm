@@ -109,7 +109,10 @@ class Scheduler(Generic[RequestT, ResponseT]):
             Each SchedulerResult object contains information about the request,
             the response, and the run information.
         """
-        self._validate_scheduler_params(scheduling_strategy, max_duration, max_error_rate, max_number)
+        self._validate_scheduler_params(scheduling_strategy,
+                                        max_duration,
+                                        max_error_rate,
+                                        max_number)
 
         with (
             multiprocessing.Manager() as manager,
@@ -163,8 +166,8 @@ class Scheduler(Generic[RequestT, ResponseT]):
                     )
                     if iter_result is not None:
                         if iter_result.request_info.errored \
-                            and not iter_result.request_info.canceled \
-                                and self._is_max_error_rate_reached(iter_result.run_info):
+                        and not iter_result.request_info.canceled \
+                        and self._is_max_error_rate_reached(iter_result.run_info):
                             shutdown_event.set()
                             max_error_rate_reached = True
                             logger.info(f"Max error rate of "
