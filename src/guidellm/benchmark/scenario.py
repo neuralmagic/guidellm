@@ -1,8 +1,11 @@
+import json
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, Literal, Optional, Self, Union
+from typing import Any, Literal, Optional, TypeVar, Union
 
+import yaml
 from datasets import Dataset, DatasetDict, IterableDataset, IterableDatasetDict
+from loguru import logger
 from transformers.tokenization_utils_base import (  # type: ignore[import]
     PreTrainedTokenizerBase,
 )
@@ -14,20 +17,28 @@ from guidellm.scheduler.strategy import StrategyType
 
 __ALL__ = ["Scenario", "GenerativeTextScenario"]
 
+T = TypeVar("T", bound="Scenario")
+
 
 class Scenario(StandardBaseModel):
     target: str
 
-    def _update(self, **fields: Any) -> Self:
-        for k, v in fields.items():
-            if not hasattr(self, k):
-                raise ValueError(f"Invalid field {k}")
-            setattr(self, k, v)
+    @classmethod
+    def from_file(
+        cls: type[T], filename: Union[str, Path], overrides: Optional[dict] = None
+    ) -> T:
+        try:
+            with open(filename) as f:
+                if str(filename).endswith(".yaml") or str(filename).endswith(".yml"):
+                    data = yaml.safe_load(f)
+                else:  # Assume everything else is json
+                    data = json.load(f)
+        except (json.JSONDecodeError, yaml.YAMLError) as e:
+            logger.error("Failed to parse scenario")
+            raise e
 
-        return self
-
-    def update(self, **fields: Any) -> Self:
-        return self._update(**{k: v for k, v in fields.items() if v is not None})
+        data.update(overrides)
+        return cls.model_validate(data)
 
 
 class GenerativeTextScenario(Scenario):
