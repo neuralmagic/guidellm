@@ -1,6 +1,6 @@
-# Developing for Speculators
+# Developing for GuideLLM
 
-Thank you for your interest in contributing to Speculators! This document provides detailed instructions for setting up your development environment, implementing changes, and adhering to the project's best practices. Your contributions help us grow and improve this project.
+Thank you for your interest in contributing to GuideLLM! This document provides detailed instructions for setting up your development environment, implementing changes, and adhering to the project's best practices. Your contributions help us grow and improve this project.
 
 ## Setting Up Your Development Environment
 
@@ -142,7 +142,7 @@ tox
 To ensure your changes are covered by tests, run:
 
 ```bash
-tox -e test-unit -- --cov=speculators --cov-report=html
+tox -e test-unit -- --cov=guidellm --cov-report=html
 ```
 
 Review the coverage report to confirm that your new code is adequately tested.
@@ -181,7 +181,7 @@ Review the coverage report to confirm that your new code is adequately tested.
 
 ## Additional Resources
 
-- [CONTRIBUTING.md](https://github.com/neuralmagic/speculators/blob/main/CONTRIBUTING.md): Guidelines for contributing to the project.
-- [CODE_OF_CONDUCT.md](https://github.com/neuralmagic/speculators/blob/main/CODE_OF_CONDUCT.md): Our expectations for community behavior.
-- [tox.ini](https://github.com/neuralmagic/speculators/blob/main/tox.ini): Configuration for Tox environments.
-- [.pre-commit-config.yaml](https://github.com/neuralmagic/speculators/blob/main/.pre-commit-config.yaml): Configuration for pre-commit hooks.
+- [CONTRIBUTING.md](https://github.com/neuralmagic/guidellm/blob/main/CONTRIBUTING.md): Guidelines for contributing to the project.
+- [CODE_OF_CONDUCT.md](https://github.com/neuralmagic/guidellm/blob/main/CODE_OF_CONDUCT.md): Our expectations for community behavior.
+- [tox.ini](https://github.com/neuralmagic/guidellm/blob/main/tox.ini): Configuration for Tox environments.
+- [.pre-commit-config.yaml](https://github.com/neuralmagic/guidellm/blob/main/.pre-commit-config.yaml): Configuration for pre-commit hooks.
