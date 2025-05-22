@@ -31,7 +31,13 @@ def cli():
 @click.option(
     "--scenario",
     type=cli_tools.Union(
-        click.Path(exists=True, readable=True, file_okay=True, dir_okay=False),
+        click.Path(
+            exists=True,
+            readable=True,
+            file_okay=True,
+            dir_okay=False,
+            path_type=Path,  # type: ignore[type-var]
+        ),
         click.STRING
     ),
     default=None,
@@ -271,9 +277,11 @@ def benchmark(
         # If a scenario file was specified read from it
         if scenario is None:
             _scenario = GenerativeTextScenario.model_validate(overrides)
+        elif isinstance(scenario, Path):
+            _scenario = GenerativeTextScenario.from_file(scenario, overrides)
         else:
-            # TODO: Support pre-defined scenarios
-            _scenario = GenerativeTextScenario.from_file(Path(scenario), overrides)
+            # TODO: Add support for builtin scenarios
+            raise NotImplementedError
     except ValidationError as e:
         errs = e.errors(include_url=False, include_context=True, include_input=True)
         param_name = "--" + str(errs[0]["loc"][0]).replace("_", "-")
