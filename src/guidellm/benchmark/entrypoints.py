@@ -38,7 +38,7 @@ async def benchmark_generative_text(
     data_args: Optional[dict[str, Any]],
     data_sampler: Optional[Literal["random"]],
     rate_type: Union[StrategyType, ProfileType],
-    rate: Optional[Union[int, float, list[Union[int, float]]]],
+    rate: Optional[Union[float, list[float]]],
     max_seconds: Optional[float],
     max_requests: Optional[int],
     max_error_rate: Optional[float],
