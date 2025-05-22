@@ -1,8 +1,7 @@
 import asyncio
 import codecs
-import json
 from pathlib import Path
-from typing import Any, get_args
+from typing import get_args
 
 import click
 from pydantic import ValidationError
@@ -14,32 +13,11 @@ from guidellm.benchmark.scenario import GenerativeTextScenario
 from guidellm.config import print_config
 from guidellm.preprocess.dataset import ShortPromptStrategy, process_dataset
 from guidellm.scheduler import StrategyType
+from guidellm.utils import cli as cli_tools
 
 STRATEGY_PROFILE_CHOICES = set(
     list(get_args(ProfileType)) + list(get_args(StrategyType))
 )
-
-
-def parse_json(ctx, param, value):  # noqa: ARG001
-    if value is None:
-        return None
-    try:
-        return json.loads(value)
-    except json.JSONDecodeError as err:
-        raise click.BadParameter(f"{param.name} must be a valid JSON string.") from err
-
-
-def set_if_not_default(ctx: click.Context, **kwargs) -> dict[str, Any]:
-    """
-    Set the value of a click option if it is not the default value.
-    This is useful for setting options that are not None by default.
-    """
-    values = {}
-    for k, v in kwargs.items():
-        if ctx.get_parameter_source(k) != click.core.ParameterSource.DEFAULT:
-            values[k] = v
-
-    return values
 
 
 @click.group()
@@ -52,7 +30,10 @@ def cli():
 )
 @click.option(
     "--scenario",
-    type=str,
+    type=cli_tools.Union(
+        click.Path(exists=True, readable=True, file_okay=True, dir_okay=False),
+        click.STRING
+    ),
     default=None,
     help=("TODO: A scenario or path to config"),
 )
@@ -72,7 +53,7 @@ def cli():
 )
 @click.option(
     "--backend-args",
-    callback=parse_json,
+    callback=cli_tools.parse_json,
     default=GenerativeTextScenario.get_default("backend_args"),
     help=(
         "A JSON string containing any arguments to pass to the backend as a "
@@ -101,7 +82,7 @@ def cli():
 @click.option(
     "--processor-args",
     default=GenerativeTextScenario.get_default("processor_args"),
-    callback=parse_json,
+    callback=cli_tools.parse_json,
     help=(
         "A JSON string containing any arguments to pass to the processor constructor "
         "as a dict with **kwargs."
@@ -119,7 +100,7 @@ def cli():
 @click.option(
     "--data-args",
     default=GenerativeTextScenario.get_default("data_args"),
-    callback=parse_json,
+    callback=cli_tools.parse_json,
     help=(
         "A JSON string containing any arguments to pass to the dataset creation "
         "as a dict with **kwargs."
@@ -220,7 +201,7 @@ def cli():
 )
 @click.option(
     "--output-extras",
-    callback=parse_json,
+    callback=cli_tools.parse_json,
     help="A JSON string of extra data to save with the output benchmarks",
 )
 @click.option(
@@ -265,7 +246,7 @@ def benchmark(
 ):
     click_ctx = click.get_current_context()
 
-    overrides = set_if_not_default(
+    overrides = cli_tools.set_if_not_default(
         click_ctx,
         target=target,
         backend_type=backend_type,
@@ -370,7 +351,7 @@ def preprocess():
 @click.option(
     "--processor-args",
     default=None,
-    callback=parse_json,
+    callback=cli_tools.parse_json,
     help=(
         "A JSON string containing any arguments to pass to the processor constructor "
         "as a dict with **kwargs."
@@ -378,7 +359,7 @@ def preprocess():
 )
 @click.option(
     "--data-args",
-    callback=parse_json,
+    callback=cli_tools.parse_json,
     help=(
         "A JSON string containing any arguments to pass to the dataset creation "
         "as a dict with **kwargs."
