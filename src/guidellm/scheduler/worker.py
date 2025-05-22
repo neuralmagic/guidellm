@@ -1,6 +1,5 @@
 import asyncio
 import math
-import multiprocessing
 import multiprocessing.queues
 import queue
 import time
@@ -8,6 +7,7 @@ from abc import ABC, abstractmethod
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
 from datetime import timedelta
+from multiprocessing.synchronize import Event as MultiprocessingEvent
 from typing import (
     Any,
     Generic,
@@ -124,7 +124,7 @@ class RequestsWorker(ABC, Generic[RequestT, ResponseT]):
 
     async def get_request(
         self, requests_queue: multiprocessing.Queue,
-            shutdown_event: Optional[multiprocessing.Event] = None,
+            shutdown_event: Optional[MultiprocessingEvent] = None,
             process_id: Optional[int] = None,
     ) -> Optional[WorkerProcessRequest[RequestT]]:
         if shutdown_event is not None and process_id is None:
@@ -186,7 +186,8 @@ class RequestsWorker(ABC, Generic[RequestT, ResponseT]):
             await asyncio.sleep(wait_time)
 
         info.worker_start = time.time()
-        request_start_result = WorkerProcessResult(
+        request_start_result: WorkerProcessResult[RequestT, ResponseT] = \
+            WorkerProcessResult(
             type_="request_start",
             request=request,
             response=None,
@@ -215,7 +216,7 @@ class RequestsWorker(ABC, Generic[RequestT, ResponseT]):
         requests_queue: multiprocessing.Queue,
         results_queue: multiprocessing.Queue,
         process_id: int,
-        shutdown_event: Optional[multiprocessing.Event] = None,
+        shutdown_event: Optional[MultiprocessingEvent] = None,
     ):
         async def _process_runner():
             while (
@@ -256,7 +257,7 @@ class RequestsWorker(ABC, Generic[RequestT, ResponseT]):
         results_queue: multiprocessing.Queue,
         max_concurrency: int,
         process_id: int,
-        shutdown_event: Optional[multiprocessing.Event] = None,
+        shutdown_event: Optional[MultiprocessingEvent] = None,
     ):
         async def _process_runner():
             pending = asyncio.Semaphore(max_concurrency)
@@ -355,7 +356,7 @@ class GenerativeRequestsWorker(RequestsWorker[GenerationRequest, ResponseSummary
         requests_queue: multiprocessing.Queue,
         results_queue: multiprocessing.Queue,
         process_id: int,
-        shutdown_event: Optional[multiprocessing.Event] = None
+        shutdown_event: Optional[MultiprocessingEvent] = None
     ):
         asyncio.run(self.backend.validate())
         super().process_loop_synchronous(
@@ -371,7 +372,7 @@ class GenerativeRequestsWorker(RequestsWorker[GenerationRequest, ResponseSummary
         results_queue: multiprocessing.Queue,
         max_concurrency: int,
         process_id: int,
-        shutdown_event: Optional[multiprocessing.Event] = None
+        shutdown_event: Optional[MultiprocessingEvent] = None
     ):
         asyncio.run(self.backend.validate())
         super().process_loop_asynchronous(

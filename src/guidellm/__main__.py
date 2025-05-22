@@ -179,7 +179,7 @@ def cli():
     type=float,
     default=None,
     help=(
-        "The percent of the benchmark (based on max-seconds, max-requets, "
+        "The percent of the benchmark (based on max-seconds, max-requests, "
         "or lenth of dataset) to run as a warmup and not include in the final results. "
         "Defaults to None."
     ),
@@ -188,7 +188,7 @@ def cli():
     "--cooldown-percent",
     type=float,
     help=(
-        "The percent of the benchmark (based on max-seconds, max-requets, or lenth "
+        "The percent of the benchmark (based on max-seconds, max-requests, or length "
         "of dataset) to run as a cooldown and not include in the final results. "
         "Defaults to None."
     ),
