@@ -177,7 +177,6 @@ class Scheduler(Generic[RequestT, ResponseT]):
                             logger.info(f"Max error rate of "
                                         f"({iter_result.run_info.max_error_rate}) "
                                         f"reached, sending shutdown signal")
-                        logger.info("Itter is not None")
                         yield iter_result
 
                     # yield control to the event loop

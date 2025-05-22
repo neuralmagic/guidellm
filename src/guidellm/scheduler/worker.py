@@ -281,6 +281,7 @@ class RequestsWorker(ABC, Generic[RequestT, ResponseT]):
 
                 if shutdown_event and shutdown_event.is_set():
                     logger.info(f"Shutdown signal received in future {process_id}")
+                    pending.release()
                     break
                 task = asyncio.create_task(
                     self.resolve_scheduler_request(
