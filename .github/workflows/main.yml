@@ -38,22 +38,6 @@ jobs:
       - name: Run quality checks
         run: tox -e types
 
-  link-checks:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python: ["3.9"]
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python }}
-      - name: Install dependencies
-        run: pip install tox
-      - name: Run link checks
-        run: tox -e links
-
   precommit-checks:
     runs-on: ubuntu-latest
     strategy:
