@@ -1,0 +1,62 @@
+{
+  "env": {
+    "browser": true,
+    "es6": true,
+    "jest": true
+  },
+  "extends": [
+    "airbnb-typescript",
+    "airbnb/hooks",
+    "eslint:recommended",
+    "plugin:@typescript-eslint/eslint-recommended",
+    "plugin:@typescript-eslint/recommended",
+    "plugin:prettier/recommended",
+    "next/core-web-vitals"
+  ],
+  "ignorePatterns": [".vscode", "jest.config.js", "__mocks__"],
+  "overrides": [
+    {
+      "files": ["*.mjs"],
+      "parser": "espree", // Use the default JavaScript parser for `.mjs` files
+      "parserOptions": {
+        "sourceType": "module"
+      }
+    }
+  ],
+  "parser": "@typescript-eslint/parser",
+  "parserOptions": {
+    "ecmaFeatures": {
+      "jsx": true
+    },
+    "ecmaVersion": 2018,
+    "sourceType": "module",
+    "project": "./tsconfig.json"
+  },
+  "plugins": ["@typescript-eslint", "jest", "react", "import", "no-secrets"],
+  "root": true,
+  "rules": {
+    "curly": ["error", "all"],
+    "complexity": ["warn", { "max": 8 }],
+    "import/order": [
+      "error",
+      { "groups": [["builtin", "external", "internal"]], "newlines-between": "always" }
+    ],
+    "import/no-extraneous-dependencies": [
+      "error",
+      {
+        "devDependencies": [
+          "**/*.test.ts",
+          "**/*.test.tsx",
+          "**/*.d.ts",
+          "**/*.interfaces.ts",
+          "**/*.setup.ts",
+          "**/*.config.js",
+          "**/*.config.mjs"
+        ],
+        "optionalDependencies": false,
+        "peerDependencies": false
+      }
+    ],
+    "no-secrets/no-secrets": ["error", { "additionalRegexes": {}, "ignoreContent": [] }]
+  }
+}
