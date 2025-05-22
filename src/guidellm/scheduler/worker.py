@@ -254,6 +254,9 @@ class RequestsWorker(ABC, Generic[RequestT, ResponseT]):
                 )
             ) is not None:
                 if shutdown_event and shutdown_event.is_set():
+                    logger.error("This shouldn't happen! "
+                                 "We should catch the "
+                                 "shutdown in the get wrapper")
                     logger.info(f"Shutdown signal received in future {process_id}")
                     break
 
