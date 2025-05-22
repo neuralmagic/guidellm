@@ -20,7 +20,7 @@ def set_if_not_default(ctx: click.Context, **kwargs) -> dict[str, Any]:
     """
     values = {}
     for k, v in kwargs.items():
-        if ctx.get_parameter_source(k) != click.core.ParameterSource.DEFAULT:
+        if ctx.get_parameter_source(k) != click.core.ParameterSource.DEFAULT:  # type: ignore[attr-defined]
             values[k] = v
 
     return values
