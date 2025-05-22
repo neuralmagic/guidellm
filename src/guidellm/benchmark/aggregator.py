@@ -637,8 +637,8 @@ class GenerativeBenchmarkAggregator(
     def _calculate_error_rate(self) -> float:
         total_successful = self.requests_stats.totals.successful.total
         total_errored = self.requests_stats.totals.errored.total
-        total_sent = total_errored + total_successful
-        return total_errored / total_sent
+        total_finished = total_errored + total_successful
+        return total_errored / total_finished
 
     def _compile_results(
         self,
