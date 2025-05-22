@@ -22,6 +22,9 @@ const customJestConfig = {
   transform: {
     '^.+\\.(ts|tsx)$': 'ts-jest',
   },
+  transformIgnorePatterns: [
+    '/node_modules/(?!(@nivo|d3|d3-.*|internmap|delaunator|robust-predicates)/)',
+  ],
 };
 
 module.exports = createJestConfig(customJestConfig);
