@@ -55,13 +55,13 @@ async def benchmark_generative_text(
     max_requests: Optional[int],
     warmup_percent: Optional[float],
     cooldown_percent: Optional[float],
-    show_progress: bool,
-    show_progress_scheduler_stats: bool,
-    output_console: bool,
     output_path: Optional[Union[str, Path]],
     output_extras: Optional[dict[str, Any]],
     output_sampling: Optional[int],
     random_seed: int,
+    show_progress: bool = True,
+    show_progress_scheduler_stats: bool = False,
+    output_console: bool = True,
 ) -> tuple[GenerativeBenchmarksReport, Optional[Path]]:
     console = GenerativeBenchmarksConsole(enabled=show_progress)
     console.print_line("Creating backend...")
