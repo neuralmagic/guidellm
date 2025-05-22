@@ -1,0 +1,43 @@
+name: UI-Development
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+jobs:
+  quality-check:
+    permissions:
+      contents: "read"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: |
+          cd ui
+          npm ci
+
+      - name: Run quality and typing checks
+        run: |
+          cd ui
+          make quality
+
+  precommit-check:
+    permissions:
+      contents: "read"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: |
+          cd ui
+          npm ci
+
+      - name: Run pre-commit checks
+        run: |
+          cd ui
+          npx husky run pre-commit
