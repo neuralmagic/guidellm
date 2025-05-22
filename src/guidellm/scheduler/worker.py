@@ -313,14 +313,14 @@ class RequestsWorker(ABC, Generic[RequestT, ResponseT]):
                 dequeued_time = time.time()
                 logger.debug(f"Dequeued Process ID {process_id} || "
                              f"Timestamp {dequeued_time} || "
-                             f"Semaphore {pending._value}/{max_concurrency}")
+                             f"Semaphore {pending._value}/{max_concurrency}")  # noqa: SLF001
 
                 await pending.acquire()
 
                 lock_acquired_at = time.time()
                 logger.debug(f"Lock acquired Process ID {process_id} ||"
                              f" Timestamp {lock_acquired_at} ||"
-                             f" Semaphore {pending._value}/{max_concurrency}")
+                             f" Semaphore {pending._value}/{max_concurrency}")  # noqa: SLF001
 
                 def _task_done(_: asyncio.Task):
                     nonlocal pending
