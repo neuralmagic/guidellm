@@ -19,8 +19,6 @@ from guidellm.benchmark.scenario import GenerativeTextScenario, Scenario
 from guidellm.request import GenerativeRequestLoader
 from guidellm.scheduler import StrategyType
 
-type benchmark_type = Literal["generative_text"]
-
 
 async def benchmark_with_scenario(scenario: Scenario, **kwargs):
     """

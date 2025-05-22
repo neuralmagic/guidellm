@@ -42,6 +42,11 @@ class Scenario(StandardBaseModel):
     target: str
 
     @classmethod
+    def get_default(cls: type[T], field: str) -> Any:
+        """Get default values for model fields"""
+        return cls.model_fields[field].default
+
+    @classmethod
     def from_file(
         cls: type[T], filename: Union[str, Path], overrides: Optional[dict] = None
     ) -> T:
