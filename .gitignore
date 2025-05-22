@@ -180,4 +180,4 @@ cython_debug/
 *.yaml
 
 # Turn off UI related ignores, defer to ui/.gitignore
-!ui/**/*.json
+!ui/**
