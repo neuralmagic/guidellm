@@ -292,7 +292,7 @@ def benchmark(
             _scenario = GenerativeTextScenario.model_validate(overrides)
         else:
             # TODO: Support pre-defined scenarios
-            _scenario = GenerativeTextScenario.from_file(scenario, overrides)
+            _scenario = GenerativeTextScenario.from_file(Path(scenario), overrides)
     except ValidationError as e:
         errs = e.errors(include_url=False, include_context=True, include_input=True)
         param_name = "--" + str(errs[0]["loc"][0]).replace("_", "-")

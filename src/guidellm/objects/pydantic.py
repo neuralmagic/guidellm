@@ -1,10 +1,14 @@
-from typing import Any, Generic, TypeVar
+import json
+from pathlib import Path
+from typing import Any, Generic, Optional, TypeVar
 
+import yaml
 from loguru import logger
 from pydantic import BaseModel, ConfigDict, Field
 
 __all__ = ["StandardBaseModel", "StatusBreakdown"]
 
+T = TypeVar("T", bound="StandardBaseModel")
 
 class StandardBaseModel(BaseModel):
     """
@@ -26,6 +30,28 @@ class StandardBaseModel(BaseModel):
             self.__class__.__name__,
             data,
         )
+
+    @classmethod
+    def get_default(cls: type[T], field: str) -> Any:
+        """Get default values for model fields"""
+        return cls.model_fields[field].default
+
+    @classmethod
+    def from_file(
+        cls: type[T], filename: Path, overrides: Optional[dict] = None
+    ) -> T:
+        try:
+            with filename.open() as f:
+                if str(filename).endswith((".yaml", ".yml")):
+                    data = yaml.safe_load(f)
+                else:  # Assume everything else is json
+                    data = json.load(f)
+        except (json.JSONDecodeError, yaml.YAMLError) as e:
+            logger.error(f"Failed to parse {filename} as type {cls.__name__}")
+            raise e
+
+        data.update(overrides)
+        return cls.model_validate(data)
 
 
 SuccessfulT = TypeVar("SuccessfulT")
