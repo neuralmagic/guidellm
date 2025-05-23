@@ -8,7 +8,7 @@ from pydantic import ValidationError
 from guidellm.backend import BackendType
 from guidellm.benchmark import ProfileType
 from guidellm.benchmark.entrypoints import benchmark_with_scenario
-from guidellm.benchmark.scenario import GenerativeTextScenario
+from guidellm.benchmark.scenario import GenerativeTextScenario, get_builtin_scenarios
 from guidellm.config import print_config
 from guidellm.scheduler import StrategyType
 from guidellm.utils import cli as cli_tools
@@ -36,7 +36,7 @@ def cli():
             dir_okay=False,
             path_type=Path,  # type: ignore[type-var]
         ),
-        click.STRING
+        click.Choice(get_builtin_scenarios()),
     ),
     default=None,
     help=("TODO: A scenario or path to config"),
@@ -278,8 +278,7 @@ def benchmark(
         elif isinstance(scenario, Path):
             _scenario = GenerativeTextScenario.from_file(scenario, overrides)
         else:
-            # TODO: Add support for builtin scenarios
-            raise NotImplementedError
+            _scenario = GenerativeTextScenario.from_builtin(scenario, overrides)
     except ValidationError as e:
         errs = e.errors(include_url=False, include_context=True, include_input=True)
         param_name = "--" + str(errs[0]["loc"][0]).replace("_", "-")
