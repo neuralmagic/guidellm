@@ -10,6 +10,7 @@ __all__ = ["StandardBaseModel", "StatusBreakdown"]
 
 T = TypeVar("T", bound="StandardBaseModel")
 
+
 class StandardBaseModel(BaseModel):
     """
     A base class for Pydantic models throughout GuideLLM enabling standard
@@ -37,9 +38,11 @@ class StandardBaseModel(BaseModel):
         return cls.model_fields[field].default
 
     @classmethod
-    def from_file(
-        cls: type[T], filename: Path, overrides: Optional[dict] = None
-    ) -> T:
+    def from_file(cls: type[T], filename: Path, overrides: Optional[dict] = None) -> T:
+        """
+        Attempt to create a new instance of the model using
+        data loaded from json or yaml file.
+        """
         try:
             with filename.open() as f:
                 if str(filename).endswith((".yaml", ".yml")):
@@ -48,7 +51,7 @@ class StandardBaseModel(BaseModel):
                     data = json.load(f)
         except (json.JSONDecodeError, yaml.YAMLError) as e:
             logger.error(f"Failed to parse {filename} as type {cls.__name__}")
-            raise e
+            raise ValueError(f"Error when parsing file: {filename}") from e
 
         data.update(overrides)
         return cls.model_validate(data)

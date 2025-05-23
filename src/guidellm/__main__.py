@@ -41,7 +41,11 @@ def cli():
         click.Choice(get_builtin_scenarios()),
     ),
     default=None,
-    help=("TODO: A scenario or path to config"),
+    help=(
+        "The name of a builtin scenario or path to a config file. "
+        "Missing values from the config will use defaults. "
+        "Options specified on the commandline will override the scenario."
+    ),
 )
 @click.option(
     "--target",
@@ -279,9 +283,10 @@ def benchmark(
             _scenario = GenerativeTextScenario.model_validate(overrides)
         elif isinstance(scenario, Path):
             _scenario = GenerativeTextScenario.from_file(scenario, overrides)
-        else:
+        else:  # Only builtins can make it here; click will catch anything else
             _scenario = GenerativeTextScenario.from_builtin(scenario, overrides)
     except ValidationError as e:
+        # Translate pydantic valdation error to click argument error
         errs = e.errors(include_url=False, include_context=True, include_input=True)
         param_name = "--" + str(errs[0]["loc"][0]).replace("_", "-")
         raise click.BadParameter(

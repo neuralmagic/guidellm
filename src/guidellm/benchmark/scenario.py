@@ -21,10 +21,16 @@ SCENARIO_DIR = Path(__file__).parent / "scenarios/"
 
 @cache
 def get_builtin_scenarios() -> list[str]:
+    """Returns list of builtin scenario names."""
     return [p.stem for p in SCENARIO_DIR.glob("*.json")]
 
 
 def parse_float_list(value: Union[str, float, list[float]]) -> list[float]:
+    """
+    Parse a comma separated string to a list of float
+    or convert single float list of one or pass float
+    list through.
+    """
     if isinstance(value, (int, float)):
         return [value]
     elif isinstance(value, list):
@@ -44,6 +50,10 @@ T = TypeVar("T", bound="Scenario")
 
 
 class Scenario(StandardBaseModel):
+    """
+    Parent Scenario class with common options for all benchmarking types.
+    """
+
     target: str
 
     @classmethod
@@ -51,14 +61,19 @@ class Scenario(StandardBaseModel):
         filename = SCENARIO_DIR / f"{name}.json"
 
         if not filename.is_file():
-            raise ValueError(f"{name} is not a vaild builtin scenario")
+            raise ValueError(f"{name} is not a valid builtin scenario")
 
         return cls.from_file(filename, overrides)
 
 
 class GenerativeTextScenario(Scenario):
-    # FIXME: This solves an issue with Pydantic and class types
+    """
+    Scenario class for generative text benchmarks.
+    """
+
     class Config:
+        # NOTE: This prevents errors due to unvalidatable
+        # types like PreTrainedTokenizerBase
         arbitrary_types_allowed = True
 
     backend_type: BackendType = "openai_http"
