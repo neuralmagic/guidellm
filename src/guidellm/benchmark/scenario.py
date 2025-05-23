@@ -1,6 +1,7 @@
 from collections.abc import Iterable
+from functools import cache
 from pathlib import Path
-from typing import Annotated, Any, Literal, Optional, Union
+from typing import Annotated, Any, Literal, Optional, TypeVar, Union
 
 from datasets import Dataset, DatasetDict, IterableDataset, IterableDatasetDict
 from pydantic import BeforeValidator, Field, NonNegativeInt, PositiveFloat, PositiveInt
@@ -13,7 +14,14 @@ from guidellm.benchmark.profile import ProfileType
 from guidellm.objects.pydantic import StandardBaseModel
 from guidellm.scheduler.strategy import StrategyType
 
-__ALL__ = ["Scenario", "GenerativeTextScenario"]
+__ALL__ = ["Scenario", "GenerativeTextScenario", "get_builtin_scenarios"]
+
+SCENARIO_DIR = Path(__file__).parent / "scenarios/"
+
+
+@cache
+def get_builtin_scenarios() -> list[str]:
+    return [p.stem for p in SCENARIO_DIR.glob("*.json")]
 
 
 def parse_float_list(value: Union[str, float, list[float]]) -> list[float]:
@@ -32,8 +40,20 @@ def parse_float_list(value: Union[str, float, list[float]]) -> list[float]:
         ) from err
 
 
+T = TypeVar("T", bound="Scenario")
+
+
 class Scenario(StandardBaseModel):
     target: str
+
+    @classmethod
+    def from_builtin(cls: type[T], name: str, overrides: Optional[dict] = None) -> T:
+        filename = SCENARIO_DIR / f"{name}.json"
+
+        if not filename.is_file():
+            raise ValueError(f"{name} is not a vaild builtin scenario")
+
+        return cls.from_file(filename, overrides)
 
 
 class GenerativeTextScenario(Scenario):
