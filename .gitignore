@@ -178,3 +178,7 @@ cython_debug/
 # Project specific files
 *.json
 *.yaml
+
+# But not scenarios
+!src/guidellm/benchmark/scenarios/*.json
+!src/guidellm/benchmark/scenarios/*.yaml
