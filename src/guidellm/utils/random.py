@@ -37,7 +37,7 @@ class IntegerRangeSampler:
             if calc_min == calc_max:
                 yield calc_min
             elif not self.variance:
-                yield self.rng.randint(calc_min, calc_max + 1)
+                yield self.rng.randint(calc_min, calc_max)
             else:
                 rand = self.rng.gauss(self.average, self.variance)
                 yield round(max(calc_min, min(calc_max, rand)))
