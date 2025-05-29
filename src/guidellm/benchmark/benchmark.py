@@ -816,7 +816,7 @@ class GenerativeBenchmark(Benchmark):
                         for req in total_with_output_first
                     ],
                     iter_counts=[
-                        req.prompt_tokens + req.output_tokens
+                        req.output_tokens
                         for req in total_with_output_first
                     ],
                     first_iter_counts=[
