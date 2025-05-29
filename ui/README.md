@@ -12,7 +12,7 @@ After running a benchmark with GuideLLM, a report.html file will be generated (b
 https://neuralmagic.github.io/guidellm/ui/dev/
 ```
 
-Open the file in your browser and you're done—no setup required.
+Open the local html file in your browser and you're done—no setup required.
 
 2. Build and Serve the UI Locally (For Development)
    This option is useful if:
@@ -40,13 +40,3 @@ src/lib/store/[runInfo/workloadDetails/benchmarks]WindowData.ts
 ```
 
 In the future this will be replaced by a configurable untracked file for dev use.
-
-### 🚧 Future Possibilities
-
-We're evaluating options for hosting dev/staging/prod builds on GitHub Pages. For now, production builds will be published at:
-
-```
-https://neuralmagic.github.io/guidellm/ui/dev/
-```
-
-If needed, alternative hosting (e.g., Vercel, Netlify) may be explored, but simplicity and transparency remain key priorities for this open-source tool.

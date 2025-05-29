@@ -1,8 +1,8 @@
-name: UI-Development
+name: Main
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
+  push:
+    branches: [main]
   workflow_dispatch:
 
 jobs:
@@ -74,8 +74,6 @@ jobs:
     needs: [quality-check, precommit-check, unit-tests, integration-tests]
     permissions:
       contents: write
-      pull-requests: write
-      issues: write
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
@@ -91,18 +89,13 @@ jobs:
           # Export vars to ensure they are loaded before build
           export $(grep -v '^#' .env.development | xargs)
 
-          PR_NUMBER=${{ github.event.pull_request.number }}
-          echo "pr_number=${PR_NUMBER}" >> $GITHUB_OUTPUT
-
           # Set asset prefix and base path with PR number
-          ASSET_PREFIX=https://neuralmagic.github.io/guidellm/ui/pr/${PR_NUMBER}
-          USE_MOCK_DATA=true
-          BASE_PATH=/ui/pr/${PR_NUMBER}
+          ASSET_PREFIX=https://neuralmagic.github.io/guidellm/ui/dev
+          BASE_PATH=/ui/dev
           GIT_SHA=${{ github.sha }}
           export ASSET_PREFIX=${ASSET_PREFIX}
           export BASE_PATH=${BASE_PATH}
           export GIT_SHA=${GIT_SHA}
-          export USE_MOCK_DATA=${USE_MOCK_DATA}
           npm run build
         working-directory: ui
 
@@ -110,23 +103,9 @@ jobs:
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./out
-          destination_dir: ui/pr/${{ steps.build.outputs.pr_number }}
+          publish_dir: ui/out
+          destination_dir: ui/dev
           keep_files: false
           user_name: ${{ github.actor }}
           user_email: ${{ github.actor }}@users.noreply.github.com
           publish_branch: gh-pages
-
-      - name: Set deployment url
-        id: deploy
-        run: |
-          DEPLOY_URL=https://neuralmagic.github.io/guidellm/pr/${{ steps.build.outputs.pr_number }}
-          echo "url=${DEPLOY_URL}" >> $GITHUB_OUTPUT
-
-      - name: Post Deployment URL to PR
-        uses: peter-evans/create-or-update-comment@v3
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          issue-number: ${{ github.event.pull_request.number }}
-          body: |
-            🎉 **Live Preview:** [Click here to view the live version](${{ steps.deploy.outputs.url }})
