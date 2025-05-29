@@ -120,7 +120,7 @@ jobs:
       - name: Set deployment url
         id: deploy
         run: |
-          DEPLOY_URL=https://neuralmagic.github.io/guidellm/pr/${{ steps.build.outputs.pr_number }}
+          DEPLOY_URL=https://neuralmagic.github.io/guidellm/ui/pr/${{ steps.build.outputs.pr_number }}
           echo "url=${DEPLOY_URL}" >> $GITHUB_OUTPUT
 
       - name: Post Deployment URL to PR
