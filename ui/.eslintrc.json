@@ -39,8 +39,25 @@
     "import/order": [
       "error",
       {
-        "groups": [["builtin", "external", "internal"]],
-        "newlines-between": "always"
+        "groups": [
+          ["builtin", "external"],
+          ["internal", "parent", "sibling", "index"]
+        ],
+        "newlines-between": "always-and-inside-groups",
+        "pathGroups": [
+          {
+            "pattern": "{@,assets,classes,components,hooks,pages,store,tests,types,utils}/**",
+            "group": "internal",
+            "position": "before"
+          },
+          {
+            "pattern": "{.,..}/**",
+            "group": "internal",
+            "position": "after"
+          }
+        ],
+        "pathGroupsExcludedImportTypes": ["builtin"],
+        "alphabetize": { "order": "asc", "caseInsensitive": true }
       }
     ],
     "import/no-extraneous-dependencies": [

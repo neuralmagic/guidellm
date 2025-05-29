@@ -1,7 +1,6 @@
 {
   "name": "guidellm",
   "version": "0.1.0",
-  "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -14,11 +13,20 @@
     "test:integration": "jest --passWithNoTests tests/integration"
   },
   "dependencies": {
-    "next": "15.3.2",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "@emotion/cache": "^11.13.1",
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.0",
+    "@mui/material": "^5.11.7",
+    "@mui/material-nextjs": "^5.16.6",
+    "@reduxjs/toolkit": "^2.2.7",
+    "next": "14.2.5",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-redux": "^9.1.2"
   },
   "devDependencies": {
+    "@mui/types": "^7.2.14",
+    "@svgr/webpack": "^8.1.0",
     "@testing-library/jest-dom": "^5.16.5",
     "@testing-library/react": "^16.0.0",
     "@testing-library/user-event": "^13.5.0",
