@@ -104,7 +104,6 @@ jobs:
           export GIT_SHA=${GIT_SHA}
           export USE_MOCK_DATA=${USE_MOCK_DATA}
           npm run build
-          cat out/index.html
         working-directory: ui
 
       - name: Deploy to GitHub Pages
