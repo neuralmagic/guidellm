@@ -11,6 +11,33 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const emptyDataScript = (
+    <script
+      dangerouslySetInnerHTML={{
+        __html: 'window.run_info = {}; window.workload_details = {}; window.benchmarks = {};',
+      }}
+    />
+  );
+  const mockDataScript = (
+    <>
+      <script
+        dangerouslySetInnerHTML={{
+          __html: runInfoScript,
+        }}
+      />
+      <script
+        dangerouslySetInnerHTML={{
+          __html: workloadDetailsScript,
+        }}
+      />
+      <script
+        dangerouslySetInnerHTML={{
+          __html: benchmarksScript,
+        }}
+      />
+    </>
+  );
+  const dataScript = process.env.USE_MOCK_DATA === 'true' ? mockDataScript : emptyDataScript;
   const assetPrefix = process.env.ASSET_PREFIX || '';
 
   return (
@@ -25,26 +52,7 @@ export default function RootLayout({
         <meta name="title" content="GuideLLM" />
         <link rel="manifest" href={`${assetPrefix}/manifest.json`} />
         <title>Guide LLM</title>
-        {/* <script
-          dangerouslySetInnerHTML={{
-            __html: 'window.run_info = {}; window.workload_details = {}; window.benchmarks = {};',
-          }}
-        /> */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: runInfoScript,
-          }}
-        />
-        <script
-          dangerouslySetInnerHTML={{
-            __html: workloadDetailsScript,
-          }}
-        />
-        <script
-          dangerouslySetInnerHTML={{
-            __html: benchmarksScript,
-          }}
-        />
+        {dataScript}
       </head>
       <body>{children}</body>
     </html>

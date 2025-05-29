@@ -3,7 +3,7 @@ name: Release
 on:
   push:
     tags:
-      - 'v*.*.*'
+      - "v*.*.*"
 
 jobs:
   build-and-publish:
@@ -37,7 +37,7 @@ jobs:
           retention-days: 90
       - name: Log artifact location
         run: |
-          echo "Artifacts uploaded to: Artifacts uploaded to: ${{ steps.artifact-upload.outputs.artifact-url }}"
+          echo "Artifacts uploaded to: ${{ steps.artifact-upload.outputs.artifact-url }}"
       - name: Push wheel to PyPI
         uses: neuralmagic/nm-actions/actions/publish-whl@v1.0.0
         with:
