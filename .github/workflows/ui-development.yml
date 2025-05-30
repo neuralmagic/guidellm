@@ -19,7 +19,9 @@ jobs:
         working-directory: src/ui
 
       - name: Run quality and typing checks
-        run: make quality
+        run: |
+          npm run lint
+          npm run type-check
         working-directory: src/ui
 
   precommit-check:

@@ -6,6 +6,7 @@
     "dev": "next dev src/ui",
     "build": "next build src/ui",
     "lint": "next lint src/ui",
+    "type-check": "tsc -p src/ui/tsconfig.json --noEmit",
     "format": "prettier --ignore-path src/ui/.prettierignore --write \"src/ui/**/*.+(js|ts|jsx|tsx|json)\"",
     "prepare": "husky install"
   },
