@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev src/ui",
-    "build": "next build src/ui"
+    "build": "next build src/ui",
+    "lint": "next lint src/ui"
   },
   "dependencies": {
     "react": "^18.2.0",
