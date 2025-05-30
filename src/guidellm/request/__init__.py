@@ -1,6 +1,7 @@
 from .loader import (
     GenerativeRequestLoader,
     GenerativeRequestLoaderDescription,
+    GetInfiniteDatasetLengthError,
     RequestLoader,
     RequestLoaderDescription,
 )
@@ -10,6 +11,7 @@ __all__ = [
     "GenerationRequest",
     "GenerativeRequestLoader",
     "GenerativeRequestLoaderDescription",
+    "GetInfiniteDatasetLengthError",
     "RequestLoader",
     "RequestLoaderDescription",
 ]
