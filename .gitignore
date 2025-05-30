@@ -221,8 +221,4 @@ src/ui/next-env.d.ts
 !package.json
 !package-lock.json
 !.eslintrc.json
-<<<<<<< HEAD
 !tsconfig.json
-=======
-!tsconfig.json
->>>>>>> implement-base-ui-app
