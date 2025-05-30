@@ -181,3 +181,47 @@ cython_debug/
 
 # Turn off UI related ignores, defer to ui/.gitignore
 !ui/**/*.json
+
+
+# UI Section - Next.js/React application under src/ui/
+# dependencies
+/node_modules/
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# testing
+coverage/
+
+# next.js
+/src/ui/.next/
+/src/ui/out/
+
+# production
+build/
+
+# misc
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# vercel
+src/ui/.vercel
+
+# typescript
+src/ui/*.tsbuildinfo
+src/ui/next-env.d.ts
+
+# Root-level UI config files that should be tracked
+!package.json
+!package-lock.json
+!.eslintrc.json
+!tsconfig.json
