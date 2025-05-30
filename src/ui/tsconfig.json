@@ -9,6 +9,7 @@
     "module": "esnext",
     "moduleResolution": "bundler",
     "noEmit": true,
+    "baseUrl": "src/ui",
     "plugins": [
       {
         "name": "next"
