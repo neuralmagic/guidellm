@@ -179,9 +179,6 @@ cython_debug/
 *.json
 *.yaml
 
-# Turn off UI related ignores, defer to ui/.gitignore
-!ui/**/*.json
-
 
 # UI Section - Next.js/React application under src/ui/
 # dependencies
@@ -224,4 +221,8 @@ src/ui/next-env.d.ts
 !package.json
 !package-lock.json
 !.eslintrc.json
+<<<<<<< HEAD
 !tsconfig.json
+=======
+!tsconfig.json
+>>>>>>> implement-base-ui-app

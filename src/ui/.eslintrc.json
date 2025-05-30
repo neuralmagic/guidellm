@@ -1,7 +1,8 @@
 {
   "env": {
     "browser": true,
-    "es6": true
+    "es2024": true,
+    "node": true
   },
   "extends": [
     "eslint:recommended",
@@ -26,8 +27,7 @@
     "ecmaFeatures": {
       "jsx": true
     },
-    "ecmaVersion": 2018,
-    "project": "./tsconfig.json",
+    "ecmaVersion": 2024,
     "sourceType": "module"
   },
   "plugins": ["@typescript-eslint", "import", "no-secrets", "react"],

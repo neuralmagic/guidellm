@@ -3,26 +3,26 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint",
-    "format": "prettier --ignore-path .prettierignore --write \"**/*.+(js|ts|jsx|tsx|json)\"",
+    "dev": "next dev src/ui",
+    "build": "next build src/ui",
+    "lint": "next lint src/ui",
+    "format": "prettier --ignore-path src/ui/.prettierignore --write \"src/ui/**/*.+(js|ts|jsx|tsx|json)\"",
     "prepare": "husky install"
   },
   "dependencies": {
     "next": "15.3.2",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
   },
   "devDependencies": {
     "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
+    "@types/react": "^18.0.28",
+    "@types/react-dom": "^18.0.11",
     "eslint": "^8.27.0",
+    "@eslint/eslintrc": "^3",
     "@typescript-eslint/eslint-plugin": "^5.43.0",
     "@typescript-eslint/parser": "^5.43.0",
-    "eslint-config-next": "14.2.5",
+    "eslint-config-next": "15.3.2",
     "eslint-config-prettier": "^8.5.0",
     "eslint-plugin-import": "^2.29.1",
     "eslint-plugin-jsx-a11y": "^6.6.1",

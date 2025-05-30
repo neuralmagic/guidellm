@@ -54,7 +54,7 @@ export default function Home() {
           target="_blank"
           rel="noopener noreferrer"
         >
-          <Image aria-hidden src="/file.svg" alt="File icon" width={16} height={16} />
+          <Image aria-hidden src="/file.svg" alt="" width={16} height={16} />
           Learn
         </a>
         <a
