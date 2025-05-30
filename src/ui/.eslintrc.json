@@ -1,0 +1,21 @@
+{
+  "env": {
+    "browser": true,
+    "es2024": true,
+    "node": true
+  },
+  "extends": [
+    "eslint:recommended",
+    "next",
+    "next/core-web-vitals",
+    "plugin:@typescript-eslint/recommended"
+  ],
+  "parser": "@typescript-eslint/parser",
+  "parserOptions": {
+    "ecmaVersion": 2024,
+    "sourceType": "module"
+  },
+  "plugins": ["@typescript-eslint"],
+  "root": true,
+  "rules": {}
+}
