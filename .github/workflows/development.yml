@@ -21,6 +21,22 @@ jobs:
       - name: Run quality checks
         run: tox -e quality
 
+  ui-quality-checks:
+    permissions:
+      contents: "read"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: src/ui
+
+      - name: Run quality and typing checks
+        run: npm run lint
+        working-directory: src/ui
+
   type-checks:
     runs-on: ubuntu-latest
     strategy:
@@ -37,6 +53,22 @@ jobs:
       - name: Run quality checks
         run: tox -e types
 
+  ui-type-checks:
+    permissions:
+      contents: "read"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: src/ui
+
+      - name: Run quality and typing checks
+        run: npm run type-check
+        working-directory: src/ui
+
   precommit-checks:
     runs-on: ubuntu-latest
     strategy:
@@ -52,6 +84,22 @@ jobs:
         run: pip install pre-commit
       - name: Run pre-commit checks
         run: pre-commit run --all-files
+
+  ui-precommit-check:
+    permissions:
+      contents: "read"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+
+      - name: Install dependencies
+        working-directory: src/ui
+        run: npm ci
+
+      - name: Run pre-commit checks
+        run: npx husky run pre-commit
+        working-directory: src/ui
 
   unit-tests:
     runs-on: ubuntu-latest
