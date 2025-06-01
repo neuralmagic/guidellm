@@ -219,7 +219,8 @@ class BenchmarkRunStats(StandardBaseModel):
     error_rate: float = Field(
         description=(
             "The number of errored requests divided by the number "
-            "of errored requests. This can be higher than max_error_rate "
+            "of successful and errored requests. "
+            "This can be higher than max_error_rate "
             "(if applicable) cause it does not take into "
             "account incomplete requests."
         )

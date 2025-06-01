@@ -110,10 +110,9 @@ class Scheduler(Generic[RequestT, ResponseT]):
             Each SchedulerResult object contains information about the request,
             the response, and the run information.
         """
-        self._validate_scheduler_params(scheduling_strategy,
-                                        max_duration,
-                                        max_error_rate,
-                                        max_number)
+        self._validate_scheduler_params(
+            scheduling_strategy, max_duration, max_error_rate, max_number
+        )
 
         with (
             multiprocessing.Manager() as manager,
@@ -122,13 +121,16 @@ class Scheduler(Generic[RequestT, ResponseT]):
             ) as executor,
         ):
             requests_iter: Optional[Iterator[Any]] = None
-            futures, requests_queue, responses_queue, shutdown_event = \
-                await self._start_processes(
-                    manager, executor, scheduling_strategy, max_error_rate is not None)
+            (
+                futures,
+                requests_queue,
+                responses_queue,
+                shutdown_event,
+            ) = await self._start_processes(
+                manager, executor, scheduling_strategy, max_error_rate is not None
+            )
             if shutdown_event and shutdown_event.is_set():
-                raise RuntimeError(
-                    "shutdown_event is set before starting scheduling"
-                )
+                raise RuntimeError("shutdown_event is set before starting scheduling")
             run_info, requests_iter, times_iter = self._run_setup(
                 futures, scheduling_strategy, max_number, max_duration, max_error_rate
             )
@@ -166,17 +168,23 @@ class Scheduler(Generic[RequestT, ResponseT]):
                         run_info,
                     )
                     if iter_result is not None:
-                        if iter_result.request_info.errored \
-                        and not iter_result.request_info.canceled \
-                        and self._is_max_error_rate_reached(iter_result.run_info):
+                        if (
+                            iter_result.request_info.errored
+                            and not iter_result.request_info.canceled
+                            and self._is_max_error_rate_reached(iter_result.run_info)
+                        ):
                             if shutdown_event is None:
-                                raise RuntimeError("We've reached max_error_rate "
-                                                   "but shutdown_event is corrupt")
+                                raise RuntimeError(
+                                    "We've reached max_error_rate "
+                                    "but shutdown_event is corrupt"
+                                )
                             shutdown_event.set()
                             max_error_rate_reached = True
-                            logger.info(f"Max error rate of "
-                                        f"({iter_result.run_info.max_error_rate}) "
-                                        f"reached, sending shutdown signal")
+                            logger.info(
+                                f"Max error rate of "
+                                f"({iter_result.run_info.max_error_rate}) "
+                                f"reached, sending shutdown signal"
+                            )
                         yield iter_result
 
                     # yield control to the event loop
@@ -192,14 +200,14 @@ class Scheduler(Generic[RequestT, ResponseT]):
             await self._stop_processes(futures, requests_queue)
 
     def _validate_scheduler_params(
-            self,
-            scheduling_strategy: SchedulingStrategy,
-            max_duration: Optional[float],
-            max_error_rate: Optional[float],
-            max_number: Optional[int]
+        self,
+        scheduling_strategy: SchedulingStrategy,
+        max_duration: Optional[float],
+        max_error_rate: Optional[float],
+        max_number: Optional[int],
     ) -> None:
         if scheduling_strategy is None or not isinstance(
-                scheduling_strategy, SchedulingStrategy
+            scheduling_strategy, SchedulingStrategy
         ):
             raise ValueError(f"Invalid scheduling strategy: {scheduling_strategy}")
         if max_number is not None and max_number < 1:
@@ -213,8 +221,10 @@ class Scheduler(Generic[RequestT, ResponseT]):
         if run_info.max_error_rate is None:
             return False
         current_error_rate = run_info.errored_requests / run_info.end_number
-        logger.info(f"Current error rate {current_error_rate} "
-                    f"i.e total_finished [success / error] / max total possible")
+        logger.info(
+            f"Current error rate {current_error_rate} "
+            f"i.e total_finished [success / error] / max total possible"
+        )
         return run_info.max_error_rate < current_error_rate
 
     async def _start_processes(
@@ -222,12 +232,12 @@ class Scheduler(Generic[RequestT, ResponseT]):
         manager,
         executor: ProcessPoolExecutor,
         scheduling_strategy: SchedulingStrategy,
-        create_shutdown_event: bool = False
+        create_shutdown_event: bool = False,
     ) -> tuple[
         list[asyncio.Future],
         multiprocessing.Queue,
         multiprocessing.Queue,
-        Optional[MultiprocessingEvent]
+        Optional[MultiprocessingEvent],
     ]:
         await self.worker.prepare_multiprocessing()
         shutdown_event = manager.Event() if create_shutdown_event else None
@@ -309,8 +319,10 @@ class Scheduler(Generic[RequestT, ResponseT]):
         )
 
         if end_number == math.inf and max_error_rate is not None:
-            logger.warning("max_error_rate will be ignored "
-                           "because end_number can not be determined.")
+            logger.warning(
+                "max_error_rate will be ignored "
+                "because end_number can not be determined."
+            )
 
         if end_number == math.inf and end_time is None:
             logger.warning(
@@ -324,16 +336,16 @@ class Scheduler(Generic[RequestT, ResponseT]):
             end_number=end_number,
             processes=len(processes),
             strategy=scheduling_strategy,
-            max_error_rate=max_error_rate
+            max_error_rate=max_error_rate,
         )
 
         return info, requests_iter, times_iter
 
     def _determine_total_requests_count(
-            self,
-            scheduling_strategy: SchedulingStrategy,
-            max_duration: Optional[float],
-            max_number: Optional[int],
+        self,
+        scheduling_strategy: SchedulingStrategy,
+        max_duration: Optional[float],
+        max_number: Optional[int],
     ) -> Union[int, float]:
         end_number = max_number or math.inf
         try:

@@ -127,9 +127,9 @@ class GenerativeRequestLoader(RequestLoader):
 
         if self.iter_type != "infinite":
             raise ValueError(f"Invalid iter_type {self.iter_type}")
-        raise GetInfiniteDatasetLengthError(f"Dataset {self.data} is "
-                                            f"infinite and thus "
-                                            f"unable to determine length")
+        raise GetInfiniteDatasetLengthError(
+            f"Dataset {self.data} is infinite and thus unable to determine length"
+        )
 
     @property
     def description(self) -> GenerativeRequestLoaderDescription:
