@@ -1,4 +1,5 @@
 import asyncio
+import codecs
 import json
 from pathlib import Path
 from typing import get_args
@@ -280,6 +281,18 @@ def benchmark(
         )
     )
 
+def decode_escaped_str(_ctx, _param, value):
+    """
+    Click auto adds characters. For example, when using --pad-char "\n",
+    it parses it as "\\n". This method decodes the string to handle escape
+    sequences correctly.
+    """
+    if value is None:
+        return None
+    try:
+        return codecs.decode(value, "unicode_escape")
+    except Exception as e:
+        raise click.BadParameter(f"Could not decode escape sequences: {e}") from e
 
 @cli.command(
     help=(
@@ -291,27 +304,26 @@ def config():
     print_config()
 
 
-@cli.group(help="Preprocessing utilities for datasets.")
+@cli.group(help="General preprocessing tools and utilities.")
 def preprocess():
     pass
 
 
 @preprocess.command(
-    help="Convert a dataset to have specific prompt and output token sizes.\n\n"
-    "INPUT_DATA: Path to the input dataset or dataset ID.\n"
-    "OUTPUT_PATH: Directory to save the converted dataset. "
-    "The dataset will be saved as an Arrow dataset (.arrow) inside the directory."
+    help=(
+        "Convert a dataset to have specific prompt and output token sizes.\n\n"
+        "INPUT_DATA: Path to the input dataset or dataset ID.\n"
+        "OUTPUT_PATH: Path to save the converted dataset, including file suffix. "
+    )
 )
 @click.argument(
-    "input_data",
+    "data",
     type=str,
-    metavar="INPUT_DATA",
     required=True,
 )
 @click.argument(
     "output_path",
     type=click.Path(file_okay=True, dir_okay=False, writable=True, resolve_path=True),
-    metavar="OUTPUT_PATH",
     required=True,
 )
 @click.option(
@@ -348,10 +360,20 @@ def preprocess():
     help="Strategy to handle prompts shorter than the target length. ",
 )
 @click.option(
-    "--pad-token",
+    "--pad-char",
     type=str,
-    default=None,
+    default="",
+    callback=decode_escaped_str,
     help="The token to pad short prompts with when using the 'pad' strategy.",
+)
+@click.option(
+    "--concat-delimiter",
+    type=str,
+    default="",
+    help=(
+        "The delimiter to use when concatenating prompts that are too short."
+        " Used when strategy is 'concatenate'."
+    )
 )
 @click.option(
     "--prompt-tokens-average",
@@ -379,13 +401,6 @@ def preprocess():
     help="Maximum number of prompt tokens.",
 )
 @click.option(
-    "--prompt-random-seed",
-    type=int,
-    default=42,
-    show_default=True,
-    help="Random seed for prompt token sampling.",
-)
-@click.option(
     "--output-tokens-average",
     type=int,
     default=10,
@@ -411,13 +426,6 @@ def preprocess():
     help="Maximum number of output tokens.",
 )
 @click.option(
-    "--output-random-seed",
-    type=int,
-    default=123,
-    show_default=True,
-    help="Random seed for output token sampling.",
-)
-@click.option(
     "--push-to-hub",
     is_flag=True,
     help="Set this flag to push the converted dataset to the Hugging Face Hub.",
@@ -429,47 +437,54 @@ def preprocess():
     help="The Hugging Face Hub dataset ID to push to. "
     "Required if --push-to-hub is used.",
 )
+@click.option(
+    "--random-seed",
+    type=int,
+    default=42,
+    show_default=True,
+    help="Random seed for prompt token sampling and output tokens sampling.",
+)
 def dataset(
-    input_data,
+    data,
     output_path,
     processor,
     processor_args,
     data_args,
     short_prompt_strategy,
-    pad_token,
+    pad_char,
+    concat_delimiter,
     prompt_tokens_average,
     prompt_tokens_stdev,
     prompt_tokens_min,
     prompt_tokens_max,
-    prompt_random_seed,
     output_tokens_average,
     output_tokens_stdev,
     output_tokens_min,
     output_tokens_max,
-    output_random_seed,
     push_to_hub,
     hub_dataset_id,
+    random_seed,
 ):
     process_dataset(
-        input_data=input_data,
+        data=data,
         output_path=output_path,
         processor=processor,
         processor_args=processor_args,
         data_args=data_args,
         short_prompt_strategy=short_prompt_strategy,
-        pad_token=pad_token,
+        pad_char=pad_char,
+        concat_delimiter=concat_delimiter,
         prompt_tokens_average=prompt_tokens_average,
         prompt_tokens_stdev=prompt_tokens_stdev,
         prompt_tokens_min=prompt_tokens_min,
         prompt_tokens_max=prompt_tokens_max,
-        prompt_random_seed=prompt_random_seed,
         output_tokens_average=output_tokens_average,
         output_tokens_stdev=output_tokens_stdev,
         output_tokens_min=output_tokens_min,
         output_tokens_max=output_tokens_max,
-        output_random_seed=output_random_seed,
         push_to_hub=push_to_hub,
         hub_dataset_id=hub_dataset_id,
+        random_seed=random_seed,
     )
 
 

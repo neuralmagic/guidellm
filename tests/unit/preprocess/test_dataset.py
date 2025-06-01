@@ -12,8 +12,10 @@ from transformers import PreTrainedTokenizerBase
 
 from guidellm.preprocess.dataset import (
     STRATEGY_HANDLERS,
+    PromptTooShortError,
     ShortPromptStrategy,
     handle_concatenate_strategy,
+    handle_error_strategy,
     handle_ignore_strategy,
     handle_pad_strategy,
     process_dataset,
@@ -80,15 +82,15 @@ def test_handle_ignore_strategy_sufficient_length(tokenizer_mock):
 def test_handle_concatenate_strategy_enough_prompts(tokenizer_mock):
     dataset_iter = iter([{"prompt": "longer"}])
     result = handle_concatenate_strategy(
-        "short", 10, dataset_iter, "prompt", tokenizer_mock
+        "short", 10, dataset_iter, "prompt", tokenizer_mock, "\n"
     )
-    assert result == "shortlonger"
+    assert result == "short\nlonger"
 
 
 def test_handle_concatenate_strategy_not_enough_prompts(tokenizer_mock):
     dataset_iter: Iterator = iter([])
     result = handle_concatenate_strategy(
-        "short", 10, dataset_iter, "prompt", tokenizer_mock
+        "short", 10, dataset_iter, "prompt", tokenizer_mock, ""
     )
     assert result is None
 
@@ -96,6 +98,17 @@ def test_handle_concatenate_strategy_not_enough_prompts(tokenizer_mock):
 def test_handle_pad_strategy(tokenizer_mock):
     result = handle_pad_strategy("short", 10, tokenizer_mock, "p")
     assert result == "shortppppp"
+
+
+def test_handle_error_strategy_valid_prompt(tokenizer_mock):
+    result = handle_error_strategy("valid prompt", 5, tokenizer_mock)
+    assert result == "valid prompt"
+    tokenizer_mock.encode.assert_called_with("valid prompt")
+
+
+def test_handle_error_strategy_too_short_prompt(tokenizer_mock):
+    with pytest.raises(PromptTooShortError):
+        handle_error_strategy("short", 10, tokenizer_mock)
 
 
 @patch("guidellm.preprocess.dataset.save_dataset_to_file")
@@ -245,8 +258,17 @@ def test_save_dataset_to_file_csv(mock_mkdir):
     mock_dataset = MagicMock(spec=Dataset)
     output_path = Path("some/path/output.csv")
     save_dataset_to_file(mock_dataset, output_path)
-    mock_dataset.to_csv.assert_called_once_with(str(output_path))
-    mock_mkdir.assert_called_once()
+    mock_dataset.to_csv.assert_called_once_with(output_path)
+    mock_mkdir.assert_called_once_with(parents=True, exist_ok=True)
+
+
+@patch.object(Path, "mkdir")
+def test_save_dataset_to_file_csv_capitalized(mock_mkdir):
+    mock_dataset = MagicMock(spec=Dataset)
+    output_path = Path("some/path/output.CSV")
+    save_dataset_to_file(mock_dataset, output_path)
+    mock_dataset.to_csv.assert_called_once_with(output_path)
+    mock_mkdir.assert_called_once_with(parents=True, exist_ok=True)
 
 
 @patch.object(Path, "mkdir")
@@ -254,8 +276,35 @@ def test_save_dataset_to_file_json(mock_mkdir):
     mock_dataset = MagicMock(spec=Dataset)
     output_path = Path("some/path/output.json")
     save_dataset_to_file(mock_dataset, output_path)
-    mock_dataset.to_json.assert_called_once_with(str(output_path))
-    mock_mkdir.assert_called_once()
+    mock_dataset.to_json.assert_called_once_with(output_path)
+    mock_mkdir.assert_called_once_with(parents=True, exist_ok=True)
+
+
+@patch.object(Path, "mkdir")
+def test_save_dataset_to_file_json_capitalized(mock_mkdir):
+    mock_dataset = MagicMock(spec=Dataset)
+    output_path = Path("some/path/output.JSON")
+    save_dataset_to_file(mock_dataset, output_path)
+    mock_dataset.to_json.assert_called_once_with(output_path)
+    mock_mkdir.assert_called_once_with(parents=True, exist_ok=True)
+
+
+@patch.object(Path, "mkdir")
+def test_save_dataset_to_file_jsonl(mock_mkdir):
+    mock_dataset = MagicMock(spec=Dataset)
+    output_path = Path("some/path/output.jsonl")
+    save_dataset_to_file(mock_dataset, output_path)
+    mock_dataset.to_json.assert_called_once_with(output_path)
+    mock_mkdir.assert_called_once_with(parents=True, exist_ok=True)
+
+
+@patch.object(Path, "mkdir")
+def test_save_dataset_to_file_jsonl_capitalized(mock_mkdir):
+    mock_dataset = MagicMock(spec=Dataset)
+    output_path = Path("some/path/output.JSONL")
+    save_dataset_to_file(mock_dataset, output_path)
+    mock_dataset.to_json.assert_called_once_with(output_path)
+    mock_mkdir.assert_called_once_with(parents=True, exist_ok=True)
 
 
 @patch.object(Path, "mkdir")
@@ -263,8 +312,8 @@ def test_save_dataset_to_file_parquet(mock_mkdir):
     mock_dataset = MagicMock(spec=Dataset)
     output_path = Path("some/path/output.parquet")
     save_dataset_to_file(mock_dataset, output_path)
-    mock_dataset.to_parquet.assert_called_once_with(str(output_path))
-    mock_mkdir.assert_called_once()
+    mock_dataset.to_parquet.assert_called_once_with(output_path)
+    mock_mkdir.assert_called_once_with(parents=True, exist_ok=True)
 
 
 @patch.object(Path, "mkdir")
@@ -273,4 +322,4 @@ def test_save_dataset_to_file_unsupported_type(mock_mkdir):
     output_path = Path("some/path/output.txt")
     with pytest.raises(ValueError, match=r"Unsupported file suffix '.txt'.*"):
         save_dataset_to_file(mock_dataset, output_path)
-    mock_mkdir.assert_called_once()
+    mock_mkdir.assert_called_once_with(parents=True, exist_ok=True)
