@@ -376,54 +376,16 @@ def preprocess():
     )
 )
 @click.option(
-    "--prompt-tokens-average",
-    type=int,
-    default=10,
-    show_default=True,
-    help="Average target number of tokens for prompts.",
-)
-@click.option(
-    "--prompt-tokens-stdev",
-    type=int,
+    "--prompt-tokens",
+    type=str,
     default=None,
-    help="Standard deviation for prompt tokens sampling.",
+    help="Prompt tokens config (JSON, YAML file or key=value string)",
 )
 @click.option(
-    "--prompt-tokens-min",
-    type=int,
+    "--output-tokens",
+    type=str,
     default=None,
-    help="Minimum number of prompt tokens.",
-)
-@click.option(
-    "--prompt-tokens-max",
-    type=int,
-    default=None,
-    help="Maximum number of prompt tokens.",
-)
-@click.option(
-    "--output-tokens-average",
-    type=int,
-    default=10,
-    show_default=True,
-    help="Average target number of tokens for outputs.",
-)
-@click.option(
-    "--output-tokens-stdev",
-    type=int,
-    default=None,
-    help="Standard deviation for output tokens sampling.",
-)
-@click.option(
-    "--output-tokens-min",
-    type=int,
-    default=None,
-    help="Minimum number of output tokens.",
-)
-@click.option(
-    "--output-tokens-max",
-    type=int,
-    default=None,
-    help="Maximum number of output tokens.",
+    help="Output tokens config (JSON, YAML file or key=value string)",
 )
 @click.option(
     "--push-to-hub",
@@ -453,14 +415,8 @@ def dataset(
     short_prompt_strategy,
     pad_char,
     concat_delimiter,
-    prompt_tokens_average,
-    prompt_tokens_stdev,
-    prompt_tokens_min,
-    prompt_tokens_max,
-    output_tokens_average,
-    output_tokens_stdev,
-    output_tokens_min,
-    output_tokens_max,
+    prompt_tokens,
+    output_tokens,
     push_to_hub,
     hub_dataset_id,
     random_seed,
@@ -469,19 +425,13 @@ def dataset(
         data=data,
         output_path=output_path,
         processor=processor,
+        prompt_tokens=prompt_tokens,
+        output_tokens=output_tokens,
         processor_args=processor_args,
         data_args=data_args,
         short_prompt_strategy=short_prompt_strategy,
         pad_char=pad_char,
         concat_delimiter=concat_delimiter,
-        prompt_tokens_average=prompt_tokens_average,
-        prompt_tokens_stdev=prompt_tokens_stdev,
-        prompt_tokens_min=prompt_tokens_min,
-        prompt_tokens_max=prompt_tokens_max,
-        output_tokens_average=output_tokens_average,
-        output_tokens_stdev=output_tokens_stdev,
-        output_tokens_min=output_tokens_min,
-        output_tokens_max=output_tokens_max,
         push_to_hub=push_to_hub,
         hub_dataset_id=hub_dataset_id,
         random_seed=random_seed,

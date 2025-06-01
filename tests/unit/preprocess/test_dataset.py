@@ -56,9 +56,11 @@ def test_strategy_handler_called(
         mock_dataset_class.from_list.return_value = mock_dataset_obj
 
         process_dataset(
-            "input",
-            "output_dir/data.json",
-            tokenizer_mock,
+            data="input",
+            output_path="output_dir/data.json",
+            processor=tokenizer_mock,
+            prompt_tokens="average=10,min=1",
+            output_tokens="average=10,min=1",
             short_prompt_strategy=ShortPromptStrategy.IGNORE,
         )
 
@@ -135,7 +137,13 @@ def test_process_dataset_non_empty(
     mock_dataset_class.from_list.return_value = mock_dataset_obj
 
     output_path = "output_dir/data.json"
-    process_dataset("input", output_path, tokenizer_mock)
+    process_dataset(
+        data="input",
+        output_path=output_path,
+        processor=tokenizer_mock,
+        prompt_tokens="average=10,min=1",
+        output_tokens="average=10,min=1",
+    )
 
     mock_load_dataset.assert_called_once()
     mock_check_processor.assert_called_once()
@@ -168,7 +176,13 @@ def test_process_dataset_empty_after_processing(
     mock_check_processor.return_value = tokenizer_mock
     mock_sampler.side_effect = lambda **kwargs: [10]
 
-    process_dataset("input", "output_dir/data.json", tokenizer_mock)
+    process_dataset(
+        data="input",
+        output_path="output_dir/data.json",
+        processor=tokenizer_mock,
+        prompt_tokens="average=10,min=1",
+        output_tokens="average=10,min=1",
+    )
 
     mock_load_dataset.assert_called_once()
     mock_check_processor.assert_called_once()
@@ -197,9 +211,11 @@ def test_process_dataset_push_to_hub_called(
     mock_dataset_class.from_list.return_value = mock_dataset_obj
 
     process_dataset(
-        "input",
-        "output_dir/data.json",
-        tokenizer_mock,
+        data="input",
+        output_path="output_dir/data.json",
+        processor=tokenizer_mock,
+        prompt_tokens="average=10,min=1",
+        output_tokens="average=10,min=1",
         push_to_hub=True,
         hub_dataset_id="id123",
     )
@@ -227,7 +243,14 @@ def test_process_dataset_push_to_hub_not_called(
     mock_dataset_obj = MagicMock(spec=Dataset)
     mock_dataset_class.from_list.return_value = mock_dataset_obj
 
-    process_dataset("input", "output_dir/data.json", tokenizer_mock, push_to_hub=False)
+    process_dataset(
+        data="input",
+        output_path="output_dir/data.json",
+        processor=tokenizer_mock,
+        prompt_tokens="average=10,min=1",
+        output_tokens="average=10,min=1",
+        push_to_hub=False,
+    )
     mock_push.assert_not_called()
 
 

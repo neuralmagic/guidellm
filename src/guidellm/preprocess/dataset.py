@@ -1,11 +1,14 @@
+import json
 import os
 from collections.abc import Iterator
 from enum import Enum
 from pathlib import Path
 from typing import Any, Callable, Optional, Union
 
+import yaml
 from datasets import Dataset
 from loguru import logger
+from pydantic import BaseModel, Field
 from transformers import PreTrainedTokenizerBase
 
 from guidellm.dataset import load_dataset as guidellm_load_dataset
@@ -100,6 +103,71 @@ STRATEGY_HANDLERS: dict[ShortPromptStrategy, Callable] = {
 }
 
 
+class TokensConfig(BaseModel):
+    average: int = Field(
+        description="The average number of tokens.",
+        gt=0,
+    )
+    stdev: Optional[int] = Field(
+        description="The standard deviation of the tokens.",
+        gt=0,
+        default=None,
+    )
+    min: Optional[int] = Field(
+        description="The minimum number of tokens.",
+        gt=0,
+        default=None,
+    )
+    max: Optional[int] = Field(
+        description="The maximum number of tokens.",
+        gt=0,
+        default=None,
+    )
+
+    @staticmethod
+    def parse_str(data: Union[str, Path]) -> "TokensConfig":
+        if (
+            isinstance(data, Path)
+            or data.strip().endswith(".config")
+            or data.strip().endswith(".yaml")
+        ):
+            return TokensConfig.parse_config_file(data)
+
+        if data.strip().startswith("{"):
+            return TokensConfig.parse_json(data)
+
+        if data.count("=") > 1:
+            return TokensConfig.parse_key_value_pairs(data)
+
+        raise ValueError(
+            f"Unsupported data format. Expected JSON or key-value pairs, got {data}"
+        )
+
+    @staticmethod
+    def parse_json(data: str) -> "TokensConfig":
+        config_dict = json.loads(data.strip())
+
+        return TokensConfig(**config_dict)
+
+    @staticmethod
+    def parse_key_value_pairs(data: str) -> "TokensConfig":
+        config_dict = {}
+        items = data.strip().split(",")
+        for item in items:
+            key, value = item.split("=")
+            config_dict[key.strip()] = (
+                int(value.strip()) if value.strip().isnumeric() else value.strip()
+            )
+
+        return TokensConfig(**config_dict)  # type: ignore[arg-type]
+
+    @staticmethod
+    def parse_config_file(data: Union[str, Path]) -> "TokensConfig":
+        with Path(data).open("r") as file:
+            config_dict = yaml.safe_load(file)
+
+        return TokensConfig(**config_dict)
+
 def save_dataset_to_file(dataset: Dataset, output_path: Union[str, Path]) -> None:
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -132,19 +200,13 @@ def process_dataset(
         data: Union[str, Path],
         output_path: Union[str, Path],
         processor: Union[str, Path, PreTrainedTokenizerBase],
+        prompt_tokens: Union[str, Path],
+        output_tokens: Union[str, Path],
         processor_args: Optional[dict[str, Any]] = None,
         data_args: Optional[dict[str, Any]] = None,
         short_prompt_strategy: ShortPromptStrategy = ShortPromptStrategy.IGNORE,
         pad_char: Optional[str] = None,
         concat_delimiter: Optional[str] = None,
-        prompt_tokens_average: int = 10,
-        prompt_tokens_stdev: Optional[int] = None,
-        prompt_tokens_min: Optional[int] = None,
-        prompt_tokens_max: Optional[int] = None,
-        output_tokens_average: int = 10,
-        output_tokens_stdev: Optional[int] = None,
-        output_tokens_min: Optional[int] = None,
-        output_tokens_max: Optional[int] = None,
         push_to_hub: bool = False,
         hub_dataset_id: Optional[str] = None,
         random_seed: int = 42,
@@ -168,22 +230,25 @@ def process_dataset(
         "output_tokens_count_column", "output_tokens_count"
     )
 
+    prompt_tokens_cfg = TokensConfig.parse_str(prompt_tokens)
+    output_tokens_cfg = TokensConfig.parse_str(output_tokens)
+
     prompt_token_sampler = iter(
         IntegerRangeSampler(
-            average=prompt_tokens_average,
-            variance=prompt_tokens_stdev,
-            min_value=prompt_tokens_min,
-            max_value=prompt_tokens_max,
+            average=prompt_tokens_cfg.average,
+            variance=prompt_tokens_cfg.stdev,
+            min_value=prompt_tokens_cfg.min,
+            max_value=prompt_tokens_cfg.max,
             random_seed=random_seed,
         )
     )
 
     output_token_sampler = iter(
         IntegerRangeSampler(
-            average=output_tokens_average,
-            variance=output_tokens_stdev,
-            min_value=output_tokens_min,
-            max_value=output_tokens_max,
+            average=output_tokens_cfg.average,
+            variance=output_tokens_cfg.stdev,
+            min_value=output_tokens_cfg.min,
+            max_value=output_tokens_cfg.max,
             random_seed=random_seed,
         )
     )
