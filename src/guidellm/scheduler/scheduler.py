@@ -251,6 +251,7 @@ class Scheduler(Generic[RequestT, ResponseT]):
             scheduling_strategy.processes_limit,
             scheduling_strategy.processing_requests_limit,
         )
+        num_processes = 1
         requests_limit_split = (
             scheduling_strategy.processing_requests_limit
             // scheduling_strategy.processes_limit
@@ -275,6 +276,7 @@ class Scheduler(Generic[RequestT, ResponseT]):
                     loop.run_in_executor(
                         executor,
                         self.worker.run_process,
+                        scheduling_strategy.processing_mode,
                         requests_queue,
                         responses_queue,
                         shutdown_event,
