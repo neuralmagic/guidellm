@@ -34,11 +34,20 @@ class ShortPromptStrategy(str, Enum):
 
 
 def handle_ignore_strategy(
-        current_prompt: str,
-        min_prompt_tokens: int,
-        tokenizer: PreTrainedTokenizerBase,
-        **_kwargs,
+    current_prompt: str,
+    min_prompt_tokens: int,
+    tokenizer: PreTrainedTokenizerBase,
+    **_kwargs,
 ) -> Optional[str]:
+    """
+    Ignores prompts that are shorter than the required minimum token length.
+
+    :param current_prompt: The input prompt string.
+    :param min_prompt_tokens: Minimum required token count.
+    :param tokenizer: Tokenizer used to count tokens.
+    :return: The prompt if it meets the length, otherwise None.
+    """
+
     if len(tokenizer.encode(current_prompt)) < min_prompt_tokens:
         logger.warning("Prompt too short, ignoring")
         return None
@@ -46,14 +55,26 @@ def handle_ignore_strategy(
 
 
 def handle_concatenate_strategy(
-        current_prompt: str,
-        min_prompt_tokens: int,
-        dataset_iterator: Iterator[dict[str, Any]],
-        prompt_column: str,
-        tokenizer: PreTrainedTokenizerBase,
-        concat_delimiter: str,
-        **_kwargs,
+    current_prompt: str,
+    min_prompt_tokens: int,
+    dataset_iterator: Iterator[dict[str, Any]],
+    prompt_column: str,
+    tokenizer: PreTrainedTokenizerBase,
+    concat_delimiter: str,
+    **_kwargs,
 ) -> Optional[str]:
+    """
+    Concatenates prompts until the minimum token requirement is met.
+
+    :param current_prompt: The initial prompt.
+    :param min_prompt_tokens: Target minimum token length.
+    :param dataset_iterator: Iterator to fetch more prompts.
+    :param prompt_column: Column key for prompt extraction.
+    :param tokenizer: Tokenizer used to count tokens.
+    :param concat_delimiter: Delimiter to use between prompts.
+    :return: Concatenated prompt or None if not enough data.
+    """
+
     tokens_len = len(tokenizer.encode(current_prompt))
     while tokens_len < min_prompt_tokens:
         try:
@@ -69,23 +90,43 @@ def handle_concatenate_strategy(
 
 
 def handle_pad_strategy(
-        current_prompt: str,
-        min_prompt_tokens: int,
-        tokenizer: PreTrainedTokenizerBase,
-        pad_char: str,
-        **_kwargs,
+    current_prompt: str,
+    min_prompt_tokens: int,
+    tokenizer: PreTrainedTokenizerBase,
+    pad_char: str,
+    **_kwargs,
 ) -> str:
+    """
+    Pads the prompt with a character until it reaches the minimum token length.
+
+    :param current_prompt: The input prompt.
+    :param min_prompt_tokens: Desired minimum token count.
+    :param tokenizer: Tokenizer used to count tokens.
+    :param pad_char: Character used for padding.
+    :return: Padded prompt string.
+    """
+
     while len(tokenizer.encode(current_prompt)) < min_prompt_tokens:
         current_prompt += pad_char
     return current_prompt
 
 
 def handle_error_strategy(
-        current_prompt: str,
-        min_prompt_tokens: int,
-        tokenizer: PreTrainedTokenizerBase,
-        **_kwargs,
+    current_prompt: str,
+    min_prompt_tokens: int,
+    tokenizer: PreTrainedTokenizerBase,
+    **_kwargs,
 ) -> Optional[str]:
+    """
+    Raises an error if the prompt is too short.
+
+    :param current_prompt: The input prompt.
+    :param min_prompt_tokens: Required token count.
+    :param tokenizer: Tokenizer used to count tokens.
+    :return: The input prompt if valid.
+    :raises PromptTooShortError: If the prompt is too short.
+    """
+
     prompt_len = len(tokenizer.encode(current_prompt))
     if prompt_len < min_prompt_tokens:
         raise PromptTooShortError(
@@ -126,6 +167,17 @@ class TokensConfig(BaseModel):
 
     @staticmethod
     def parse_str(data: Union[str, Path]) -> "TokensConfig":
+        """
+        Parses a string or path into a TokensConfig object. Supports:
+        - JSON string
+        - key=value pairs
+        - file path to .yaml/.config
+
+        :param data: String or path containing configuration.
+        :return: Parsed TokensConfig instance.
+        :raises ValueError: If the format is not recognized.
+        """
+
         if (
             isinstance(data, Path)
             or data.strip().endswith(".config")
@@ -169,6 +221,13 @@ class TokensConfig(BaseModel):
         return TokensConfig(**config_dict)
 
 def save_dataset_to_file(dataset: Dataset, output_path: Union[str, Path]) -> None:
+    """
+    Saves a HuggingFace Dataset to file in a supported format.
+
+    :param dataset: Dataset to save.
+    :param output_path: Output file path (.json, .jsonl, .csv, .parquet).
+    :raises ValueError: If the file extension is not supported.
+    """
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     suffix = output_path.suffix.lower()
@@ -197,20 +256,39 @@ def _validate_output_suffix(output_path: Union[str, Path]) -> None:
 
 
 def process_dataset(
-        data: Union[str, Path],
-        output_path: Union[str, Path],
-        processor: Union[str, Path, PreTrainedTokenizerBase],
-        prompt_tokens: Union[str, Path],
-        output_tokens: Union[str, Path],
-        processor_args: Optional[dict[str, Any]] = None,
-        data_args: Optional[dict[str, Any]] = None,
-        short_prompt_strategy: ShortPromptStrategy = ShortPromptStrategy.IGNORE,
-        pad_char: Optional[str] = None,
-        concat_delimiter: Optional[str] = None,
-        push_to_hub: bool = False,
-        hub_dataset_id: Optional[str] = None,
-        random_seed: int = 42,
+    data: Union[str, Path],
+    output_path: Union[str, Path],
+    processor: Union[str, Path, PreTrainedTokenizerBase],
+    prompt_tokens: Union[str, Path],
+    output_tokens: Union[str, Path],
+    processor_args: Optional[dict[str, Any]] = None,
+    data_args: Optional[dict[str, Any]] = None,
+    short_prompt_strategy: ShortPromptStrategy = ShortPromptStrategy.IGNORE,
+    pad_char: Optional[str] = None,
+    concat_delimiter: Optional[str] = None,
+    push_to_hub: bool = False,
+    hub_dataset_id: Optional[str] = None,
+    random_seed: int = 42,
 ) -> None:
+    """
+    Main method to process and save a dataset with sampled prompt/output token counts.
+
+    :param data: Path or identifier for dataset input.
+    :param output_path: File path to save the processed dataset.
+    :param processor: Tokenizer object or its config.
+    :param prompt_tokens: Prompt token config string or file.
+    :param output_tokens: Output token config string or file.
+    :param processor_args: Optional processor arguments.
+    :param data_args: Optional data loading arguments.
+    :param short_prompt_strategy: Strategy for handling short prompts.
+    :param pad_char: Character used when padding short prompts.
+    :param concat_delimiter: Delimiter for concatenation strategy.
+    :param push_to_hub: Whether to push to Hugging Face Hub.
+    :param hub_dataset_id: Dataset ID on Hugging Face Hub.
+    :param random_seed: Seed for random sampling.
+    :raises ValueError: If output path is invalid or pushing conditions unmet.
+    """
+
     _validate_output_suffix(output_path)
     logger.info(
         f"Starting dataset conversion | Input: {data} | "
@@ -300,8 +378,16 @@ def process_dataset(
 
 
 def push_dataset_to_hub(
-        hub_dataset_id: Optional[str], processed_dataset: Dataset,
+    hub_dataset_id: Optional[str], processed_dataset: Dataset,
 ) -> None:
+    """
+    Pushes the processed dataset to Hugging Face Hub using HF_TOKEN.
+
+    :param hub_dataset_id: Identifier on the Hub to push to.
+    :param processed_dataset: HuggingFace Dataset object.
+    :raises ValueError: If hub_dataset_id or HF_TOKEN is not available.
+    """
+
     hf_token = os.environ.get("HF_TOKEN")
     if not hub_dataset_id or not hf_token:
         raise ValueError(
