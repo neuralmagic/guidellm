@@ -313,9 +313,9 @@ def preprocess():
 
 @preprocess.command(
     help=(
-        "Convert a dataset to have specific prompt and output token sizes.\n\n"
-        "INPUT_DATA: Path to the input dataset or dataset ID.\n"
-        "OUTPUT_PATH: Path to save the converted dataset, including file suffix. "
+        "Convert a dataset to have specific prompt and output token sizes.\n"
+        "DATA: Path to the input dataset or dataset ID.\n"
+        "OUTPUT_PATH: Path to save the converted dataset, including file suffix."
     )
 )
 @click.argument(
