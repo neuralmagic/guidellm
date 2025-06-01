@@ -33,7 +33,7 @@ def parse_number_str(ctx, param, value):  # noqa: ARG001
     values = value.split(",") if "," in value else [value]
 
     try:
-        return [int(val) if val.isdigit() else float(val) for val in values]
+        return [float(val) for val in values]
     except ValueError as err:
         raise click.BadParameter(
             f"{param.name} must be a number or comma-separated list of numbers."
