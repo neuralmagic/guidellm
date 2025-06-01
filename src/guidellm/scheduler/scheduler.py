@@ -1,3 +1,4 @@
+from datetime import timedelta
 import asyncio
 import math
 import multiprocessing
@@ -269,27 +270,17 @@ class Scheduler(Generic[RequestT, ResponseT]):
         futures = []
         loop = asyncio.get_event_loop()
         for id_, requests_limit in zip(process_ids, process_requests_limits):
-            if scheduling_strategy.processing_mode == "sync":
+            if scheduling_strategy.processing_mode in ["sync", "async"]:
                 futures.append(
                     loop.run_in_executor(
                         executor,
-                        self.worker.process_loop_synchronous,
+                        self.worker.run_process,
                         requests_queue,
                         responses_queue,
-                        id_,
                         shutdown_event,
-                    )
-                )
-            elif scheduling_strategy.processing_mode == "async":
-                futures.append(
-                    loop.run_in_executor(
-                        executor,
-                        self.worker.process_loop_asynchronous,
-                        requests_queue,
-                        responses_queue,
+                        timedelta(seconds=10).total_seconds(),
+                        id_,
                         requests_limit,
-                        id_,
-                        shutdown_event,
                     )
                 )
             else:

@@ -194,22 +194,25 @@ class RequestsWorker(ABC, Generic[RequestT, ResponseT]):
 
     def run_process(
             self,
-            type_: Literal["synchronous", "asynchronous"],
+            type_: Literal["sync", "async"],
             requests_queue: multiprocessing.Queue,
             results_queue: multiprocessing.Queue,
             shutdown_event: multiprocessing.Event,
-            shutdown_poll_interval: float,
+            shutdown_poll_interval_seconds: float,
             process_id: int,
-            max_concurrency: int,
+            max_concurrency: Optional[int] = None,
     ):
         async def _process_runner():
-            if type_ == "synchronous":
+            if type_ == "sync":
                 loop_task = asyncio.create_task(self._process_synchronous_requests_loop(
                     requests_queue=requests_queue,
                     results_queue=results_queue,
                     process_id=process_id,
                 ), name="request_loop_processor_task")
-            elif type_ == "asynchronous":
+            elif type_ == "async":
+                if max_concurrency is None:
+                    raise ValueError("max_concurrency must be set "
+                                     "for async processor")
                 loop_task = asyncio.create_task(self._process_asynchronous_requests_loop(
                     requests_queue=requests_queue,
                     results_queue=results_queue,
@@ -220,8 +223,8 @@ class RequestsWorker(ABC, Generic[RequestT, ResponseT]):
                 raise ValueError(f"Invalid process type: {type_}")
 
             shutdown_task = asyncio.create_task(
-                self._wait_for_shutdown(shutdown_event, shutdown_poll_interval),
-                name="shutdown_task"
+                self._wait_for_shutdown(shutdown_event, shutdown_poll_interval_seconds),
+                name="shutdown_task",
             )
 
             done, pending = await asyncio.wait(
