@@ -815,7 +815,10 @@ class GenerativeBenchmark(Benchmark):
                         req.first_token_time or req.start_time
                         for req in total_with_output_first
                     ],
-                    iter_counts=[req.output_tokens for req in total_with_output_first],
+                    iter_counts=[
+                        req.output_tokens
+                        for req in total_with_output_first
+                    ],
                     first_iter_counts=[
                         req.prompt_tokens for req in total_with_output_first
                     ],
