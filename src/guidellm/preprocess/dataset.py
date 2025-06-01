@@ -220,6 +220,7 @@ class TokensConfig(BaseModel):
 
         return TokensConfig(**config_dict)
 
+
 def save_dataset_to_file(dataset: Dataset, output_path: Union[str, Path]) -> None:
     """
     Saves a HuggingFace Dataset to file in a supported format.
@@ -291,8 +292,7 @@ def process_dataset(
 
     _validate_output_suffix(output_path)
     logger.info(
-        f"Starting dataset conversion | Input: {data} | "
-        f"Output directory: {output_path}"
+        f"Starting dataset conversion | Input: {data} | Output directory: {output_path}"
     )
 
     dataset, column_mappings = guidellm_load_dataset(
@@ -378,7 +378,8 @@ def process_dataset(
 
 
 def push_dataset_to_hub(
-    hub_dataset_id: Optional[str], processed_dataset: Dataset,
+    hub_dataset_id: Optional[str],
+    processed_dataset: Dataset,
 ) -> None:
     """
     Pushes the processed dataset to Hugging Face Hub using HF_TOKEN.

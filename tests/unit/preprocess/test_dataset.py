@@ -33,17 +33,18 @@ def tokenizer_mock():
     )
     return tokenizer
 
+
 @pytest.mark.smoke
 @patch(f"{process_dataset.__module__}.guidellm_load_dataset")
 @patch(f"{process_dataset.__module__}.check_load_processor")
 @patch(f"{process_dataset.__module__}.Dataset")
 @patch(f"{process_dataset.__module__}.IntegerRangeSampler")
 def test_strategy_handler_called(
-        mock_sampler,
-        mock_dataset_class,
-        mock_check_processor,
-        mock_load_dataset,
-        tokenizer_mock,
+    mock_sampler,
+    mock_dataset_class,
+    mock_check_processor,
+    mock_load_dataset,
+    tokenizer_mock,
 ):
     mock_handler = MagicMock(return_value="processed_prompt")
     with patch.dict(STRATEGY_HANDLERS, {ShortPromptStrategy.IGNORE: mock_handler}):
@@ -68,17 +69,20 @@ def test_strategy_handler_called(
         mock_load_dataset.assert_called_once()
         mock_check_processor.assert_called_once()
 
+
 @pytest.mark.sanity
 def test_handle_ignore_strategy_too_short(tokenizer_mock):
     result = handle_ignore_strategy("short", 10, tokenizer_mock)
     assert result is None
     tokenizer_mock.encode.assert_called_with("short")
 
+
 @pytest.mark.sanity
 def test_handle_ignore_strategy_sufficient_length(tokenizer_mock):
     result = handle_ignore_strategy("long prompt", 5, tokenizer_mock)
     assert result == "long prompt"
     tokenizer_mock.encode.assert_called_with("long prompt")
+
 
 @pytest.mark.sanity
 def test_handle_concatenate_strategy_enough_prompts(tokenizer_mock):
@@ -88,6 +92,7 @@ def test_handle_concatenate_strategy_enough_prompts(tokenizer_mock):
     )
     assert result == "short\nlonger"
 
+
 @pytest.mark.sanity
 def test_handle_concatenate_strategy_not_enough_prompts(tokenizer_mock):
     dataset_iter: Iterator = iter([])
@@ -96,10 +101,12 @@ def test_handle_concatenate_strategy_not_enough_prompts(tokenizer_mock):
     )
     assert result is None
 
+
 @pytest.mark.sanity
 def test_handle_pad_strategy(tokenizer_mock):
     result = handle_pad_strategy("short", 10, tokenizer_mock, "p")
     assert result == "shortppppp"
+
 
 @pytest.mark.sanity
 def test_handle_error_strategy_valid_prompt(tokenizer_mock):
@@ -107,10 +114,12 @@ def test_handle_error_strategy_valid_prompt(tokenizer_mock):
     assert result == "valid prompt"
     tokenizer_mock.encode.assert_called_with("valid prompt")
 
+
 @pytest.mark.sanity
 def test_handle_error_strategy_too_short_prompt(tokenizer_mock):
     with pytest.raises(PromptTooShortError):
         handle_error_strategy("short", 10, tokenizer_mock)
+
 
 @pytest.mark.smoke
 @patch("guidellm.preprocess.dataset.save_dataset_to_file")
@@ -119,12 +128,12 @@ def test_handle_error_strategy_too_short_prompt(tokenizer_mock):
 @patch("guidellm.preprocess.dataset.check_load_processor")
 @patch("guidellm.preprocess.dataset.IntegerRangeSampler")
 def test_process_dataset_non_empty(
-        mock_sampler,
-        mock_check_processor,
-        mock_load_dataset,
-        mock_dataset_class,
-        mock_save_to_file,
-        tokenizer_mock,
+    mock_sampler,
+    mock_check_processor,
+    mock_load_dataset,
+    mock_dataset_class,
+    mock_save_to_file,
+    tokenizer_mock,
 ):
     from guidellm.preprocess.dataset import process_dataset
 
@@ -159,17 +168,18 @@ def test_process_dataset_non_empty(
         assert "output_tokens_count" in item
         assert len(tokenizer_mock.encode(item["prompt"])) <= 3
 
+
 @pytest.mark.sanity
 @patch(f"{process_dataset.__module__}.Dataset")
 @patch(f"{process_dataset.__module__}.guidellm_load_dataset")
 @patch(f"{process_dataset.__module__}.check_load_processor")
 @patch(f"{process_dataset.__module__}.IntegerRangeSampler")
 def test_process_dataset_empty_after_processing(
-        mock_sampler,
-        mock_check_processor,
-        mock_load_dataset,
-        mock_dataset_class,
-        tokenizer_mock,
+    mock_sampler,
+    mock_check_processor,
+    mock_load_dataset,
+    mock_dataset_class,
+    tokenizer_mock,
 ):
     mock_dataset = [{"prompt": ""}]
     mock_load_dataset.return_value = (mock_dataset, {"prompt_column": "prompt"})
@@ -188,6 +198,7 @@ def test_process_dataset_empty_after_processing(
     mock_check_processor.assert_called_once()
     mock_dataset_class.from_list.assert_not_called()
 
+
 @pytest.mark.smoke
 @patch(f"{process_dataset.__module__}.push_dataset_to_hub")
 @patch(f"{process_dataset.__module__}.Dataset")
@@ -195,12 +206,12 @@ def test_process_dataset_empty_after_processing(
 @patch(f"{process_dataset.__module__}.check_load_processor")
 @patch(f"{process_dataset.__module__}.IntegerRangeSampler")
 def test_process_dataset_push_to_hub_called(
-        mock_sampler,
-        mock_check_processor,
-        mock_load_dataset,
-        mock_dataset_class,
-        mock_push,
-        tokenizer_mock,
+    mock_sampler,
+    mock_check_processor,
+    mock_load_dataset,
+    mock_dataset_class,
+    mock_push,
+    tokenizer_mock,
 ):
     mock_dataset = [{"prompt": "abc"}]
     mock_load_dataset.return_value = (mock_dataset, {"prompt_column": "prompt"})
@@ -221,6 +232,7 @@ def test_process_dataset_push_to_hub_called(
     )
     mock_push.assert_called_once_with("id123", mock_dataset_obj)
 
+
 @pytest.mark.sanity
 @patch(f"{process_dataset.__module__}.push_dataset_to_hub")
 @patch(f"{process_dataset.__module__}.Dataset")
@@ -228,12 +240,12 @@ def test_process_dataset_push_to_hub_called(
 @patch(f"{process_dataset.__module__}.check_load_processor")
 @patch(f"{process_dataset.__module__}.IntegerRangeSampler")
 def test_process_dataset_push_to_hub_not_called(
-        mock_sampler,
-        mock_check_processor,
-        mock_load_dataset,
-        mock_dataset_class,
-        mock_push,
-        tokenizer_mock,
+    mock_sampler,
+    mock_check_processor,
+    mock_load_dataset,
+    mock_dataset_class,
+    mock_push,
+    tokenizer_mock,
 ):
     mock_dataset = [{"prompt": "abc"}]
     mock_load_dataset.return_value = (mock_dataset, {"prompt_column": "prompt"})
@@ -253,12 +265,14 @@ def test_process_dataset_push_to_hub_not_called(
     )
     mock_push.assert_not_called()
 
+
 @pytest.mark.regression
 def test_push_dataset_to_hub_success():
     os.environ["HF_TOKEN"] = "token"
     mock_dataset = MagicMock(spec=Dataset)
     push_dataset_to_hub("dataset_id", mock_dataset)
     mock_dataset.push_to_hub.assert_called_once_with("dataset_id", token="token")
+
 
 @pytest.mark.regression
 def test_push_dataset_to_hub_error_no_env():
@@ -268,12 +282,14 @@ def test_push_dataset_to_hub_error_no_env():
     with pytest.raises(ValueError, match="hub_dataset_id and HF_TOKEN"):
         push_dataset_to_hub("dataset_id", mock_dataset)
 
+
 @pytest.mark.regression
 def test_push_dataset_to_hub_error_no_id():
     os.environ["HF_TOKEN"] = "token"
     mock_dataset = MagicMock(spec=Dataset)
     with pytest.raises(ValueError, match="hub_dataset_id and HF_TOKEN"):
         push_dataset_to_hub(None, mock_dataset)
+
 
 @pytest.mark.regression
 @patch.object(Path, "mkdir")
@@ -284,6 +300,7 @@ def test_save_dataset_to_file_csv(mock_mkdir):
     mock_dataset.to_csv.assert_called_once_with(output_path)
     mock_mkdir.assert_called_once_with(parents=True, exist_ok=True)
 
+
 @pytest.mark.regression
 @patch.object(Path, "mkdir")
 def test_save_dataset_to_file_csv_capitalized(mock_mkdir):
@@ -292,6 +309,7 @@ def test_save_dataset_to_file_csv_capitalized(mock_mkdir):
     save_dataset_to_file(mock_dataset, output_path)
     mock_dataset.to_csv.assert_called_once_with(output_path)
     mock_mkdir.assert_called_once_with(parents=True, exist_ok=True)
+
 
 @pytest.mark.regression
 @patch.object(Path, "mkdir")
@@ -302,6 +320,7 @@ def test_save_dataset_to_file_json(mock_mkdir):
     mock_dataset.to_json.assert_called_once_with(output_path)
     mock_mkdir.assert_called_once_with(parents=True, exist_ok=True)
 
+
 @pytest.mark.regression
 @patch.object(Path, "mkdir")
 def test_save_dataset_to_file_json_capitalized(mock_mkdir):
@@ -310,6 +329,7 @@ def test_save_dataset_to_file_json_capitalized(mock_mkdir):
     save_dataset_to_file(mock_dataset, output_path)
     mock_dataset.to_json.assert_called_once_with(output_path)
     mock_mkdir.assert_called_once_with(parents=True, exist_ok=True)
+
 
 @pytest.mark.regression
 @patch.object(Path, "mkdir")
@@ -320,6 +340,7 @@ def test_save_dataset_to_file_jsonl(mock_mkdir):
     mock_dataset.to_json.assert_called_once_with(output_path)
     mock_mkdir.assert_called_once_with(parents=True, exist_ok=True)
 
+
 @pytest.mark.regression
 @patch.object(Path, "mkdir")
 def test_save_dataset_to_file_jsonl_capitalized(mock_mkdir):
@@ -329,6 +350,7 @@ def test_save_dataset_to_file_jsonl_capitalized(mock_mkdir):
     mock_dataset.to_json.assert_called_once_with(output_path)
     mock_mkdir.assert_called_once_with(parents=True, exist_ok=True)
 
+
 @pytest.mark.regression
 @patch.object(Path, "mkdir")
 def test_save_dataset_to_file_parquet(mock_mkdir):
@@ -337,6 +359,7 @@ def test_save_dataset_to_file_parquet(mock_mkdir):
     save_dataset_to_file(mock_dataset, output_path)
     mock_dataset.to_parquet.assert_called_once_with(output_path)
     mock_mkdir.assert_called_once_with(parents=True, exist_ok=True)
+
 
 @pytest.mark.regression
 @patch.object(Path, "mkdir")

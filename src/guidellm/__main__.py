@@ -281,6 +281,7 @@ def benchmark(
         )
     )
 
+
 def decode_escaped_str(_ctx, _param, value):
     """
     Click auto adds characters. For example, when using --pad-char "\n",
@@ -293,6 +294,7 @@ def decode_escaped_str(_ctx, _param, value):
         return codecs.decode(value, "unicode_escape")
     except Exception as e:
         raise click.BadParameter(f"Could not decode escape sequences: {e}") from e
+
 
 @cli.command(
     help=(
@@ -373,7 +375,7 @@ def preprocess():
     help=(
         "The delimiter to use when concatenating prompts that are too short."
         " Used when strategy is 'concatenate'."
-    )
+    ),
 )
 @click.option(
     "--prompt-tokens",
