@@ -62,7 +62,13 @@ export default function Home() {
           target="_blank"
           rel="noopener noreferrer"
         >
-          <Image aria-hidden src="/window.svg" alt="Window icon" width={16} height={16} />
+          <Image
+            aria-hidden
+            src="/window.svg"
+            alt="Window icon"
+            width={16}
+            height={16}
+          />
           Examples
         </a>
         <a

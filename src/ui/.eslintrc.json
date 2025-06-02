@@ -44,5 +44,6 @@
     ],
     "import/no-extraneous-dependencies": ["error"],
     "no-secrets/no-secrets": ["error", { "additionalRegexes": {}, "ignoreContent": [] }]
-  }
+  },
+  "settings": { "next": { "rootDir": ["src/ui/"] } }
 }

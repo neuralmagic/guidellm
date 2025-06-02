@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "allowJs": true,
+    "allowJs": false,
     "allowSyntheticDefaultImports": true,
     "baseUrl": "src/ui",
     "esModuleInterop": true,
@@ -26,6 +26,13 @@
     "strict": true,
     "target": "ES2022"
   },
-  "include": ["**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "next-env.d.ts", "src", "app"],
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    "next-env.d.ts",
+    "src",
+    "app"
+  ],
   "exclude": [".meta/**/*", ".next/**/*", ".vscode", "node_modules"]
 }
