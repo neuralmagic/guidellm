@@ -228,6 +228,12 @@ def cli():
     type=int,
     help="The random seed to use for benchmarking to ensure reproducibility.",
 )
+@click.option(
+    "--use-old-run",
+    default=False,
+    type=bool,
+    help="To reload the benchmarks.json into the console",
+)
 def benchmark(
     target,
     backend_type,
@@ -251,6 +257,7 @@ def benchmark(
     output_extras,
     output_sampling,
     random_seed,
+    use_old_run,
 ):
     asyncio.run(
         benchmark_generative_text(
@@ -276,6 +283,7 @@ def benchmark(
             output_extras=output_extras,
             output_sampling=output_sampling,
             random_seed=random_seed,
+            use_old_run=use_old_run,
         )
     )
 

@@ -50,86 +50,95 @@ async def benchmark_generative_text(
     output_extras: Optional[dict[str, Any]],
     output_sampling: Optional[int],
     random_seed: int,
+    use_old_run: bool,
 ) -> tuple[GenerativeBenchmarksReport, Optional[Path]]:
     console = GenerativeBenchmarksConsole(enabled=show_progress)
-    console.print_line("Creating backend...")
-    backend = Backend.create(
-        backend_type, target=target, model=model, **(backend_args or {})
-    )
-    await backend.validate()
-    console.print_line(
-        f"Backend {backend_type} connected to {target} for model {backend.model}."
-    )
-
-    if processor is None:
-        processor = backend.model
-
-    console.print_line("Creating request loader...")
-    request_loader = GenerativeRequestLoader(
-        data=data,
-        data_args=data_args,
-        processor=processor,
-        processor_args=processor_args,
-        shuffle=data_sampler == "random",
-        iter_type=(
-            "finite"  # assume a finite dataset is our limit
-            if max_requests is None and max_seconds is None
-            else "infinite"  # default to infinite so we don't run out of data
-        ),
-        random_seed=random_seed,
-    )
-    unique_requests = request_loader.num_unique_items(raise_err=False)
-    console.print_line(
-        f"Created loader with {unique_requests} unique requests from {data}.\n\n"
-        if unique_requests > 0
-        else f"Created loader with unknown number unique requests from {data}.\n\n"
-    )
-
-    profile = create_profile(rate_type=rate_type, rate=rate)
-    benchmarker = GenerativeBenchmarker(
-        backend=backend,
-        request_loader=request_loader,
-        request_loader_description=request_loader.description,
-        benchmark_save_extras=output_extras,
-        processor=processor,
-        processor_args=processor_args,
-    )
-    progress = (
-        GenerativeTextBenchmarkerProgressDisplay(
-            display_scheduler_stats=show_progress_scheduler_stats
+    report = None
+    if not use_old_run:
+        console.print_line("Creating backend...")
+        backend = Backend.create(
+            backend_type, target=target, model=model, **(backend_args or {})
         )
-        if show_progress
-        else None
-    )
-    report = GenerativeBenchmarksReport()
+        await backend.validate()
+        console.print_line(
+            f"Backend {backend_type} connected to {target} for model {backend.model}."
+        )
 
-    async for result in benchmarker.run(
-        profile=profile,
-        max_number_per_strategy=max_requests,
-        max_duration_per_strategy=max_seconds,
-        warmup_percent_per_strategy=warmup_percent,
-        cooldown_percent_per_strategy=cooldown_percent,
-    ):
-        if progress:
-            progress.update(result)
+        if processor is None:
+            processor = backend.model
 
-        if result.type_ == "benchmark_compiled":
-            if result.current_benchmark is None:
-                raise ValueError("Current benchmark is None")
-            report.benchmarks.append(
-                result.current_benchmark.set_sample_size(output_sampling)
+        console.print_line("Creating request loader...")
+        request_loader = GenerativeRequestLoader(
+            data=data,
+            data_args=data_args,
+            processor=processor,
+            processor_args=processor_args,
+            shuffle=data_sampler == "random",
+            iter_type=(
+                "finite"  # assume a finite dataset is our limit
+                if max_requests is None and max_seconds is None
+                else "infinite"  # default to infinite so we don't run out of data
+            ),
+            random_seed=random_seed,
+        )
+        unique_requests = request_loader.num_unique_items(raise_err=False)
+        console.print_line(
+            f"Created loader with {unique_requests} unique requests from {data}.\n\n"
+            if unique_requests > 0
+            else f"Created loader with unknown number unique requests from {data}.\n\n"
+        )
+
+        profile = create_profile(rate_type=rate_type, rate=rate)
+        benchmarker = GenerativeBenchmarker(
+            backend=backend,
+            request_loader=request_loader,
+            request_loader_description=request_loader.description,
+            benchmark_save_extras=output_extras,
+            processor=processor,
+            processor_args=processor_args,
+        )
+        progress = (
+            GenerativeTextBenchmarkerProgressDisplay(
+                display_scheduler_stats=show_progress_scheduler_stats
             )
+            if show_progress
+            else None
+        )
+        report = GenerativeBenchmarksReport()
+
+        async for result in benchmarker.run(
+            profile=profile,
+            max_number_per_strategy=max_requests,
+            max_duration_per_strategy=max_seconds,
+            warmup_percent_per_strategy=warmup_percent,
+            cooldown_percent_per_strategy=cooldown_percent,
+        ):
+            if progress:
+                progress.update(result)
+
+            if result.type_ == "benchmark_compiled":
+                if result.current_benchmark is None:
+                    raise ValueError("Current benchmark is None")
+                report.benchmarks.append(
+                    result.current_benchmark.set_sample_size(output_sampling)
+                )
+
+    reloadedReport = GenerativeBenchmarksReport.load_file(
+        path="benchmarks.json",
+    )
+
+    report_to_display = reloadedReport.benchmarks if use_old_run else report.benchmarks
 
     if output_console:
         orig_enabled = console.enabled
         console.enabled = True
-        console.benchmarks = report.benchmarks
+        console.benchmarks = report_to_display
         console.print_benchmarks_metadata()
         console.print_benchmarks_info()
         console.print_benchmarks_stats()
         console.enabled = orig_enabled
 
-    if output_path:
+    if output_path and not use_old_run:
         console.print_line("\nSaving benchmarks report...")
         saved_path = report.save_file(output_path)
         console.print_line(f"Benchmarks report saved to {saved_path}")
