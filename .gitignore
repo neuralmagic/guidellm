@@ -221,4 +221,4 @@ src/ui/next-env.d.ts
 !package.json
 !package-lock.json
 !.eslintrc.json
-!tsconfig.json
+!tsconfig.*.json

@@ -2,6 +2,7 @@
   "env": {
     "browser": true,
     "es2024": true,
+    "jest": true,
     "node": true
   },
   "extends": [
@@ -13,24 +14,20 @@
     "plugin:prettier/recommended"
   ],
   "ignorePatterns": [".vscode"],
-  "overrides": [
-    {
-      "files": ["*.mjs"],
-      "parser": "espree", // Use the default JavaScript parser for `.mjs` files
-      "parserOptions": {
-        "sourceType": "module"
-      }
-    }
-  ],
   "parser": "@typescript-eslint/parser",
   "parserOptions": {
     "ecmaFeatures": {
       "jsx": true
     },
     "ecmaVersion": 2024,
+    "project": [
+      "src/ui/tsconfig.json",
+      "src/ui/tsconfig.test.json",
+      "src/ui/tsconfig.cypress.json"
+    ],
     "sourceType": "module"
   },
-  "plugins": ["@typescript-eslint", "import", "no-secrets", "react"],
+  "plugins": ["@typescript-eslint", "import", "jest", "no-secrets", "react"],
   "root": true,
   "rules": {
     "complexity": ["warn", { "max": 8 }],
