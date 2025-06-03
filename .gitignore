@@ -179,10 +179,7 @@ cython_debug/
 *.json
 *.yaml
 
-<<<<<<< HEAD
-=======
 
->>>>>>> testing-tooling
 # UI Section - Next.js/React application under src/ui/
 # dependencies
 /node_modules/
