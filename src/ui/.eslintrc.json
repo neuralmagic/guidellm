@@ -1,8 +1,9 @@
 {
   "env": {
     "browser": true,
-    "es6": true,
-    "jest": true
+    "es2024": true,
+    "jest": true,
+    "node": true
   },
   "extends": [
     "eslint:recommended",
@@ -12,23 +13,18 @@
     "plugin:@typescript-eslint/recommended",
     "plugin:prettier/recommended"
   ],
-  "ignorePatterns": [".vscode", "jest.config.js"],
-  "overrides": [
-    {
-      "files": ["*.mjs"],
-      "parser": "espree", // Use the default JavaScript parser for `.mjs` files
-      "parserOptions": {
-        "sourceType": "module"
-      }
-    }
-  ],
+  "ignorePatterns": [".vscode"],
   "parser": "@typescript-eslint/parser",
   "parserOptions": {
     "ecmaFeatures": {
       "jsx": true
     },
-    "ecmaVersion": 2018,
-    "project": "./tsconfig.json",
+    "ecmaVersion": 2024,
+    "project": [
+      "src/ui/tsconfig.json",
+      "src/ui/tsconfig.test.json",
+      "src/ui/tsconfig.cypress.json"
+    ],
     "sourceType": "module"
   },
   "plugins": ["@typescript-eslint", "import", "jest", "no-secrets", "react"],
@@ -46,7 +42,7 @@
         "newlines-between": "always-and-inside-groups",
         "pathGroups": [
           {
-            "pattern": "{@,assets,classes,components,hooks,pages,store,tests,types,utils}/**",
+            "pattern": "@{app,assets,classes,components,hooks,lib,pages,store,tests,types,utils}/**",
             "group": "internal",
             "position": "before"
           },
@@ -60,22 +56,19 @@
         "alphabetize": { "order": "asc", "caseInsensitive": true }
       }
     ],
-    "import/no-extraneous-dependencies": [
-      "error",
-      {
-        "devDependencies": [
-          "**/*.test.ts",
-          "**/*.test.tsx",
-          "**/*.d.ts",
-          "**/*.interfaces.ts",
-          "**/*.setup.ts",
-          "**/*.config.js",
-          "**/*.config.mjs"
-        ],
-        "optionalDependencies": false,
-        "peerDependencies": false
-      }
-    ],
+    "import/no-extraneous-dependencies": ["error"],
     "no-secrets/no-secrets": ["error", { "additionalRegexes": {}, "ignoreContent": [] }]
+  },
+  "settings": {
+    "next": { "rootDir": ["src/ui/"] },
+    "import/resolver": {
+      "typescript": {
+        "project": [
+          "src/ui/tsconfig.json",
+          "src/ui/tsconfig.test.json",
+          "src/ui/tsconfig.cypress.json"
+        ]
+      }
+    }
   }
 }

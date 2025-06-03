@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    /* only runtime types here */
+    "types": ["node"],
+    "allowJs": false,
+    "isolatedModules": true
+  },
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "app"],
+  "exclude": ["**/*.test.ts", "**/*.test.tsx"]
+}

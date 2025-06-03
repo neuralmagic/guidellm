@@ -1,5 +1,8 @@
 import { Palette, createTheme } from '@mui/material/styles';
-import { TypographyOptions, TypographyStyleOptions } from '@mui/material/styles/createTypography';
+import {
+  TypographyOptions,
+  TypographyStyleOptions,
+} from '@mui/material/styles/createTypography';
 
 import {
   BLACK,
@@ -154,215 +157,217 @@ const PALETTE_COLOR_OPTIONS_PLACEHOLDER_TOKENS = {
   onContainer: '#000',
 };
 
-const themeV3Typography: TypographyOptions | ((palette: Palette) => TypographyOptions) | undefined =
-  {
+const themeV3Typography:
+  | TypographyOptions
+  | ((palette: Palette) => TypographyOptions)
+  | undefined = {
+  fontFamily: FONT_FAMILY_SPEZIA,
+  fontWeightRegular: 400,
+  fontWeightMedium: 500,
+  h1: {
+    color: BLACK,
+    fontSize: 96,
+    fontWeight: 400,
     fontFamily: FONT_FAMILY_SPEZIA,
-    fontWeightRegular: 400,
-    fontWeightMedium: 500,
-    h1: {
-      color: BLACK,
-      fontSize: 96,
-      fontWeight: 400,
-      fontFamily: FONT_FAMILY_SPEZIA,
-      lineHeight: '120px',
-      '@media (max-width:600px)': {
-        fontSize: 56,
-        lineHeight: '70px',
-      },
+    lineHeight: '120px',
+    '@media (max-width:600px)': {
+      fontSize: 56,
+      lineHeight: '70px',
     },
-    h2: {
-      color: BLACK,
-      fontSize: 60,
-      fontWeight: 400,
-      fontFamily: FONT_FAMILY_SPEZIA,
-      lineHeight: '75px',
-      '@media (max-width:600px)': {
-        fontSize: 38,
-        lineHeight: '48px',
-      },
+  },
+  h2: {
+    color: BLACK,
+    fontSize: 60,
+    fontWeight: 400,
+    fontFamily: FONT_FAMILY_SPEZIA,
+    lineHeight: '75px',
+    '@media (max-width:600px)': {
+      fontSize: 38,
+      lineHeight: '48px',
     },
-    h3: {
-      color: BLACK,
-      fontSize: 48,
-      fontWeight: 400,
-      fontFamily: FONT_FAMILY_SPEZIA,
-      lineHeight: '60px',
-      '@media (max-width:600px)': {
-        fontSize: 32,
-        lineHeight: '40px',
-      },
-    },
-    h4: {
-      color: BLACK,
+  },
+  h3: {
+    color: BLACK,
+    fontSize: 48,
+    fontWeight: 400,
+    fontFamily: FONT_FAMILY_SPEZIA,
+    lineHeight: '60px',
+    '@media (max-width:600px)': {
       fontSize: 32,
-      fontWeight: 400,
-      fontFamily: FONT_FAMILY_SPEZIA,
       lineHeight: '40px',
-      '@media (max-width:600px)': {
-        fontSize: 24,
-        lineHeight: '30px',
-      },
     },
-    h5: {
-      color: BLACK,
+  },
+  h4: {
+    color: BLACK,
+    fontSize: 32,
+    fontWeight: 400,
+    fontFamily: FONT_FAMILY_SPEZIA,
+    lineHeight: '40px',
+    '@media (max-width:600px)': {
       fontSize: 24,
-      fontWeight: 400,
-      fontFamily: FONT_FAMILY_SPEZIA,
       lineHeight: '30px',
-      '@media (max-width:600px)': {
-        fontSize: 20,
-        lineHeight: '25px',
-      },
     },
-    h6: {
-      color: BLACK,
+  },
+  h5: {
+    color: BLACK,
+    fontSize: 24,
+    fontWeight: 400,
+    fontFamily: FONT_FAMILY_SPEZIA,
+    lineHeight: '30px',
+    '@media (max-width:600px)': {
       fontSize: 20,
-      fontWeight: 400,
-      fontFamily: FONT_FAMILY_SPEZIA,
       lineHeight: '25px',
-      '@media (max-width:600px)': {
-        fontSize: 18,
-        lineHeight: '25px',
-      },
     },
-    body1: {
-      color: BLACK,
+  },
+  h6: {
+    color: BLACK,
+    fontSize: 20,
+    fontWeight: 400,
+    fontFamily: FONT_FAMILY_SPEZIA,
+    lineHeight: '25px',
+    '@media (max-width:600px)': {
       fontSize: 18,
-      fontFamily: FONT_FAMILY_SPEZIA,
-      fontWeight: 400,
-      letterSpacing: '0.25px',
-      lineHeight: '22px',
-      '@media (max-width:600px)': {
-        fontSize: 16,
-        lineHeight: '20px',
-      },
+      lineHeight: '25px',
     },
-    body2: {
-      color: BLACK,
+  },
+  body1: {
+    color: BLACK,
+    fontSize: 18,
+    fontFamily: FONT_FAMILY_SPEZIA,
+    fontWeight: 400,
+    letterSpacing: '0.25px',
+    lineHeight: '22px',
+    '@media (max-width:600px)': {
       fontSize: 16,
-      fontWeight: 400,
-      fontFamily: FONT_FAMILY_SPEZIA,
-      letterSpacing: '0.25px',
       lineHeight: '20px',
-      '@media (max-width:600px)': {
-        fontSize: 14,
-        lineHeight: '17px',
-      },
     },
-    subtitle1: {
-      color: BLACK,
-      fontSize: 22,
-      lineHeight: '26px',
-      fontWeight: 500,
-      fontFamily: FONT_FAMILY_SPEZIA,
-      '@media (max-width:600px)': {
-        fontSize: 20,
-        lineHeight: '25px',
-      },
-    },
-    subtitle2: {
-      color: BLACK,
-      fontSize: 16,
-      fontWeight: 500,
-      fontFamily: FONT_FAMILY_SPEZIA,
-      lineHeight: '20px',
-      '@media (max-width:600px)': {
-        fontSize: 14,
-        lineHeight: '17px',
-      },
-    },
-    caption: {
-      color: BLACK,
-      fontSize: 12,
-      fontWeight: 400,
-      lineHeight: '15px',
-      fontFamily: FONT_FAMILY_SPEZIA,
-      letterSpacing: '0.25px',
-      '@media (max-width:600px)': {
-        fontSize: 10,
-        lineHeight: '12px',
-      },
-    },
-    button: {
-      fontSize: 16,
-      fontWeight: 500,
-      fontFamily: FONT_FAMILY_SPEZIA_MONO,
-      lineHeight: '20px',
-      textTransform: 'uppercase',
-      '@media (max-width:600px)': {
-        fontSize: 14,
-        lineHeight: '17px',
-      },
-    },
-    overline1: {
-      color: BLACK,
+  },
+  body2: {
+    color: BLACK,
+    fontSize: 16,
+    fontWeight: 400,
+    fontFamily: FONT_FAMILY_SPEZIA,
+    letterSpacing: '0.25px',
+    lineHeight: '20px',
+    '@media (max-width:600px)': {
       fontSize: 14,
-      fontWeight: 500,
-      fontFamily: FONT_FAMILY_SPEZIA_MONO,
-      lineHeight: '20px',
-      textTransform: 'uppercase',
-      '@media (max-width:600px)': {
-        fontSize: 10,
-        lineHeight: '12px',
-      },
+      lineHeight: '17px',
     },
-    overline2: {
-      color: BLACK,
-      fontSize: 12,
-      fontWeight: 500,
-      fontFamily: FONT_FAMILY_SPEZIA_MONO,
-      lineHeight: '20px',
-      textTransform: 'uppercase',
-      '@media (max-width:600px)': {
-        fontSize: 10,
-        lineHeight: '12px',
-      },
+  },
+  subtitle1: {
+    color: BLACK,
+    fontSize: 22,
+    lineHeight: '26px',
+    fontWeight: 500,
+    fontFamily: FONT_FAMILY_SPEZIA,
+    '@media (max-width:600px)': {
+      fontSize: 20,
+      lineHeight: '25px',
     },
-    metric1: {
-      color: BLACK,
-      fontSize: 32,
-      fontWeight: 400,
-      fontFamily: FONT_FAMILY_SPEZIA,
-      lineHeight: '26px',
-      '@media (max-width:600px)': {
-        fontSize: 10,
-        lineHeight: '12px',
-      },
+  },
+  subtitle2: {
+    color: BLACK,
+    fontSize: 16,
+    fontWeight: 500,
+    fontFamily: FONT_FAMILY_SPEZIA,
+    lineHeight: '20px',
+    '@media (max-width:600px)': {
+      fontSize: 14,
+      lineHeight: '17px',
     },
-    metric2: {
-      color: BLACK,
-      fontSize: 22,
-      fontWeight: 400,
-      fontFamily: FONT_FAMILY_SPEZIA,
-      lineHeight: '26px',
-      '@media (max-width:600px)': {
-        fontSize: 10,
-        lineHeight: '12px',
-      },
-    },
-    axisTitle: {
-      color: BLACK,
+  },
+  caption: {
+    color: BLACK,
+    fontSize: 12,
+    fontWeight: 400,
+    lineHeight: '15px',
+    fontFamily: FONT_FAMILY_SPEZIA,
+    letterSpacing: '0.25px',
+    '@media (max-width:600px)': {
       fontSize: 10,
-      fontWeight: 500,
-      fontFamily: FONT_FAMILY_SPEZIA_MONO,
-      lineHeight: '14px',
-      '@media (max-width:600px)': {
-        fontSize: 10,
-        lineHeight: '12px',
-      },
+      lineHeight: '12px',
     },
-    axisLabel: {
-      color: BLACK,
-      fontSize: 8,
-      fontWeight: 500,
-      fontFamily: FONT_FAMILY_SPEZIA,
-      lineHeight: '8px',
-      '@media (max-width:600px)': {
-        fontSize: 10,
-        lineHeight: '12px',
-      },
+  },
+  button: {
+    fontSize: 16,
+    fontWeight: 500,
+    fontFamily: FONT_FAMILY_SPEZIA_MONO,
+    lineHeight: '20px',
+    textTransform: 'uppercase',
+    '@media (max-width:600px)': {
+      fontSize: 14,
+      lineHeight: '17px',
     },
-  };
+  },
+  overline1: {
+    color: BLACK,
+    fontSize: 14,
+    fontWeight: 500,
+    fontFamily: FONT_FAMILY_SPEZIA_MONO,
+    lineHeight: '20px',
+    textTransform: 'uppercase',
+    '@media (max-width:600px)': {
+      fontSize: 10,
+      lineHeight: '12px',
+    },
+  },
+  overline2: {
+    color: BLACK,
+    fontSize: 12,
+    fontWeight: 500,
+    fontFamily: FONT_FAMILY_SPEZIA_MONO,
+    lineHeight: '20px',
+    textTransform: 'uppercase',
+    '@media (max-width:600px)': {
+      fontSize: 10,
+      lineHeight: '12px',
+    },
+  },
+  metric1: {
+    color: BLACK,
+    fontSize: 32,
+    fontWeight: 400,
+    fontFamily: FONT_FAMILY_SPEZIA,
+    lineHeight: '26px',
+    '@media (max-width:600px)': {
+      fontSize: 10,
+      lineHeight: '12px',
+    },
+  },
+  metric2: {
+    color: BLACK,
+    fontSize: 22,
+    fontWeight: 400,
+    fontFamily: FONT_FAMILY_SPEZIA,
+    lineHeight: '26px',
+    '@media (max-width:600px)': {
+      fontSize: 10,
+      lineHeight: '12px',
+    },
+  },
+  axisTitle: {
+    color: BLACK,
+    fontSize: 10,
+    fontWeight: 500,
+    fontFamily: FONT_FAMILY_SPEZIA_MONO,
+    lineHeight: '14px',
+    '@media (max-width:600px)': {
+      fontSize: 10,
+      lineHeight: '12px',
+    },
+  },
+  axisLabel: {
+    color: BLACK,
+    fontSize: 8,
+    fontWeight: 500,
+    fontFamily: FONT_FAMILY_SPEZIA,
+    lineHeight: '8px',
+    '@media (max-width:600px)': {
+      fontSize: 10,
+      lineHeight: '12px',
+    },
+  },
+};
 
 const themeV3FontStyles = {
   fallbacks: [

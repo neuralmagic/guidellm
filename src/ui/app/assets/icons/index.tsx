@@ -7,4 +7,13 @@ import NeuralMagicTitleV2 from './nm-logo-with-name.svg';
 import Open from './open.svg';
 import WarningCircle from './warning-circle.svg';
 
-export { ArrowDown, ArrowUp, Expand, CheckCircle, WarningCircle, Info, NeuralMagicTitleV2, Open };
+export {
+  ArrowDown,
+  ArrowUp,
+  Expand,
+  CheckCircle,
+  WarningCircle,
+  Info,
+  NeuralMagicTitleV2,
+  Open,
+};

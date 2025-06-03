@@ -4,5 +4,5 @@
     "types": ["jest", "@testing-library/jest-dom", "node"],
     "noEmit": true
   },
-  "include": ["jest.setup.ts", "tests/**/*.ts?(x)", "src/**/*.ts?(x)"]
+  "include": ["jest.setup.ts", "tests/**/*.ts?(x)"]
 }
