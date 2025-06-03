@@ -572,12 +572,12 @@ class OpenAIHTTPBackend(Backend):
 
             async for line in stream.aiter_lines():
                 iter_time = time.time()
-                logger.debug(
-                    "{} request: {} recieved iter response line: {}",
-                    self.__class__.__name__,
-                    request_id,
-                    line,
-                )
+                # logger.debug(
+                #     "{} request: {} recieved iter response line: {}",
+                #     self.__class__.__name__,
+                #     request_id,
+                #     line,
+                # )
 
                 if not line or not line.strip().startswith("data:"):
                     continue

@@ -223,7 +223,10 @@ class RequestsWorker(ABC, Generic[RequestT, ResponseT]):
                 raise ValueError(f"Invalid process type: {type_}")
 
             shutdown_task = asyncio.create_task(
-                self._wait_for_shutdown(shutdown_event, shutdown_poll_interval_seconds),
+                self._wait_for_shutdown(
+                    shutdown_event=shutdown_event,
+                    shutdown_poll_interval=shutdown_poll_interval_seconds
+                ),
                 name="shutdown_task",
             )
 
@@ -236,7 +239,9 @@ class RequestsWorker(ABC, Generic[RequestT, ResponseT]):
             )
 
             for task in pending:
-                task.cancel()
+                logger.debug(f"Cancelling task {task.get_name()}")
+                cancel_result = task.cancel()
+                logger.debug(f"{'Task is already done or canceled' if not cancel_result else 'sent cancel signal'}")
                 try:
                     await task
                 except asyncio.CancelledError:
@@ -265,6 +270,8 @@ class RequestsWorker(ABC, Generic[RequestT, ResponseT]):
         while not shutdown_event.is_set():
             await asyncio.sleep(shutdown_poll_interval)
 
+        logger.debug("Shutdown signal received")
+        raise ValueError("kaki")
         raise asyncio.CancelledError("Shutdown event set, cancelling process loop.")
 
     async def _process_synchronous_requests_loop(
@@ -290,6 +297,9 @@ class RequestsWorker(ABC, Generic[RequestT, ResponseT]):
                 process_id=process_id,
             )
 
+        logger.debug("Done processing synchronous loop")
+
+
     async def _process_asynchronous_requests_loop(
         self,
         requests_queue: multiprocessing.Queue,
@@ -303,6 +313,7 @@ class RequestsWorker(ABC, Generic[RequestT, ResponseT]):
             raise ValueError("Async worker called with max_concurrency < 1")
 
         while True:
+            logger.info("Awaiting request...")
             process_request = await self.get_request(
                 requests_queue=requests_queue,
             )
@@ -315,7 +326,6 @@ class RequestsWorker(ABC, Generic[RequestT, ResponseT]):
             )
 
             await pending.acquire()
-
             lock_acquired_at = time.time()
             logger.debug(
                 f"Lock acquired Process ID {process_id} ||"
@@ -340,6 +350,8 @@ class RequestsWorker(ABC, Generic[RequestT, ResponseT]):
             )
             task.add_done_callback(_task_done)
             await asyncio.sleep(0)  # enable start task immediately
+
+        logger.debug("Done processing asynchronous loop")
 
 
 class GenerativeRequestsWorkerDescription(WorkerDescription):

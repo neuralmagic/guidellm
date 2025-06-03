@@ -21,11 +21,11 @@ class StandardBaseModel(BaseModel):
 
     def __init__(self, /, **data: Any) -> None:
         super().__init__(**data)
-        logger.debug(
-            "Initialized new instance of {} with data: {}",
-            self.__class__.__name__,
-            data,
-        )
+        # logger.debug(
+        #     "Initialized new instance of {} with data: {}",
+        #     self.__class__.__name__,
+        #     data,
+        # )
 
 
 SuccessfulT = TypeVar("SuccessfulT")

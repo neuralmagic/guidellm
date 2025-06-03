@@ -154,6 +154,7 @@ class Scheduler(Generic[RequestT, ResponseT]):
                     ):
                         # we've exhausted all requests we've wanted to run
                         # and yielded all responses
+                        logger.info("run_info.completed_requests >= run_info.created_requests")
                         break
 
                     requests_iter = self._add_requests(
@@ -198,7 +199,7 @@ class Scheduler(Generic[RequestT, ResponseT]):
                 run_info=run_info,
             )
 
-            await self._stop_processes(futures, requests_queue)
+            await self._stop_processes(futures, shutdown_event, requests_queue)
 
     def _validate_scheduler_params(
         self,
@@ -457,10 +458,9 @@ class Scheduler(Generic[RequestT, ResponseT]):
     async def _stop_processes(
         self,
         futures: list[asyncio.Future],
+        shutdown_event: MultiprocessingEvent,
         requests_queue: multiprocessing.Queue,
     ):
-        for _ in futures:
-            requests_queue.put(None)
-
+        shutdown_event.set()
         logger.debug("Waiting for futures to shut down")
         await asyncio.gather(*futures)
