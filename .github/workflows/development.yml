@@ -117,6 +117,22 @@ jobs:
       - name: Run unit tests
         run: tox -e test-unit -- -m "smoke or sanity"
 
+  ui-unit-tests:
+    permissions:
+      contents: "read"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: src/ui
+
+      - name: Run unit tests
+        run: npm run test-unit
+        working-directory: src/ui
+
   integration-tests:
     runs-on: ubuntu-latest
     strategy:
@@ -132,6 +148,22 @@ jobs:
         run: pip install tox
       - name: Run integration tests
         run: tox -e test-integration -- -m smoke
+
+  ui-integration-tests:
+    permissions:
+      contents: "read"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: src/ui
+
+      - name: Run integration tests
+        run: npm run test-integration
+        working-directory: src/ui
 
   build:
     runs-on: ubuntu-latest

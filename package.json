@@ -11,7 +11,8 @@
     "prepare": "husky install",
     "test": "jest --config src/ui/jest.config.js --passWithNoTests src/ui",
     "test:unit": "jest --config src/ui/jest.config.js --passWithNoTests src/ui/tests/unit",
-    "test:integration": "jest --config src/ui/jest.config.js --passWithNoTests src/ui/tests/integration"
+    "test:integration": "jest --config src/ui/jest.config.js --passWithNoTests src/ui/tests/integration",
+    "test:e2e": "cypress run --project src/ui --headless"
   },
   "dependencies": {
     "next": "15.3.2",
@@ -19,11 +20,11 @@
     "react-dom": "^18.2.0"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "^3",
     "@testing-library/jest-dom": "^5.16.5",
     "@testing-library/react": "^16.0.0",
     "@testing-library/user-event": "^13.5.0",
     "@types/jest": "^27.5.2",
-    "@eslint/eslintrc": "^3",
     "@types/node": "^22",
     "@types/react": "^18.0.28",
     "@types/react-dom": "^18.0.11",
