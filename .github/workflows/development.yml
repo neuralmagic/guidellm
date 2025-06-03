@@ -130,7 +130,7 @@ jobs:
         working-directory: src/ui
 
       - name: Run unit tests
-        run: npm run test-unit
+        run: npm run test:unit
         working-directory: src/ui
 
   integration-tests:
@@ -162,7 +162,7 @@ jobs:
         working-directory: src/ui
 
       - name: Run integration tests
-        run: npm run test-integration
+        run: npm run test:integration
         working-directory: src/ui
 
   build:
