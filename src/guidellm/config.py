@@ -113,6 +113,7 @@ class Settings(BaseSettings):
     default_async_loop_sleep: float = 10e-5
     logging: LoggingSettings = LoggingSettings()
     default_sweep_number: int = 10
+    shutdown_poll_interval_seconds: float = 10
 
     # HTTP settings
     request_follow_redirects: bool = True

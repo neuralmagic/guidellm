@@ -275,7 +275,7 @@ class Scheduler(Generic[RequestT, ResponseT]):
                         requests_queue,
                         responses_queue,
                         shutdown_event,
-                        timedelta(seconds=10).total_seconds(),
+                        settings.shutdown_poll_interval_seconds,
                         id_,
                         requests_limit,
                     )
