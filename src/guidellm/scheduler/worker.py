@@ -145,15 +145,7 @@ class RequestsWorker(ABC, Generic[RequestT, ResponseT]):
                     if shutdown_event.is_set():
                         logger.info(f"Shutdown signal received in future {process_id}")
                         raise asyncio.CancelledError()
-                        # return None
-
-        try:
-            return await asyncio.to_thread(_get_queue_intermittently)  # type: ignore[attr-defined]
-        except asyncio.CancelledError:
-            logger.info("kaki")
-            # return None
-            raise
-            # raise
+        return await asyncio.to_thread(_get_queue_intermittently)  # type: ignore[attr-defined]
 
     async def send_result(
         self,
@@ -305,9 +297,10 @@ class RequestsWorker(ABC, Generic[RequestT, ResponseT]):
         while not shutdown_event.is_set():
             await asyncio.sleep(shutdown_poll_interval)
 
-        logger.debug("Shutdown signal received")
+        # Raising asyncio.CancelledError instead would
+        # cause the asyncio.wait above to wait
+        # forever, couldn't find a reasonable reason why
         raise ShutdownSignalReceived("Shutdown event set, cancelling process loop.")
-        # raise asyncio.CancelledError("Shutdown event set, cancelling process loop.")
 
     async def _process_synchronous_requests_loop(
             self,
@@ -352,7 +345,6 @@ class RequestsWorker(ABC, Generic[RequestT, ResponseT]):
             raise ValueError("Async worker called with max_concurrency < 1")
 
         while True:
-            logger.info("Awaiting request...")
             process_request = await self.get_request(
                 requests_queue=requests_queue,
                 shutdown_event=shutdown_event,

@@ -218,7 +218,7 @@ class Scheduler(Generic[RequestT, ResponseT]):
         if run_info.max_error_rate is None:
             return False
         current_error_rate = run_info.errored_requests / run_info.end_number
-        logger.info(
+        logger.debug(
             f"Current error rate {current_error_rate} "
             f"i.e total_finished [success / error] / max total possible"
         )
