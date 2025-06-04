@@ -638,7 +638,7 @@ class GenerativeBenchmarkAggregator(
         total_successful = self.requests_stats.totals.successful.total
         total_errored = self.requests_stats.totals.errored.total
         total_finished = total_errored + total_successful
-        return total_errored / total_finished
+        return total_errored / total_finished if total_finished > 0 else 0
 
     def _compile_results(
         self,

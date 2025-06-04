@@ -175,11 +175,6 @@ class Scheduler(Generic[RequestT, ResponseT]):
                             and not iter_result.request_info.canceled
                             and self._is_max_error_rate_reached(iter_result.run_info)
                         ):
-                            if shutdown_event is None:
-                                raise RuntimeError(
-                                    "We've reached max_error_rate "
-                                    "but shutdown_event is corrupt"
-                                )
                             shutdown_event.set()
                             max_error_rate_reached = True
                             logger.info(
@@ -199,7 +194,7 @@ class Scheduler(Generic[RequestT, ResponseT]):
                 run_info=run_info,
             )
 
-            await self._stop_processes(futures, shutdown_event, requests_queue)
+            await self._stop_processes(futures, shutdown_event)
 
     def _validate_scheduler_params(
         self,
@@ -252,7 +247,6 @@ class Scheduler(Generic[RequestT, ResponseT]):
             scheduling_strategy.processes_limit,
             scheduling_strategy.processing_requests_limit,
         )
-        num_processes = 1
         requests_limit_split = (
             scheduling_strategy.processing_requests_limit
             // scheduling_strategy.processes_limit
@@ -459,8 +453,8 @@ class Scheduler(Generic[RequestT, ResponseT]):
         self,
         futures: list[asyncio.Future],
         shutdown_event: MultiprocessingEvent,
-        requests_queue: multiprocessing.Queue,
     ):
-        shutdown_event.set()
+        if not shutdown_event.is_set():
+            shutdown_event.set()
         logger.debug("Waiting for futures to shut down")
         await asyncio.gather(*futures)

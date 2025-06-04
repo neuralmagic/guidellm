@@ -42,6 +42,10 @@ __all__ = [
 ]
 
 
+class ShutdownSignalReceived(Exception):
+    pass
+
+
 @dataclass
 class WorkerProcessRequest(Generic[RequestT]):
     request: RequestT
@@ -132,25 +136,24 @@ class RequestsWorker(ABC, Generic[RequestT, ResponseT]):
         # if we simply use asyncio.to_thread(requests_queue.get)
         # the cancellation task doesn't propagate because the
         # asyncio.to_thread is blocking
-        return await asyncio.to_thread(requests_queue.get)
-        # def _get_queue_intermittently():
-        #     while True:
-        #         try:
-        #             return requests_queue.get(timeout=shutdown_poll_interval_seconds)
-        #         except queue.Empty:
-        #             logger.info("Checking shutdown even is set in get_request")
-        #             if shutdown_event.is_set():
-        #                 logger.info(f"Shutdown signal received in future {process_id}")
-        #                 raise asyncio.CancelledError()
-        #                 # return None
-        #
-        # try:
-        #     return await asyncio.to_thread(_get_queue_intermittently)  # type: ignore[attr-defined]
-        # except asyncio.CancelledError:
-        #     logger.info("kaki")
-        #     # return None
-        #     raise
-        #     # raise
+        def _get_queue_intermittently():
+            while True:
+                try:
+                    return requests_queue.get(timeout=shutdown_poll_interval_seconds)
+                except queue.Empty:
+                    logger.info("Checking shutdown even is set in get_request")
+                    if shutdown_event.is_set():
+                        logger.info(f"Shutdown signal received in future {process_id}")
+                        raise asyncio.CancelledError()
+                        # return None
+
+        try:
+            return await asyncio.to_thread(_get_queue_intermittently)  # type: ignore[attr-defined]
+        except asyncio.CancelledError:
+            logger.info("kaki")
+            # return None
+            raise
+            # raise
 
     async def send_result(
         self,
@@ -267,7 +270,7 @@ class RequestsWorker(ABC, Generic[RequestT, ResponseT]):
                 ],
                 return_when=asyncio.FIRST_EXCEPTION,
             )
-            logger.info("First exception happened")
+            logger.info(f"First exception happened, done: [{[r.get_name() for r in done]}")
 
             for task in pending:
                 logger.debug(f"Cancelling task {task.get_name()}")
@@ -281,7 +284,7 @@ class RequestsWorker(ABC, Generic[RequestT, ResponseT]):
 
             for task in done:
                 task_exception = task.exception()
-                if not isinstance(task_exception, asyncio.CancelledError):
+                if not isinstance(task_exception, ShutdownSignalReceived):
                     raise task_exception
         try:
             asyncio.run(_process_runner())
@@ -303,7 +306,8 @@ class RequestsWorker(ABC, Generic[RequestT, ResponseT]):
             await asyncio.sleep(shutdown_poll_interval)
 
         logger.debug("Shutdown signal received")
-        raise asyncio.CancelledError("Shutdown event set, cancelling process loop.")
+        raise ShutdownSignalReceived("Shutdown event set, cancelling process loop.")
+        # raise asyncio.CancelledError("Shutdown event set, cancelling process loop.")
 
     async def _process_synchronous_requests_loop(
             self,
