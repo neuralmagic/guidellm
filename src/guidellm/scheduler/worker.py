@@ -123,10 +123,34 @@ class RequestsWorker(ABC, Generic[RequestT, ResponseT]):
         ...
 
     async def get_request(
-        self,
-        requests_queue: multiprocessing.Queue,
+            self, requests_queue: multiprocessing.Queue,
+            shutdown_event: MultiprocessingEvent,
+            process_id: int,
+            shutdown_poll_interval_seconds: float,
     ) -> Optional[WorkerProcessRequest[RequestT]]:
-        return await asyncio.to_thread(requests_queue.get)  # type: ignore[attr-defined]
+        # We need to check shutdown_event intermittently cause
+        # if we simply use asyncio.to_thread(requests_queue.get)
+        # the cancellation task doesn't propagate because the
+        # asyncio.to_thread is blocking
+        return await asyncio.to_thread(requests_queue.get)
+        # def _get_queue_intermittently():
+        #     while True:
+        #         try:
+        #             return requests_queue.get(timeout=shutdown_poll_interval_seconds)
+        #         except queue.Empty:
+        #             logger.info("Checking shutdown even is set in get_request")
+        #             if shutdown_event.is_set():
+        #                 logger.info(f"Shutdown signal received in future {process_id}")
+        #                 raise asyncio.CancelledError()
+        #                 # return None
+        #
+        # try:
+        #     return await asyncio.to_thread(_get_queue_intermittently)  # type: ignore[attr-defined]
+        # except asyncio.CancelledError:
+        #     logger.info("kaki")
+        #     # return None
+        #     raise
+        #     # raise
 
     async def send_result(
         self,
@@ -203,11 +227,15 @@ class RequestsWorker(ABC, Generic[RequestT, ResponseT]):
             max_concurrency: Optional[int] = None,
     ):
         async def _process_runner():
+            import threading
+            internal_shutdown_event = threading.Event()
             if type_ == "sync":
                 loop_task = asyncio.create_task(self._process_synchronous_requests_loop(
                     requests_queue=requests_queue,
                     results_queue=results_queue,
                     process_id=process_id,
+                    shutdown_event=internal_shutdown_event,
+                    shutdown_poll_interval_seconds=shutdown_poll_interval_seconds,
                 ), name="request_loop_processor_task")
             elif type_ == "async":
                 if max_concurrency is None:
@@ -218,6 +246,8 @@ class RequestsWorker(ABC, Generic[RequestT, ResponseT]):
                     results_queue=results_queue,
                     max_concurrency=max_concurrency,
                     process_id=process_id,
+                    shutdown_event=internal_shutdown_event,
+                    shutdown_poll_interval_seconds=shutdown_poll_interval_seconds,
                 ), name="request_loop_processor_task")
             else:
                 raise ValueError(f"Invalid process type: {type_}")
@@ -237,10 +267,12 @@ class RequestsWorker(ABC, Generic[RequestT, ResponseT]):
                 ],
                 return_when=asyncio.FIRST_EXCEPTION,
             )
+            logger.info("First exception happened")
 
             for task in pending:
                 logger.debug(f"Cancelling task {task.get_name()}")
                 cancel_result = task.cancel()
+                internal_shutdown_event.set()
                 logger.debug(f"{'Task is already done or canceled' if not cancel_result else 'sent cancel signal'}")
                 try:
                     await task
@@ -271,7 +303,6 @@ class RequestsWorker(ABC, Generic[RequestT, ResponseT]):
             await asyncio.sleep(shutdown_poll_interval)
 
         logger.debug("Shutdown signal received")
-        raise ValueError("kaki")
         raise asyncio.CancelledError("Shutdown event set, cancelling process loop.")
 
     async def _process_synchronous_requests_loop(
@@ -279,10 +310,15 @@ class RequestsWorker(ABC, Generic[RequestT, ResponseT]):
             requests_queue: multiprocessing.Queue,
             results_queue: multiprocessing.Queue,
             process_id: int,
+            shutdown_event: MultiprocessingEvent,
+            shutdown_poll_interval_seconds: float,
     ):
         while True:
             process_request = await self.get_request(
                 requests_queue=requests_queue,
+                shutdown_event=shutdown_event,
+                process_id=process_id,
+                shutdown_poll_interval_seconds=shutdown_poll_interval_seconds
             )
 
             dequeued_time = time.time()
@@ -297,15 +333,14 @@ class RequestsWorker(ABC, Generic[RequestT, ResponseT]):
                 process_id=process_id,
             )
 
-        logger.debug("Done processing synchronous loop")
-
-
     async def _process_asynchronous_requests_loop(
         self,
         requests_queue: multiprocessing.Queue,
         results_queue: multiprocessing.Queue,
         max_concurrency: int,
         process_id: int,
+        shutdown_event: MultiprocessingEvent,
+        shutdown_poll_interval_seconds: float,
     ):
         pending = asyncio.Semaphore(max_concurrency)
 
@@ -316,6 +351,9 @@ class RequestsWorker(ABC, Generic[RequestT, ResponseT]):
             logger.info("Awaiting request...")
             process_request = await self.get_request(
                 requests_queue=requests_queue,
+                shutdown_event=shutdown_event,
+                process_id=process_id,
+                shutdown_poll_interval_seconds=shutdown_poll_interval_seconds,
             )
 
             dequeued_time = time.time()
@@ -350,8 +388,6 @@ class RequestsWorker(ABC, Generic[RequestT, ResponseT]):
             )
             task.add_done_callback(_task_done)
             await asyncio.sleep(0)  # enable start task immediately
-
-        logger.debug("Done processing asynchronous loop")
 
 
 class GenerativeRequestsWorkerDescription(WorkerDescription):
