@@ -11,11 +11,11 @@ const customJestConfig = {
   coverageReporters: ['json-summary'],
   moduleFileExtensions: ['ts', 'tsx', 'js'],
   moduleNameMapper: {
-    '^.+\\.(svg)$': '<rootDir>/__mocks__/svg.js',
+    '^.+\\.(svg)$': '<rootDir>/tests/ui/__mocks__/svg.js',
     '^@/(.*)$': '<rootDir>/src/$1',
     '\\.(jpg|jpeg|png|gif|eot|otf|webp|svg|ttf|woff|woff2|mp4|webm|wav|mp3|m4a|aac|oga)$':
-      '<rootDir>/__mocks__/fileMock.js',
-    '\\.(css|less|scss|sass)$': '<rootDir>/__mocks__/styleMock.js',
+      '<rootDir>/tests/ui/__mocks__/fileMock.js',
+    '\\.(css|less|scss|sass)$': '<rootDir>/tests/ui/__mocks__/styleMock.js',
     '^@/(.*)$': '<rootDir>/$1',
   },
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
