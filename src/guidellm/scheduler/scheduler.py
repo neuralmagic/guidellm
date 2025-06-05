@@ -12,7 +12,7 @@ from typing import (
     Any,
     Generic,
     Optional,
-    Union,
+    Union, Literal, cast,
 )
 
 from loguru import logger
@@ -213,33 +213,48 @@ class Scheduler(Generic[RequestT, ResponseT]):
             raise ValueError(f"Invalid max_number: {max_number}")
         if max_duration is not None and max_duration < 0:
             raise ValueError(f"Invalid max_duration: {max_duration}")
-        if max_error_rate is not None and (max_error_rate < 0 or max_error_rate > 1):
+        if max_error_rate is not None and (max_error_rate < 0):
             raise ValueError(f"Invalid max_error_rate: {max_error_rate}")
 
     def _is_max_error_rate_reached(self, run_info: SchedulerRunInfo) -> bool:
-        if run_info.max_error_rate is None:
+        max_error = run_info.max_error_rate
+        if max_error is None:
             return False
 
-        is_max_error_rate = run_info.max_error_rate < 1
-        if not is_max_error_rate:
-            # Constant value
-            raise NotImplementedError()
-        if(
+        if not max_error < 1:
+            # Absolute error count, i.e not a ratio
+            logger.debug(
+                f"Current error count "
+                f"{run_info.errored_requests} / "
+                f"{max_error} (max error)"
+            )
+            return max_error < run_info.errored_requests
+        elif(
             run_info.strategy.type_ == "constant"
             and run_info.end_number != math.inf
         ):
-            # We know how many requests
-            current_error_rate = run_info.errored_requests / run_info.end_number
+            current_error_ratio = run_info.errored_requests / run_info.end_number
             logger.debug(
-                f"Current error rate {current_error_rate} "
+                f"Current error rate {current_error_ratio} "
                 f"i.e total_finished [success / error] / max total possible"
             )
-            return run_info.max_error_rate < current_error_rate
-        elif settings.constant_error_check_window_size <= run_info.completed_requests:
-            # Calculate deque ratio or success to erorr
-            if run_info.last_requests_statuses is None:
-                raise RuntimeError("")
-            return
+            return max_error < current_error_ratio
+        elif settings.error_check_window_size <= run_info.completed_requests:
+            last_requests_statuses = run_info.last_requests_statuses
+            last_errored_requests_count = len([
+                s
+                for s
+                in last_requests_statuses
+                if s == "error"
+            ])
+            current_error_ratio = last_errored_requests_count / len(last_requests_statuses)
+            logger.debug(
+                f"Current error rate in "
+                f"last requests window is "
+                f"{current_error_ratio} / {max_error} "
+                f"(max error rate)"
+            )
+            return max_error < current_error_ratio
         return False
 
     async def _start_processes(
@@ -323,12 +338,6 @@ class Scheduler(Generic[RequestT, ResponseT]):
             scheduling_strategy, max_duration, max_number
         )
 
-        if end_number == math.inf and max_error_rate is not None:
-            logger.warning(
-                "max_error_rate will be ignored "
-                "because end_number can not be determined."
-            )
-
         if end_number == math.inf and end_time is None:
             logger.warning(
                 "No end number or end time set, "
@@ -342,7 +351,9 @@ class Scheduler(Generic[RequestT, ResponseT]):
             processes=len(processes),
             strategy=scheduling_strategy,
             max_error_rate=max_error_rate,
-            last_requests_statuses = collections.deque(maxlen=settings.constant_error_check_window_size) if max_error_rate > 1 else None
+            last_requests_statuses=collections.deque(
+                maxlen=settings.error_check_window_size
+            )
         )
 
         return info, requests_iter, times_iter
@@ -459,9 +470,11 @@ class Scheduler(Generic[RequestT, ResponseT]):
             if is_errored:
                 run_info.errored_requests += 1
 
-            if run_info.last_requests_statuses:
-                status = "error" if is_errored else "success"
-                run_info.last_requests_statuses.append(status)
+            request_status: Literal["error", "success"] = cast(
+                Literal["error", "success"],
+                "error" if is_errored else "success"
+            )
+            run_info.last_requests_statuses.append(request_status)
 
             return SchedulerRequestResult(
                 type_="request_complete",

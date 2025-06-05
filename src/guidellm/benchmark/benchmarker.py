@@ -77,7 +77,6 @@ class BenchmarkerStrategyLimits(StandardBaseModel):
     max_error_rate: Optional[float] = Field(
         description="Maximum error rate after which a benchmark will stop",
         ge=0,
-        le=1,
     )
     warmup_percent_per_strategy: Optional[float] = Field(
         description="Percentage of requests to use for warmup.",

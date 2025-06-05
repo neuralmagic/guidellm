@@ -17,7 +17,8 @@ __all__ = [
 ]
 
 
-RequestStatus = Literal["success" | "error"]
+RequestStatus = Literal["success", "error"]
+
 
 class SchedulerRunInfo(StandardBaseModel):
     """

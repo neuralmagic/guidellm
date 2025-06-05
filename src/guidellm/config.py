@@ -114,7 +114,7 @@ class Settings(BaseSettings):
     logging: LoggingSettings = LoggingSettings()
     default_sweep_number: int = 10
     shutdown_poll_interval_seconds: float = 10
-    constant_error_check_window_size = 100
+    error_check_window_size: int = 10
 
     # HTTP settings
     request_follow_redirects: bool = True
