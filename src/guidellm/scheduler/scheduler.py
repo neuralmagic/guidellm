@@ -1,3 +1,4 @@
+import collections
 from datetime import timedelta
 import asyncio
 import math
@@ -128,10 +129,11 @@ class Scheduler(Generic[RequestT, ResponseT]):
                 responses_queue,
                 shutdown_event,
             ) = await self._start_processes(
-                manager, executor, scheduling_strategy, max_error_rate is not None
+                manager, executor, scheduling_strategy
             )
-            if shutdown_event and shutdown_event.is_set():
+            if shutdown_event.is_set():
                 raise RuntimeError("shutdown_event is set before starting scheduling")
+
             run_info, requests_iter, times_iter = self._run_setup(
                 futures, scheduling_strategy, max_number, max_duration, max_error_rate
             )
@@ -217,27 +219,42 @@ class Scheduler(Generic[RequestT, ResponseT]):
     def _is_max_error_rate_reached(self, run_info: SchedulerRunInfo) -> bool:
         if run_info.max_error_rate is None:
             return False
-        current_error_rate = run_info.errored_requests / run_info.end_number
-        logger.debug(
-            f"Current error rate {current_error_rate} "
-            f"i.e total_finished [success / error] / max total possible"
-        )
-        return run_info.max_error_rate < current_error_rate
+
+        is_max_error_rate = run_info.max_error_rate < 1
+        if not is_max_error_rate:
+            # Constant value
+            raise NotImplementedError()
+        if(
+            run_info.strategy.type_ == "constant"
+            and run_info.end_number != math.inf
+        ):
+            # We know how many requests
+            current_error_rate = run_info.errored_requests / run_info.end_number
+            logger.debug(
+                f"Current error rate {current_error_rate} "
+                f"i.e total_finished [success / error] / max total possible"
+            )
+            return run_info.max_error_rate < current_error_rate
+        elif settings.constant_error_check_window_size <= run_info.completed_requests:
+            # Calculate deque ratio or success to erorr
+            if run_info.last_requests_statuses is None:
+                raise RuntimeError("")
+            return
+        return False
 
     async def _start_processes(
         self,
         manager,
         executor: ProcessPoolExecutor,
         scheduling_strategy: SchedulingStrategy,
-        create_shutdown_event: bool = False,
     ) -> tuple[
         list[asyncio.Future],
         multiprocessing.Queue,
         multiprocessing.Queue,
-        Optional[MultiprocessingEvent],
+        MultiprocessingEvent,
     ]:
         await self.worker.prepare_multiprocessing()
-        shutdown_event = manager.Event() if create_shutdown_event else None
+        shutdown_event = manager.Event()
         requests_queue = manager.Queue(
             maxsize=scheduling_strategy.queued_requests_limit
         )
@@ -325,6 +342,7 @@ class Scheduler(Generic[RequestT, ResponseT]):
             processes=len(processes),
             strategy=scheduling_strategy,
             max_error_rate=max_error_rate,
+            last_requests_statuses = collections.deque(maxlen=settings.constant_error_check_window_size) if max_error_rate > 1 else None
         )
 
         return info, requests_iter, times_iter
@@ -437,8 +455,13 @@ class Scheduler(Generic[RequestT, ResponseT]):
             run_info.processing_requests -= 1
             run_info.completed_requests += 1
 
-            if process_response.info.errored:
+            is_errored = process_response.info.errored
+            if is_errored:
                 run_info.errored_requests += 1
+
+            if run_info.last_requests_statuses:
+                status = "error" if is_errored else "success"
+                run_info.last_requests_statuses.append(status)
 
             return SchedulerRequestResult(
                 type_="request_complete",

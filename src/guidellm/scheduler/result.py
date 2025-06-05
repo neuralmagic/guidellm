@@ -1,3 +1,4 @@
+from collections import deque
 from typing import (
     Generic,
     Literal,
@@ -15,6 +16,8 @@ __all__ = [
     "SchedulerRunInfo",
 ]
 
+
+RequestStatus = Literal["success" | "error"]
 
 class SchedulerRunInfo(StandardBaseModel):
     """
@@ -54,6 +57,8 @@ class SchedulerRunInfo(StandardBaseModel):
     processing_requests: int = 0
     completed_requests: int = 0
     errored_requests: int = 0
+
+    last_requests_statuses: Optional[deque[RequestStatus]] = None
 
 
 class SchedulerRequestInfo(StandardBaseModel):
