@@ -221,7 +221,7 @@ def mock_generative_benchmark() -> GenerativeBenchmark:
             strategy=SynchronousStrategy(),
             max_number=None,
             max_duration=10.0,
-            max_error_rate=0.05,
+            max_error=0.05,
             warmup_number=None,
             warmup_duration=None,
             cooldown_number=None,
