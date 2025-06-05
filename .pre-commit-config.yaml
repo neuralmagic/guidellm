@@ -9,7 +9,7 @@ repos:
   hooks:
     - id: ruff
       name: run linter
-      args: [ --fix ]
+      args: [ --fix, --show-fixes ]
     - id: ruff-format
       name: run formatter
 - repo: https://github.com/pre-commit/mirrors-mypy
