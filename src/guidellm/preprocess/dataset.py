@@ -111,6 +111,7 @@ def handle_pad_strategy(
         pad_count *= pad_multiplier
     return prompt
 
+
 def handle_error_strategy(
     current_prompt: str,
     min_prompt_tokens: int,
