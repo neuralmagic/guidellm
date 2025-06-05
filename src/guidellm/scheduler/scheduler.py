@@ -1,6 +1,5 @@
-import collections
-from datetime import timedelta
 import asyncio
+import collections
 import math
 import multiprocessing
 import multiprocessing.queues
@@ -11,8 +10,10 @@ from multiprocessing.synchronize import Event as MultiprocessingEvent
 from typing import (
     Any,
     Generic,
+    Literal,
     Optional,
-    Union, Literal, cast,
+    Union,
+    cast,
 )
 
 from loguru import logger
@@ -128,9 +129,7 @@ class Scheduler(Generic[RequestT, ResponseT]):
                 requests_queue,
                 responses_queue,
                 shutdown_event,
-            ) = await self._start_processes(
-                manager, executor, scheduling_strategy
-            )
+            ) = await self._start_processes(manager, executor, scheduling_strategy)
             if shutdown_event.is_set():
                 raise RuntimeError("shutdown_event is set before starting scheduling")
 
@@ -156,7 +155,6 @@ class Scheduler(Generic[RequestT, ResponseT]):
                     ):
                         # we've exhausted all requests we've wanted to run
                         # and yielded all responses
-                        logger.info("run_info.completed_requests >= run_info.created_requests")
                         break
 
                     requests_iter = self._add_requests(
@@ -229,10 +227,7 @@ class Scheduler(Generic[RequestT, ResponseT]):
                 f"{max_error} (max error)"
             )
             return max_error < run_info.errored_requests
-        elif(
-            run_info.strategy.type_ == "constant"
-            and run_info.end_number != math.inf
-        ):
+        elif run_info.strategy.type_ == "constant" and run_info.end_number != math.inf:
             current_error_ratio = run_info.errored_requests / run_info.end_number
             logger.debug(
                 f"Current error rate {current_error_ratio} "
@@ -241,13 +236,12 @@ class Scheduler(Generic[RequestT, ResponseT]):
             return max_error < current_error_ratio
         elif settings.error_check_window_size <= run_info.completed_requests:
             last_requests_statuses = run_info.last_requests_statuses
-            last_errored_requests_count = len([
-                s
-                for s
-                in last_requests_statuses
-                if s == "error"
-            ])
-            current_error_ratio = last_errored_requests_count / len(last_requests_statuses)
+            last_errored_requests_count = len(
+                [s for s in last_requests_statuses if s == "error"]
+            )
+            current_error_ratio = last_errored_requests_count / len(
+                last_requests_statuses
+            )
             logger.debug(
                 f"Current error rate in "
                 f"last requests window is "
@@ -353,7 +347,7 @@ class Scheduler(Generic[RequestT, ResponseT]):
             max_error_rate=max_error_rate,
             last_requests_statuses=collections.deque(
                 maxlen=settings.error_check_window_size
-            )
+            ),
         )
 
         return info, requests_iter, times_iter
@@ -471,8 +465,7 @@ class Scheduler(Generic[RequestT, ResponseT]):
                 run_info.errored_requests += 1
 
             request_status: Literal["error", "success"] = cast(
-                Literal["error", "success"],
-                "error" if is_errored else "success"
+                "Literal['error', 'success']", "error" if is_errored else "success"
             )
             run_info.last_requests_statuses.append(request_status)
 
