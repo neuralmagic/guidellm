@@ -164,14 +164,19 @@ def cli():
     ),
 )
 @click.option(
-    "--max-error-rate",
+    "--max-error",
     type=float,
     help=(
-        "The maximum error rate after which a benchmark will stop. "
-        "Applicable only for finite deterministic scenarios i.e "
-        "rate_type is 'constant' and 'max_seconds' exists OR "
-        "'max_requests' exists OR the dataset is finite. "
-        "If None or not applicable, benchmarks will continue regardless of error rate."
+        "The maximum error after which a benchmark will stop. "
+        "Can either be a rate i.e 0 < rate < 1 or constant number. "
+        "If rate is given and rate_type is 'constant' and 'max_seconds' exists "
+        "then the rate will be calculated as part of the total expected "
+        "requests count i.e rate * duration. If rate is given and number"
+        "of requests is not pre-determined than a context window "
+        "of the last requests will be looked at. Context window size"
+        "is configurable under GUIDELLM__ERROR_CHECK_WINDOW_SIZE."
+        "If a number above 1 is given than we just count the total"
+        "number of error and check if it's above the threshold."
     ),
 )
 @click.option(
@@ -253,7 +258,7 @@ def benchmark(
     rate,
     max_seconds,
     max_requests,
-    max_error_rate,
+    max_error,
     warmup_percent,
     cooldown_percent,
     disable_progress,
@@ -279,7 +284,7 @@ def benchmark(
             rate=rate,
             max_seconds=max_seconds,
             max_requests=max_requests,
-            max_error_rate=max_error_rate,
+            max_error=max_error,
             warmup_percent=warmup_percent,
             cooldown_percent=cooldown_percent,
             show_progress=not disable_progress,

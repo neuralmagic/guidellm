@@ -74,8 +74,10 @@ class BenchmarkerStrategyLimits(StandardBaseModel):
         description="Maximum duration (in seconds) to process requests per strategy.",
         ge=0,
     )
-    max_error_rate: Optional[float] = Field(
-        description="Maximum error rate after which a benchmark will stop",
+    max_error: Optional[float] = Field(
+        description="Maximum error after which a "
+        "benchmark will stop,"
+        " either rate or fixed number",
         ge=0,
     )
     warmup_percent_per_strategy: Optional[float] = Field(
@@ -152,7 +154,7 @@ class Benchmarker(Generic[AggregatorT, BenchmarkT, RequestT, ResponseT], ABC):
         profile: Profile,
         max_number_per_strategy: Optional[int],
         max_duration_per_strategy: Optional[float],
-        max_error_rate: Optional[float],
+        max_error: Optional[float],
         warmup_percent_per_strategy: Optional[float],
         cooldown_percent_per_strategy: Optional[float],
     ) -> AsyncGenerator[
@@ -167,7 +169,7 @@ class Benchmarker(Generic[AggregatorT, BenchmarkT, RequestT, ResponseT], ABC):
             requests_loader_size=requests_loader_size,
             max_number_per_strategy=max_number_per_strategy,
             max_duration_per_strategy=max_duration_per_strategy,
-            max_error_rate=max_error_rate,
+            max_error=max_error,
             warmup_percent_per_strategy=warmup_percent_per_strategy,
             cooldown_percent_per_strategy=cooldown_percent_per_strategy,
         )
@@ -202,7 +204,7 @@ class Benchmarker(Generic[AggregatorT, BenchmarkT, RequestT, ResponseT], ABC):
                 scheduling_strategy=scheduling_strategy,
                 max_number=max_number_per_strategy,
                 max_duration=max_duration_per_strategy,
-                max_error_rate=max_error_rate,
+                max_error=max_error,
             ):
                 if result.type_ == "run_start":
                     yield BenchmarkerResult(
@@ -328,7 +330,7 @@ class GenerativeBenchmarker(
                 strategy=strategy,
                 max_number=limits.max_number,
                 max_duration=limits.max_duration,
-                max_error_rate=limits.max_error_rate,
+                max_error=limits.max_error,
                 warmup_number=limits.warmup_number,
                 warmup_duration=limits.warmup_duration,
                 cooldown_number=limits.cooldown_number,

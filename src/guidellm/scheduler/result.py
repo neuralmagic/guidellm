@@ -51,7 +51,7 @@ class SchedulerRunInfo(StandardBaseModel):
     processes: int
     strategy: SchedulingStrategy
     last_requests_statuses: deque[RequestStatus]
-    max_error_rate: Optional[float] = None
+    max_error: Optional[float] = None
 
     created_requests: int = 0
     queued_requests: int = 0

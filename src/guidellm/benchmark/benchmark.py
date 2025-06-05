@@ -90,8 +90,8 @@ class BenchmarkArgs(StandardBaseModel):
     max_duration: Optional[float] = Field(
         description="The maximum duration in seconds to run this benchmark, if any."
     )
-    max_error_rate: Optional[float] = Field(
-        description="Maximum error rate after which a benchmark will stop."
+    max_error: Optional[float] = Field(
+        description="Maximum error rate or const after which a benchmark will stop."
     )
     warmup_number: Optional[int] = Field(
         description=(
@@ -220,7 +220,7 @@ class BenchmarkRunStats(StandardBaseModel):
         description=(
             "The number of errored requests divided by the number "
             "of successful and errored requests. "
-            "This can be higher than max_error_rate "
+            "This can be higher than max_error "
             "(if applicable) cause it does not take into "
             "account incomplete requests."
         )

@@ -76,7 +76,7 @@ class Scheduler(Generic[RequestT, ResponseT]):
         scheduling_strategy: SchedulingStrategy,
         max_number: Optional[int] = None,
         max_duration: Optional[float] = None,
-        max_error_rate: Optional[float] = None,
+        max_error: Optional[float] = None,
     ) -> AsyncGenerator[
         Union[SchedulerResult, SchedulerRequestResult[RequestT, ResponseT]], None
     ]:
@@ -105,8 +105,8 @@ class Scheduler(Generic[RequestT, ResponseT]):
         :param max_duration: The maximum duration for the scheduling run.
             If None, then no limit is set and either the iterator must be exhaustible
             or the max_number must be set.
-        :param max_error_rate: The maximum error rate after which the
-            scheduler shuts down.
+        :param max_error: The maximum error rate or const
+            after which the scheduler shuts down.
             Only applicable in benchmarks with finite deterministic number of requests.
             If None or not applicable then scheduler will continue regardless of errors.
         :return: An asynchronous generator that yields SchedulerResult objects.
@@ -114,7 +114,7 @@ class Scheduler(Generic[RequestT, ResponseT]):
             the response, and the run information.
         """
         self._validate_scheduler_params(
-            scheduling_strategy, max_duration, max_error_rate, max_number
+            scheduling_strategy, max_duration, max_error, max_number
         )
 
         with (
@@ -134,7 +134,7 @@ class Scheduler(Generic[RequestT, ResponseT]):
                 raise RuntimeError("shutdown_event is set before starting scheduling")
 
             run_info, requests_iter, times_iter = self._run_setup(
-                futures, scheduling_strategy, max_number, max_duration, max_error_rate
+                futures, scheduling_strategy, max_number, max_duration, max_error
             )
             yield SchedulerResult(
                 type_="run_start",
@@ -142,8 +142,8 @@ class Scheduler(Generic[RequestT, ResponseT]):
             )
 
             try:
-                max_error_rate_reached = False
-                while not max_error_rate_reached:
+                max_error_reached = False
+                while not max_error_reached:
                     # check errors and raise them
                     for future in futures:
                         if future.done() and (err := future.exception()) is not None:
@@ -173,13 +173,13 @@ class Scheduler(Generic[RequestT, ResponseT]):
                         if (
                             iter_result.request_info.errored
                             and not iter_result.request_info.canceled
-                            and self._is_max_error_rate_reached(iter_result.run_info)
+                            and self._is_max_error_reached(iter_result.run_info)
                         ):
                             shutdown_event.set()
-                            max_error_rate_reached = True
+                            max_error_reached = True
                             logger.info(
                                 f"Max error rate of "
-                                f"({iter_result.run_info.max_error_rate}) "
+                                f"({iter_result.run_info.max_error}) "
                                 f"reached, sending shutdown signal"
                             )
                         yield iter_result
@@ -200,7 +200,7 @@ class Scheduler(Generic[RequestT, ResponseT]):
         self,
         scheduling_strategy: SchedulingStrategy,
         max_duration: Optional[float],
-        max_error_rate: Optional[float],
+        max_error: Optional[float],
         max_number: Optional[int],
     ) -> None:
         if scheduling_strategy is None or not isinstance(
@@ -211,11 +211,11 @@ class Scheduler(Generic[RequestT, ResponseT]):
             raise ValueError(f"Invalid max_number: {max_number}")
         if max_duration is not None and max_duration < 0:
             raise ValueError(f"Invalid max_duration: {max_duration}")
-        if max_error_rate is not None and (max_error_rate < 0):
-            raise ValueError(f"Invalid max_error_rate: {max_error_rate}")
+        if max_error is not None and (max_error < 0):
+            raise ValueError(f"Invalid max_error: {max_error}")
 
-    def _is_max_error_rate_reached(self, run_info: SchedulerRunInfo) -> bool:
-        max_error = run_info.max_error_rate
+    def _is_max_error_reached(self, run_info: SchedulerRunInfo) -> bool:
+        max_error = run_info.max_error
         if max_error is None:
             return False
 
@@ -322,7 +322,7 @@ class Scheduler(Generic[RequestT, ResponseT]):
         scheduling_strategy: SchedulingStrategy,
         max_number: Optional[int],
         max_duration: Optional[float],
-        max_error_rate: Optional[float],
+        max_error: Optional[float],
     ) -> tuple[SchedulerRunInfo, Iterator[Any], Iterator[float]]:
         requests_iter = iter(self.request_loader)
         start_time = time.time()
@@ -344,7 +344,7 @@ class Scheduler(Generic[RequestT, ResponseT]):
             end_number=end_number,
             processes=len(processes),
             strategy=scheduling_strategy,
-            max_error_rate=max_error_rate,
+            max_error=max_error,
             last_requests_statuses=collections.deque(
                 maxlen=settings.error_check_window_size
             ),
