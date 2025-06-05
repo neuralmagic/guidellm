@@ -600,6 +600,8 @@ class GenerativeBenchmarkAggregator(
         """
         successful, incomplete, errored = self._compile_results()
 
+        error_rate = self._calculate_error_rate()
+
         return GenerativeBenchmark.from_stats(
             run_id=self.run_id,
             successful=successful,
@@ -625,11 +627,18 @@ class GenerativeBenchmarkAggregator(
                 request_start_time_targeted_delay_avg=self.requests_stats.request_start_time_targeted_delay.mean,
                 request_time_delay_avg=self.requests_stats.request_time_delay.mean,
                 request_time_avg=self.requests_stats.request_time.mean,
+                error_rate=error_rate,
             ),
             worker=self.worker_description,
             requests_loader=self.request_loader_description,
             extras=self.extras,
         )
+
+    def _calculate_error_rate(self) -> float:
+        total_successful = self.requests_stats.totals.successful.total
+        total_errored = self.requests_stats.totals.errored.total
+        total_finished = total_errored + total_successful
+        return total_errored / total_finished if total_finished > 0 else 0
 
     def _compile_results(
         self,

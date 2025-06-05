@@ -1,20 +1,25 @@
 import asyncio
+import collections
 import math
 import multiprocessing
 import multiprocessing.queues
 import time
 from collections.abc import AsyncGenerator, Iterable, Iterator
 from concurrent.futures import ProcessPoolExecutor
+from multiprocessing.synchronize import Event as MultiprocessingEvent
 from typing import (
     Any,
     Generic,
+    Literal,
     Optional,
     Union,
+    cast,
 )
 
 from loguru import logger
 
 from guidellm.config import settings
+from guidellm.request.loader import GetInfiniteDatasetLengthError
 from guidellm.scheduler.result import (
     SchedulerRequestResult,
     SchedulerResult,
@@ -64,12 +69,14 @@ class Scheduler(Generic[RequestT, ResponseT]):
 
         self.worker = worker
         self.request_loader = request_loader
+        self.error_rate: Optional[float] = None
 
     async def run(
         self,
         scheduling_strategy: SchedulingStrategy,
         max_number: Optional[int] = None,
         max_duration: Optional[float] = None,
+        max_error: Optional[float] = None,
     ) -> AsyncGenerator[
         Union[SchedulerResult, SchedulerRequestResult[RequestT, ResponseT]], None
     ]:
@@ -98,20 +105,17 @@ class Scheduler(Generic[RequestT, ResponseT]):
         :param max_duration: The maximum duration for the scheduling run.
             If None, then no limit is set and either the iterator must be exhaustible
             or the max_number must be set.
+        :param max_error: The maximum error rate or const
+            after which the scheduler shuts down.
+            Only applicable in benchmarks with finite deterministic number of requests.
+            If None or not applicable then scheduler will continue regardless of errors.
         :return: An asynchronous generator that yields SchedulerResult objects.
             Each SchedulerResult object contains information about the request,
             the response, and the run information.
         """
-        if scheduling_strategy is None or not isinstance(
-            scheduling_strategy, SchedulingStrategy
-        ):
-            raise ValueError(f"Invalid scheduling strategy: {scheduling_strategy}")
-
-        if max_number is not None and max_number < 1:
-            raise ValueError(f"Invalid max_number: {max_number}")
-
-        if max_duration is not None and max_duration < 0:
-            raise ValueError(f"Invalid max_duration: {max_duration}")
+        self._validate_scheduler_params(
+            scheduling_strategy, max_duration, max_error, max_number
+        )
 
         with (
             multiprocessing.Manager() as manager,
@@ -120,11 +124,17 @@ class Scheduler(Generic[RequestT, ResponseT]):
             ) as executor,
         ):
             requests_iter: Optional[Iterator[Any]] = None
-            futures, requests_queue, responses_queue = await self._start_processes(
-                manager, executor, scheduling_strategy
-            )
+            (
+                futures,
+                requests_queue,
+                responses_queue,
+                shutdown_event,
+            ) = await self._start_processes(manager, executor, scheduling_strategy)
+            if shutdown_event.is_set():
+                raise RuntimeError("shutdown_event is set before starting scheduling")
+
             run_info, requests_iter, times_iter = self._run_setup(
-                futures, scheduling_strategy, max_number, max_duration
+                futures, scheduling_strategy, max_number, max_duration, max_error
             )
             yield SchedulerResult(
                 type_="run_start",
@@ -132,7 +142,8 @@ class Scheduler(Generic[RequestT, ResponseT]):
             )
 
             try:
-                while True:
+                max_error_reached = False
+                while not max_error_reached:
                     # check errors and raise them
                     for future in futures:
                         if future.done() and (err := future.exception()) is not None:
@@ -159,6 +170,18 @@ class Scheduler(Generic[RequestT, ResponseT]):
                         run_info,
                     )
                     if iter_result is not None:
+                        if (
+                            iter_result.request_info.errored
+                            and not iter_result.request_info.canceled
+                            and self._is_max_error_reached(iter_result.run_info)
+                        ):
+                            shutdown_event.set()
+                            max_error_reached = True
+                            logger.info(
+                                f"Max error rate of "
+                                f"({iter_result.run_info.max_error}) "
+                                f"reached, sending shutdown signal"
+                            )
                         yield iter_result
 
                     # yield control to the event loop
@@ -171,7 +194,62 @@ class Scheduler(Generic[RequestT, ResponseT]):
                 run_info=run_info,
             )
 
-            await self._stop_processes(futures, requests_queue)
+            await self._stop_processes(futures, shutdown_event)
+
+    def _validate_scheduler_params(
+        self,
+        scheduling_strategy: SchedulingStrategy,
+        max_duration: Optional[float],
+        max_error: Optional[float],
+        max_number: Optional[int],
+    ) -> None:
+        if scheduling_strategy is None or not isinstance(
+            scheduling_strategy, SchedulingStrategy
+        ):
+            raise ValueError(f"Invalid scheduling strategy: {scheduling_strategy}")
+        if max_number is not None and max_number < 1:
+            raise ValueError(f"Invalid max_number: {max_number}")
+        if max_duration is not None and max_duration < 0:
+            raise ValueError(f"Invalid max_duration: {max_duration}")
+        if max_error is not None and (max_error < 0):
+            raise ValueError(f"Invalid max_error: {max_error}")
+
+    def _is_max_error_reached(self, run_info: SchedulerRunInfo) -> bool:
+        max_error = run_info.max_error
+        if max_error is None:
+            return False
+
+        if max_error >= 1:
+            # Absolute error count, i.e not a ratio
+            logger.debug(
+                f"Current error count "
+                f"{run_info.errored_requests} / "
+                f"{max_error} (max error)"
+            )
+            return max_error < run_info.errored_requests
+        elif run_info.strategy.type_ == "constant" and run_info.end_number != math.inf:
+            current_error_ratio = run_info.errored_requests / run_info.end_number
+            logger.debug(
+                f"Current error rate {current_error_ratio} "
+                f"i.e total_finished [success / error] / max total possible"
+            )
+            return max_error < current_error_ratio
+        elif settings.error_check_window_size <= run_info.completed_requests:
+            last_requests_statuses = run_info.last_requests_statuses
+            last_errored_requests_count = len(
+                [s for s in last_requests_statuses if s == "error"]
+            )
+            current_error_ratio = last_errored_requests_count / len(
+                last_requests_statuses
+            )
+            logger.debug(
+                f"Current error rate in "
+                f"last requests window is "
+                f"{current_error_ratio} / {max_error} "
+                f"(max error rate)"
+            )
+            return max_error < current_error_ratio
+        return False
 
     async def _start_processes(
         self,
@@ -182,8 +260,10 @@ class Scheduler(Generic[RequestT, ResponseT]):
         list[asyncio.Future],
         multiprocessing.Queue,
         multiprocessing.Queue,
+        MultiprocessingEvent,
     ]:
         await self.worker.prepare_multiprocessing()
+        shutdown_event = manager.Event()
         requests_queue = manager.Queue(
             maxsize=scheduling_strategy.queued_requests_limit
         )
@@ -212,25 +292,18 @@ class Scheduler(Generic[RequestT, ResponseT]):
         futures = []
         loop = asyncio.get_event_loop()
         for id_, requests_limit in zip(process_ids, process_requests_limits):
-            if scheduling_strategy.processing_mode == "sync":
+            if scheduling_strategy.processing_mode in ["sync", "async"]:
                 futures.append(
                     loop.run_in_executor(
                         executor,
-                        self.worker.process_loop_synchronous,
+                        self.worker.run_process,
+                        scheduling_strategy.processing_mode,
                         requests_queue,
                         responses_queue,
+                        shutdown_event,
+                        settings.shutdown_poll_interval_seconds,
                         id_,
-                    )
-                )
-            elif scheduling_strategy.processing_mode == "async":
-                futures.append(
-                    loop.run_in_executor(
-                        executor,
-                        self.worker.process_loop_asynchronous,
-                        requests_queue,
-                        responses_queue,
                         requests_limit,
-                        id_,
                     )
                 )
             else:
@@ -241,7 +314,7 @@ class Scheduler(Generic[RequestT, ResponseT]):
 
         await asyncio.sleep(0.1)  # give time for processes to start
 
-        return futures, requests_queue, responses_queue
+        return futures, requests_queue, responses_queue, shutdown_event
 
     def _run_setup(
         self,
@@ -249,20 +322,15 @@ class Scheduler(Generic[RequestT, ResponseT]):
         scheduling_strategy: SchedulingStrategy,
         max_number: Optional[int],
         max_duration: Optional[float],
+        max_error: Optional[float],
     ) -> tuple[SchedulerRunInfo, Iterator[Any], Iterator[float]]:
         requests_iter = iter(self.request_loader)
         start_time = time.time()
         times_iter = iter(scheduling_strategy.request_times())
         end_time = time.time() + (max_duration or math.inf)
-        end_number = max_number or math.inf
-
-        try:
-            # update end number if the request loader is finite and less than max
-            iter_length = len(self.request_loader)  # type: ignore[arg-type]
-            if 0 < iter_length < end_number:
-                end_number = iter_length
-        except Exception:  # noqa: BLE001, S110
-            pass
+        end_number = self._determine_total_requests_count(
+            scheduling_strategy, max_duration, max_number
+        )
 
         if end_number == math.inf and end_time is None:
             logger.warning(
@@ -276,9 +344,39 @@ class Scheduler(Generic[RequestT, ResponseT]):
             end_number=end_number,
             processes=len(processes),
             strategy=scheduling_strategy,
+            max_error=max_error,
+            last_requests_statuses=collections.deque(
+                maxlen=settings.error_check_window_size
+            ),
         )
 
         return info, requests_iter, times_iter
+
+    def _determine_total_requests_count(
+        self,
+        scheduling_strategy: SchedulingStrategy,
+        max_duration: Optional[float],
+        max_number: Optional[int],
+    ) -> Union[int, float]:
+        end_number = max_number or math.inf
+        try:
+            # update end_number if the request_loader is finite and less than max_number
+            iter_length = len(self.request_loader)  # type: ignore[arg-type]
+            if 0 < iter_length < end_number:
+                end_number = iter_length
+        except GetInfiniteDatasetLengthError:
+            # Only when RPS is constant and duration is
+            # capped we can determine the total amount of requests
+            # that are supposed to be sent
+            if scheduling_strategy.type_ == "constant" and max_duration is not None:
+                total_requests_in_max_duration = int(
+                    scheduling_strategy.rate * max_duration
+                )
+                if 0 < total_requests_in_max_duration < end_number:
+                    end_number = total_requests_in_max_duration
+        except Exception:  # noqa: BLE001, S110
+            pass
+        return end_number
 
     def _add_requests(
         self,
@@ -362,6 +460,15 @@ class Scheduler(Generic[RequestT, ResponseT]):
             run_info.processing_requests -= 1
             run_info.completed_requests += 1
 
+            is_errored = process_response.info.errored
+            if is_errored:
+                run_info.errored_requests += 1
+
+            request_status: Literal["error", "success"] = cast(
+                "Literal['error', 'success']", "error" if is_errored else "success"
+            )
+            run_info.last_requests_statuses.append(request_status)
+
             return SchedulerRequestResult(
                 type_="request_complete",
                 run_info=run_info,
@@ -374,9 +481,9 @@ class Scheduler(Generic[RequestT, ResponseT]):
     async def _stop_processes(
         self,
         futures: list[asyncio.Future],
-        requests_queue: multiprocessing.Queue,
+        shutdown_event: MultiprocessingEvent,
     ):
-        for _ in futures:
-            requests_queue.put(None)
-
+        if not shutdown_event.is_set():
+            shutdown_event.set()
+        logger.debug("Waiting for futures to shut down")
         await asyncio.gather(*futures)
