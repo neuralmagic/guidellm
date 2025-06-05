@@ -179,6 +179,68 @@ Review the coverage report to confirm that your new code is adequately tested.
 
 3. **Address Feedback**: Respond to any feedback from reviewers and make necessary changes.
 
+## Developing the Web UI
+
+The GuideLLM project includes a frontend UI located in `src/ui`, built using [Next.js](https://nextjs.org/). This section provides instructions for working on the UI.
+
+### Getting Started
+
+To start the local development server:
+
+```bash
+npm run dev
+```
+
+Then open [http://localhost:3000](http://localhost:3000) in your browser.
+
+### Building for Production
+
+To build the app for production (output in the `out` directory):
+
+```bash
+npm run build
+```
+
+### Running UI Tests
+
+- **Unit tests**:
+
+  ```bash
+  npm run test:unit
+  ```
+
+- **Integration tests**:
+
+  ```bash
+  npm run test:integration
+  ```
+
+- **End-to-end tests** (using Cypress, ensure live dev server):
+
+  ```bash
+  npm run test:e2e
+  ```
+
+### Code Quality and Styling
+
+- **Fix styling issues**:
+
+  ```bash
+  npm run format
+  ```
+
+- **Run ESLint checks**:
+
+  ```bash
+  npm run lint
+  ```
+
+- **Run TS type checks**:
+
+  ```bash
+  npm run type-checks
+  ```
+
 ## Additional Resources
 
 - [CONTRIBUTING.md](https://github.com/neuralmagic/guidellm/blob/main/CONTRIBUTING.md): Guidelines for contributing to the project.

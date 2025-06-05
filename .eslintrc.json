@@ -2,6 +2,7 @@
   "env": {
     "browser": true,
     "es2024": true,
+    "jest": true,
     "node": true
   },
   "extends": [
@@ -12,25 +13,16 @@
     "plugin:@typescript-eslint/recommended",
     "plugin:prettier/recommended"
   ],
-  "ignorePatterns": [".vscode"],
-  "overrides": [
-    {
-      "files": ["*.mjs"],
-      "parser": "espree", // Use the default JavaScript parser for `.mjs` files
-      "parserOptions": {
-        "sourceType": "module"
-      }
-    }
-  ],
   "parser": "@typescript-eslint/parser",
   "parserOptions": {
     "ecmaFeatures": {
       "jsx": true
     },
     "ecmaVersion": 2024,
+    "project": ["src/ui/tsconfig.json", "tsconfig.test.json", "tsconfig.cypress.json"],
     "sourceType": "module"
   },
-  "plugins": ["@typescript-eslint", "import", "no-secrets", "react"],
+  "plugins": ["@typescript-eslint", "import", "jest", "no-secrets", "react"],
   "root": true,
   "rules": {
     "complexity": ["warn", { "max": 8 }],
@@ -45,5 +37,5 @@
     "import/no-extraneous-dependencies": ["error"],
     "no-secrets/no-secrets": ["error", { "additionalRegexes": {}, "ignoreContent": [] }]
   },
-  "settings": { "next": { "rootDir": ["src/ui/"] } }
+  "settings": { "next": { "rootDir": ["src/ui/", "tests/ui/"] } }
 }
