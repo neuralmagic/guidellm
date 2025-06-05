@@ -1,32 +1,48 @@
-FROM python:3.12-slim
+ARG PYTHON=3.13
 
-LABEL org.opencontainers.image.source="https://github.com/neuralmagic/guidellm"
-LABEL org.opencontainers.image.description="GuideLLM Benchmark Container"
+# Use a multi-stage build to create a lightweight production image
+FROM docker.io/python:${PYTHON}-slim as builder
 
-# Install dependencies and set up environment in a single layer
-RUN apt-get update && apt-get install -y \
-    git \
-    curl \
-    && pip install git+https://github.com/neuralmagic/guidellm.git \
-    && useradd -m -u 1000 guidellm \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+# Copy repository files
+COPY / /src
 
-# Set working directory
-WORKDIR /app
+# Create a venv and install guidellm
+RUN python3 -m venv /opt/guidellm \
+    && /opt/guidellm/bin/pip install --no-cache-dir /src
 
-# Copy and set up the benchmark script
-COPY build/run_benchmark.sh /app/
+# Copy entrypoint script into the venv bin directory
+RUN install -m0755 /src/build/entrypoint.sh /opt/guidellm/bin/entrypoint.sh
 
-# Set ownership to non-root user
-RUN chown -R guidellm:guidellm /app
+# Prod image
+FROM docker.io/python:${PYTHON}-slim
+
+# Copy the virtual environment from the builder stage
+COPY --from=builder /opt/guidellm /opt/guidellm
+
+# Add guidellm bin to PATH
+ENV PATH="/opt/guidellm/bin:$PATH"
+
+# Create a non-root user
+RUN useradd -md /results guidellm
 
 # Switch to non-root user
 USER guidellm
 
-# Healthcheck
-HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
+# Set working directory
+WORKDIR /results
 
-# Set the entrypoint
-ENTRYPOINT ["/app/run_benchmark.sh"]
+# Metadata
+LABEL org.opencontainers.image.source="https://github.com/neuralmagic/guidellm"
+LABEL org.opencontainers.image.description="GuideLLM Benchmark Container"
+
+# Set the environment variable for the benchmark script
+# TODO: Replace with scenario environment variables
+ENV TARGET="http://localhost:8000" \
+    MODEL="neuralmagic/Meta-Llama-3.1-8B-Instruct-quantized.w4a16" \
+    RATE_TYPE="sweep" \
+    DATA="prompt_tokens=256,output_tokens=128" \
+    MAX_REQUESTS="100" \
+    MAX_SECONDS="" \
+    OUTPUT_PATH="/results/results.json"
+
+ENTRYPOINT [ "/opt/guidellm/bin/entrypoint.sh" ]
