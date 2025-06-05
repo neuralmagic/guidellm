@@ -219,7 +219,7 @@ class Scheduler(Generic[RequestT, ResponseT]):
         if max_error is None:
             return False
 
-        if not max_error < 1:
+        if max_error >= 1:
             # Absolute error count, i.e not a ratio
             logger.debug(
                 f"Current error count "
