@@ -13,13 +13,7 @@ from transformers import PreTrainedTokenizerBase
 
 from guidellm.dataset import load_dataset as guidellm_load_dataset
 from guidellm.utils import IntegerRangeSampler, check_load_processor
-
-SUPPORTED_TYPES = {
-    ".json",
-    ".jsonl",
-    ".csv",
-    ".parquet",
-}
+from guidellm.utils.hf_datasets import SUPPORTED_TYPES, save_dataset_to_file
 
 
 class PromptTooShortError(Exception):
@@ -94,6 +88,7 @@ def handle_pad_strategy(
     min_prompt_tokens: int,
     tokenizer: PreTrainedTokenizerBase,
     pad_char: str,
+    pad_multiplier: int = 2,
     **_kwargs,
 ) -> str:
     """
@@ -103,13 +98,18 @@ def handle_pad_strategy(
     :param min_prompt_tokens: Desired minimum token count.
     :param tokenizer: Tokenizer used to count tokens.
     :param pad_char: Character used for padding.
+    :param pad_multiplier: Multiplier for padding character length.
     :return: Padded prompt string.
     """
 
-    while len(tokenizer.encode(current_prompt)) < min_prompt_tokens:
-        current_prompt += pad_char
-    return current_prompt
-
+    tokens = tokenizer.encode(current_prompt)
+    pad_count = 1
+    prompt = current_prompt
+    while len(tokens) < min_prompt_tokens:
+        prompt += pad_char * pad_count
+        tokens = tokenizer.encode(prompt)
+        pad_count *= pad_multiplier
+    return prompt
 
 def handle_error_strategy(
     current_prompt: str,
@@ -221,31 +221,6 @@ class TokensConfig(BaseModel):
         return TokensConfig(**config_dict)
 
 
-def save_dataset_to_file(dataset: Dataset, output_path: Union[str, Path]) -> None:
-    """
-    Saves a HuggingFace Dataset to file in a supported format.
-
-    :param dataset: Dataset to save.
-    :param output_path: Output file path (.json, .jsonl, .csv, .parquet).
-    :raises ValueError: If the file extension is not supported.
-    """
-    output_path = Path(output_path)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    suffix = output_path.suffix.lower()
-
-    if suffix == ".csv":
-        dataset.to_csv(output_path)
-    elif suffix in {".json", ".jsonl"}:
-        dataset.to_json(output_path)
-    elif suffix == ".parquet":
-        dataset.to_parquet(output_path)
-    else:
-        raise ValueError(
-            f"Unsupported file suffix '{suffix}' in output_path'{output_path}'."
-            f" Only {SUPPORTED_TYPES} are supported."
-        )
-
-
 def _validate_output_suffix(output_path: Union[str, Path]) -> None:
     output_path = Path(output_path)
     suffix = output_path.suffix.lower()
@@ -351,8 +326,8 @@ def process_dataset(
         if prompt_text is None:
             continue
 
-        if len(tokenizer.encode(prompt_text)) > target_prompt_len:
-            tokens = tokenizer.encode(prompt_text)
+        tokens = tokenizer.encode(prompt_text)
+        if len(tokens) > target_prompt_len:
             prompt_text = tokenizer.decode(tokens[:target_prompt_len])
 
         processed_prompt = prompt_row.copy()
@@ -370,7 +345,7 @@ def process_dataset(
 
     processed_dataset = Dataset.from_list(processed_prompts)
     save_dataset_to_file(processed_dataset, output_path)
-    logger.info(f"Conversion complete. Dataset saved to: {output_path}")
+    logger.info(f"Conversion completed. Dataset saved to: {output_path}")
 
     if push_to_hub:
         push_dataset_to_hub(hub_dataset_id, processed_dataset)

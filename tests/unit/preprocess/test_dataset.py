@@ -1,5 +1,4 @@
 import os
-from pathlib import Path
 from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 
@@ -20,7 +19,6 @@ from guidellm.preprocess.dataset import (
     handle_pad_strategy,
     process_dataset,
     push_dataset_to_hub,
-    save_dataset_to_file,
 )
 
 
@@ -105,7 +103,7 @@ def test_handle_concatenate_strategy_not_enough_prompts(tokenizer_mock):
 @pytest.mark.sanity
 def test_handle_pad_strategy(tokenizer_mock):
     result = handle_pad_strategy("short", 10, tokenizer_mock, "p")
-    assert result == "shortppppp"
+    assert result.startswith("shortppppp")
 
 
 @pytest.mark.sanity
@@ -122,11 +120,11 @@ def test_handle_error_strategy_too_short_prompt(tokenizer_mock):
 
 
 @pytest.mark.smoke
-@patch("guidellm.preprocess.dataset.save_dataset_to_file")
-@patch("guidellm.preprocess.dataset.Dataset")
-@patch("guidellm.preprocess.dataset.guidellm_load_dataset")
-@patch("guidellm.preprocess.dataset.check_load_processor")
-@patch("guidellm.preprocess.dataset.IntegerRangeSampler")
+@patch(f"{process_dataset.__module__}.save_dataset_to_file")
+@patch(f"{process_dataset.__module__}.Dataset")
+@patch(f"{process_dataset.__module__}.guidellm_load_dataset")
+@patch(f"{process_dataset.__module__}.check_load_processor")
+@patch(f"{process_dataset.__module__}.IntegerRangeSampler")
 def test_process_dataset_non_empty(
     mock_sampler,
     mock_check_processor,
@@ -291,81 +289,3 @@ def test_push_dataset_to_hub_error_no_id():
         push_dataset_to_hub(None, mock_dataset)
 
 
-@pytest.mark.regression
-@patch.object(Path, "mkdir")
-def test_save_dataset_to_file_csv(mock_mkdir):
-    mock_dataset = MagicMock(spec=Dataset)
-    output_path = Path("some/path/output.csv")
-    save_dataset_to_file(mock_dataset, output_path)
-    mock_dataset.to_csv.assert_called_once_with(output_path)
-    mock_mkdir.assert_called_once_with(parents=True, exist_ok=True)
-
-
-@pytest.mark.regression
-@patch.object(Path, "mkdir")
-def test_save_dataset_to_file_csv_capitalized(mock_mkdir):
-    mock_dataset = MagicMock(spec=Dataset)
-    output_path = Path("some/path/output.CSV")
-    save_dataset_to_file(mock_dataset, output_path)
-    mock_dataset.to_csv.assert_called_once_with(output_path)
-    mock_mkdir.assert_called_once_with(parents=True, exist_ok=True)
-
-
-@pytest.mark.regression
-@patch.object(Path, "mkdir")
-def test_save_dataset_to_file_json(mock_mkdir):
-    mock_dataset = MagicMock(spec=Dataset)
-    output_path = Path("some/path/output.json")
-    save_dataset_to_file(mock_dataset, output_path)
-    mock_dataset.to_json.assert_called_once_with(output_path)
-    mock_mkdir.assert_called_once_with(parents=True, exist_ok=True)
-
-
-@pytest.mark.regression
-@patch.object(Path, "mkdir")
-def test_save_dataset_to_file_json_capitalized(mock_mkdir):
-    mock_dataset = MagicMock(spec=Dataset)
-    output_path = Path("some/path/output.JSON")
-    save_dataset_to_file(mock_dataset, output_path)
-    mock_dataset.to_json.assert_called_once_with(output_path)
-    mock_mkdir.assert_called_once_with(parents=True, exist_ok=True)
-
-
-@pytest.mark.regression
-@patch.object(Path, "mkdir")
-def test_save_dataset_to_file_jsonl(mock_mkdir):
-    mock_dataset = MagicMock(spec=Dataset)
-    output_path = Path("some/path/output.jsonl")
-    save_dataset_to_file(mock_dataset, output_path)
-    mock_dataset.to_json.assert_called_once_with(output_path)
-    mock_mkdir.assert_called_once_with(parents=True, exist_ok=True)
-
-
-@pytest.mark.regression
-@patch.object(Path, "mkdir")
-def test_save_dataset_to_file_jsonl_capitalized(mock_mkdir):
-    mock_dataset = MagicMock(spec=Dataset)
-    output_path = Path("some/path/output.JSONL")
-    save_dataset_to_file(mock_dataset, output_path)
-    mock_dataset.to_json.assert_called_once_with(output_path)
-    mock_mkdir.assert_called_once_with(parents=True, exist_ok=True)
-
-
-@pytest.mark.regression
-@patch.object(Path, "mkdir")
-def test_save_dataset_to_file_parquet(mock_mkdir):
-    mock_dataset = MagicMock(spec=Dataset)
-    output_path = Path("some/path/output.parquet")
-    save_dataset_to_file(mock_dataset, output_path)
-    mock_dataset.to_parquet.assert_called_once_with(output_path)
-    mock_mkdir.assert_called_once_with(parents=True, exist_ok=True)
-
-
-@pytest.mark.regression
-@patch.object(Path, "mkdir")
-def test_save_dataset_to_file_unsupported_type(mock_mkdir):
-    mock_dataset = MagicMock(spec=Dataset)
-    output_path = Path("some/path/output.txt")
-    with pytest.raises(ValueError, match=r"Unsupported file suffix '.txt'.*"):
-        save_dataset_to_file(mock_dataset, output_path)
-    mock_mkdir.assert_called_once_with(parents=True, exist_ok=True)

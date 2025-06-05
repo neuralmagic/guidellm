@@ -1,4 +1,8 @@
 from .colors import Colors
+from .hf_datasets import (
+    save_dataset_to_file,
+    SUPPORTED_TYPES,
+)
 from .hf_transformers import (
     check_load_processor,
 )
@@ -22,6 +26,8 @@ __all__ = [
     "filter_text",
     "is_puncutation",
     "load_text",
+    "save_dataset_to_file",
     "split_text",
     "split_text_list_by_length",
+    "SUPPORTED_TYPES",
 ]
