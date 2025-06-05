@@ -4,5 +4,5 @@
     "types": ["cypress", "node"],
     "noEmit": true
   },
-  "include": ["cypress.config.ts", "cypress/**/*.ts"]
+  "include": ["cypress.config.ts", "tests/ui/cypress/**/*.ts"]
 }

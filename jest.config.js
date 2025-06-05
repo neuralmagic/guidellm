@@ -1,7 +1,7 @@
 const nextJest = require('next/jest');
 
 const createJestConfig = nextJest({
-  dir: __dirname,
+  dir: './src/ui',
 });
 
 const customJestConfig = {

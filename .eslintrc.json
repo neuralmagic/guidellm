@@ -13,18 +13,13 @@
     "plugin:@typescript-eslint/recommended",
     "plugin:prettier/recommended"
   ],
-  "ignorePatterns": [".vscode"],
   "parser": "@typescript-eslint/parser",
   "parserOptions": {
     "ecmaFeatures": {
       "jsx": true
     },
     "ecmaVersion": 2024,
-    "project": [
-      "src/ui/tsconfig.json",
-      "src/ui/tsconfig.test.json",
-      "src/ui/tsconfig.cypress.json"
-    ],
+    "project": ["src/ui/tsconfig.json", "tsconfig.test.json", "tsconfig.cypress.json"],
     "sourceType": "module"
   },
   "plugins": ["@typescript-eslint", "import", "jest", "no-secrets", "react"],
@@ -42,5 +37,5 @@
     "import/no-extraneous-dependencies": ["error"],
     "no-secrets/no-secrets": ["error", { "additionalRegexes": {}, "ignoreContent": [] }]
   },
-  "settings": { "next": { "rootDir": ["src/ui/"] } }
+  "settings": { "next": { "rootDir": ["src/ui/", "tests/ui/"] } }
 }

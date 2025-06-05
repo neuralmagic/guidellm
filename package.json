@@ -6,13 +6,13 @@
     "dev": "next dev src/ui",
     "build": "next build src/ui",
     "lint": "next lint src/ui",
-    "type-check": "tsc -p src/ui/tsconfig.json --noEmit && tsc -p src/ui/tsconfig.test.json --noEmit && tsc -p src/ui/tsconfig.cypress.json --noEmit",
-    "format": "prettier --ignore-path src/ui/.prettierignore --write \"src/ui/**/*.+(js|ts|jsx|tsx|json)\"",
+    "type-check": "tsc -p src/ui/tsconfig.json --noEmit && tsc -p tsconfig.test.json --noEmit && tsc -p tsconfig.cypress.json --noEmit",
+    "format": "prettier --write .",
     "prepare": "husky install",
-    "test": "jest --config src/ui/jest.config.js --passWithNoTests src/ui",
-    "test:unit": "jest --config src/ui/jest.config.js --passWithNoTests src/ui/tests/unit",
-    "test:integration": "jest --config src/ui/jest.config.js --passWithNoTests src/ui/tests/integration",
-    "test:e2e": "cypress run --project src/ui --headless"
+    "test": "jest --config jest.config.js --passWithNoTests tests/ui",
+    "test:unit": "jest --config jest.config.js --passWithNoTests tests/ui/unit",
+    "test:integration": "jest --config jest.config.js --passWithNoTests tests/ui/integration",
+    "test:e2e": "cypress run --headless"
   },
   "dependencies": {
     "next": "15.3.2",
