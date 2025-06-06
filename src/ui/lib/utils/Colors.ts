@@ -31,7 +31,6 @@ export const SURFACE_CONTAINER_SHADE_4 = '#E7E8EE';
 export const SURFACE_CONTAINER_SHADE_5 = LAVENDER_GRAY;
 
 export const CHARCOAL_NAVY = '#0F161F';
-export const DODGER_BLUE = '#2A8EFD';
 export const SEA_LION = '#7F8795';
 export const MIDNIGHT_BLUE = '#001B3C';
 export const DEEP_FOREST_GREEN = '#002112';

@@ -16,16 +16,19 @@ code {
   font-style: 'normal';
   font-weight: 400;
   src: url('./assets/fonts/spezia/spezia-regular.ttf') format('truetype');
+  font-display: swap;
 }
 @font-face {
   font-family: 'Spezia';
   font-style: 'normal';
   font-weight: 500;
   src: url('./assets/fonts/spezia/spezia-medium.ttf') format('truetype');
+  font-display: swap;
 }
 @font-face {
   font-family: 'SpeziaMono';
   font-style: 'normal';
   font-weight: 500;
   src: url('./assets/fonts/spezia/spezia-mono-medium.ttf') format('truetype');
+  font-display: swap;
 }

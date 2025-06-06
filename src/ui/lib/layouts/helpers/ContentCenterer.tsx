@@ -6,22 +6,8 @@ type HasChildren = {
   children: ReactNode;
 };
 
-const getPaddingForBreakpoint = (breakpoint: string) => {
-  switch (breakpoint) {
-    case 'xs':
-      return '16px';
-    case 'sm':
-      return '32px';
-    case 'md':
-      return '32px';
-    case 'lg':
-      return '32px';
-    case 'xl':
-      return '32px';
-    default:
-      return '32px';
-  }
-};
+const getPaddingForBreakpoint = (breakpoint: string) =>
+  breakpoint === 'xs' ? '16px' : '32px';
 
 export const ContentCenterer = ({ children }: HasChildren) => {
   const breakpoint = useCurrentBreakpoint();

@@ -32,7 +32,6 @@ import {
   DARK_SURFACE_CONTAINER_SHADE_4,
   DARK_SURFACE_CONTAINER_SHADE_5,
   CHARCOAL_NAVY,
-  DODGER_BLUE,
   SEA_LION,
   MIDNIGHT_BLUE,
   DEEP_FOREST_GREEN,
@@ -429,7 +428,7 @@ export const muiThemeV3Light = createTheme({
     },
     surface: {
       onSurface: CHARCOAL_NAVY,
-      onSurfaceAccent: DODGER_BLUE,
+      onSurfaceAccent: NEURAL_BLUE,
       onSurfaceSubdued: SEA_LION,
       surface: SURFACE_SHADE_2,
       surfaceContainer: SURFACE_CONTAINER_SHADE_3,
@@ -482,7 +481,7 @@ export const themeV3LightName = 'muiThemeV3Light';
 
 const DEFAULT_SURFACE_OPTIONS = {
   onSurface: CHARCOAL_NAVY,
-  onSurfaceAccent: DODGER_BLUE,
+  onSurfaceAccent: NEURAL_BLUE,
   onSurfaceSubdued: SEA_LION,
   surface: SURFACE_SHADE_2,
   surfaceContainer: SURFACE_CONTAINER_SHADE_3,
@@ -525,7 +524,7 @@ export const muiThemeV3Dark = createTheme({
     surface: {
       ...DEFAULT_SURFACE_OPTIONS,
       onSurface: LAVENDER_GRAY,
-      onSurfaceAccent: DODGER_BLUE,
+      onSurfaceAccent: NEURAL_BLUE,
       onSurfaceSubdued: ASH_GRAY,
       surface: DARK_SURFACE_SHADE_1,
       surfaceContainer: DARK_SURFACE_CONTAINER_SHADE_3,
