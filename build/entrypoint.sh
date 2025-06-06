@@ -10,20 +10,26 @@ if [ $# -gt 0 ]; then
     exec $guidellm_bin "$@"
 fi
 
-# NOTE: Bash vec + exec prevent shell escape issues
-CMD=("${guidellm_bin}" "benchmark" "--target" "${TARGET}" "--model" "${MODEL}" "--rate-type" "${RATE_TYPE}" "--data" "${DATA}")
+# Get a list of environment variables that start with GUIDELLM_
+args="$(printenv | cut -d= -f1 | grep -E '^GUIDELLM_')"
 
-if [ -n "${MAX_REQUESTS}" ]; then
-    CMD+=("--max-requests" "${MAX_REQUESTS}")
-fi
+# NOTE: Bash array + exec prevent shell escape issues
+CMD=("${guidellm_bin}" "benchmark")
 
-if [ -n "${MAX_SECONDS}" ]; then
-    CMD+=("--max-seconds" "${MAX_SECONDS}")
-fi
+# Parse environment variables for the benchmark command
+for var in $args; do
+    # Remove GUIDELLM_ prefix
+    arg_name="${var#GUIDELLM_}"
+    # Convert to lowercase
+    arg_name="${arg_name,,}"
+    # Replace underscores with dashes
+    arg_name="${arg_name//_/-}"
 
-if [ -n "${OUTPUT_PATH}" ]; then
-    CMD+=("--output-path" "${OUTPUT_PATH}")
-fi
+    # Add the argument to the command array if set
+    if [ -n "${!var}" ]; then
+        CMD+=("--${arg_name}" "${!var}")
+    fi
+done
 
 # Execute the command
 echo "Running command: ${CMD[*]}"
