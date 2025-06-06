@@ -31,11 +31,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-        working-directory: src/ui
 
       - name: Run quality and typing checks
         run: npm run lint
-        working-directory: src/ui
 
   type-checks:
     runs-on: ubuntu-latest
@@ -63,11 +61,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-        working-directory: src/ui
 
       - name: Run quality and typing checks
         run: npm run type-check
-        working-directory: src/ui
 
   precommit-checks:
     runs-on: ubuntu-latest
@@ -94,12 +90,10 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Install dependencies
-        working-directory: src/ui
         run: npm ci
 
       - name: Run pre-commit checks
         run: npx husky run pre-commit
-        working-directory: src/ui
 
   unit-tests:
     runs-on: ubuntu-latest
@@ -127,11 +121,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-        working-directory: src/ui
 
       - name: Run unit tests
         run: npm run test:unit
-        working-directory: src/ui
 
   integration-tests:
     runs-on: ubuntu-latest
@@ -159,11 +151,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-        working-directory: src/ui
 
       - name: Run integration tests
         run: npm run test:integration
-        working-directory: src/ui
 
   build:
     runs-on: ubuntu-latest

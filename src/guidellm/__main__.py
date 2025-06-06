@@ -1,4 +1,5 @@
 import asyncio
+import codecs
 import json
 from pathlib import Path
 from typing import get_args
@@ -8,6 +9,7 @@ import click
 from guidellm.backend import BackendType
 from guidellm.benchmark import ProfileType, benchmark_generative_text
 from guidellm.config import print_config
+from guidellm.preprocess.dataset import ShortPromptStrategy, process_dataset
 from guidellm.scheduler import StrategyType
 
 STRATEGY_PROFILE_CHOICES = set(
@@ -280,6 +282,20 @@ def benchmark(
     )
 
 
+def decode_escaped_str(_ctx, _param, value):
+    """
+    Click auto adds characters. For example, when using --pad-char "\n",
+    it parses it as "\\n". This method decodes the string to handle escape
+    sequences correctly.
+    """
+    if value is None:
+        return None
+    try:
+        return codecs.decode(value, "unicode_escape")
+    except Exception as e:
+        raise click.BadParameter(f"Could not decode escape sequences: {e}") from e
+
+
 @cli.command(
     help=(
         "Print out the available configuration settings that can be set "
@@ -288,6 +304,140 @@ def benchmark(
 )
 def config():
     print_config()
+
+
+@cli.group(help="General preprocessing tools and utilities.")
+def preprocess():
+    pass
+
+
+@preprocess.command(
+    help=(
+        "Convert a dataset to have specific prompt and output token sizes.\n"
+        "DATA: Path to the input dataset or dataset ID.\n"
+        "OUTPUT_PATH: Path to save the converted dataset, including file suffix."
+    )
+)
+@click.argument(
+    "data",
+    type=str,
+    required=True,
+)
+@click.argument(
+    "output_path",
+    type=click.Path(file_okay=True, dir_okay=False, writable=True, resolve_path=True),
+    required=True,
+)
+@click.option(
+    "--processor",
+    type=str,
+    required=True,
+    help=(
+        "The processor or tokenizer to use to calculate token counts for statistics "
+        "and synthetic data generation."
+    ),
+)
+@click.option(
+    "--processor-args",
+    default=None,
+    callback=parse_json,
+    help=(
+        "A JSON string containing any arguments to pass to the processor constructor "
+        "as a dict with **kwargs."
+    ),
+)
+@click.option(
+    "--data-args",
+    callback=parse_json,
+    help=(
+        "A JSON string containing any arguments to pass to the dataset creation "
+        "as a dict with **kwargs."
+    ),
+)
+@click.option(
+    "--short-prompt-strategy",
+    type=click.Choice([s.value for s in ShortPromptStrategy]),
+    default=ShortPromptStrategy.IGNORE.value,
+    show_default=True,
+    help="Strategy to handle prompts shorter than the target length. ",
+)
+@click.option(
+    "--pad-char",
+    type=str,
+    default="",
+    callback=decode_escaped_str,
+    help="The token to pad short prompts with when using the 'pad' strategy.",
+)
+@click.option(
+    "--concat-delimiter",
+    type=str,
+    default="",
+    help=(
+        "The delimiter to use when concatenating prompts that are too short."
+        " Used when strategy is 'concatenate'."
+    ),
+)
+@click.option(
+    "--prompt-tokens",
+    type=str,
+    default=None,
+    help="Prompt tokens config (JSON, YAML file or key=value string)",
+)
+@click.option(
+    "--output-tokens",
+    type=str,
+    default=None,
+    help="Output tokens config (JSON, YAML file or key=value string)",
+)
+@click.option(
+    "--push-to-hub",
+    is_flag=True,
+    help="Set this flag to push the converted dataset to the Hugging Face Hub.",
+)
+@click.option(
+    "--hub-dataset-id",
+    type=str,
+    default=None,
+    help="The Hugging Face Hub dataset ID to push to. "
+    "Required if --push-to-hub is used.",
+)
+@click.option(
+    "--random-seed",
+    type=int,
+    default=42,
+    show_default=True,
+    help="Random seed for prompt token sampling and output tokens sampling.",
+)
+def dataset(
+    data,
+    output_path,
+    processor,
+    processor_args,
+    data_args,
+    short_prompt_strategy,
+    pad_char,
+    concat_delimiter,
+    prompt_tokens,
+    output_tokens,
+    push_to_hub,
+    hub_dataset_id,
+    random_seed,
+):
+    process_dataset(
+        data=data,
+        output_path=output_path,
+        processor=processor,
+        prompt_tokens=prompt_tokens,
+        output_tokens=output_tokens,
+        processor_args=processor_args,
+        data_args=data_args,
+        short_prompt_strategy=short_prompt_strategy,
+        pad_char=pad_char,
+        concat_delimiter=concat_delimiter,
+        push_to_hub=push_to_hub,
+        hub_dataset_id=hub_dataset_id,
+        random_seed=random_seed,
+    )
 
 
 if __name__ == "__main__":
