@@ -20,6 +20,13 @@ CMD=("${guidellm_bin}" "benchmark")
 for var in $args; do
     # Remove GUIDELLM_ prefix
     arg_name="${var#GUIDELLM_}"
+
+    # If there is an extra underscore at the
+    # start than this is a config variable
+    if [ "${arg_name:0:1}" == "_" ]; then
+        continue
+    fi
+
     # Convert to lowercase
     arg_name="${arg_name,,}"
     # Replace underscores with dashes
