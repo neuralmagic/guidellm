@@ -1,7 +1,6 @@
 {
   "name": "guidellm",
   "version": "0.1.0",
-  "private": true,
   "scripts": {
     "dev": "next dev src/ui",
     "build": "next build src/ui",
@@ -23,12 +22,21 @@
   },
 
   "dependencies": {
+    "@emotion/cache": "^11.13.1",
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.0",
+    "@mui/material": "^5.11.7",
+    "@mui/material-nextjs": "^5.16.6",
+    "@reduxjs/toolkit": "^2.2.7",
     "next": "15.3.2",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^18.2.0",
+    "react-redux": "^9.1.2"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
+    "@mui/types": "^7.2.14",
+    "@svgr/webpack": "^8.1.0",
     "@testing-library/jest-dom": "^5.16.5",
     "@testing-library/react": "^16.0.0",
     "@testing-library/user-event": "^13.5.0",
@@ -43,6 +51,7 @@
     "eslint": "^9.0.0",
     "eslint-config-next": "15.3.2",
     "eslint-config-prettier": "^8.5.0",
+    "eslint-import-resolver-typescript": "^4.4.2",
     "eslint-plugin-import": "^2.29.1",
     "eslint-plugin-jest": "^28.11.0",
     "eslint-plugin-jsx-a11y": "^6.6.1",
@@ -58,7 +67,6 @@
     "jest-transform-stub": "^2.0.0",
     "nyc": "^17.1.0",
     "prettier": "^3.5.3",
-    "ts-jest": "^29.2.4",
     "typescript": "^5"
   },
   "lint-staged": {

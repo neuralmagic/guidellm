@@ -30,12 +30,40 @@
     "import/order": [
       "error",
       {
-        "groups": [["builtin", "external", "internal"]],
-        "newlines-between": "always"
+        "groups": [
+          ["builtin", "external"],
+          ["internal", "parent", "sibling", "index"]
+        ],
+        "newlines-between": "always-and-inside-groups",
+        "pathGroups": [
+          {
+            "pattern": "@{app,assets,classes,components,hooks,lib,pages,store,tests,types,utils}/**",
+            "group": "internal",
+            "position": "before"
+          },
+          {
+            "pattern": "{.,..}/**",
+            "group": "internal",
+            "position": "after"
+          }
+        ],
+        "pathGroupsExcludedImportTypes": ["builtin"],
+        "alphabetize": { "order": "asc", "caseInsensitive": true }
       }
     ],
     "import/no-extraneous-dependencies": ["error"],
     "no-secrets/no-secrets": ["error", { "additionalRegexes": {}, "ignoreContent": [] }]
   },
-  "settings": { "next": { "rootDir": ["src/ui/", "tests/ui/"] } }
+  "settings": {
+    "next": { "rootDir": ["src/ui/", "tests/ui/"] },
+    "import/resolver": {
+      "typescript": {
+        "project": [
+          "src/ui/tsconfig.json",
+          "tsconfig.test.json",
+          "tsconfig.cypress.json"
+        ]
+      }
+    }
+  }
 }

@@ -13,6 +13,7 @@
     "moduleResolution": "node",
     "baseUrl": ".",
     "paths": {
+      "@assets/*": ["src/ui/app/assets/*"],
       "@/*": ["src/ui/*"]
     },
     "resolveJsonModule": true,
