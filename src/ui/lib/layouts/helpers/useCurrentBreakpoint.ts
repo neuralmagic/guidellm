@@ -1,5 +1,13 @@
 import { useMediaQuery, useTheme } from '@mui/material';
 
+/**
+ * Custom hook that returns the current MUI breakpoint based on screen width.
+ *
+ * Uses Material-UI's breakpoint system to determine which breakpoint matches
+ * the current viewport size.
+ *
+ * @returns {'xs' | 'sm' | 'md' | 'lg' | 'xl'} The current breakpoint name
+ */
 export function useCurrentBreakpoint() {
   const theme = useTheme();
   const isXs = useMediaQuery(theme.breakpoints.only('xs'));
@@ -10,18 +18,14 @@ export function useCurrentBreakpoint() {
 
   if (isXs) {
     return 'xs';
-  }
-  if (isSm) {
+  } else if (isSm) {
     return 'sm';
-  }
-  if (isMd) {
+  } else if (isMd) {
     return 'md';
-  }
-  if (isLg) {
+  } else if (isLg) {
     return 'lg';
-  }
-  if (isXl) {
+  } else if (isXl) {
     return 'xl';
   }
-  return 'xl';
+  return 'xs';
 }
