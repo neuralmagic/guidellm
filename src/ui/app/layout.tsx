@@ -1,30 +1,31 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import React from 'react';
 
 import './globals.css';
 
-export const metadata: Metadata = {
-  title: 'GuideLLM',
-  description: 'LLM Benchmarking Tool',
-};
-
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export async function generateMetadata(): Promise<Metadata> {
   const assetPrefix = process.env.ASSET_PREFIX || '';
 
+  return {
+    title: 'GuideLLM',
+    description: 'LLM Benchmarking Tool',
+    icons: {
+      icon: `${assetPrefix}/favicon.ico`,
+      apple: `${assetPrefix}/favicon-192x192.png`,
+    },
+    manifest: `${assetPrefix}/manifest.json`,
+  };
+}
+
+export const viewport: Viewport = {
+  initialScale: 1,
+  themeColor: '#000000',
+  width: 'device-width',
+};
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <Head>
-        <meta charSet="utf-8" />
-        <link rel="icon" href={`${assetPrefix}/favicon.ico`} />
-        <link rel="apple-touch-icon" href={`${assetPrefix}/favicon-192x192.png`} />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <meta name="theme-color" content="#000000" />
-        <link rel="manifest" href={`${assetPrefix}/manifest.json`} />
-      </Head>
       <body>{children}</body>
     </html>
   );
