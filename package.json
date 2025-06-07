@@ -9,8 +9,8 @@
     "format": "prettier --write .",
     "prepare": "husky install",
     "test": "jest --config jest.config.js tests/ui",
-    "test:unit": "jest --config jest.config.js --coverage --coverageDirectory=coverage/unit",
-    "test:integration": "jest --config jest.config.js --coverage --coverageDirectory=coverage/integration",
+    "test:unit": "jest --config jest.config.js --coverage --coverageDirectory=coverage/unit tests/ui/unit",
+    "test:integration": "jest --config jest.config.js --coverage --coverageDirectory=coverage/integration tests/ui/integration",
     "test:e2e": "cypress run --headless",
     "coverage:merge": "nyc merge coverage/unit > coverage/tmp.json && nyc merge coverage/integration coverage/tmp.json && mv coverage/tmp.json coverage/coverage-final.json",
     "coverage:collect":
