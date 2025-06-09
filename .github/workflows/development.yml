@@ -21,6 +21,20 @@ jobs:
       - name: Run quality checks
         run: tox -e quality
 
+  ui-quality-checks:
+    permissions:
+      contents: "read"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run quality and typing checks
+        run: npm run lint
+
   type-checks:
     runs-on: ubuntu-latest
     strategy:
@@ -36,6 +50,20 @@ jobs:
         run: pip install tox
       - name: Run quality checks
         run: tox -e types
+
+  ui-type-checks:
+    permissions:
+      contents: "read"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run quality and typing checks
+        run: npm run type-check
 
   precommit-checks:
     runs-on: ubuntu-latest
@@ -53,6 +81,20 @@ jobs:
       - name: Run pre-commit checks
         run: pre-commit run --all-files
 
+  ui-precommit-check:
+    permissions:
+      contents: "read"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run pre-commit checks
+        run: npx husky run pre-commit
+
   unit-tests:
     runs-on: ubuntu-latest
     strategy:
@@ -69,6 +111,20 @@ jobs:
       - name: Run unit tests
         run: tox -e test-unit -- -m "smoke or sanity"
 
+  ui-unit-tests:
+    permissions:
+      contents: "read"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit tests
+        run: npm run test:unit
+
   integration-tests:
     runs-on: ubuntu-latest
     strategy:
@@ -84,6 +140,20 @@ jobs:
         run: pip install tox
       - name: Run integration tests
         run: tox -e test-integration -- -m smoke
+
+  ui-integration-tests:
+    permissions:
+      contents: "read"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run integration tests
+        run: npm run test:integration
 
   build:
     runs-on: ubuntu-latest

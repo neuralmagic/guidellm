@@ -153,6 +153,59 @@ The `guidellm benchmark` command is used to run benchmarks against a generative 
 
 - `--output-path`: Defines the path to save the benchmark results. Supports JSON, YAML, or CSV formats. If a directory is provided, the results will be saved as `benchmarks.json` in that directory. If not set, the results will be saved in the current working directory.
 
+### GuideLLM UI
+
+GuideLLM UI is a companion frontend for visualizing the results of a GuideLLM benchmark run.
+
+### 🛠 Running the UI
+
+1. Use the Hosted Build (Recommended for Most Users)
+
+After running a benchmark with GuideLLM, a report.html file will be generated (by default at guidellm_report/report.html). This file references the latest stable version of the UI hosted at:
+
+```
+https://neuralmagic.github.io/guidellm/ui/dev/
+```
+
+Open the file in your browser and you're done—no setup required.
+
+2. Build and Serve the UI Locally (For Development)
+   This option is useful if:
+
+- You are actively developing the UI
+
+- You want to test changes to the UI before publishing
+
+- You want full control over how the report is displayed
+
+```bash
+npm install
+npm run build
+npx serve out
+```
+
+This will start a local server (e.g., at http://localhost:3000). Then, in your GuideLLM config or CLI flags, point to this local server as the asset base for report generation.
+
+### 🧪 Development Notes
+
+During UI development, it can be helpful to view sample data. We include a sample benchmark run wired into the Redux store under:
+
+```
+src/lib/store/[runInfo/workloadDetails/benchmarks]WindowData.ts
+```
+
+In the future this will be replaced by a configurable untracked file for dev use.
+
+### 🚧 Future Possibilities
+
+We're evaluating options for hosting dev/staging/prod builds on GitHub Pages. For now, production builds will be published at:
+
+```
+https://neuralmagic.github.io/guidellm/ui/dev/
+```
+
+If needed, alternative hosting (e.g., Vercel, Netlify) may be explored, but simplicity and transparency remain key priorities for this open-source tool.
+
 ## Resources
 
 ### Documentation

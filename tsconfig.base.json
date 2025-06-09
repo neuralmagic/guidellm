@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "compilerOptions": {
+    /* --- language / emit --- */
+    "target": "ES2022",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "module": "esnext",
+    "jsx": "preserve",
+    "incremental": true,
+    "noEmit": true,
+
+    /* --- module resolution --- */
+    "moduleResolution": "node",
+    "baseUrl": ".",
+    "paths": {
+      "@assets/*": ["src/ui/app/assets/*"],
+      "@/*": ["src/ui/*"]
+    },
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "plugins": [{ "name": "next" }],
+
+    /* --- correctness / style --- */
+    "strict": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "exclude": [".meta", ".next", "node_modules", ".vscode"]
+}
