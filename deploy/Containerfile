@@ -11,7 +11,7 @@ RUN python3 -m venv /opt/guidellm \
     && /opt/guidellm/bin/pip install --no-cache-dir /src
 
 # Copy entrypoint script into the venv bin directory
-RUN install -m0755 /src/build/entrypoint.sh /opt/guidellm/bin/entrypoint.sh
+RUN install -m0755 /src/deploy/entrypoint.sh /opt/guidellm/bin/entrypoint.sh
 
 # Prod image
 FROM docker.io/python:${PYTHON}-slim

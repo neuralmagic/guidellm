@@ -17,6 +17,7 @@ __pycache__/
 
 # Distribution / packaging
 .Python
+build/
 develop-eggs/
 dist/
 downloads/
@@ -196,6 +197,9 @@ coverage/
 # next.js
 /src/ui/.next/
 /src/ui/out/
+
+# production
+build/
 
 # misc
 *.pem
