@@ -26,7 +26,8 @@ def cli():
 
 
 @cli.command(
-    help="Run a benchmark against a generative model using the specified arguments."
+    help="Run a benchmark against a generative model using the specified arguments.",
+    context_settings={"auto_envvar_prefix": "GUIDELLM"},
 )
 @click.option(
     "--scenario",
@@ -339,7 +340,8 @@ def preprocess():
         "Convert a dataset to have specific prompt and output token sizes.\n"
         "DATA: Path to the input dataset or dataset ID.\n"
         "OUTPUT_PATH: Path to save the converted dataset, including file suffix."
-    )
+    ),
+    context_settings={"auto_envvar_prefix": "GUIDELLM"},
 )
 @click.argument(
     "data",
