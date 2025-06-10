@@ -25,6 +25,11 @@ __all__ = [
 
 
 class SyntheticDatasetConfig(BaseModel):
+    prefix_tokens: int = Field(
+        description="The number of shared prefix tokens to prepend to each prompt.",
+        ge=0,
+        default=0,
+    )
     prompt_tokens: int = Field(
         description="The average number of text tokens generated for prompts.",
         gt=0,
@@ -164,6 +169,10 @@ class SyntheticTextItemsGenerator(
         # ensure diff distribution from output tokens
         rand = random.Random(self.random_seed + 2)  # noqa: S311
 
+        prefix_index = rand.randint(0, len(self.text_creator.words))
+        prefix_tokens = self.config.prefix_tokens
+        prefix = self._create_prompt(prefix_tokens, prefix_index)
+
         for _, prompt_tokens, output_tokens in zip(
             range(self.config.samples),
             prompt_tokens_sampler,
@@ -171,8 +180,8 @@ class SyntheticTextItemsGenerator(
         ):
             start_index = rand.randint(0, len(self.text_creator.words))
             yield {
-                "prompt": self._create_prompt(prompt_tokens, start_index),
-                "prompt_tokens_count": prompt_tokens,
+                "prompt": prefix + self._create_prompt(prompt_tokens, start_index),
+                "prompt_tokens_count": prefix_tokens + prompt_tokens,
                 "output_tokens_count": output_tokens,
             }
 
