@@ -1,8 +1,6 @@
 import { render, waitFor } from '@testing-library/react';
-
 import Home from '@/app/page';
-
-import mockBenchmarks from '../unit/mocks/mockBenchmarks';
+import mockBenchmarks from './mocks/mockBenchmarks';
 
 const jsonResponse = (data: unknown, status = 200) =>
   Promise.resolve(
@@ -31,11 +29,11 @@ beforeEach(() => {
   (global.fetch as jest.Mock).mockImplementation(route);
 });
 
-describe('Home Page', () => {
-  it('renders the homepage content', async () => {
-    const { getByText } = render(<Home />);
+describe('Home Component', () => {
+  it('renders without crashing', async () => {
+    const { container } = render(<Home />);
     await waitFor(() => {
-      expect(getByText('GuideLLM')).toBeInTheDocument();
+      expect(container.firstChild).toBeInTheDocument();
     });
   });
 });

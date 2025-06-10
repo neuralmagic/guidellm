@@ -33,7 +33,8 @@ const useChartScales = ({ bars, width, height, margins }: ChartScalesProps) => {
 
     const innerHeight = height - margins.top - margins.bottom;
     const innerWidth = width - margins.left - margins.right;
-    const fnScaleX = (d: number) => innerWidth * Math.min(1, (d - xMin) / (xMax - xMin));
+    const fnScaleX = (d: number) =>
+      innerWidth * Math.min(1, (d - xMin) / (xMax - xMin));
     const fnScaleY = (d: number) => (innerHeight * (d - yMin)) / (yMax - yMin);
 
     return {

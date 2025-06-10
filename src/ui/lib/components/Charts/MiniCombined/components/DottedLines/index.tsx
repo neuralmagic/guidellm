@@ -2,7 +2,13 @@ import useLineColors from '../../../common/useLineColors';
 
 import { DottedLinesProps } from './DottedLines.interfaces';
 
-const DottedLines = ({ lines, leftMargin, topMargin, xScale, innerHeight }: DottedLinesProps) => {
+const DottedLines = ({
+  lines,
+  leftMargin,
+  topMargin,
+  xScale,
+  innerHeight,
+}: DottedLinesProps) => {
   const lineColor = useLineColors();
   return (
     <svg

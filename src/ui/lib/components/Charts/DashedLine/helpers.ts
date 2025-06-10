@@ -9,7 +9,9 @@ export const toNumberValue = (value: DatumValue | null | undefined): NumberValue
   return value as NumberValue;
 };
 
-const allowedMultipliers = [1, 1.2, 1.4, 1.5, 1.6, 1.8, 2, 2.5, 3, 3.5, 4, 5, 6, 7, 7.5, 8, 9, 10];
+const allowedMultipliers = [
+  1, 1.2, 1.4, 1.5, 1.6, 1.8, 2, 2.5, 3, 3.5, 4, 5, 6, 7, 7.5, 8, 9, 10,
+];
 
 export function roundUpNice(x: number) {
   if (x <= 0) {

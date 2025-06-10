@@ -5,16 +5,22 @@ import { FC } from 'react';
 import { CarouselProps } from './Carousel.interfaces';
 import { PromptWrapper } from './Carousel.styles';
 
-const Carousel = dynamic(() => import('react-material-ui-carousel').then((mod) => mod.default), {
-  ssr: false,
-});
+const Carousel = dynamic(
+  () => import('react-material-ui-carousel').then((mod) => mod.default),
+  {
+    ssr: false,
+  }
+);
 
 function truncateString(str: string, limit: number) {
   if (str.length <= limit) {
     return str;
   }
   let cutIndex = limit;
-  while (cutIndex < str.length && (str[cutIndex] !== ' ' || /[.,!?]/.test(str[cutIndex - 1]))) {
+  while (
+    cutIndex < str.length &&
+    (str[cutIndex] !== ' ' || /[.,!?]/.test(str[cutIndex - 1]))
+  ) {
     cutIndex++;
   }
   return cutIndex < str.length ? str.slice(0, cutIndex) + '...' : str;
@@ -24,7 +30,11 @@ export const Component: FC<CarouselProps> = ({ label, items }) => {
   const theme = useTheme();
   return (
     <Box sx={{ width: '100%' }}>
-      <Typography variant="overline2" color="surface.onSurface" textTransform="uppercase">
+      <Typography
+        variant="overline2"
+        color="surface.onSurface"
+        textTransform="uppercase"
+      >
         {label}
       </Typography>
       <Carousel

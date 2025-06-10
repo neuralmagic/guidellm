@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, RefObject } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 interface ContainerSizeWrapperProps {
   children: (containerSize: ContainerSize) => React.ReactNode;
@@ -10,8 +10,11 @@ export interface ContainerSize {
 }
 
 const ContainerSizeWrapper: React.FC<ContainerSizeWrapperProps> = ({ children }) => {
-  const [containerSize, setContainerSize] = useState<ContainerSize>({ width: 0, height: 0 });
-  const containerRef: RefObject<HTMLDivElement | null> = useRef(null);
+  const [containerSize, setContainerSize] = useState<ContainerSize>({
+    width: 0,
+    height: 0,
+  });
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const updateSize = () => {

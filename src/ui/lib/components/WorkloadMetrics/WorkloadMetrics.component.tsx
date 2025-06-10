@@ -3,7 +3,10 @@ import { Box } from '@mui/material';
 import { useSelector } from 'react-redux';
 
 import { DashedLine } from '../../components/Charts/DashedLine';
-import { DistributionPercentiles, PercentileItem } from '../../components/DistributionPercentiles';
+import {
+  DistributionPercentiles,
+  PercentileItem,
+} from '../../components/DistributionPercentiles';
 import { MeanMetricSummary } from '../../components/MeanMetricSummary';
 import {
   selectInterpolatedMetrics,
@@ -20,9 +23,11 @@ import { GraphTitle } from '../GraphTitle';
 import { MetricsContainer } from '../MetricsContainer';
 import { GraphsWrapper } from './WorkloadMetrics.styles';
 
-export const columnContent = (rpsValue: number, percentiles: PercentileItem[], units: string) => (
-  <DistributionPercentiles list={percentiles} rpsValue={rpsValue} units={units} />
-);
+export const columnContent = (
+  rpsValue: number,
+  percentiles: PercentileItem[],
+  units: string
+) => <DistributionPercentiles list={percentiles} rpsValue={rpsValue} units={units} />;
 
 export const leftColumn = (rpsValue: number, value: number, units: string) => (
   <MeanMetricSummary meanValue={`${value}`} meanUnit={units} rpsValue={rpsValue} />
@@ -34,7 +39,9 @@ export const leftColumn3 = (rpsValue: number, value: number, units: string) => (
 
 export const Component = () => {
   const { data } = useGetBenchmarksQuery();
-  const { ttft, tpot, timePerRequest, throughput } = useSelector(selectMetricsDetailsLineData);
+  const { ttft, tpot, timePerRequest, throughput } = useSelector(
+    selectMetricsDetailsLineData
+  );
   const { currentRequestRate } = useSelector(selectSloState);
   const formattedRequestRate = formatNumber(currentRequestRate);
   const {
@@ -44,7 +51,9 @@ export const Component = () => {
     throughput: throughputAtRPS,
   } = useSelector(selectInterpolatedMetrics);
 
-  const minX = Math.floor(Math.min(...(data?.benchmarks?.map((bm) => bm.requestsPerSecond) || [])));
+  const minX = Math.floor(
+    Math.min(...(data?.benchmarks?.map((bm) => bm.requestsPerSecond) || []))
+  );
   if ((data?.benchmarks?.length ?? 0) <= 1) {
     return <></>;
   }
@@ -54,7 +63,11 @@ export const Component = () => {
       <Box display="flex" flexDirection="row" gap={3} mt={3}>
         <MetricsContainer
           header="TTFT"
-          leftColumn={leftColumn(formattedRequestRate, formatNumber(ttftAtRPS.mean), 'ms')}
+          leftColumn={leftColumn(
+            formattedRequestRate,
+            formatNumber(ttftAtRPS.mean),
+            'ms'
+          )}
           rightColumn={columnContent(formattedRequestRate, ttftAtRPS.percentiles, 'ms')}
         >
           <GraphTitle title="TTFS vs RPS" />
@@ -70,7 +83,11 @@ export const Component = () => {
         </MetricsContainer>
         <MetricsContainer
           header="TPOT"
-          leftColumn={leftColumn3(formattedRequestRate, formatNumber(tpotAtRPS.mean), 'ms')}
+          leftColumn={leftColumn3(
+            formattedRequestRate,
+            formatNumber(tpotAtRPS.mean),
+            'ms'
+          )}
           rightColumn={columnContent(formattedRequestRate, tpotAtRPS.percentiles, 'ms')}
         >
           <GraphTitle title="TPOT vs RPS" />
@@ -93,7 +110,11 @@ export const Component = () => {
             formatNumber(timePerRequestAtRPS.mean),
             'ms'
           )}
-          rightColumn={columnContent(formattedRequestRate, timePerRequestAtRPS.percentiles, 'ms')}
+          rightColumn={columnContent(
+            formattedRequestRate,
+            timePerRequestAtRPS.percentiles,
+            'ms'
+          )}
         >
           <GraphTitle title="E2E Latency vs RPS" />
           <GraphsWrapper>
@@ -108,7 +129,11 @@ export const Component = () => {
         </MetricsContainer>
         <MetricsContainer
           header="Throughput"
-          leftColumn={leftColumn3(formattedRequestRate, formatNumber(throughputAtRPS.mean), 'ms')}
+          leftColumn={leftColumn3(
+            formattedRequestRate,
+            formatNumber(throughputAtRPS.mean),
+            'ms'
+          )}
         >
           <GraphTitle title="Throughput vs RPS" />
           <GraphsWrapper>

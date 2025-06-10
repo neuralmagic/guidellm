@@ -16,7 +16,12 @@ export const Component: FC<RequestOverTimeProps> = ({
   rateType,
   lines = [],
 }) => (
-  <Box display="flex" flexDirection="column" sx={{ width: '100%' }} justifyItems="center">
+  <Box
+    display="flex"
+    flexDirection="column"
+    sx={{ width: '100%' }}
+    justifyItems="center"
+  >
     <Grid container spacing={2}>
       <Grid item xs={12}>
         <SpecBadge
@@ -26,7 +31,11 @@ export const Component: FC<RequestOverTimeProps> = ({
         />
       </Grid>
       <Grid item>
-        <Typography variant="overline2" color="surface.onSurface" textTransform="uppercase">
+        <Typography
+          variant="overline2"
+          color="surface.onSurface"
+          textTransform="uppercase"
+        >
           Rate Type
         </Typography>
       </Grid>

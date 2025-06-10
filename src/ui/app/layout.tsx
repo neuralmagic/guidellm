@@ -50,7 +50,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             __html: benchmarksScript,
           }}
         />
-        </head>
+      </head>
       <body>{children}</body>
     </html>
   );

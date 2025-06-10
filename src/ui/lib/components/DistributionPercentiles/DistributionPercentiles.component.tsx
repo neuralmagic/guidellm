@@ -8,7 +8,11 @@ export const Component = ({ list, rpsValue, units }: DistributionPercentilesProp
   return (
     <Box>
       <Box flexDirection="row" display="flex" alignItems="center" gap={'12px'}>
-        <Typography variant="overline1" color="surface.onSurfaceSubdued" textTransform="uppercase">
+        <Typography
+          variant="overline1"
+          color="surface.onSurfaceSubdued"
+          textTransform="uppercase"
+        >
           Distribution At
         </Typography>
         <Badge label={`${rpsValue} rps`} />

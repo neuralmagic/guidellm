@@ -2,8 +2,9 @@
 import { Grid, useTheme } from '@mui/material';
 import { MutableRefObject, useEffect, useRef, useState } from 'react';
 
-import { SvgContainer } from '../../utils/SvgContainer';
 import { ArrowDown, ArrowUp } from '@assets/icons';
+
+import { SvgContainer } from '../../utils/SvgContainer';
 
 import { SectionContainerProps } from './SectionContainer.interfaces';
 import { Container, RoundedButton } from './SectionContainer.styles';
@@ -43,9 +44,17 @@ export const Component = ({ children }: SectionContainerProps) => {
       >
         {children}
       </Grid>
-      <Grid sx={{ width: '72px' }} justifyContent="flex-end" alignItems="flex-start" display="flex">
+      <Grid
+        sx={{ width: '72px' }}
+        justifyContent="flex-end"
+        alignItems="flex-start"
+        display="flex"
+      >
         {showButton && (
-          <RoundedButton onClick={() => setExpanded(!expanded)} sx={{ marginTop: '4px' }}>
+          <RoundedButton
+            onClick={() => setExpanded(!expanded)}
+            sx={{ marginTop: '4px' }}
+          >
             <SvgContainer color={theme.palette.primary.onContainer}>
               {expanded ? (
                 <SvgContainer color={theme.palette.primary.onContainer}>

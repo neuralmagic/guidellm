@@ -5,6 +5,7 @@ import { formatNumber } from '../../../utils/helpers';
 
 import { Benchmarks, MetricData } from './benchmarks.interfaces';
 import { defaultPercentile } from '../slo/slo.constants';
+import { SloState } from '../slo/slo.interfaces';
 import { setSloData } from '../slo/slo.slice';
 
 const USE_MOCK_API = process.env.NEXT_PUBLIC_USE_MOCK_API === 'true';
@@ -18,19 +19,33 @@ const getAverageValueForPercentile = (
   lastMetric: MetricData,
   percentile: string
 ) => {
-  const firstPercentile = firstMetric.percentiles.find((p) => p.percentile === percentile);
-  const lastPercentile = lastMetric.percentiles.find((p) => p.percentile === percentile);
+  const firstPercentile = firstMetric.percentiles.find(
+    (p) => p.percentile === percentile
+  );
+  const lastPercentile = lastMetric.percentiles.find(
+    (p) => p.percentile === percentile
+  );
   return ((firstPercentile?.value ?? 0) + (lastPercentile?.value ?? 0)) / 2;
 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const setDefaultSLOs = (data: Benchmarks, dispatch: ThunkDispatch<any, any, UnknownAction>) => {
+const setDefaultSLOs = (
+  data: Benchmarks,
+  dispatch: ThunkDispatch<SloState, unknown, UnknownAction>
+) => {
   // temporarily set default slo values, long term the backend should set default slos that will not just be the avg at the default percentile
   const firstBM = data.benchmarks[0];
   const lastBM = data.benchmarks[data.benchmarks.length - 1];
 
-  const ttftAvg = getAverageValueForPercentile(firstBM.ttft, lastBM.ttft, defaultPercentile);
-  const tpotAvg = getAverageValueForPercentile(firstBM.tpot, lastBM.tpot, defaultPercentile);
+  const ttftAvg = getAverageValueForPercentile(
+    firstBM.ttft,
+    lastBM.ttft,
+    defaultPercentile
+  );
+  const tpotAvg = getAverageValueForPercentile(
+    firstBM.tpot,
+    lastBM.tpot,
+    defaultPercentile
+  );
   const timePerRequestAvg = getAverageValueForPercentile(
     firstBM.timePerRequest,
     lastBM.timePerRequest,

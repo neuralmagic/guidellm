@@ -22,7 +22,11 @@ export const Component: FC<SpecBadgeProps> = ({
         {label}
       </Typography>
       <ValueWrapper>
-        {withTooltip ? <Tooltip title={value}>{tooltipContent}</Tooltip> : tooltipContent}
+        {withTooltip ? (
+          <Tooltip title={value}>{tooltipContent}</Tooltip>
+        ) : (
+          tooltipContent
+        )}
         {additionalValue && <Box ml={1}>{additionalValue}</Box>}
       </ValueWrapper>
     </Container>

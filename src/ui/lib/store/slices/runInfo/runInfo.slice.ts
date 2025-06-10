@@ -21,9 +21,12 @@ const runInfoSlice = createSlice({
     },
   },
   extraReducers: (builder) => {
-    builder.addMatcher(runInfoApi.endpoints.getRunInfo.matchFulfilled, (state, action) => {
-      state.data = action.payload;
-    });
+    builder.addMatcher(
+      runInfoApi.endpoints.getRunInfo.matchFulfilled,
+      (state, action) => {
+        state.data = action.payload;
+      }
+    );
   },
 });
 

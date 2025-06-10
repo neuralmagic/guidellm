@@ -2,9 +2,8 @@ import { useTheme } from '@mui/material';
 import { ResponsiveLine } from '@nivo/line';
 import React, { FC } from 'react';
 
-import { useColor } from '@/lib/hooks/useColor';
-
 import { MetricLineProps } from '.';
+import { useColor } from '@/lib/hooks/useColor';
 
 import CustomAxes from './components/CustomAxes';
 import ThresholdBar from './components/ThresholdBar';

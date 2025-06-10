@@ -29,12 +29,16 @@ export const selectPromptsHistogramLineData = createSelector(
   [selectWorkloadDetails],
   (workloadDetails) => [
     {
-      x: formatNumber(workloadDetails?.prompts?.tokenDistributions.statistics.mean ?? 0),
+      x: formatNumber(
+        workloadDetails?.prompts?.tokenDistributions.statistics.mean ?? 0
+      ),
       y: 35,
       id: 'mean',
     },
     {
-      x: formatNumber(workloadDetails?.prompts?.tokenDistributions.statistics.median ?? 0),
+      x: formatNumber(
+        workloadDetails?.prompts?.tokenDistributions.statistics.median ?? 0
+      ),
       y: 35,
       id: 'median',
     },
@@ -45,12 +49,16 @@ export const selectGenerationsHistogramLineData = createSelector(
   [selectWorkloadDetails],
   (workloadDetails) => [
     {
-      x: formatNumber(workloadDetails?.generations?.tokenDistributions.statistics.mean ?? 0),
+      x: formatNumber(
+        workloadDetails?.generations?.tokenDistributions.statistics.mean ?? 0
+      ),
       y: 35,
       id: 'mean',
     },
     {
-      x: formatNumber(workloadDetails?.generations?.tokenDistributions.statistics.median ?? 0),
+      x: formatNumber(
+        workloadDetails?.generations?.tokenDistributions.statistics.median ?? 0
+      ),
       y: 35,
       id: 'median',
     },

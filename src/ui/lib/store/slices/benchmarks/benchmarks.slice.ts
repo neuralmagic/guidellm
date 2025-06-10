@@ -21,9 +21,12 @@ const benchmarksSlice = createSlice({
     },
   },
   extraReducers: (builder) => {
-    builder.addMatcher(benchmarksApi.endpoints.getBenchmarks.matchFulfilled, (state, action) => {
-      state.data = action.payload;
-    });
+    builder.addMatcher(
+      benchmarksApi.endpoints.getBenchmarks.matchFulfilled,
+      (state, action) => {
+        state.data = action.payload;
+      }
+    );
   },
 });
 

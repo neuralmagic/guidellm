@@ -3,11 +3,19 @@ import { Box, Typography } from '@mui/material';
 import { Badge } from '../Badge';
 import { MeanMetricSummaryProps } from './MeanMetricSummary.interfaces';
 
-export const Component = ({ meanValue, meanUnit, rpsValue }: MeanMetricSummaryProps) => {
+export const Component = ({
+  meanValue,
+  meanUnit,
+  rpsValue,
+}: MeanMetricSummaryProps) => {
   return (
     <Box flexDirection="column">
       <Box flexDirection="row" display="flex" alignItems="center" gap={'12px'}>
-        <Typography variant="overline1" color="surface.onSurfaceSubdued" textTransform="uppercase">
+        <Typography
+          variant="overline1"
+          color="surface.onSurfaceSubdued"
+          textTransform="uppercase"
+        >
           Mean At
         </Typography>
         <Badge label={`${rpsValue} rps`} />

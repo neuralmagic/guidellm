@@ -28,7 +28,9 @@ const Component = () => {
   const promptsLineData = useSelector(selectPromptsHistogramLineData);
   const generationsBarData = useSelector(selectGenerationsHistogramBarData);
   const generationsLineData = useSelector(selectGenerationsHistogramLineData);
-  const { barChartData: requestOverTimeBarData } = useSelector(selectRequestOverTimeBarData);
+  const { barChartData: requestOverTimeBarData } = useSelector(
+    selectRequestOverTimeBarData
+  );
   const { type, target, port } = parseUrlParts(data?.server?.target || '');
 
   return (
@@ -44,11 +46,15 @@ const Component = () => {
       >
         <DataPanel
           header="Prompt"
-          topContainer={<Carousel items={data?.prompts?.samples || []} label="Sample Prompt" />}
+          topContainer={
+            <Carousel items={data?.prompts?.samples || []} label="Sample Prompt" />
+          }
           bottomContainer={
             <TokenLength
               label={'Mean Prompt Length'}
-              tokenCount={formatNumber(data?.prompts?.tokenDistributions.statistics.mean ?? 0)}
+              tokenCount={formatNumber(
+                data?.prompts?.tokenDistributions.statistics.mean ?? 0
+              )}
               bars={promptsBarData || []}
               lines={promptsLineData}
             />
@@ -82,12 +88,17 @@ const Component = () => {
         <DataPanel
           header="Generated"
           topContainer={
-            <Carousel items={data?.generations?.samples || []} label="Sample Generated" />
+            <Carousel
+              items={data?.generations?.samples || []}
+              label="Sample Generated"
+            />
           }
           bottomContainer={
             <TokenLength
               label={'Mean Generated Length'}
-              tokenCount={formatNumber(data?.generations?.tokenDistributions.statistics.mean ?? 0)}
+              tokenCount={formatNumber(
+                data?.generations?.tokenDistributions.statistics.mean ?? 0
+              )}
               bars={generationsBarData || []}
               lines={generationsLineData}
             />

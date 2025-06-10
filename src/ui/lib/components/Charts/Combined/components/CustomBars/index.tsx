@@ -5,7 +5,12 @@ import React from 'react';
 
 import { CustomBarsProps } from './CustomBars.interfaces';
 
-const CustomBars = ({ bars, xScaleFunc, yScaleFunc, heightOffset }: CustomBarsProps<Point>) => {
+const CustomBars = ({
+  bars,
+  xScaleFunc,
+  yScaleFunc,
+  heightOffset,
+}: CustomBarsProps<Point>) => {
   const { showTooltipFromEvent, hideTooltip } = useTooltip();
 
   const handleMouseEnter = (

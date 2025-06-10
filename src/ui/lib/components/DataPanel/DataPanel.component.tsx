@@ -1,12 +1,21 @@
 import { Typography } from '@mui/material';
 
 import { DataPanelProps } from './DataPanel.interfaces';
-import { BottomCell, InnerContainer, TopCell, HeaderContainer } from './DataPanel.styles';
+import {
+  BottomCell,
+  InnerContainer,
+  TopCell,
+  HeaderContainer,
+} from './DataPanel.styles';
 
-export const Component = ({ header, topContainer, bottomContainer }: DataPanelProps) => {
+export const Component = ({
+  header,
+  topContainer,
+  bottomContainer,
+}: DataPanelProps) => {
   return (
     <InnerContainer item xs={4}>
-      <HeaderContainer xs={12}>
+      <HeaderContainer item xs={12}>
         <Typography variant="overline1" color="surface.onSurface">
           {header}
         </Typography>

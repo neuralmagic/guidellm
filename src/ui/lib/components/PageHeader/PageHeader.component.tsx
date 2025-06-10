@@ -3,10 +3,11 @@ import { Box, Link, Typography, useTheme } from '@mui/material';
 import dynamic from 'next/dynamic';
 import NextLink from 'next/link';
 
+import { Open } from '@assets/icons';
+
 import { useGetRunInfoQuery } from '../../store/slices/runInfo';
 import { formateDate, getFileSize } from '../../utils/helpers';
 import { SvgContainer } from '../../utils/SvgContainer';
-import { Open } from '@assets/icons';
 
 import { SpecBadge } from '../SpecBadge';
 import { HeaderCell, HeaderWrapper } from './PageHeader.styles';

@@ -36,7 +36,13 @@ const CustomTick = ({
   ) => (
     <>
       {withTicks && (
-        <line x1={0} y1={0} x2={lineX} y2={lineY} stroke={theme.palette.surface.onSurface} />
+        <line
+          x1={0}
+          y1={0}
+          x2={lineX}
+          y2={lineY}
+          stroke={theme.palette.surface.onSurface}
+        />
       )}
       <text
         textAnchor={textAnchor}
@@ -57,7 +63,9 @@ const CustomTick = ({
 
   return (
     <g key={tick} transform={`translate(${x}, ${y})`}>
-      {isXAxis ? renderTickContent('middle', 0, 10, 0, 6) : renderTickContent('end', -5, 0, -6, 0)}
+      {isXAxis
+        ? renderTickContent('middle', 0, 10, 0, 6)
+        : renderTickContent('end', -5, 0, -6, 0)}
     </g>
   );
 };

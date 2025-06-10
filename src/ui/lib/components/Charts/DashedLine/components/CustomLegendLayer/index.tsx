@@ -28,7 +28,9 @@ export const CustomLegendLayer = ({ series, ...rest }: CustomLegendLayerProps) =
     return colors.splice(0, 1)[0];
   };
   return (
-    <g transform={`translate(20, ${(rest?.height || rest.innerHeight) - LEGEND_HEIGHT})`}>
+    <g
+      transform={`translate(20, ${(rest?.height || rest.innerHeight) - LEGEND_HEIGHT})`}
+    >
       {series.map((item, index) => {
         return (
           <g key={item.id} transform={`translate(${index * 100}, 0)`}>

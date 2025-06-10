@@ -13,7 +13,8 @@ export const floor = (number: number, precision = 0) => {
   return Math.floor(n) / Math.pow(10, precision);
 };
 
-export const formatNumber = (number: number, precision = 2) => Number(number.toFixed(precision));
+export const formatNumber = (number: number, precision = 2) =>
+  Number(number.toFixed(precision));
 
 export const parseUrlParts = (urlString: string) => {
   try {

@@ -8,10 +8,21 @@ import {
   RightColumn,
 } from './MetricsContainer.styles';
 
-export const Component = ({ header, leftColumn, rightColumn, children }: MetricsContainerProps) => {
+export const Component = ({
+  header,
+  leftColumn,
+  rightColumn,
+  children,
+}: MetricsContainerProps) => {
   return (
     <InnerContainer container spacing={2}>
-      <HeaderContainer xs={12} flexDirection="row" display="flex" justifyContent="space-between">
+      <HeaderContainer
+        xs={12}
+        item
+        flexDirection="row"
+        display="flex"
+        justifyContent="space-between"
+      >
         <Typography variant="overline1" color="surface.onSurface">
           {header}
         </Typography>
@@ -19,6 +30,7 @@ export const Component = ({ header, leftColumn, rightColumn, children }: Metrics
 
       <MainContainer
         xs={12}
+        item
         padding="24px"
         flexDirection="column"
         justifyContent="center"
@@ -31,6 +43,7 @@ export const Component = ({ header, leftColumn, rightColumn, children }: Metrics
       {/* middle containers  */}
       <Grid
         xs={rightColumn ? 6 : 12}
+        item
         display="flex"
         alignItems="center"
         padding="24px"
@@ -39,7 +52,14 @@ export const Component = ({ header, leftColumn, rightColumn, children }: Metrics
         {leftColumn}
       </Grid>
       {rightColumn && (
-        <RightColumn xs={6} display="flex" alignItems="center" padding="24px" minHeight="232px">
+        <RightColumn
+          xs={6}
+          item
+          display="flex"
+          alignItems="center"
+          padding="24px"
+          minHeight="232px"
+        >
           {rightColumn}
         </RightColumn>
       )}

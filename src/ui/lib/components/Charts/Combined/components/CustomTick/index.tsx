@@ -2,7 +2,14 @@ import { useTheme } from '@mui/material';
 
 import { CustomTickProps } from './CustomTick.interfaces';
 
-function CustomTick({ isXAxis, tick, scale, withTicks = false, isFirst, isLast }: CustomTickProps) {
+function CustomTick({
+  isXAxis,
+  tick,
+  scale,
+  withTicks = false,
+  isFirst,
+  isLast,
+}: CustomTickProps) {
   const theme = useTheme();
 
   function getGroupPosition() {
@@ -29,7 +36,9 @@ function CustomTick({ isXAxis, tick, scale, withTicks = false, isFirst, isLast }
 
     return isXAxis ? (
       <>
-        {withTicks && <line x1={0} y1={0} x2={0} y2={6} stroke={theme.palette.surface.onSurface} />}
+        {withTicks && (
+          <line x1={0} y1={0} x2={0} y2={6} stroke={theme.palette.surface.onSurface} />
+        )}
         <text textAnchor="middle" y={10} {...commonProps}>
           {tick}
         </text>

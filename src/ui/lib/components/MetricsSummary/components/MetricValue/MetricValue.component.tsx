@@ -2,6 +2,7 @@ import { Box, Typography } from '@mui/material';
 import { FC } from 'react';
 
 import { CheckCircle, WarningCircle } from '@assets/icons';
+
 import { useColor } from '@/lib/hooks/useColor';
 
 import { MetricValueProps } from './MetricValue.interfaces';

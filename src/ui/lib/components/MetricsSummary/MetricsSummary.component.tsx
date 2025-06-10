@@ -3,18 +3,17 @@ import React, { ElementType } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
 import { Expand } from '@assets/icons';
-import { MetricLine, LineColor } from '@/lib/components/Charts/MetricLine';
-import { selectSloState } from '@/lib/store/slices/slo/slo.selectors';
-import { setCurrentRequestRate } from '@/lib/store/slices/slo/slo.slice';
 
 import {
   selectInterpolatedMetrics,
   selectMetricsSummaryLineData,
   useGetBenchmarksQuery,
 } from '../../store/slices/benchmarks';
-
 import { selectRunInfo } from '../../store/slices/runInfo';
 import { formatNumber } from '../../utils/helpers';
+import { MetricLine, LineColor } from '@/lib/components/Charts/MetricLine';
+import { selectSloState } from '@/lib/store/slices/slo/slo.selectors';
+import { setCurrentRequestRate } from '@/lib/store/slices/slo/slo.slice';
 
 import { BlockHeader } from '../BlockHeader';
 import { Input } from '../Input';

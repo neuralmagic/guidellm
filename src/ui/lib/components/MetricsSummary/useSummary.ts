@@ -2,12 +2,11 @@ import { SelectChangeEvent } from '@mui/material';
 import { ChangeEvent, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
-import { Point } from '@/lib/components/Charts/common/interfaces';
-
 import { selectMetricsSummaryLineData } from '../../store/slices/benchmarks';
 import { selectSloState } from '../../store/slices/slo/slo.selectors';
 import { setEnforcedPercentile, setSloValue } from '../../store/slices/slo/slo.slice';
 import { ceil, floor } from '../../utils/helpers';
+import { Point } from '@/lib/components/Charts/common/interfaces';
 
 type Errors = { [key: string]: string | undefined };
 
@@ -47,7 +46,9 @@ export const useSummary = () => {
   const dispatch = useDispatch();
 
   const { current, enforcedPercentile, tasksDefaults } = useSelector(selectSloState);
-  const { ttft, tpot, timePerRequest, throughput } = useSelector(selectMetricsSummaryLineData);
+  const { ttft, tpot, timePerRequest, throughput } = useSelector(
+    selectMetricsSummaryLineData
+  );
 
   const [errors, setErrors] = useState<Errors>(initErrorsState);
 
@@ -81,13 +82,14 @@ export const useSummary = () => {
     return sanitizedValue !== '' ? Number(sanitizedValue) : undefined;
   };
 
-  const handleChange = (metric: keyof typeof current) => (event: ChangeEvent<HTMLInputElement>) => {
-    const newValue = sanitizeInput(event.target.value);
-    validateInput(metric, newValue);
-    if (newValue !== undefined) {
-      dispatch(setSloValue({ metric, value: newValue }));
-    }
-  };
+  const handleChange =
+    (metric: keyof typeof current) => (event: ChangeEvent<HTMLInputElement>) => {
+      const newValue = sanitizeInput(event.target.value);
+      validateInput(metric, newValue);
+      if (newValue !== undefined) {
+        dispatch(setSloValue({ metric, value: newValue }));
+      }
+    };
 
   const handlePercentileChange = (event: SelectChangeEvent<unknown>) => {
     // TODO: need to validate slos on percentile change

@@ -15,7 +15,10 @@ const sloSlice = createSlice({
         state.current = { ...state.current, ...action.payload.current };
       }
       if (action.payload.tasksDefaults) {
-        state.tasksDefaults = { ...state.tasksDefaults, ...action.payload.tasksDefaults };
+        state.tasksDefaults = {
+          ...state.tasksDefaults,
+          ...action.payload.tasksDefaults,
+        };
       }
       if (action.payload.currentRequestRate) {
         state.currentRequestRate = action.payload.currentRequestRate;

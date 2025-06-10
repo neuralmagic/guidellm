@@ -1,9 +1,9 @@
 'use client';
 import { Box, Typography, useTheme } from '@mui/material';
 
-import { SvgContainer } from '@/lib/utils/SvgContainer';
-
 import { Info } from '@assets/icons';
+
+import { SvgContainer } from '@/lib/utils/SvgContainer';
 
 import { BlockHeaderProps } from './BlockHeader.interfaces';
 import { CustomDivider } from './BlockHeader.styles';

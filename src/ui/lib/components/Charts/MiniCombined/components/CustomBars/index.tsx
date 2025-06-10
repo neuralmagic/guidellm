@@ -5,10 +5,17 @@ import React from 'react';
 
 import { CustomBarsProps } from './CustomBars.interfaces';
 
-const CustomBars = ({ bars, xScaleFunc, yScaleFunc, heightOffset }: CustomBarsProps<Point>) => {
+const CustomBars = ({
+  bars,
+  xScaleFunc,
+  yScaleFunc,
+  heightOffset,
+}: CustomBarsProps<Point>) => {
   const { showTooltipFromEvent, hideTooltip } = useTooltip();
   const minX =
-    bars.length === 1 ? 0 : Math.min(...bars.map((bar) => xScaleFunc(bar.data.data.x || 0)));
+    bars.length === 1
+      ? 0
+      : Math.min(...bars.map((bar) => xScaleFunc(bar.data.data.x || 0)));
   const maxX = Math.max(...bars.map((bar) => xScaleFunc(bar.data.data.x || 0)));
   const handleMouseEnter = (
     event: React.MouseEvent<SVGPathElement>,

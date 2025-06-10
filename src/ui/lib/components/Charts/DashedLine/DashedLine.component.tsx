@@ -8,13 +8,17 @@ import { spacedLogValues } from './helpers';
 
 export const getMinTick = (data: readonly Serie[]) => {
   return Math.max(
-    ...data.map((lineData) => Math.min(...lineData.data.map((point) => point.y as number)))
+    ...data.map((lineData) =>
+      Math.min(...lineData.data.map((point) => point.y as number))
+    )
   );
 };
 
 export const getMaxTick = (data: readonly Serie[]) => {
   return Math.max(
-    ...data.map((lineData) => Math.max(...lineData.data.map((point) => point.y as number)))
+    ...data.map((lineData) =>
+      Math.max(...lineData.data.map((point) => point.y as number))
+    )
   );
 };
 
@@ -120,7 +124,14 @@ export const Component = ({
           ...extraYScaleOptions,
         }}
         colors={{ scheme: 'category10' }}
-        layers={['markers', 'axes', 'points', 'legends', DashedSolidLine, CustomLegendLayer]}
+        layers={[
+          'markers',
+          'axes',
+          'points',
+          'legends',
+          DashedSolidLine,
+          CustomLegendLayer,
+        ]}
         theme={dashedLineTheme}
       />
     </div>

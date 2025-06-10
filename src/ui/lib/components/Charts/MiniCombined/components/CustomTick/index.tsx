@@ -32,7 +32,9 @@ const CustomTick = ({
 
   const renderTickContent = (textAnchor: 'middle' | 'end', x: number, y: number) => (
     <>
-      {withTicks && <line x1={0} y1={0} x2={x} y2={y} stroke={theme.palette.surface.onSurface} />}
+      {withTicks && (
+        <line x1={0} y1={0} x2={x} y2={y} stroke={theme.palette.surface.onSurface} />
+      )}
       <text
         textAnchor={textAnchor}
         x={x === 0 ? undefined : x}

@@ -13,14 +13,10 @@
     "test:integration": "jest --config jest.config.js --coverage --coverageDirectory=coverage/integration tests/ui/integration",
     "test:e2e": "cypress run --headless",
     "coverage:merge": "nyc merge coverage/unit > coverage/tmp.json && nyc merge coverage/integration coverage/tmp.json && mv coverage/tmp.json coverage/coverage-final.json",
-    "coverage:collect":
-    "mkdir -p .nyc_output && cp coverage/coverage-final.json .nyc_output/merged.json",
-    "coverage:report":
-    "nyc report --reporter=json-summary --reporter=lcov --report-dir=coverage",
-    "coverage:badge":
-    "jest-coverage-badges --input coverage/coverage-summary.json --output coverage/.coverage"
+    "coverage:collect": "mkdir -p .nyc_output && cp coverage/coverage-final.json .nyc_output/merged.json",
+    "coverage:report": "nyc report --reporter=json-summary --reporter=lcov --report-dir=coverage",
+    "coverage:badge": "jest-coverage-badges --input coverage/coverage-summary.json --output coverage/.coverage"
   },
-
   "dependencies": {
     "@emotion/cache": "^11.13.1",
     "@emotion/react": "^11.14.0",
@@ -54,6 +50,7 @@
     "@types/testing-library__jest-dom": "^5.14.9",
     "@typescript-eslint/eslint-plugin": "^8.33.1",
     "@typescript-eslint/parser": "^8.33.1",
+    "cross-fetch": "^4.1.0",
     "cypress": "^13.13.3",
     "eslint": "^9.0.0",
     "eslint-config-next": "15.3.2",

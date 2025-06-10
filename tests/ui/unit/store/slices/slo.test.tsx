@@ -1,6 +1,6 @@
-import { initialState } from '../../../../lib/store/slices/slo/slo.constants';
-import { SloState } from '../../../../lib/store/slices/slo/slo.interfaces';
-import sloReducer, { setSloData } from '../../../../lib/store/slices/slo/slo.slice';
+import { initialState } from '@/lib/store/slices/slo/slo.constants';
+import { SloState } from '@/lib/store/slices/slo/slo.interfaces';
+import sloReducer, { setSloData } from '@/lib/store/slices/slo/slo.slice';
 
 test('should handle initial state', () => {
   expect(sloReducer(undefined, { type: '' })).toEqual(initialState);
