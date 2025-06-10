@@ -45,10 +45,10 @@ class StandardBaseModel(BaseModel):
         """
         try:
             with filename.open() as f:
-                if str(filename).endswith((".yaml", ".yml")):
-                    data = yaml.safe_load(f)
-                else:  # Assume everything else is json
+                if str(filename).endswith(".json"):
                     data = json.load(f)
+                else:  # Assume everything else is yaml
+                    data = yaml.safe_load(f)
         except (json.JSONDecodeError, yaml.YAMLError) as e:
             logger.error(f"Failed to parse {filename} as type {cls.__name__}")
             raise ValueError(f"Error when parsing file: {filename}") from e
