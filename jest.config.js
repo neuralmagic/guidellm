@@ -6,11 +6,11 @@ const createJestConfig = nextJest({
 });
 
 const customJestConfig = {
-  collectCoverage: true,
+  collectCoverage: false,
   collectCoverageFrom: ['./src/ui/**/*.{ts,tsx}'],
   coverageDirectory: './coverage',
   coverageProvider: 'v8',
-  coverageReporters: ['json', 'text-summary', 'lcov'],
+  coverageReporters: ['text-summary', 'lcov', 'json-summary'],
   moduleFileExtensions: ['ts', 'tsx', 'js'],
   moduleNameMapper: {
     '^.+\\.(svg)$': '<rootDir>/tests/ui/__mocks__/svg.js',
