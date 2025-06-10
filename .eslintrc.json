@@ -72,6 +72,7 @@
       { "additionalRegexes": {}, "ignoreContent": [] }
     ],
     "no-unused-vars": "off",
+    "@next/next/no-img-element": "off",
     "@typescript-eslint/no-unused-vars": [
       "warn", // or "error"
       {

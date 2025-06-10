@@ -26,7 +26,7 @@ export const Component = () => {
         </Link>
       </Box>
       <Box>
-        <img width="150px" alt="guidellm logo" src={guideLLMLogoLight.src} />
+        <img width="150" alt="guidellm logo" src={guideLLMLogoLight.src} />
       </Box>
     </Box>
   );
