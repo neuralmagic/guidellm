@@ -12,6 +12,6 @@
     "**/*.tsx",
     ".next/types/**/*.ts",
     "app",
-    "images.d.ts"
+    "./app/types/images.d.ts"
   ]
 }

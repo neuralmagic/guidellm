@@ -1,6 +1,4 @@
-import type { StaticImageData } from 'next/image';
-
 declare module '*.png' {
-  const content: StaticImageData;
+  const content: import('next/image').StaticImageData;
   export default content;
 }
