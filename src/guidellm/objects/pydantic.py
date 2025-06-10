@@ -1,9 +1,10 @@
 from typing import Any, Generic, TypeVar
 
-from loguru import logger
 from pydantic import BaseModel, ConfigDict, Field
 
 __all__ = ["StandardBaseModel", "StatusBreakdown"]
+
+from guidellm import logger
 
 
 class StandardBaseModel(BaseModel):
