@@ -221,6 +221,11 @@ npm run build
   npm run test:integration
   ```
 
+- **Integration+Unit tests with coverage**:
+  ```bash
+  npm run coverage
+  ```
+
 - **End-to-end tests** (using Cypress, ensure live dev server):
 
   ```bash

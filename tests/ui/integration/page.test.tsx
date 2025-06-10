@@ -27,7 +27,7 @@ const route = (input: RequestInfo) => {
 };
 
 beforeEach(() => {
-  jest.resetAllMocks(); // clears call history & impl
+  jest.resetAllMocks();
   (global.fetch as jest.Mock).mockImplementation(route);
 });
 

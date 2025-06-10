@@ -13,7 +13,7 @@ export async function generateMetadata(): Promise<Metadata> {
     title: 'GuideLLM',
     description: 'LLM Benchmarking Tool',
     icons: {
-      icon: `${assetPrefix}/favicon.ico`,
+      icon: `${assetPrefix}/favicon.png`,
       apple: `${assetPrefix}/favicon-192x192.png`,
     },
     manifest: `${assetPrefix}/manifest.json`,

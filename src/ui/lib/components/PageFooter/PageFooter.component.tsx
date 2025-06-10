@@ -2,7 +2,7 @@
 import { Box, Link, Typography } from '@mui/material';
 import React from 'react';
 
-import { NeuralMagicTitleV2 } from '@assets/icons';
+import { guideLLMLogoLight } from '@assets/icons';
 
 export const Component = () => {
   return (
@@ -26,7 +26,7 @@ export const Component = () => {
         </Link>
       </Box>
       <Box>
-        <NeuralMagicTitleV2 />
+        <img width="150px" alt="guidellm logo" src={guideLLMLogoLight.src} />
       </Box>
     </Box>
   );

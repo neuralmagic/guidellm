@@ -196,16 +196,6 @@ src/lib/store/[runInfo/workloadDetails/benchmarks]WindowData.ts
 
 In the future this will be replaced by a configurable untracked file for dev use.
 
-### 🚧 Future Possibilities
-
-We're evaluating options for hosting dev/staging/prod builds on GitHub Pages. For now, production builds will be published at:
-
-```
-https://neuralmagic.github.io/guidellm/ui/dev/
-```
-
-If needed, alternative hosting (e.g., Vercel, Netlify) may be explored, but simplicity and transparency remain key priorities for this open-source tool.
-
 ## Resources
 
 ### Documentation
