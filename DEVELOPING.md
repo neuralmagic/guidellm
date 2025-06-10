@@ -222,6 +222,7 @@ npm run build
   ```
 
 - **Integration+Unit tests with coverage**:
+
   ```bash
   npm run coverage
   ```
@@ -254,9 +255,7 @@ npm run build
 
 ##### Tagging Tests
 
-Reference [https://www.npmjs.com/package/jest-runner-groups](jest-runner-groups)
-Add @group with the tag in a docblock at the top of the test file to indicate which types of tests are contained within.
-Can't distinguish between different types of tests in the same file.
+Reference [https://www.npmjs.com/package/jest-runner-groups](jest-runner-groups) Add @group with the tag in a docblock at the top of the test file to indicate which types of tests are contained within. Can't distinguish between different types of tests in the same file.
 
 ```
 /**

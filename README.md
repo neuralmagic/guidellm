@@ -169,8 +169,7 @@ https://neuralmagic.github.io/guidellm/ui/dev/
 
 Open the file in your browser and you're done—no setup required.
 
-2. Build and Serve the UI Locally (For Development)
-   This option is useful if:
+2. Build and Serve the UI Locally (For Development) This option is useful if:
 
 - You are actively developing the UI
 
