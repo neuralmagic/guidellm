@@ -67,6 +67,7 @@
     "jest-transform-stub": "^2.0.0",
     "nyc": "^17.1.0",
     "prettier": "^3.5.3",
+    "ts-jest": "^29.2.4",
     "typescript": "^5"
   },
   "lint-staged": {
