@@ -22,7 +22,6 @@ const __dirname = path.dirname(__filename);
 // --- EXPORT ESLINT CONFIG ---
 export default tseslint.config(
   // 1. Global Ignores
-  // It's best practice to explicitly ignore directories you never want to lint.
   {
     ignores: ['node_modules/', '.next/', 'dist/', 'coverage/', '.DS_Store'],
   },
@@ -33,9 +32,8 @@ export default tseslint.config(
   prettierConfig, // Disables ESLint rules that conflict with Prettier. IMPORTANT: Must be after other configs.
 
   // 3. Configuration for App Source Code (Next.js with Type-Aware Linting)
-  // This is the core of your configuration. It targets only your app's TS/TSX files.
   {
-    files: ['src/**/*.{ts,tsx}', 'src/ui/**/*.{ts,tsx}'], // Covers both common `src` and your specific `src/ui`
+    files: ['src/ui/**/*.{ts,tsx}'],
     languageOptions: {
       parser: tseslint.parser,
       parserOptions: {
