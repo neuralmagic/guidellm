@@ -27,7 +27,6 @@ export default tseslint.config(
   },
 
   // 2. Base Configurations (Applied to all files)
-  // These configs are NOT type-aware and are safe to apply globally.
   eslint.configs.recommended,
   prettierConfig, // Disables ESLint rules that conflict with Prettier. IMPORTANT: Must be after other configs.
 
@@ -93,6 +92,7 @@ export default tseslint.config(
       'react/prop-types': 'off',
 
       '@next/next/no-html-link-for-pages': 'off',
+      '@next/next/no-img-element': 'off',
 
       complexity: ['warn', { max: 8 }],
     },

@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev src/ui",
     "build": "next build src/ui",
-    "lint": "next lint src/ui",
+    "lint": "next lint --fix src/ui",
     "type-check": "tsc -p src/ui/tsconfig.json --noEmit && tsc -p tsconfig.test.json --noEmit && tsc -p tsconfig.cypress.json --noEmit",
     "format": "prettier --write .",
     "prepare": "husky",
