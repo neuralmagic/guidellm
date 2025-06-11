@@ -1,8 +1,6 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    /* only runtime types here */
-    "types": ["node", "next"],
     "allowJs": false,
     "isolatedModules": true
   },

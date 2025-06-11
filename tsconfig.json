@@ -3,7 +3,7 @@
 
   /* Extra options that apply only to Node-side files */
   "compilerOptions": {
-    "types": ["node", "next"], // Buffer, process, __dirname, etc.
+    "types": ["node"], // Buffer, process, __dirname, etc.
     "allowJs": false,
     "isolatedModules": true
   },
