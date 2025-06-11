@@ -1,4 +1,5 @@
 import { render } from '@testing-library/react';
+
 import RootLayout from '@/app/layout';
 
 describe('RootLayout', () => {

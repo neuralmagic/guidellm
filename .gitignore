@@ -223,4 +223,5 @@ src/ui/next-env.d.ts
 !.eslintrc.json
 !tsconfig.json
 !tsconfig.*.json
+!src/ui/lib
 !src/ui/public/manifest.json
