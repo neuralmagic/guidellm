@@ -179,6 +179,9 @@ cython_debug/
 *.json
 *.yaml
 
+# But not scenarios
+!src/guidellm/benchmark/scenarios/*.json
+!src/guidellm/benchmark/scenarios/*.yaml
 
 # UI Section - Next.js/React application under src/ui/
 # dependencies
