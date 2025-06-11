@@ -1,16 +1,19 @@
 'use client';
-import { Typography, useTheme } from '@mui/material';
+import { useTheme } from '@mui/material';
 import { ThemeProvider } from '@mui/material/styles';
 import { AppRouterCacheProvider } from '@mui/material-nextjs/v13-appRouter';
 import Script from 'next/script';
 import React, { ReactNode } from 'react';
 
 import { muiThemeV3Dark } from '@/app/theme';
+import { MetricsSummary } from '@/lib/components/MetricsSummary';
 import { PageFooter } from '@/lib/components/PageFooter';
-
-import { FullPageWithHeaderAndFooterLayout } from '../lib/layouts/FullPageWithHeaderAndFooterLayout';
-import { ContentCenterer } from '../lib/layouts/helpers/ContentCenterer';
-import { ReduxProvider } from '../lib/store/provider';
+import { PageHeader } from '@/lib/components/PageHeader';
+import { WorkloadDetails } from '@/lib/components/WorkloadDetails';
+import { WorkloadMetrics } from '@/lib/components/WorkloadMetrics';
+import { FullPageWithHeaderAndFooterLayout } from '@/lib/layouts/FullPageWithHeaderAndFooterLayout';
+import { ContentCenterer } from '@/lib/layouts/helpers/ContentCenterer';
+import { ReduxProvider } from '@/lib/store/provider';
 
 interface MyProps {
   children?: ReactNode;
@@ -25,9 +28,7 @@ const Content = () => {
 
   const header = (
     <ContentCenterer>
-      <Typography color="white" variant="h1">
-        Header
-      </Typography>
+      <PageHeader />
     </ContentCenterer>
   );
   const footer = (
@@ -37,9 +38,9 @@ const Content = () => {
   );
   const body = (
     <ContentCenterer>
-      <Typography color="white" variant="h3">
-        GuideLLM
-      </Typography>
+      <WorkloadDetails />
+      <MetricsSummary />
+      <WorkloadMetrics />
     </ContentCenterer>
   );
   return (

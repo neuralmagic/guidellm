@@ -1,15 +1,12 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
   "compilerOptions": {
-    /* --- language / emit --- */
     "target": "ES2022",
     "lib": ["dom", "dom.iterable", "esnext"],
     "module": "esnext",
     "jsx": "preserve",
     "incremental": true,
     "noEmit": true,
-
-    /* --- module resolution --- */
     "moduleResolution": "node",
     "baseUrl": ".",
     "paths": {
@@ -20,8 +17,6 @@
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "plugins": [{ "name": "next" }],
-
-    /* --- correctness / style --- */
     "strict": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,

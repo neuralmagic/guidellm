@@ -2,18 +2,20 @@ import ArrowDown from './arrow-down.svg';
 import ArrowUp from './arrow-up.svg';
 import CheckCircle from './check-circle.svg';
 import Expand from './expand.svg';
+import guideLLMIconDark from './guidellm-icon-dark.png';
+import guideLLMLogoLight from './guidellm-logo-light.png';
 import Info from './info.svg';
-import NeuralMagicTitleV2 from './nm-logo-with-name.svg';
 import Open from './open.svg';
 import WarningCircle from './warning-circle.svg';
 
 export {
   ArrowDown,
   ArrowUp,
-  Expand,
   CheckCircle,
-  WarningCircle,
+  Expand,
+  guideLLMIconDark,
+  guideLLMLogoLight,
   Info,
-  NeuralMagicTitleV2,
   Open,
+  WarningCircle,
 };
