@@ -30,7 +30,7 @@ export default [
   // Next.js configuration using FlatCompat
   ...compat.extends('next/core-web-vitals'),
 
-  // --- Main Configuration for your files ---
+  // --- Main Configuration ---
   {
     files: ['src/**/*.{js,jsx,ts,tsx}', 'tests/**/*.{js,jsx,ts,tsx}'],
     languageOptions: {
@@ -65,7 +65,7 @@ export default [
       prettier: prettierPlugin,
     },
     rules: {
-      // Your custom rules
+      // Ccustom rules
       complexity: ['warn', { max: 8 }],
       curly: ['error', 'all'],
       'no-unused-vars': 'off',
@@ -81,7 +81,7 @@ export default [
       ],
       '@typescript-eslint/no-explicit-any': 'warn',
 
-      // Next.js overrides (these will override the ones from next/core-web-vitals)
+      // Next.js overrides
       '@next/next/no-img-element': 'off', // Allow img tags if needed
       '@next/next/no-page-custom-font': 'warn',
 
