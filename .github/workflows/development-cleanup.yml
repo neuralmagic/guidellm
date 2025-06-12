@@ -13,10 +13,29 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Check out gh-pages branch
+        uses: actions/checkout@v3
+        with:
+          ref: gh-pages
+          fetch-depth: 1
+
+      - name: Check if preview directory exists
+        id: check-preview
+        run: |
+          if [ -d "ui/pr/${{ github.event.pull_request.number }}" ]; then
+            echo "preview_exists=true" >> $GITHUB_OUTPUT
+            echo "Preview directory exists for PR #${{ github.event.pull_request.number }}"
+          else
+            echo "preview_exists=false" >> $GITHUB_OUTPUT
+            echo "No preview directory found for PR #${{ github.event.pull_request.number }}"
+          fi
+
       - name: Create an empty directory for cleanup
+        if: steps.check-preview.outputs.preview_exists == 'true'
         run: mkdir -p empty
 
       - name: Remove GitHub Pages Build
+        if: steps.check-preview.outputs.preview_exists == 'true'
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -58,3 +77,11 @@ jobs:
           body: |
             <!-- pr-preview-comment -->
             🧹 The live preview for this PR has been removed.
+
+      - name: Log comment update status
+        run: |
+          if [ "${{ steps.find-comment.outputs.comment-id }}" != "" ]; then
+            echo "Updated existing preview comment"
+          else
+            echo "No preview comment found to update"
+          fi

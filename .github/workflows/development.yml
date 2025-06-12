@@ -216,11 +216,48 @@ jobs:
     steps:
       - name: Check out code
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Check if UI-related files changed
+        id: check-changes
+        run: |
+          # Get the base branch
+          BASE_BRANCH=${{ github.event.pull_request.base.ref }}
+          
+          # Get list of changed files
+          CHANGED_FILES=$(git diff --name-only origin/$BASE_BRANCH...HEAD)
+          
+          # Define the files we care about in root
+          ROOT_FILES="package.json package-lock.json jest.config.cjs jest.setup.ts eslint.config.js cypress.config.ts .prettierrc .prettierignore tsconfig.json tsconfig.base.json tsconfig.test.json tsconfig.cypress.json"
+          
+          # Check if src/ui directory changed or any of the root files changed
+          SHOULD_BUILD=false
+          
+          # Check if any file in src/ui changed
+          if echo "$CHANGED_FILES" | grep -q -E "^(src/ui|tests/ui)/"; then
+            echo "UI source files changed"
+            SHOULD_BUILD=true
+          fi
+          
+          # Check if any of the root configuration files changed
+          for file in $ROOT_FILES; do
+            if echo "$CHANGED_FILES" | grep -q "^${file}$"; then
+              echo "Root config file changed: $file"
+              SHOULD_BUILD=true
+              break
+            fi
+          done
+          
+          echo "should_build=$SHOULD_BUILD" >> $GITHUB_OUTPUT
+          echo "Should build: $SHOULD_BUILD"
 
       - name: Install dependencies
+        if: steps.check-changes.outputs.should_build == 'true'
         run: npm ci
 
       - name: Build app to root
+        if: steps.check-changes.outputs.should_build == 'true'
         id: build
         run: |
           # Export vars to ensure they are loaded before build
@@ -241,6 +278,7 @@ jobs:
           npm run build
 
       - name: Deploy to GitHub Pages
+        if: steps.check-changes.outputs.should_build == 'true'
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -253,12 +291,14 @@ jobs:
           commit_message: 'build: Deploy preview build for PR #${{ github.event.pull_request.number }}'
 
       - name: Set deployment url
+        if: steps.check-changes.outputs.should_build == 'true'
         id: deploy
         run: |
           DEPLOY_URL=https://neuralmagic.github.io/guidellm/ui/pr/${{ steps.build.outputs.pr_number }}
           echo "url=${DEPLOY_URL}" >> $GITHUB_OUTPUT
 
       - name: Find PR comment
+        if: steps.check-changes.outputs.should_build == 'true'
         uses: peter-evans/find-comment@v2
         id: find-comment
         with:
@@ -267,6 +307,7 @@ jobs:
           body-includes: '<!-- pr-preview-comment -->'
 
       - name: Post Deployment URL to PR
+        if: steps.check-changes.outputs.should_build == 'true'
         uses: peter-evans/create-or-update-comment@v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -277,3 +318,7 @@ jobs:
             <!-- pr-preview-comment -->
             🎉 **Live Preview:** [Click here to view the live version](${{ steps.deploy.outputs.url }})
             *Last updated: ${{ github.sha }}*
+
+      - name: Skip build notification
+        if: steps.check-changes.outputs.should_build == 'false'
+        run: echo "Skipping UI preview build - no relevant files changed"
