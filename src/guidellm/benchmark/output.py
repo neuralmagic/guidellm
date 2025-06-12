@@ -944,3 +944,20 @@ class GenerativeBenchmarksConsole:
             title="Benchmarks Stats",
             sections=sections,
         )
+
+    def print_full_report(self):
+        """
+        Print out the benchmark statistics to the console.
+        Temporarily enables the console if it's disabled.
+
+        Format:
+        - Metadata
+        - Info
+        - Stats
+        """
+        orig_enabled = self.enabled
+        self.enabled = True
+        self.print_benchmarks_metadata()
+        self.print_benchmarks_info()
+        self.print_benchmarks_stats()
+        self.enabled = orig_enabled

@@ -7,7 +7,7 @@ from typing import get_args
 import click
 
 from guidellm.backend import BackendType
-from guidellm.benchmark import ProfileType, benchmark_generative_text
+from guidellm.benchmark import ProfileType, benchmark_generative_text, display_benchmarks_report
 from guidellm.config import print_config
 from guidellm.preprocess.dataset import ShortPromptStrategy, process_dataset
 from guidellm.scheduler import StrategyType
@@ -280,6 +280,16 @@ def benchmark(
             random_seed=random_seed,
         )
     )
+
+
+@cli.command(help="Redisplay a saved benchmark report.")
+@click.argument(
+    "path",
+    type=click.Path(),
+    default=Path.cwd() / "benchmarks.json",
+)
+def display(path):
+    asyncio.run(display_benchmarks_report(path))
 
 
 def decode_escaped_str(_ctx, _param, value):
