@@ -12,7 +12,7 @@ from .benchmark import (
     StatusBreakdown,
 )
 from .benchmarker import Benchmarker, BenchmarkerResult, GenerativeBenchmarker
-from .entrypoints import benchmark_generative_text
+from .entrypoints import benchmark_generative_text, display_benchmarks_report
 from .output import GenerativeBenchmarksConsole, GenerativeBenchmarksReport
 from .profile import (
     AsyncProfile,
