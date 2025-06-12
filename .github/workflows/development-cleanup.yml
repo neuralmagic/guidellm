@@ -7,7 +7,7 @@ on:
 jobs:
   cleanup-ui-pr-preview:
     permissions:
-      contents: read
+      contents: write
       id-token: 'write'
       issues: write
     runs-on: ubuntu-latest
@@ -32,6 +32,7 @@ jobs:
         run: echo "Cleanup completed for PR \#${{ github.event.pull_request.number }}"
 
   update-preview-comment:
+    needs: [cleanup-ui-pr-preview]
     name: Update PR Comment
     permissions:
       pull-requests: write
