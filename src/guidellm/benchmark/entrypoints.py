@@ -136,7 +136,7 @@ async def benchmark_generative_text(
 
     return report, saved_path
 
-async def display_benchmarks_report(file: str):
+def display_benchmarks_report(file: str):
     console = GenerativeBenchmarksConsole(enabled=True)
     if not os.path.exists(file):
         console.print_line(f"File {file} not found.")
