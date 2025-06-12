@@ -258,12 +258,22 @@ jobs:
           DEPLOY_URL=https://neuralmagic.github.io/guidellm/ui/pr/${{ steps.build.outputs.pr_number }}
           echo "url=${DEPLOY_URL}" >> $GITHUB_OUTPUT
 
+      - name: Find PR comment
+        uses: peter-evans/find-comment@v2
+        id: find-comment
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          issue-number: ${{ github.event.pull_request.number }}
+          body-includes: '<!-- pr-preview-comment -->'
+
       - name: Post Deployment URL to PR
         uses: peter-evans/create-or-update-comment@v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          comment-id: ${{ steps.find-comment.outputs.comment-id }}
           issue-number: ${{ github.event.pull_request.number }}
           edit-mode: replace
           body: |
             <!-- pr-preview-comment -->
             🎉 **Live Preview:** [Click here to view the live version](${{ steps.deploy.outputs.url }})
+            *Last updated: ${{ github.sha }}*

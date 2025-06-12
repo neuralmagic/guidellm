@@ -40,9 +40,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Update PR comment to reflect cleanup
+        uses: peter-evans/find-comment@v2
+        id: find-comment
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          issue-number: ${{ github.event.pull_request.number }}
+          body-includes: '<!-- pr-preview-comment -->'
+
+      - name: Update PR comment to reflect cleanup
+        if: steps.find-comment.outputs.comment-id != ''
         uses: peter-evans/create-or-update-comment@v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          comment-id: ${{ steps.find-comment.outputs.comment-id }}
           issue-number: ${{ github.event.pull_request.number }}
           edit-mode: replace
           body: |
