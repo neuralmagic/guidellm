@@ -410,7 +410,7 @@ class OpenAIHTTPBackend(Backend):
 
         return self.extra_query
 
-    def _extra_body(self, endpoint_type: EndpointType) -> dict[str, str]:
+    def _extra_body(self, endpoint_type: EndpointType) -> dict[str, Any]:
         if self.extra_body is None:
             return {}
 
