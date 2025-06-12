@@ -224,22 +224,22 @@ jobs:
         run: |
           # Get the base branch
           BASE_BRANCH=${{ github.event.pull_request.base.ref }}
-          
+
           # Get list of changed files
           CHANGED_FILES=$(git diff --name-only origin/$BASE_BRANCH...HEAD)
-          
+
           # Define the files we care about in root
           ROOT_FILES="package.json package-lock.json jest.config.cjs jest.setup.ts eslint.config.js cypress.config.ts .prettierrc .prettierignore tsconfig.json tsconfig.base.json tsconfig.test.json tsconfig.cypress.json"
-          
+
           # Check if src/ui directory changed or any of the root files changed
           SHOULD_BUILD=false
-          
+
           # Check if any file in src/ui changed
           if echo "$CHANGED_FILES" | grep -q -E "^(src/ui|tests/ui)/"; then
             echo "UI source files changed"
             SHOULD_BUILD=true
           fi
-          
+
           # Check if any of the root configuration files changed
           for file in $ROOT_FILES; do
             if echo "$CHANGED_FILES" | grep -q "^${file}$"; then
@@ -248,7 +248,7 @@ jobs:
               break
             fi
           done
-          
+
           echo "should_build=$SHOULD_BUILD" >> $GITHUB_OUTPUT
           echo "Should build: $SHOULD_BUILD"
 
