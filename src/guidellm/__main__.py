@@ -289,7 +289,7 @@ def benchmark(
     default=Path.cwd() / "benchmarks.json",
 )
 def display(path):
-    asyncio.run(display_benchmarks_report(path))
+    display_benchmarks_report(path)
 
 
 def decode_escaped_str(_ctx, _param, value):
