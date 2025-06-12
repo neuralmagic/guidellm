@@ -250,6 +250,7 @@ jobs:
           user_name: ${{ github.actor }}
           user_email: ${{ github.actor }}@users.noreply.github.com
           publish_branch: gh-pages
+          commit_message: 'build: Deploy preview build for PR #${{ github.event.pull_request.number }}'
 
       - name: Set deployment url
         id: deploy
@@ -262,5 +263,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           issue-number: ${{ github.event.pull_request.number }}
+          edit-mode: replace
           body: |
+            <!-- pr-preview-comment -->
             🎉 **Live Preview:** [Click here to view the live version](${{ steps.deploy.outputs.url }})
