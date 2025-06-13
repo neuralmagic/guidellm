@@ -366,6 +366,7 @@ class OpenAIHTTPBackend(Backend):
                 http2=self.http2,
                 timeout=self.timeout,
                 follow_redirects=self.follow_redirects,
+                limits=httpx.Limits(max_keepalive_connections=0),
             )
             self._async_client = client
         else:
