@@ -1,4 +1,3 @@
-import os
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Any, Literal, Optional, Union
@@ -136,9 +135,9 @@ async def benchmark_generative_text(
 
     return report, saved_path
 
-def display_benchmarks_report(file: str):
+def display_benchmarks_report(file: Path):
     console = GenerativeBenchmarksConsole(enabled=True)
-    if not os.path.exists(file):
+    if not file.exists():
         console.print_line(f"File {file} not found.")
         return
     report = GenerativeBenchmarksReport.load_file(file)

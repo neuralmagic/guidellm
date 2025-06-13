@@ -7,7 +7,11 @@ from typing import get_args
 import click
 
 from guidellm.backend import BackendType
-from guidellm.benchmark import ProfileType, benchmark_generative_text, display_benchmarks_report
+from guidellm.benchmark import (
+    ProfileType,
+    benchmark_generative_text,
+    display_benchmarks_report,
+)
 from guidellm.config import print_config
 from guidellm.preprocess.dataset import ShortPromptStrategy, process_dataset
 from guidellm.scheduler import StrategyType
