@@ -6,7 +6,6 @@ import pytest
 
 from guidellm.benchmark import display_benchmarks_report
 
-
 # Set to true to re-write the expected output.
 REGENERATE_ARTIFACTS = False
 
@@ -43,7 +42,8 @@ def generic_test_display_entrypoint(filename, capfd, get_test_asset_dir):
     expected_output_path = asset_dir / "benchmarks_stripped_output.txt"
     if REGENERATE_ARTIFACTS:
         expected_output_path.write_text(out)
-        assert False  # Fail to prevent accidentally leaving this set
+        # Fail to prevent accidentally leaving regeneration mode on
+        pytest.fail("Test bypassed to regenerate output")
     else:
         with expected_output_path.open(encoding="utf_8") as file:
             expected_output = file.read()
