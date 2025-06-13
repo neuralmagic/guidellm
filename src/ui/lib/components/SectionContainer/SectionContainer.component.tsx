@@ -4,10 +4,9 @@ import { MutableRefObject, useEffect, useRef, useState } from 'react';
 
 import { ArrowDown, ArrowUp } from '@assets/icons';
 
-import { SvgContainer } from '../../utils/SvgContainer';
-
 import { SectionContainerProps } from './SectionContainer.interfaces';
 import { Container, RoundedButton } from './SectionContainer.styles';
+import { SvgContainer } from '../../utils/SvgContainer';
 
 export const Component = ({ children }: SectionContainerProps) => {
   const theme = useTheme();

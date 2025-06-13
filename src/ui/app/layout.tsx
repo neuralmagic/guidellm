@@ -31,30 +31,39 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const emptyDataScript = (
+    <script
+      dangerouslySetInnerHTML={{
+        __html:
+          'window.run_info = {}; window.workload_details = {}; window.benchmarks = {};',
+      }}
+    />
+  );
+  const mockDataScript = (
+    <>
+      <script
+        dangerouslySetInnerHTML={{
+          __html: runInfoScript,
+        }}
+      />
+      <script
+        dangerouslySetInnerHTML={{
+          __html: workloadDetailsScript,
+        }}
+      />
+      <script
+        dangerouslySetInnerHTML={{
+          __html: benchmarksScript,
+        }}
+      />
+    </>
+  );
+  const dataScript =
+    process.env.USE_MOCK_DATA === 'true' ? mockDataScript : emptyDataScript;
+
   return (
     <html lang="en">
-      <head>
-        {/* <script
-          dangerouslySetInnerHTML={{
-            __html: 'window.run_info = {}; window.workload_details = {}; window.benchmarks = {};',
-          }}
-        /> */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: runInfoScript,
-          }}
-        />
-        <script
-          dangerouslySetInnerHTML={{
-            __html: workloadDetailsScript,
-          }}
-        />
-        <script
-          dangerouslySetInnerHTML={{
-            __html: benchmarksScript,
-          }}
-        />
-      </head>
+      <head>{dataScript}</head>
       <body>{children}</body>
     </html>
   );

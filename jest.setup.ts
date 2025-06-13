@@ -11,7 +11,6 @@ jest.mock('next/dynamic', () => ({
     const dynamicModule = jest.requireActual('next/dynamic');
     const dynamicActualComp = dynamicModule.default;
     const RequiredComponent = dynamicActualComp(props[0]);
-    // eslint-disable-next-line no-unused-expressions, @typescript-eslint/no-unused-expressions
     RequiredComponent.preload
       ? RequiredComponent.preload()
       : RequiredComponent.render.preload();
