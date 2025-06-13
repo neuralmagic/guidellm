@@ -41,7 +41,6 @@ test('no local extremas added', () => {
     const upperIndex = xs.findIndex((x) => x >= i);
     if (upperIndex === 0) {
       loopedValuesToTest.push({ expected: interpolate(i), actual: ys[0] });
-      // expect(interpolate(i)).toBeCloseTo(ys[0]);
       continue;
     }
     const lowerY = ys[upperIndex - 1];
