@@ -8,7 +8,6 @@
     "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
-    "**/*.d.ts",
     ".next/types/**/*.ts",
     "app",
     "./app/types/images.d.ts"
