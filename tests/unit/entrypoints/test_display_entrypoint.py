@@ -7,6 +7,10 @@ import pytest
 from guidellm.benchmark import display_benchmarks_report
 
 
+# Set to true to re-write the expected output.
+REGENERATE_ARTIFACTS = False
+
+
 @pytest.fixture
 def get_test_asset_dir():
     def _() -> Path:
@@ -32,14 +36,18 @@ def test_display_entrypoint_yaml(capfd, get_test_asset_dir):
 
 
 def generic_test_display_entrypoint(filename, capfd, get_test_asset_dir):
-    os.environ["COLUMNS"] = "120"  # CLI output depends on terminal width.
+    os.environ["COLUMNS"] = "180"  # CLI output depends on terminal width.
     asset_dir = get_test_asset_dir()
     display_benchmarks_report(asset_dir / filename)
     out, err = capfd.readouterr()
     expected_output_path = asset_dir / "benchmarks_stripped_output.txt"
-    with expected_output_path.open(encoding="utf_8") as file:
-        expected_output = file.read()
-    assert out == expected_output
+    if REGENERATE_ARTIFACTS:
+        expected_output_path.write_text(out)
+        assert False  # Fail to prevent accidentally leaving this set
+    else:
+        with expected_output_path.open(encoding="utf_8") as file:
+            expected_output = file.read()
+        assert out == expected_output
 
 
 if __name__ == "__main__":
