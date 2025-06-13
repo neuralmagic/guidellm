@@ -62,5 +62,6 @@ __all__ = [
     "SynchronousProfile",
     "ThroughputProfile",
     "benchmark_generative_text",
+    "display_benchmarks_report",
     "create_profile",
 ]
