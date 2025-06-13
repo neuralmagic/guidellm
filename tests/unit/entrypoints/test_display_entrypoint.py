@@ -13,8 +13,16 @@ def get_test_asset_dir():
 
 
 def test_display_entrypoint_json(capfd, get_test_asset_dir):
+    generic_test_display_entrypoint("benchmarks_stripped.json", capfd, get_test_asset_dir)
+
+
+def test_display_entrypoint_yaml(capfd, get_test_asset_dir):
+    generic_test_display_entrypoint("benchmarks_stripped.yaml", capfd, get_test_asset_dir)
+
+
+def generic_test_display_entrypoint(filename, capfd, get_test_asset_dir):
     asset_dir = get_test_asset_dir()
-    display_benchmarks_report(asset_dir + "/benchmarks_stripped.json")
+    display_benchmarks_report(asset_dir + "/" + filename)
     out, err = capfd.readouterr()
     expected_output_path = asset_dir + "/benchmarks_stripped_output.txt"
     with open(expected_output_path, 'r', encoding='utf_8') as file:
