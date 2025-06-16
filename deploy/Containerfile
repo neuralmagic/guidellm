@@ -32,8 +32,8 @@ USER guidellm
 WORKDIR /results
 
 # Metadata
-LABEL org.opencontainers.image.source="https://github.com/neuralmagic/guidellm"
-LABEL org.opencontainers.image.description="GuideLLM Benchmark Container"
+LABEL org.opencontainers.image.source="https://github.com/neuralmagic/guidellm" \
+      org.opencontainers.image.description="GuideLLM Performance Benchmarking Container"
 
 # Set the environment variable for the benchmark script
 # TODO: Replace with scenario environment variables
