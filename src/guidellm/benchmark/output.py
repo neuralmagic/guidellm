@@ -1,6 +1,7 @@
 import csv
 import json
 import math
+import humps
 from collections import OrderedDict
 from datetime import datetime
 from pathlib import Path
@@ -27,7 +28,8 @@ from guidellm.objects import (
 )
 from guidellm.scheduler import strategy_display_str
 from guidellm.utils import Colors, split_text_list_by_length
-
+from guidellm.utils.injector import create_report
+from guidellm.presentation import UIDataBuilder
 __all__ = [
     "GenerativeBenchmarksConsole",
     "GenerativeBenchmarksReport",
@@ -67,6 +69,9 @@ class GenerativeBenchmarksReport(StandardBaseModel):
 
         if type_ == "csv":
             raise ValueError(f"CSV file type is not supported for loading: {path}.")
+        
+        if type_ == "html":
+            raise ValueError(f"HTML file type is not supported for loading: {path}.")
 
         raise ValueError(f"Unsupported file type: {type_} for {path}.")
 
@@ -113,6 +118,9 @@ class GenerativeBenchmarksReport(StandardBaseModel):
 
         if type_ == "csv":
             return self.save_csv(path)
+
+        if type_ == "html":
+            return self.save_html(path)
 
         raise ValueError(f"Unsupported file type: {type_} for {path}.")
 
@@ -220,11 +228,44 @@ class GenerativeBenchmarksReport(StandardBaseModel):
 
         return path
 
+    def save_html(self, path: str | Path) -> Path:
+        """
+        Download html, inject report data and save to a file.
+        If the file is a directory, it will create the report in a file named
+        benchmarks.html under the directory.
+
+        :param path: The path to create the report at.
+        :return: The path to the report.
+        """
+
+        # json_data = json.dumps(data, indent=2)
+        # thing = f'window.{variable_name} = {json_data};'
+
+        data_builder = UIDataBuilder(self.benchmarks)
+        data = data_builder.to_dict()
+        camel_data = humps.camelize(data)
+        ui_api_data = {
+            f"window.{humps.decamelize(k)} = {{}};": f'window.{humps.decamelize(k)} = {json.dumps(v, indent=2)};\n'
+            for k, v in camel_data.items()
+        }
+        print("________")
+        print("________")
+        print("________")
+        print("________")
+        print("ui_api_data")
+        print(ui_api_data)
+        print("________")
+        print("________")
+        print("________")
+        print("________")
+        create_report(ui_api_data, path)
+        return path
+
     @staticmethod
     def _file_setup(
         path: Union[str, Path],
-        default_file_type: Literal["json", "yaml", "csv"] = "json",
-    ) -> tuple[Path, Literal["json", "yaml", "csv"]]:
+        default_file_type: Literal["json", "yaml", "csv", "html"] = "json",
+    ) -> tuple[Path, Literal["json", "yaml", "csv", "html"]]:
         path = Path(path) if not isinstance(path, Path) else path
 
         if path.is_dir():
@@ -241,6 +282,9 @@ class GenerativeBenchmarksReport(StandardBaseModel):
 
         if path_suffix in [".csv"]:
             return path, "csv"
+
+        if path_suffix in [".html"]:
+            return path, "html"
 
         raise ValueError(f"Unsupported file extension: {path_suffix} for {path}.")
 
