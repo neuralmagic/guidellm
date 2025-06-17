@@ -113,8 +113,6 @@ class Scheduler(Generic[RequestT, ResponseT]):
         if max_duration is not None and max_duration < 0:
             raise ValueError(f"Invalid max_duration: {max_duration}")
 
-        # Must call before workers fork
-        await self.worker.prepare_multiprocessing()
         with (
             multiprocessing.Manager() as manager,
             ProcessPoolExecutor(
@@ -185,6 +183,7 @@ class Scheduler(Generic[RequestT, ResponseT]):
         multiprocessing.Queue,
         multiprocessing.Queue,
     ]:
+        await self.worker.prepare_multiprocessing()
         requests_queue = manager.Queue(
             maxsize=scheduling_strategy.queued_requests_limit
         )
