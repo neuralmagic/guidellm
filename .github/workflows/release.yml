@@ -3,7 +3,7 @@ name: Release
 on:
   push:
     tags:
-      - 'v*.*.*'
+      - "v*.*.*"
 
 jobs:
   build-and-publish:
@@ -37,7 +37,7 @@ jobs:
           retention-days: 90
       - name: Log artifact location
         run: |
-          echo "Artifacts uploaded to: Artifacts uploaded to: ${{ steps.artifact-upload.outputs.artifact-url }}"
+          echo "Artifacts uploaded to: ${{ steps.artifact-upload.outputs.artifact-url }}"
       - name: Push wheel to PyPI
         uses: neuralmagic/nm-actions/actions/publish-whl@v1.0.0
         with:
@@ -83,6 +83,25 @@ jobs:
       - name: Run unit tests
         run: tox -e test-unit
 
+  ui-unit-tests:
+    permissions:
+      contents: "read"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit tests
+        run: npm run test:unit
+
   integration-tests:
     runs-on: ubuntu-latest
     strategy:
@@ -99,6 +118,25 @@ jobs:
       - name: Run integration tests
         run: tox -e test-integration
 
+  ui-integration-tests:
+    permissions:
+      contents: "read"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run integration tests
+        run: npm run test:integration
+
   e2e-tests:
     runs-on: ubuntu-latest
     strategy:
@@ -114,3 +152,138 @@ jobs:
         run: pip install tox
       - name: Run end-to-end tests
         run: tox -e test-e2e
+
+  ui-e2e-tests:
+    permissions:
+      contents: "read"
+      id-token: "write"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Build
+        run: |
+          npm run build
+
+      - name: Start the Next.js app
+        run: |
+          npx serve@latest src/ui/out &
+          npx wait-on http://localhost:3000  # Wait until the app is ready
+
+      - name: Run Cypress tests
+        run: npm run test:e2e --headless
+
+  publish-versioned-ui-build:
+    needs: [ui-unit-tests, ui-integration-tests, ui-e2e-tests]
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: "Set GIT_TAG"
+        id: vars
+        run: |
+          if [ -z "${{ github.ref_name }}" ]; then
+            echo "TAG=latest" >> $GITHUB_ENV
+          else
+            echo "TAG=${{ github.ref_name }}" >> $GITHUB_ENV
+          fi
+
+      - name: Build app to root
+        id: build
+        run: |
+          # Export vars to ensure they are loaded before build
+          export $(grep -v '^#' .env.production | xargs)
+
+          # Set asset prefix and base path with git tag
+          ASSET_PREFIX=https://neuralmagic.github.io/guidellm/ui/${TAG}
+          BASE_PATH=/ui/${TAG}
+          GIT_SHA=${{ github.sha }}
+          export ASSET_PREFIX=${ASSET_PREFIX}
+          export BASE_PATH=${BASE_PATH}
+          export GIT_SHA=${GIT_SHA}
+          npm run build
+
+      - name: Deploy versioned build to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./ui/out
+          destination_dir: ui/${TAG}
+          keep_files: false
+          user_name: ${{ github.actor }}
+          user_email: ${{ github.actor }}@users.noreply.github.com
+          publish_branch: gh-pages
+
+  publish-latest-ui-build:
+    needs: [publish-versioned-ui-build]
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: "Set GIT_TAG"
+        id: vars
+        run: |
+          if [ -z "${{ github.ref_name }}" ]; then
+            echo "TAG=latest" >> $GITHUB_ENV
+          else
+            echo "TAG=${{ github.ref_name }}" >> $GITHUB_ENV
+          fi
+
+      - name: Build app to root
+        id: build
+        run: |
+          # Export vars to ensure they are loaded before build
+          export $(grep -v '^#' .env.production | xargs)
+
+          # Set asset prefix and base path with git tag
+          ASSET_PREFIX=https://neuralmagic.github.io/guidellm/ui/latest
+          BASE_PATH=/ui/latest
+          GIT_SHA=${{ github.sha }}
+          export ASSET_PREFIX=${ASSET_PREFIX}
+          export BASE_PATH=${BASE_PATH}
+          export GIT_SHA=${GIT_SHA}
+          npm run build
+
+      - name: Update latest build in GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./ui/out
+          destination_dir: ui/latest
+          keep_files: false
+          user_name: ${{ github.actor }}
+          user_email: ${{ github.actor }}@users.noreply.github.com
+          publish_branch: gh-pages

@@ -1,8 +1,7 @@
 import React from 'react';
 
-import useLineColors from '../../../common/useLineColors';
-
 import { DottedLinesProps } from './DottedLines.interfaces';
+import useLineColors from '../../../common/useLineColors';
 
 const DottedLines = ({
   lines,
