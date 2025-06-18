@@ -14,6 +14,7 @@ export const selectBenchmarks = (state: RootState) => state.benchmarks.data;
 export const selectMetricsSummaryLineData = createSelector(
   [selectBenchmarks, selectSloState],
   (benchmarks, sloState) => {
+    console.log('🚀 ~ benchmarks.selectors.ts:18 ~ benchmarks:', benchmarks);
     const sortedByRPS = benchmarks
       ?.slice()
       ?.sort((bm1, bm2) => (bm1.requestsPerSecond > bm2.requestsPerSecond ? 1 : -1));

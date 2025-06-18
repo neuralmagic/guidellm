@@ -8,8 +8,13 @@ import { setSloData } from '../slo/slo.slice';
 
 const USE_MOCK_API = process.env.NEXT_PUBLIC_USE_MOCK_API === 'true';
 
+// currently the injector requires 'window.benchmarks = {};' to be present in the html, but benchmarks is expected to be null or an array
 const fetchBenchmarks = () => {
-  return { data: window.benchmarks as Benchmarks };
+  let benchmarks = window.benchmarks;
+  if (!Array.isArray(benchmarks)) {
+    benchmarks = [];
+  }
+  return { data: benchmarks as Benchmarks };
 };
 
 const getAverageValueForPercentile = (
@@ -17,10 +22,10 @@ const getAverageValueForPercentile = (
   lastMetric: Statistics,
   percentile: string
 ) => {
-  const firstPercentile = firstMetric.percentileRows.find(
+  const firstPercentile = firstMetric?.percentileRows.find(
     (p) => p.percentile === percentile
   );
-  const lastPercentile = lastMetric.percentileRows.find(
+  const lastPercentile = lastMetric?.percentileRows.find(
     (p) => p.percentile === percentile
   );
   return ((firstPercentile?.value ?? 0) + (lastPercentile?.value ?? 0)) / 2;
@@ -36,29 +41,29 @@ const setDefaultSLOs = (
   const lastBM = data[data.length - 1];
 
   const ttftAvg = getAverageValueForPercentile(
-    firstBM.ttft,
-    lastBM.ttft,
+    firstBM?.ttft,
+    lastBM?.ttft,
     defaultPercentile
   );
   const tpotAvg = getAverageValueForPercentile(
-    firstBM.tpot,
-    lastBM.tpot,
+    firstBM?.tpot,
+    lastBM?.tpot,
     defaultPercentile
   );
   const timePerRequestAvg = getAverageValueForPercentile(
-    firstBM.timePerRequest,
-    lastBM.timePerRequest,
+    firstBM?.timePerRequest,
+    lastBM?.timePerRequest,
     defaultPercentile
   );
   const throughputAvg = getAverageValueForPercentile(
-    firstBM.throughput,
-    lastBM.throughput,
+    firstBM?.throughput,
+    lastBM?.throughput,
     defaultPercentile
   );
 
   dispatch(
     setSloData({
-      currentRequestRate: firstBM.requestsPerSecond,
+      currentRequestRate: firstBM?.requestsPerSecond,
       current: {
         ttft: formatNumber(ttftAvg, 0),
         tpot: formatNumber(tpotAvg, 0),

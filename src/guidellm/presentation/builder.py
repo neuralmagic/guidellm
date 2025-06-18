@@ -22,7 +22,7 @@ class UIDataBuilder:
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "run_info": self.build_run_info().dict(),
-            "workload_details": self.build_workload_details().dict(),
-            "benchmarks": [b.dict() for b in self.build_benchmarks()],
+            "run_info": self.build_run_info().model_dump(),
+            "workload_details": self.build_workload_details().model_dump(),
+            "benchmarks": [b.model_dump() for b in self.build_benchmarks()],
         }
