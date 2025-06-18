@@ -124,8 +124,7 @@ class OpenAIHTTPBackend(Backend):
         self.extra_query = extra_query
         self.extra_body = extra_body
         self._async_client: Optional[httpx.AsyncClient] = None
-        j2_env = jinja2.Environment(loader=jinja2.BaseLoader(), autoescape=True)
-        self.request_template = j2_env.from_string(settings.openai.request_template)
+        self.request_template = settings.openai.request_template
 
     @property
     def target(self) -> str:
@@ -425,8 +424,10 @@ class OpenAIHTTPBackend(Backend):
         max_output_tokens: Optional[int],
         **kwargs,
     ) -> dict:
+        j2_env = jinja2.Environment(loader=jinja2.BaseLoader(), autoescape=True)
+        request_template = j2_env.from_string(self.request_template)
         payload = json.loads(
-            self.request_template.render(
+            request_template.render(
                 model=self.model,
                 output_tokens=(max_output_tokens or self.max_output_tokens),
             )
