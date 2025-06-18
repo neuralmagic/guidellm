@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 from typing import Union
 
 from guidellm.config import settings
@@ -13,9 +14,7 @@ def create_report(js_data: dict, output_path: Union[str, Path]) -> Path:
 
     :param js_data: dict with match str and json data to inject
     :type js_data: dict
-    :param output_path: the path, either a file or a directory,
-        to save the report to. If a directory, the report will be saved
-        as "report.html" inside of the directory.
+    :param output_path: the file to save the report to.
     :type output_path: str
     :return: the path to the saved report
     :rtype: str
@@ -23,9 +22,6 @@ def create_report(js_data: dict, output_path: Union[str, Path]) -> Path:
 
     if not isinstance(output_path, Path):
         output_path = Path(output_path)
-
-    if output_path.is_dir():
-        output_path = output_path / "report.html"
 
     html_content = load_text(settings.report_generation.source)
     report_content = inject_data(
@@ -38,13 +34,12 @@ def create_report(js_data: dict, output_path: Union[str, Path]) -> Path:
     print(f"Report saved to {output_path}")
     return output_path
 
-
 def inject_data(
     js_data: dict,
     html: str,
 ) -> str:
     """
-    Injects the json data into the HTML while replacing the placeholder.
+    Injects the json data into the HTML, replacing placeholders only within the <head> section.
 
     :param js_data: the json data to inject
     :type js_data: dict
@@ -53,6 +48,18 @@ def inject_data(
     :return: the html with the json data injected
     :rtype: str
     """
+    head_match = re.search(r"<head[^>]*>(.*?)</head>", html, re.DOTALL | re.IGNORECASE)
+    if not head_match:
+        return html  # or raise error?
+
+    head_content = head_match.group(1)
+
+    # Replace placeholders only inside the <head> content
     for placeholder, script in js_data.items():
-        html = html.replace(placeholder, script)
+        head_content = head_content.replace(placeholder, script)
+
+    # Rebuild the HTML
+    new_head = f"<head>{head_content}</head>"
+    html = html[:head_match.start()] + new_head + html[head_match.end():]
+
     return html
