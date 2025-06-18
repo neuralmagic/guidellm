@@ -1,18 +1,28 @@
 from .builder import UIDataBuilder
-from .data_models import (Bucket, Model, Dataset, RunInfo, Distribution, TokenDetails, Server, WorkloadDetails, BenchmarkDatum)
-from .injector import (create_report, inject_data)
+from .data_models import (
+    BenchmarkDatum,
+    Bucket,
+    Dataset,
+    Distribution,
+    Model,
+    RunInfo,
+    Server,
+    TokenDetails,
+    WorkloadDetails,
+)
+from .injector import create_report, inject_data
 
 __all__ = [
-    "UIDataBuilder",
-    "Bucket",
-    "Model",
-    "Dataset",
-    "RunInfo",
-    "Distribution",
-    "TokenDetails",
-    "Server",
-    "WorkloadDetails",
     "BenchmarkDatum",
+    "Bucket",
+    "Dataset",
+    "Distribution",
+    "Model",
+    "RunInfo",
+    "Server",
+    "TokenDetails",
+    "UIDataBuilder",
+    "WorkloadDetails",
     "create_report",
     "inject_data",
 ]

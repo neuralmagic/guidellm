@@ -86,12 +86,14 @@ class OpenAISettings(BaseModel):
     base_url: str = "http://localhost:8000"
     max_output_tokens: int = 16384
 
+
 class ReportGenerationSettings(BaseModel):
     """
     Report generation settings for the application
     """
 
     source: str = ""
+
 
 class Settings(BaseSettings):
     """

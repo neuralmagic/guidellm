@@ -20,7 +20,7 @@ def create_report(js_data: dict, output_path: Union[str, Path]) -> Path:
     :return: the path to the saved report
     :rtype: str
     """
-    
+
     if not isinstance(output_path, Path):
         output_path = Path(output_path)
 
@@ -35,8 +35,9 @@ def create_report(js_data: dict, output_path: Union[str, Path]) -> Path:
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(report_content)
-    print(f'Report saved to {output_path}')
+    print(f"Report saved to {output_path}")
     return output_path
+
 
 def inject_data(
     js_data: dict,

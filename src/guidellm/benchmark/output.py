@@ -1,12 +1,12 @@
 import csv
 import json
 import math
-import humps
 from collections import OrderedDict
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal, Optional, Union
 
+import humps
 import yaml
 from pydantic import Field
 from rich.console import Console
@@ -26,10 +26,11 @@ from guidellm.objects import (
     StandardBaseModel,
     StatusDistributionSummary,
 )
+from guidellm.presentation import UIDataBuilder
 from guidellm.scheduler import strategy_display_str
 from guidellm.utils import Colors, split_text_list_by_length
 from guidellm.utils.injector import create_report
-from guidellm.presentation import UIDataBuilder
+
 __all__ = [
     "GenerativeBenchmarksConsole",
     "GenerativeBenchmarksReport",
@@ -69,7 +70,7 @@ class GenerativeBenchmarksReport(StandardBaseModel):
 
         if type_ == "csv":
             raise ValueError(f"CSV file type is not supported for loading: {path}.")
-        
+
         if type_ == "html":
             raise ValueError(f"HTML file type is not supported for loading: {path}.")
 
@@ -245,7 +246,7 @@ class GenerativeBenchmarksReport(StandardBaseModel):
         data = data_builder.to_dict()
         camel_data = humps.camelize(data)
         ui_api_data = {
-            f"window.{humps.decamelize(k)} = {{}};": f'window.{humps.decamelize(k)} = {json.dumps(v, indent=2)};\n'
+            f"window.{humps.decamelize(k)} = {{}};": f"window.{humps.decamelize(k)} = {json.dumps(v, indent=2)};\n"
             for k, v in camel_data.items()
         }
         print("________")

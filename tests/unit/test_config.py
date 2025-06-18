@@ -46,10 +46,13 @@ def test_settings_from_env_variables(mocker):
     assert settings.report_generation.source == "http://custom.url"
 
 
-@pytest.mark.smoke()
+@pytest.mark.smoke
 def test_report_generation_default_source():
     settings = Settings(env=Environment.LOCAL)
-    assert settings.report_generation.source == "https://neuralmagic.github.io/ui/dev/index.html"
+    assert (
+        settings.report_generation.source
+        == "https://neuralmagic.github.io/ui/dev/index.html"
+    )
 
     settings = Settings(env=Environment.DEV)
     assert (
@@ -90,9 +93,11 @@ def test_openai_settings():
     assert openai_settings.api_key == "test_api_key"
     assert openai_settings.base_url == "http://test.api"
 
+
 def test_report_generation_settings():
     report_settings = ReportGenerationSettings(source="http://custom.report")
     assert report_settings.source == "http://custom.report"
+
 
 @pytest.mark.sanity
 def test_generate_env_file():
