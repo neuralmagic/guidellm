@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, Literal, Optional, Union
 
 import httpx
+import jinja2
 from loguru import logger
 from PIL import Image
 
@@ -123,6 +124,8 @@ class OpenAIHTTPBackend(Backend):
         self.extra_query = extra_query
         self.extra_body = extra_body
         self._async_client: Optional[httpx.AsyncClient] = None
+        j2_env = jinja2.Environment(loader=jinja2.BaseLoader(), autoescape=True)
+        self.request_template = j2_env.from_string(settings.openai.request_template)
 
     @property
     def target(self) -> str:
@@ -422,29 +425,15 @@ class OpenAIHTTPBackend(Backend):
         max_output_tokens: Optional[int],
         **kwargs,
     ) -> dict:
-        payload = body or {}
+        payload = json.loads(
+            self.request_template.render(
+                model=self.model,
+                output_tokens=(max_output_tokens or self.max_output_tokens),
+            )
+        )
+        payload.update(body or {})
         payload.update(orig_kwargs or {})
         payload.update(kwargs)
-        payload["model"] = self.model
-        payload["stream"] = True
-        payload["stream_options"] = {
-            "include_usage": True,
-        }
-
-        if max_output_tokens or self.max_output_tokens:
-            logger.debug(
-                "{} adding payload args for setting output_token_count: {}",
-                self.__class__.__name__,
-                max_output_tokens or self.max_output_tokens,
-            )
-            payload["max_tokens"] = max_output_tokens or self.max_output_tokens
-            payload["max_completion_tokens"] = payload["max_tokens"]
-
-            if max_output_tokens:
-                # only set stop and ignore_eos if max_output_tokens set at request level
-                # otherwise the instance value is just the max to enforce we stay below
-                payload["stop"] = None
-                payload["ignore_eos"] = True
 
         return payload
 
