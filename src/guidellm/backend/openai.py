@@ -127,6 +127,13 @@ class OpenAIHTTPBackend(Backend):
         self._async_client: Optional[httpx.AsyncClient] = None
         self._request_template_str = settings.openai.request_template
 
+    def __getstate__(self) -> object:
+        state = self.__dict__.copy()
+        # Templates are not serializable
+        # so we delete it before pickling
+        state.pop("request_template", None)
+        return state
+
     @cached_property
     def request_template(self) -> jinja2.Template:
         j2_env = jinja2.Environment(loader=jinja2.BaseLoader(), autoescape=True)
@@ -163,6 +170,7 @@ class OpenAIHTTPBackend(Backend):
             "project": self.project,
             "text_completions_path": TEXT_COMPLETIONS_PATH,
             "chat_completions_path": CHAT_COMPLETIONS_PATH,
+            "request_template": self._request_template_str,
         }
 
     async def check_setup(self):
