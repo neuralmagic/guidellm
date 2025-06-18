@@ -2,6 +2,7 @@ import base64
 import json
 import time
 from collections.abc import AsyncGenerator
+from functools import cached_property
 from pathlib import Path
 from typing import Any, Literal, Optional, Union
 
@@ -124,7 +125,12 @@ class OpenAIHTTPBackend(Backend):
         self.extra_query = extra_query
         self.extra_body = extra_body
         self._async_client: Optional[httpx.AsyncClient] = None
-        self.request_template = settings.openai.request_template
+        self._request_template_str = settings.openai.request_template
+
+    @cached_property
+    def request_template(self) -> jinja2.Template:
+        j2_env = jinja2.Environment(loader=jinja2.BaseLoader(), autoescape=True)
+        return j2_env.from_string(self._request_template_str)
 
     @property
     def target(self) -> str:
@@ -424,10 +430,8 @@ class OpenAIHTTPBackend(Backend):
         max_output_tokens: Optional[int],
         **kwargs,
     ) -> dict:
-        j2_env = jinja2.Environment(loader=jinja2.BaseLoader(), autoescape=True)
-        request_template = j2_env.from_string(self.request_template)
         payload = json.loads(
-            request_template.render(
+            self.request_template.render(
                 model=self.model,
                 output_tokens=(max_output_tokens or self.max_output_tokens),
             )
