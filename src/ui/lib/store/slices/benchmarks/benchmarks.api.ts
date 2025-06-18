@@ -32,8 +32,8 @@ const setDefaultSLOs = (
   dispatch: ThunkDispatch<any, any, UnknownAction>
 ) => {
   // temporarily set default slo values, long term the backend should set default slos that will not just be the avg at the default percentile
-  const firstBM = data.benchmarks[0];
-  const lastBM = data.benchmarks[data.benchmarks.length - 1];
+  const firstBM = data[0];
+  const lastBM = data[data.length - 1];
 
   const ttftAvg = getAverageValueForPercentile(
     firstBM.ttft,
