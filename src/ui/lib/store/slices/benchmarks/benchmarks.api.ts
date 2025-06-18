@@ -1,7 +1,7 @@
 import { ThunkDispatch, UnknownAction } from '@reduxjs/toolkit';
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 
-import { Benchmarks, MetricData } from './benchmarks.interfaces';
+import { Benchmarks, Statistics } from './benchmarks.interfaces';
 import { formatNumber } from '../../../utils/helpers';
 import { defaultPercentile } from '../slo/slo.constants';
 import { setSloData } from '../slo/slo.slice';
@@ -13,14 +13,14 @@ const fetchBenchmarks = () => {
 };
 
 const getAverageValueForPercentile = (
-  firstMetric: MetricData,
-  lastMetric: MetricData,
+  firstMetric: Statistics,
+  lastMetric: Statistics,
   percentile: string
 ) => {
-  const firstPercentile = firstMetric.percentiles.find(
+  const firstPercentile = firstMetric.percentileRows.find(
     (p) => p.percentile === percentile
   );
-  const lastPercentile = lastMetric.percentiles.find(
+  const lastPercentile = lastMetric.percentileRows.find(
     (p) => p.percentile === percentile
   );
   return ((firstPercentile?.value ?? 0) + (lastPercentile?.value ?? 0)) / 2;

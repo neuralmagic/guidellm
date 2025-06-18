@@ -1,13 +1,13 @@
 from collections import defaultdict
 from math import ceil
-from pydantic import BaseModel
+from pydantic import computed_field, BaseModel
 import random
 from typing import List, Optional, Tuple
 
 from guidellm.benchmark.benchmark import GenerativeBenchmark
 from guidellm.objects.statistics import DistributionSummary
 
-__all__ = ["Bucket", "Model", "Dataset", "RunInfo", "TokenDistribution", "TokenDetails", "Server", "WorkloadDetails", "BenchmarkDatum"]
+__all__ = ["Bucket", "Model", "Dataset", "RunInfo", "Distribution", "TokenDetails", "Server", "WorkloadDetails", "BenchmarkDatum"]
 
 class Bucket(BaseModel):
   value: float
@@ -69,7 +69,7 @@ class RunInfo(BaseModel):
       dataset=Dataset(name="N/A")
     )
 
-class TokenDistribution(BaseModel):
+class Distribution(BaseModel):
   statistics: Optional[DistributionSummary] = None
   buckets: list[Bucket]
   bucket_width: float
@@ -77,14 +77,14 @@ class TokenDistribution(BaseModel):
 
 class TokenDetails(BaseModel):
   samples: list[str]
-  token_distributions: TokenDistribution
+  token_distributions: Distribution
 
 class Server(BaseModel):
   target: str
 
 class RequestOverTime(BaseModel):
    num_benchmarks: int
-   requests_over_time: TokenDistribution
+   requests_over_time: Distribution
 
 class WorkloadDetails(BaseModel):
   prompts: TokenDetails
@@ -109,8 +109,8 @@ class WorkloadDetails(BaseModel):
     
     prompt_token_stats = DistributionSummary.from_values(prompt_tokens)
     output_token_stats = DistributionSummary.from_values(output_tokens)
-    prompt_token_distributions = TokenDistribution(statistics=prompt_token_stats, buckets=prompt_token_buckets, bucket_width=1)
-    output_token_distributions = TokenDistribution(statistics=output_token_stats, buckets=output_token_buckets, bucket_width=1)
+    prompt_token_distributions = Distribution(statistics=prompt_token_stats, buckets=prompt_token_buckets, bucket_width=1)
+    output_token_distributions = Distribution(statistics=output_token_stats, buckets=output_token_buckets, bucket_width=1)
 
     min_start_time = benchmarks[0].run_stats.start_time
 
@@ -122,7 +122,7 @@ class WorkloadDetails(BaseModel):
     ]
     number_of_buckets = len(benchmarks)
     request_over_time_buckets, bucket_width = Bucket.from_data(all_req_times, None, number_of_buckets)
-    request_over_time_distribution = TokenDistribution(buckets=request_over_time_buckets, bucket_width=bucket_width)
+    request_over_time_distribution = Distribution(buckets=request_over_time_buckets, bucket_width=bucket_width)
     return cls(
        prompts=TokenDetails(samples=sample_prompts, token_distributions=prompt_token_distributions),
        generations=TokenDetails(samples=sample_outputs, token_distributions=output_token_distributions),
@@ -131,19 +131,39 @@ class WorkloadDetails(BaseModel):
        server=Server(target=target)
     )
 
+class TabularDistributionSummary(DistributionSummary):
+    """
+    Same fields as `DistributionSummary`, but adds a ready-to-serialize/iterate
+    `percentile_rows` helper.
+    """
+
+    @computed_field
+    @property
+    def percentile_rows(self) -> list[dict[str, float]]:
+        return [
+            {"percentile": name, "value": value}
+            for name, value in self.percentiles.model_dump().items()
+        ]
+
+    @classmethod
+    def from_distribution_summary(
+        cls, distribution: DistributionSummary
+    ) -> "TabularDistributionSummary":
+        return cls(**distribution.model_dump())
+
 class BenchmarkDatum(BaseModel):
   requests_per_second: float
-  tpot: DistributionSummary
-  ttft: DistributionSummary
-  throughput: DistributionSummary
-  time_per_request: DistributionSummary
+  tpot: TabularDistributionSummary
+  ttft: TabularDistributionSummary
+  throughput: TabularDistributionSummary
+  time_per_request: TabularDistributionSummary
 
   @classmethod
   def from_benchmark(cls, bm: GenerativeBenchmark):
     return cls(
        requests_per_second=bm.metrics.requests_per_second.successful.mean,
-       tpot=bm.metrics.inter_token_latency_ms.successful,
-       ttft=bm.metrics.time_to_first_token_ms.successful,
-       throughput=bm.metrics.output_tokens_per_second.successful,
-       time_per_request=bm.metrics.request_latency.successful,
+       tpot=TabularDistributionSummary.from_distribution_summary(bm.metrics.inter_token_latency_ms.successful),
+       ttft=TabularDistributionSummary.from_distribution_summary(bm.metrics.time_to_first_token_ms.successful),
+       throughput=TabularDistributionSummary.from_distribution_summary(bm.metrics.output_tokens_per_second.successful),
+       time_per_request=TabularDistributionSummary.from_distribution_summary(bm.metrics.request_latency.successful),
     )

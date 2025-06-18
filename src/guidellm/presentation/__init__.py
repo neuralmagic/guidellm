@@ -1,5 +1,5 @@
 from .builder import UIDataBuilder
-from .data_models import (Bucket, Model, Dataset, RunInfo, TokenDistribution, TokenDetails, Server, WorkloadDetails, BenchmarkDatum)
+from .data_models import (Bucket, Model, Dataset, RunInfo, Distribution, TokenDetails, Server, WorkloadDetails, BenchmarkDatum)
 from .injector import (create_report, inject_data)
 
 __all__ = [
@@ -8,7 +8,7 @@ __all__ = [
     "Model",
     "Dataset",
     "RunInfo",
-    "TokenDistribution",
+    "Distribution",
     "TokenDetails",
     "Server",
     "WorkloadDetails",
