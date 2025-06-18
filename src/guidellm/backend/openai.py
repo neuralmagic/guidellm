@@ -8,6 +8,7 @@ from typing import Any, Literal, Optional, Union
 
 import httpx
 import jinja2
+from jinja2.sandbox import ImmutableSandboxedEnvironment
 from loguru import logger
 from PIL import Image
 
@@ -136,7 +137,17 @@ class OpenAIHTTPBackend(Backend):
 
     @cached_property
     def request_template(self) -> jinja2.Template:
-        j2_env = jinja2.Environment(loader=jinja2.BaseLoader(), autoescape=True)
+        # Thanks to HuggingFace Tokenizers for this implementation
+        def tojson(x, ensure_ascii=False):
+            # We override the built-in tojson filter because Jinja's
+            # default filter escapes HTML characters
+            return json.dumps(x, ensure_ascii=ensure_ascii)
+
+        j2_env = ImmutableSandboxedEnvironment(trim_blocks=True, lstrip_blocks=True)
+
+        # Define custom filter functions
+        j2_env.filters["tojson"] = tojson
+
         return j2_env.from_string(self._request_template_str)
 
     @property
