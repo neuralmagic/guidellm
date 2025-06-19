@@ -59,11 +59,6 @@ const getDefaultMetricValues = () => ({
 export const selectInterpolatedMetrics = createSelector(
   [selectBenchmarks, selectSloState],
   (benchmarks, sloState) => {
-    const sortedByRPS = benchmarks
-      ?.slice()
-      ?.sort((bm1, bm2) => (bm1.requestsPerSecond > bm2.requestsPerSecond ? 1 : -1));
-    const requestRates = sortedByRPS?.map((bm) => bm.requestsPerSecond) || [];
-    const { enforcedPercentile, currentRequestRate } = sloState;
     const metricData: {
       [K in keyof BenchmarkMetrics | 'mean']: {
         enforcedPercentileValue: number;
@@ -77,6 +72,14 @@ export const selectInterpolatedMetrics = createSelector(
       throughput: getDefaultMetricValues(),
       mean: getDefaultMetricValues(),
     };
+    if ((benchmarks?.length || 0) < 2) {
+      return metricData;
+    }
+    const sortedByRPS = benchmarks
+      ?.slice()
+      ?.sort((bm1, bm2) => (bm1.requestsPerSecond > bm2.requestsPerSecond ? 1 : -1));
+    const requestRates = sortedByRPS?.map((bm) => bm.requestsPerSecond) || [];
+    const { enforcedPercentile, currentRequestRate } = sloState;
     const metrics: (keyof BenchmarkMetrics)[] = [
       'ttft',
       'tpot',

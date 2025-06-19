@@ -27,9 +27,9 @@ from guidellm.objects import (
     StatusDistributionSummary,
 )
 from guidellm.presentation import UIDataBuilder
+from guidellm.presentation.injector import create_report
 from guidellm.scheduler import strategy_display_str
 from guidellm.utils import Colors, split_text_list_by_length
-from guidellm.utils.injector import create_report
 
 __all__ = [
     "GenerativeBenchmarksConsole",
