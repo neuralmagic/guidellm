@@ -127,7 +127,7 @@ jobs:
         with:
           image: ${{ github.event.repository.name }}
           # TODO: Tag version
-          tags: latest stable ${{ github.sha }}
+          tags: latest stable
           containerfiles: |
             ./deploy/Containerfile
       - name: Push To ghcr.io
