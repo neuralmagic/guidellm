@@ -280,8 +280,7 @@ jobs:
 
           # Set asset prefix and base path with PR number
           ASSET_PREFIX=https://neuralmagic.github.io/guidellm/ui/pr/${PR_NUMBER}
-          # temporarily setting to false to test if this build works with guidellm
-          USE_MOCK_DATA=false
+          USE_MOCK_DATA=true
           BASE_PATH=/ui/pr/${PR_NUMBER}
           GIT_SHA=${{ github.sha }}
           export ASSET_PREFIX=${ASSET_PREFIX}
