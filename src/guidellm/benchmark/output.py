@@ -249,16 +249,6 @@ class GenerativeBenchmarksReport(StandardBaseModel):
             f"window.{humps.decamelize(k)} = {{}};": f"window.{humps.decamelize(k)} = {json.dumps(v, indent=2)};\n"
             for k, v in camel_data.items()
         }
-        print("________")
-        print("________")
-        print("________")
-        print("________")
-        print("ui_api_data")
-        print(ui_api_data)
-        print("________")
-        print("________")
-        print("________")
-        print("________")
         create_report(ui_api_data, path)
         return path
 

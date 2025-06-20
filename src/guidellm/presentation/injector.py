@@ -1,5 +1,5 @@
-from pathlib import Path
 import re
+from pathlib import Path
 from typing import Union
 
 from guidellm.config import settings
@@ -34,6 +34,7 @@ def create_report(js_data: dict, output_path: Union[str, Path]) -> Path:
     print(f"Report saved to {output_path}")
     return output_path
 
+
 def inject_data(
     js_data: dict,
     html: str,
@@ -60,6 +61,6 @@ def inject_data(
 
     # Rebuild the HTML
     new_head = f"<head>{head_content}</head>"
-    html = html[:head_match.start()] + new_head + html[head_match.end():]
+    html = html[: head_match.start()] + new_head + html[head_match.end() :]
 
     return html

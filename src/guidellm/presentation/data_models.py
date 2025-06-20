@@ -36,7 +36,7 @@ class Bucket(BaseModel):
 
         min_v = min(data)
         max_v = max(data)
-        range_v = max_v - min_v
+        range_v = (1 + max_v) - min_v
 
         if bucket_width is None:
             if n_buckets is None:
@@ -198,10 +198,14 @@ class TabularDistributionSummary(DistributionSummary):
     @computed_field
     @property
     def percentile_rows(self) -> list[dict[str, float]]:
-        return [
+        rows = [
             {"percentile": name, "value": value}
             for name, value in self.percentiles.model_dump().items()
         ]
+        filtered_rows = list(
+            filter(lambda row: row["percentile"] in ["p50", "p90", "p95", "p99"], rows)
+        )
+        return filtered_rows
 
     @classmethod
     def from_distribution_summary(

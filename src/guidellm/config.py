@@ -31,9 +31,9 @@ class Environment(str, Enum):
 
 ENV_REPORT_MAPPING = {
     Environment.PROD: "https://neuralmagic.github.io/guidellm/ui/latest/index.html",
-    Environment.STAGING: "https://neuralmagic.github.io/guidellm/ui/staging/latest/index.html",
-    Environment.DEV: "https://neuralmagic.github.io/guidellm/ui/pr/191/index.html",
-    Environment.LOCAL: "https://neuralmagic.github.io/guidellm/ui/dev/index.html",
+    Environment.STAGING: "https://neuralmagic.github.io/guidellm/ui/release/latest/index.html",
+    Environment.DEV: "https://neuralmagic.github.io/guidellm/ui/dev/index.html",
+    Environment.LOCAL: "http://localhost:3000/index.html",
 }
 
 
@@ -117,7 +117,7 @@ class Settings(BaseSettings):
     )
 
     # general settings
-    env: Environment = Environment.DEV
+    env: Environment = Environment.PROD
     default_async_loop_sleep: float = 10e-5
     logging: LoggingSettings = LoggingSettings()
     default_sweep_number: int = 10
