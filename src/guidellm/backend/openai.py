@@ -2,10 +2,13 @@ import base64
 import json
 import time
 from collections.abc import AsyncGenerator
+from functools import cached_property
 from pathlib import Path
 from typing import Any, Literal, Optional, Union
 
 import httpx
+import jinja2
+from jinja2.sandbox import ImmutableSandboxedEnvironment
 from loguru import logger
 from PIL import Image
 
@@ -123,6 +126,29 @@ class OpenAIHTTPBackend(Backend):
         self.extra_query = extra_query
         self.extra_body = extra_body
         self._async_client: Optional[httpx.AsyncClient] = None
+        self._request_template_str = settings.openai.request_template
+
+    def __getstate__(self) -> object:
+        state = self.__dict__.copy()
+        # Templates are not serializable
+        # so we delete it before pickling
+        state.pop("request_template", None)
+        return state
+
+    @cached_property
+    def request_template(self) -> jinja2.Template:
+        # Thanks to HuggingFace Tokenizers for this implementation
+        def tojson(x, ensure_ascii=False):
+            # We override the built-in tojson filter because Jinja's
+            # default filter escapes HTML characters
+            return json.dumps(x, ensure_ascii=ensure_ascii)
+
+        j2_env = ImmutableSandboxedEnvironment(trim_blocks=True, lstrip_blocks=True)
+
+        # Define custom filter functions
+        j2_env.filters["tojson"] = tojson
+
+        return j2_env.from_string(self._request_template_str)
 
     @property
     def target(self) -> str:
@@ -155,6 +181,7 @@ class OpenAIHTTPBackend(Backend):
             "project": self.project,
             "text_completions_path": TEXT_COMPLETIONS_PATH,
             "chat_completions_path": CHAT_COMPLETIONS_PATH,
+            "request_template": self._request_template_str,
         }
 
     async def reset(self) -> None:
@@ -431,29 +458,15 @@ class OpenAIHTTPBackend(Backend):
         max_output_tokens: Optional[int],
         **kwargs,
     ) -> dict:
-        payload = body or {}
+        payload = json.loads(
+            self.request_template.render(
+                model=self.model,
+                output_tokens=(max_output_tokens or self.max_output_tokens),
+            )
+        )
+        payload.update(body or {})
         payload.update(orig_kwargs or {})
         payload.update(kwargs)
-        payload["model"] = self.model
-        payload["stream"] = True
-        payload["stream_options"] = {
-            "include_usage": True,
-        }
-
-        if max_output_tokens or self.max_output_tokens:
-            logger.debug(
-                "{} adding payload args for setting output_token_count: {}",
-                self.__class__.__name__,
-                max_output_tokens or self.max_output_tokens,
-            )
-            payload["max_tokens"] = max_output_tokens or self.max_output_tokens
-            payload["max_completion_tokens"] = payload["max_tokens"]
-
-            if max_output_tokens:
-                # only set stop and ignore_eos if max_output_tokens set at request level
-                # otherwise the instance value is just the max to enforce we stay below
-                payload["stop"] = None
-                payload["ignore_eos"] = True
 
         return payload
 
