@@ -232,15 +232,10 @@ class GenerativeBenchmarksReport(StandardBaseModel):
     def save_html(self, path: str | Path) -> Path:
         """
         Download html, inject report data and save to a file.
-        If the file is a directory, it will create the report in a file named
-        benchmarks.html under the directory.
 
         :param path: The path to create the report at.
         :return: The path to the report.
         """
-
-        # json_data = json.dumps(data, indent=2)
-        # thing = f'window.{variable_name} = {json_data};'
 
         data_builder = UIDataBuilder(self.benchmarks)
         data = data_builder.to_dict()
