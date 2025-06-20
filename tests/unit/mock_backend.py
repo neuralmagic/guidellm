@@ -41,6 +41,9 @@ class MockBackend(Backend):
     def info(self) -> dict[str, Any]:
         return {}
 
+    async def reset(self) -> None:
+        pass
+
     async def prepare_multiprocessing(self):
         pass
 
