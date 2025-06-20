@@ -56,6 +56,7 @@ dependencies = [
     "pyyaml>=6.0.0",
     "rich",
     "transformers",
+    "pyhumps>=3.8.0",
 ]
 
 [project.optional-dependencies]
