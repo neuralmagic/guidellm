@@ -237,7 +237,7 @@ jobs:
         uses: redhat-actions/buildah-build@v2
         with:
           image: ${{ github.event.repository.name }}
-          tags: ${{ github.sha }}
+          tags: "pr-${{ github.event.number }}"
           containerfiles: |
             ./deploy/Containerfile
       - name: Push To ghcr.io
