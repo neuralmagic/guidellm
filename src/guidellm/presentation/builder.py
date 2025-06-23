@@ -1,14 +1,12 @@
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
-from guidellm.benchmark.benchmark import GenerativeBenchmark
+if TYPE_CHECKING:
+    from guidellm.benchmark.benchmark import GenerativeBenchmark
 
 from .data_models import BenchmarkDatum, RunInfo, WorkloadDetails
 
-__all__ = ["UIDataBuilder"]
-
-
 class UIDataBuilder:
-    def __init__(self, benchmarks: list[GenerativeBenchmark]):
+    def __init__(self, benchmarks: list["GenerativeBenchmark"]):
         self.benchmarks = benchmarks
 
     def build_run_info(self):

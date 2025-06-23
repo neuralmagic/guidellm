@@ -236,7 +236,7 @@ class GenerativeBenchmarksReport(StandardBaseModel):
         :param path: The path to create the report at.
         :return: The path to the report.
         """
-
+        from guidellm.presentation import UIDataBuilder
         data_builder = UIDataBuilder(self.benchmarks)
         data = data_builder.to_dict()
         camel_data = humps.camelize(data)

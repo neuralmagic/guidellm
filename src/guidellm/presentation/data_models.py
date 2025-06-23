@@ -1,25 +1,14 @@
 import random
 from collections import defaultdict
 from math import ceil
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, TYPE_CHECKING
 
 from pydantic import BaseModel, computed_field
 
-from guidellm.benchmark.benchmark import GenerativeBenchmark
+if TYPE_CHECKING:
+    from guidellm.benchmark.benchmark import GenerativeBenchmark
+
 from guidellm.objects.statistics import DistributionSummary
-
-__all__ = [
-    "BenchmarkDatum",
-    "Bucket",
-    "Dataset",
-    "Distribution",
-    "Model",
-    "RunInfo",
-    "Server",
-    "TokenDetails",
-    "WorkloadDetails",
-]
-
 
 class Bucket(BaseModel):
     value: float
@@ -76,7 +65,7 @@ class RunInfo(BaseModel):
     dataset: Dataset
 
     @classmethod
-    def from_benchmarks(cls, benchmarks: list[GenerativeBenchmark]):
+    def from_benchmarks(cls, benchmarks: list["GenerativeBenchmark"]):
         model = benchmarks[0].worker.backend_model or "N/A"
         timestamp = max(
             bm.run_stats.start_time for bm in benchmarks if bm.start_time is not None
@@ -117,7 +106,7 @@ class WorkloadDetails(BaseModel):
     server: Server
 
     @classmethod
-    def from_benchmarks(cls, benchmarks: list[GenerativeBenchmark]):
+    def from_benchmarks(cls, benchmarks: list["GenerativeBenchmark"]):
         target = benchmarks[0].worker.backend_target
         rate_type = benchmarks[0].args.profile.type_
         successful_requests = [
@@ -222,7 +211,7 @@ class BenchmarkDatum(BaseModel):
     time_per_request: TabularDistributionSummary
 
     @classmethod
-    def from_benchmark(cls, bm: GenerativeBenchmark):
+    def from_benchmark(cls, bm: "GenerativeBenchmark"):
         return cls(
             requests_per_second=bm.metrics.requests_per_second.successful.mean,
             tpot=TabularDistributionSummary.from_distribution_summary(
