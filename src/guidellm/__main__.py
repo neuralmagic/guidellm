@@ -289,7 +289,7 @@ def benchmark(
 @cli.command(help="Redisplay a saved benchmark report.")
 @click.argument(
     "path",
-    type=click.Path(),
+    type=click.Path(file_okay=True, dir_okay=False, exists=True),
     default=Path.cwd() / "benchmarks.json",
 )
 def display(path):

@@ -136,10 +136,11 @@ async def benchmark_generative_text(
     return report, saved_path
 
 def display_benchmarks_report(file: Path):
+    """
+    The command-line entry point for displaying a benchmarks report.
+    Assumes the file provided exists.
+    """
     console = GenerativeBenchmarksConsole(enabled=True)
-    if not file.exists():
-        console.print_line(f"File {file} not found.")
-        return
     report = GenerativeBenchmarksReport.load_file(file)
     console.benchmarks = report.benchmarks
     console.print_full_report()
