@@ -1,7 +1,7 @@
 import random
 from collections import defaultdict
 from math import ceil
-from typing import List, Optional, Tuple, TYPE_CHECKING
+from typing import List, Optional, Tuple, TYPE_CHECKING, Union
 
 from pydantic import BaseModel, computed_field
 
@@ -11,12 +11,12 @@ if TYPE_CHECKING:
 from guidellm.objects.statistics import DistributionSummary
 
 class Bucket(BaseModel):
-    value: float
+    value: Union[float, int]
     count: int
 
     @staticmethod
     def from_data(
-        data: List[float],
+        data: Union[List[float], List[int]],
         bucket_width: Optional[float] = None,
         n_buckets: Optional[int] = None,
     ) -> Tuple[List["Bucket"], float]:
@@ -34,7 +34,7 @@ class Bucket(BaseModel):
         else:
             n_buckets = ceil(range_v / bucket_width)
 
-        bucket_counts = defaultdict(int)
+        bucket_counts: defaultdict[Union[float, int], int] = defaultdict(int)
         for val in data:
             idx = int((val - min_v) // bucket_width)
             if idx >= n_buckets:
@@ -125,10 +125,10 @@ class WorkloadDetails(BaseModel):
         ]
 
         prompt_tokens = [
-            req.prompt_tokens for bm in benchmarks for req in bm.requests.successful
+            float(req.prompt_tokens) for bm in benchmarks for req in bm.requests.successful
         ]
         output_tokens = [
-            req.output_tokens for bm in benchmarks for req in bm.requests.successful
+            float(req.output_tokens) for bm in benchmarks for req in bm.requests.successful
         ]
 
         prompt_token_buckets, _prompt_token_bucket_width = Bucket.from_data(
@@ -184,7 +184,6 @@ class TabularDistributionSummary(DistributionSummary):
     `percentile_rows` helper.
     """
 
-    @computed_field
     @property
     def percentile_rows(self) -> list[dict[str, float]]:
         rows = [
