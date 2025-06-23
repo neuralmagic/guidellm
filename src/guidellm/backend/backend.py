@@ -110,6 +110,14 @@ class Backend(ABC):
         """
         ...
 
+    @abstractmethod
+    async def reset(self) -> None:
+        """
+        Reset the connection object. This is useful for backends that
+        reuse connections or have state that needs to be cleared.
+        """
+        ...
+
     async def validate(self):
         """
         Handle final setup and validate the backend is ready for use.
@@ -125,6 +133,8 @@ class Backend(ABC):
             prompt="Test connection", output_token_count=1
         ):  # type: ignore[attr-defined]
             pass
+
+        await self.reset()
 
     @abstractmethod
     async def check_setup(self):
