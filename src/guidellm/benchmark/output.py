@@ -229,7 +229,7 @@ class GenerativeBenchmarksReport(StandardBaseModel):
 
         return path
 
-    def save_html(self, path: str | Path) -> Path:
+    def save_html(self, path: Union[str, Path]) -> Path:
         """
         Download html, inject report data and save to a file.
 
@@ -244,8 +244,7 @@ class GenerativeBenchmarksReport(StandardBaseModel):
             f"window.{humps.decamelize(k)} = {{}};": f"window.{humps.decamelize(k)} = {json.dumps(v, indent=2)};\n"
             for k, v in camel_data.items()
         }
-        create_report(ui_api_data, path)
-        return path
+        return create_report(ui_api_data, path)
 
     @staticmethod
     def _file_setup(
