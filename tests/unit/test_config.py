@@ -49,10 +49,7 @@ def test_settings_from_env_variables(mocker):
 @pytest.mark.smoke
 def test_report_generation_default_source():
     settings = Settings(env=Environment.LOCAL)
-    assert (
-        settings.report_generation.source
-        == "http://localhost:3000/index.html"
-    )
+    assert settings.report_generation.source == "http://localhost:3000/index.html"
 
     settings = Settings(env=Environment.DEV)
     assert (

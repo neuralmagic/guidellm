@@ -37,7 +37,8 @@ def inject_data(
     html: str,
 ) -> str:
     """
-    Injects the json data into the HTML, replacing placeholders only within the <head> section.
+    Injects the json data into the HTML,
+    replacing placeholders only within the <head> section.
 
     :param js_data: the json data to inject
     :type js_data: dict
@@ -58,6 +59,4 @@ def inject_data(
 
     # Rebuild the HTML
     new_head = f"<head>{head_content}</head>"
-    html = html[: head_match.start()] + new_head + html[head_match.end() :]
-
-    return html
+    return html[: head_match.start()] + new_head + html[head_match.end() :]

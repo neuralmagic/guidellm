@@ -1,14 +1,15 @@
 import random
 from collections import defaultdict
 from math import ceil
-from typing import List, Optional, Tuple, TYPE_CHECKING, Union
+from typing import TYPE_CHECKING, Optional, Union
 
-from pydantic import BaseModel, computed_field
+from pydantic import BaseModel
 
 if TYPE_CHECKING:
     from guidellm.benchmark.benchmark import GenerativeBenchmark
 
 from guidellm.objects.statistics import DistributionSummary
+
 
 class Bucket(BaseModel):
     value: Union[float, int]
@@ -16,10 +17,10 @@ class Bucket(BaseModel):
 
     @staticmethod
     def from_data(
-        data: Union[List[float], List[int]],
+        data: Union[list[float], list[int]],
         bucket_width: Optional[float] = None,
         n_buckets: Optional[int] = None,
-    ) -> Tuple[List["Bucket"], float]:
+    ) -> tuple[list["Bucket"], float]:
         if not data:
             return [], 1.0
 
@@ -125,10 +126,14 @@ class WorkloadDetails(BaseModel):
         ]
 
         prompt_tokens = [
-            float(req.prompt_tokens) for bm in benchmarks for req in bm.requests.successful
+            float(req.prompt_tokens)
+            for bm in benchmarks
+            for req in bm.requests.successful
         ]
         output_tokens = [
-            float(req.output_tokens) for bm in benchmarks for req in bm.requests.successful
+            float(req.output_tokens)
+            for bm in benchmarks
+            for req in bm.requests.successful
         ]
 
         prompt_token_buckets, _prompt_token_bucket_width = Bucket.from_data(
@@ -190,10 +195,9 @@ class TabularDistributionSummary(DistributionSummary):
             {"percentile": name, "value": value}
             for name, value in self.percentiles.model_dump().items()
         ]
-        filtered_rows = list(
+        return list(
             filter(lambda row: row["percentile"] in ["p50", "p90", "p95", "p99"], rows)
         )
-        return filtered_rows
 
     @classmethod
     def from_distribution_summary(

@@ -15,8 +15,16 @@ class ExampleModel(BaseModel):
 @pytest.mark.smoke
 def test_inject_data():
     html = "<head><script>window.run_info = {};</script></head>"
-    expected_html = '<head><script>window.run_info = { \"model\": { \"name\": \"neuralmagic/Qwen2.5-7B-quantized.w8a8\" } };</script></head>'
-    js_data = { "window.run_info = {};": "window.run_info = { \"model\": { \"name\": \"neuralmagic/Qwen2.5-7B-quantized.w8a8\" } };" }
+    expected_html = (
+        "<head><script>"
+        "window.run_info ="
+        '{ "model": { "name": "neuralmagic/Qwen2.5-7B-quantized.w8a8" } };'
+        "</script></head>"
+    )
+    js_data = {
+        "window.run_info = {};": "window.run_info ="
+        '{ "model": { "name": "neuralmagic/Qwen2.5-7B-quantized.w8a8" } };'
+    }
     result = inject_data(
         js_data,
         html,
@@ -26,9 +34,17 @@ def test_inject_data():
 
 @pytest.mark.smoke
 def test_create_report_to_file(tmpdir):
-    js_data = { "window.run_info = {};": "window.run_info = { \"model\": { \"name\": \"neuralmagic/Qwen2.5-7B-quantized.w8a8\" } };" }
+    js_data = {
+        "window.run_info = {};": "window.run_info ="
+        '{ "model": { "name": "neuralmagic/Qwen2.5-7B-quantized.w8a8" } };'
+    }
     html_content = "<head><script>window.run_info = {};</script></head>"
-    expected_html_content = '<head><script>window.run_info = { \"model\": { \"name\": \"neuralmagic/Qwen2.5-7B-quantized.w8a8\" } };</script></head>'
+    expected_html_content = (
+        "<head><script>"
+        "window.run_info ="
+        '{ "model": { "name": "neuralmagic/Qwen2.5-7B-quantized.w8a8" } };'
+        "</script></head>"
+    )
 
     mock_html_path = tmpdir.join("template.html")
     mock_html_path.write(html_content)
@@ -44,9 +60,17 @@ def test_create_report_to_file(tmpdir):
 
 @pytest.mark.smoke
 def test_create_report_with_file_nested_in_dir(tmpdir):
-    js_data = { "window.run_info = {};": "window.run_info = { \"model\": { \"name\": \"neuralmagic/Qwen2.5-7B-quantized.w8a8\" } };" }
+    js_data = {
+        "window.run_info = {};": "window.run_info ="
+        '{ "model": { "name": "neuralmagic/Qwen2.5-7B-quantized.w8a8" } };'
+    }
     html_content = "<head><script>window.run_info = {};</script></head>"
-    expected_html_content = '<head><script>window.run_info = { \"model\": { \"name\": \"neuralmagic/Qwen2.5-7B-quantized.w8a8\" } };</script></head>'
+    expected_html_content = (
+        "<head><script>"
+        "window.run_info ="
+        '{ "model": { "name": "neuralmagic/Qwen2.5-7B-quantized.w8a8" } };'
+        "</script></head>"
+    )
 
     output_dir = tmpdir.mkdir("output_dir")
     mock_html_path = tmpdir.join("template.html")

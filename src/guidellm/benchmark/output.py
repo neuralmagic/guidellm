@@ -6,7 +6,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal, Optional, Union
 
-import humps
+import humps  # type: ignore[import-not-found]
 import yaml
 from pydantic import Field
 from rich.console import Console
@@ -236,14 +236,15 @@ class GenerativeBenchmarksReport(StandardBaseModel):
         :param path: The path to create the report at.
         :return: The path to the report.
         """
-        from guidellm.presentation import UIDataBuilder
+
         data_builder = UIDataBuilder(self.benchmarks)
         data = data_builder.to_dict()
         camel_data = humps.camelize(data)
-        ui_api_data = {
-            f"window.{humps.decamelize(k)} = {{}};": f"window.{humps.decamelize(k)} = {json.dumps(v, indent=2)};\n"
-            for k, v in camel_data.items()
-        }
+        ui_api_data = {}
+        for k, v in camel_data.items():
+            key = f"window.{humps.decamelize(k)} = {{}};"
+            value = f"window.{humps.decamelize(k)} = {json.dumps(v, indent=2)};\n"
+            ui_api_data[key] = value
         return create_report(ui_api_data, path)
 
     @staticmethod

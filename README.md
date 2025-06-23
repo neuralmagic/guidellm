@@ -160,6 +160,7 @@ GuideLLM UI is a companion frontend for visualizing the results of a GuideLLM be
 ### 🛠 Generating an HTML report with a benchmark run
 
 Set the output to benchmarks.html for your run:
+
 ```base
 --output-path=benchmarks.html
 ```
