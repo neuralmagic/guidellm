@@ -74,10 +74,6 @@
     "typescript": "^5",
     "typescript-eslint": "^8.34.0"
   },
-  "optionalDependencies": {
-    "@next/swc-linux-x64-gnu": "^15.3.3",
-    "@next/swc-linux-x64-musl": "^15.3.3"
-  },
   "lint-staged": {
     "*.js": "eslint --cache --fix",
     "*.ts": "eslint --cache --fix",
