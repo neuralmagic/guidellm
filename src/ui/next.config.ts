@@ -25,13 +25,6 @@ const nextConfig: NextConfig = {
         use: ['@svgr/webpack'],
       },
       {
-        test: /\.(png|jpe?g|gif|webp|avif)$/i,
-        type: 'asset/resource',
-        generator: {
-          filename: 'static/images/[name].[hash][ext]',
-        },
-      },
-      {
         test: /\.(woff|woff2|eot|ttf|otf)$/,
         type: 'asset/resource',
         generator: {
