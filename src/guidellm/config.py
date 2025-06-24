@@ -85,6 +85,12 @@ class OpenAISettings(BaseModel):
     project: Optional[str] = None
     base_url: str = "http://localhost:8000"
     max_output_tokens: int = 16384
+    request_template: str = (
+        '{"model": "{{ model }}", {% if output_tokens %} '
+        '"max_tokens": {{ output_tokens }}, "stop": null, '
+        '"ignore_eos": true, {% endif %} '
+        '"stream": true, "stream_options": {"include_usage": true}}'
+    )
 
 
 class Settings(BaseSettings):
