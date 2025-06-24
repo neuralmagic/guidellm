@@ -35,7 +35,7 @@ jobs:
           node-version: '22'
 
       - name: Install dependencies
-        run: npm ci
+        run: npm i
 
       - name: Run quality and typing checks
         run: npm run lint
@@ -70,7 +70,7 @@ jobs:
           node-version: '22'
 
       - name: Install dependencies
-        run: npm ci
+        run: npm i
 
       - name: Run quality and typing checks
         run: npm run type-check
@@ -105,7 +105,7 @@ jobs:
           node-version: '22'
 
       - name: Install dependencies
-        run: npm ci
+        run: npm i
 
       - name: Run pre-commit checks
         run: npx husky run pre-commit
@@ -140,7 +140,7 @@ jobs:
           node-version: '22'
 
       - name: Install dependencies
-        run: npm ci
+        run: npm i
 
       - name: Run unit tests
         run: npm run test:unit
@@ -175,7 +175,7 @@ jobs:
           node-version: '22'
 
       - name: Install dependencies
-        run: npm ci
+        run: npm i
 
       - name: Run integration tests
         run: npm run test:integration
@@ -261,7 +261,7 @@ jobs:
 
       - name: Install dependencies
         if: steps.check-changes.outputs.should_build == 'true'
-        run: npm ci
+        run: npm i
 
       - name: Build app to root
         if: steps.check-changes.outputs.should_build == 'true'
