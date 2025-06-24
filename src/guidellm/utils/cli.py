@@ -46,7 +46,6 @@ class Union(click.ParamType):
 
         self.fail("; ".join(fails) or f"Invalid value: {value}")  # noqa: RET503
 
-
     def get_metavar(self, param: click.Parameter) -> str:
         def get_choices(t: click.ParamType) -> str:
             meta = t.get_metavar(param)
