@@ -15,8 +15,20 @@ from guidellm.benchmark.output import (
 )
 from guidellm.benchmark.profile import ProfileType, create_profile
 from guidellm.benchmark.progress import GenerativeTextBenchmarkerProgressDisplay
+from guidellm.benchmark.scenario import GenerativeTextScenario, Scenario
 from guidellm.request import GenerativeRequestLoader
 from guidellm.scheduler import StrategyType
+
+
+async def benchmark_with_scenario(scenario: Scenario, **kwargs):
+    """
+    Run a benchmark using a scenario and specify any extra arguments
+    """
+
+    if isinstance(scenario, GenerativeTextScenario):
+        return await benchmark_generative_text(**vars(scenario), **kwargs)
+    else:
+        raise ValueError(f"Unsupported Scenario type {type(scenario)}")
 
 
 async def benchmark_generative_text(
@@ -43,13 +55,13 @@ async def benchmark_generative_text(
     max_requests: Optional[int],
     warmup_percent: Optional[float],
     cooldown_percent: Optional[float],
-    show_progress: bool,
-    show_progress_scheduler_stats: bool,
-    output_console: bool,
     output_path: Optional[Union[str, Path]],
     output_extras: Optional[dict[str, Any]],
     output_sampling: Optional[int],
     random_seed: int,
+    show_progress: bool = True,
+    show_progress_scheduler_stats: bool = False,
+    output_console: bool = True,
 ) -> tuple[GenerativeBenchmarksReport, Optional[Path]]:
     console = GenerativeBenchmarksConsole(enabled=show_progress)
     console.print_line("Creating backend...")
