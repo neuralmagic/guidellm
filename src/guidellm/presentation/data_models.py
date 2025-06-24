@@ -3,7 +3,7 @@ from collections import defaultdict
 from math import ceil
 from typing import TYPE_CHECKING, Optional, Union
 
-from pydantic import BaseModel
+from pydantic import BaseModel, computed_field
 
 if TYPE_CHECKING:
     from guidellm.benchmark.benchmark import GenerativeBenchmark
@@ -189,6 +189,7 @@ class TabularDistributionSummary(DistributionSummary):
     `percentile_rows` helper.
     """
 
+    @computed_field
     @property
     def percentile_rows(self) -> list[dict[str, float]]:
         rows = [

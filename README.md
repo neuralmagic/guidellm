@@ -185,7 +185,13 @@ npm run build
 npm run serve
 ```
 
-This will start a local server (e.g., at http://localhost:3000). Then, in your GuideLLM config or CLI flags, point to this local server as the asset base for report generation. You can set the Environment to LOCAL before running your benchmarks to accomplish this.
+This will start a local server (e.g., at http://localhost:3000). Then set the Environment to LOCAL before running your benchmarks.
+
+```bash
+export GUIDELLM__ENV=local
+
+Alternatively, in config.py update the ENV_REPORT_MAPPING used as the asset base for report generation to the LOCAL option.
+```
 
 ## Resources
 
