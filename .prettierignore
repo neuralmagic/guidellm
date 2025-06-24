@@ -12,7 +12,7 @@
 !tests/ui/**/*.json
 
 # Root-level configs to format
-!/.eslintrc.json
+!/.eslint.config.js
 !/tsconfig*.json
 !/*.config.{js,ts}
 !/jest.setup.ts
