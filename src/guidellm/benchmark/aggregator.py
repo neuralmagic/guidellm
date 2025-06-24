@@ -403,7 +403,7 @@ class BenchmarkAggregator(
         in_warmup_duration = (
             self.args.warmup_duration
             and result.request_info.worker_start
-            <= (global_start_time - self.args.warmup_duration)
+            <= (global_start_time + self.args.warmup_duration)
         )
 
         if in_warmup_number or in_warmup_duration:

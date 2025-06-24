@@ -1,41 +1,23 @@
 import asyncio
-import json
+import codecs
 from pathlib import Path
 from typing import get_args
 
 import click
+from pydantic import ValidationError
 
 from guidellm.backend import BackendType
-from guidellm.benchmark import ProfileType, benchmark_generative_text
+from guidellm.benchmark import ProfileType
+from guidellm.benchmark.entrypoints import benchmark_with_scenario
+from guidellm.benchmark.scenario import GenerativeTextScenario, get_builtin_scenarios
 from guidellm.config import print_config
+from guidellm.preprocess.dataset import ShortPromptStrategy, process_dataset
 from guidellm.scheduler import StrategyType
+from guidellm.utils import cli as cli_tools
 
 STRATEGY_PROFILE_CHOICES = set(
     list(get_args(ProfileType)) + list(get_args(StrategyType))
 )
-
-
-def parse_json(ctx, param, value):  # noqa: ARG001
-    if value is None:
-        return None
-    try:
-        return json.loads(value)
-    except json.JSONDecodeError as err:
-        raise click.BadParameter(f"{param.name} must be a valid JSON string.") from err
-
-
-def parse_number_str(ctx, param, value):  # noqa: ARG001
-    if value is None:
-        return None
-
-    values = value.split(",") if "," in value else [value]
-
-    try:
-        return [float(val) for val in values]
-    except ValueError as err:
-        raise click.BadParameter(
-            f"{param.name} must be a number or comma-separated list of numbers."
-        ) from err
 
 
 @click.group()
@@ -44,11 +26,30 @@ def cli():
 
 
 @cli.command(
-    help="Run a benchmark against a generative model using the specified arguments."
+    help="Run a benchmark against a generative model using the specified arguments.",
+    context_settings={"auto_envvar_prefix": "GUIDELLM"},
+)
+@click.option(
+    "--scenario",
+    type=cli_tools.Union(
+        click.Path(
+            exists=True,
+            readable=True,
+            file_okay=True,
+            dir_okay=False,
+            path_type=Path,  # type: ignore[type-var]
+        ),
+        click.Choice(get_builtin_scenarios()),
+    ),
+    default=None,
+    help=(
+        "The name of a builtin scenario or path to a config file. "
+        "Missing values from the config will use defaults. "
+        "Options specified on the commandline will override the scenario."
+    ),
 )
 @click.option(
     "--target",
-    required=True,
     type=str,
     help="The target path for the backend to run benchmarks against. For example, http://localhost:8000",
 )
@@ -59,12 +60,12 @@ def cli():
         "The type of backend to use to run requests against. Defaults to 'openai_http'."
         f" Supported types: {', '.join(get_args(BackendType))}"
     ),
-    default="openai_http",
+    default=GenerativeTextScenario.get_default("backend_type"),
 )
 @click.option(
     "--backend-args",
-    callback=parse_json,
-    default=None,
+    callback=cli_tools.parse_json,
+    default=GenerativeTextScenario.get_default("backend_args"),
     help=(
         "A JSON string containing any arguments to pass to the backend as a "
         "dict with **kwargs."
@@ -72,7 +73,7 @@ def cli():
 )
 @click.option(
     "--model",
-    default=None,
+    default=GenerativeTextScenario.get_default("model"),
     type=str,
     help=(
         "The ID of the model to benchmark within the backend. "
@@ -81,7 +82,7 @@ def cli():
 )
 @click.option(
     "--processor",
-    default=None,
+    default=GenerativeTextScenario.get_default("processor"),
     type=str,
     help=(
         "The processor or tokenizer to use to calculate token counts for statistics "
@@ -91,8 +92,8 @@ def cli():
 )
 @click.option(
     "--processor-args",
-    default=None,
-    callback=parse_json,
+    default=GenerativeTextScenario.get_default("processor_args"),
+    callback=cli_tools.parse_json,
     help=(
         "A JSON string containing any arguments to pass to the processor constructor "
         "as a dict with **kwargs."
@@ -100,7 +101,6 @@ def cli():
 )
 @click.option(
     "--data",
-    required=True,
     type=str,
     help=(
         "The HuggingFace dataset ID, a path to a HuggingFace dataset, "
@@ -110,7 +110,8 @@ def cli():
 )
 @click.option(
     "--data-args",
-    callback=parse_json,
+    default=GenerativeTextScenario.get_default("data_args"),
+    callback=cli_tools.parse_json,
     help=(
         "A JSON string containing any arguments to pass to the dataset creation "
         "as a dict with **kwargs."
@@ -118,7 +119,7 @@ def cli():
 )
 @click.option(
     "--data-sampler",
-    default=None,
+    default=GenerativeTextScenario.get_default("data_sampler"),
     type=click.Choice(["random"]),
     help=(
         "The data sampler type to use. 'random' will add a random shuffle on the data. "
@@ -127,7 +128,6 @@ def cli():
 )
 @click.option(
     "--rate-type",
-    required=True,
     type=click.Choice(STRATEGY_PROFILE_CHOICES),
     help=(
         "The type of benchmark to run. "
@@ -136,8 +136,7 @@ def cli():
 )
 @click.option(
     "--rate",
-    default=None,
-    callback=parse_number_str,
+    default=GenerativeTextScenario.get_default("rate"),
     help=(
         "The rates to run the benchmark at. "
         "Can be a single number or a comma-separated list of numbers. "
@@ -150,6 +149,7 @@ def cli():
 @click.option(
     "--max-seconds",
     type=float,
+    default=GenerativeTextScenario.get_default("max_seconds"),
     help=(
         "The maximum number of seconds each benchmark can run for. "
         "If None, will run until max_requests or the data is exhausted."
@@ -158,6 +158,7 @@ def cli():
 @click.option(
     "--max-requests",
     type=int,
+    default=GenerativeTextScenario.get_default("max_requests"),
     help=(
         "The maximum number of requests each benchmark can run for. "
         "If None, will run until max_seconds or the data is exhausted."
@@ -166,7 +167,7 @@ def cli():
 @click.option(
     "--warmup-percent",
     type=float,
-    default=None,
+    default=GenerativeTextScenario.get_default("warmup_percent"),
     help=(
         "The percent of the benchmark (based on max-seconds, max-requets, "
         "or lenth of dataset) to run as a warmup and not include in the final results. "
@@ -176,6 +177,7 @@ def cli():
 @click.option(
     "--cooldown-percent",
     type=float,
+    default=GenerativeTextScenario.get_default("cooldown_percent"),
     help=(
         "The percent of the benchmark (based on max-seconds, max-requets, or lenth "
         "of dataset) to run as a cooldown and not include in the final results. "
@@ -210,7 +212,7 @@ def cli():
 )
 @click.option(
     "--output-extras",
-    callback=parse_json,
+    callback=cli_tools.parse_json,
     help="A JSON string of extra data to save with the output benchmarks",
 )
 @click.option(
@@ -220,15 +222,16 @@ def cli():
         "The number of samples to save in the output file. "
         "If None (default), will save all samples."
     ),
-    default=None,
+    default=GenerativeTextScenario.get_default("output_sampling"),
 )
 @click.option(
     "--random-seed",
-    default=42,
+    default=GenerativeTextScenario.get_default("random_seed"),
     type=int,
     help="The random seed to use for benchmarking to ensure reproducibility.",
 )
 def benchmark(
+    scenario,
     target,
     backend_type,
     backend_args,
@@ -252,32 +255,69 @@ def benchmark(
     output_sampling,
     random_seed,
 ):
+    click_ctx = click.get_current_context()
+
+    overrides = cli_tools.set_if_not_default(
+        click_ctx,
+        target=target,
+        backend_type=backend_type,
+        backend_args=backend_args,
+        model=model,
+        processor=processor,
+        processor_args=processor_args,
+        data=data,
+        data_args=data_args,
+        data_sampler=data_sampler,
+        rate_type=rate_type,
+        rate=rate,
+        max_seconds=max_seconds,
+        max_requests=max_requests,
+        warmup_percent=warmup_percent,
+        cooldown_percent=cooldown_percent,
+        output_sampling=output_sampling,
+        random_seed=random_seed,
+    )
+
+    try:
+        # If a scenario file was specified read from it
+        if scenario is None:
+            _scenario = GenerativeTextScenario.model_validate(overrides)
+        elif isinstance(scenario, Path):
+            _scenario = GenerativeTextScenario.from_file(scenario, overrides)
+        else:  # Only builtins can make it here; click will catch anything else
+            _scenario = GenerativeTextScenario.from_builtin(scenario, overrides)
+    except ValidationError as e:
+        # Translate pydantic valdation error to click argument error
+        errs = e.errors(include_url=False, include_context=True, include_input=True)
+        param_name = "--" + str(errs[0]["loc"][0]).replace("_", "-")
+        raise click.BadParameter(
+            errs[0]["msg"], ctx=click_ctx, param_hint=param_name
+        ) from e
+
     asyncio.run(
-        benchmark_generative_text(
-            target=target,
-            backend_type=backend_type,
-            backend_args=backend_args,
-            model=model,
-            processor=processor,
-            processor_args=processor_args,
-            data=data,
-            data_args=data_args,
-            data_sampler=data_sampler,
-            rate_type=rate_type,
-            rate=rate,
-            max_seconds=max_seconds,
-            max_requests=max_requests,
-            warmup_percent=warmup_percent,
-            cooldown_percent=cooldown_percent,
+        benchmark_with_scenario(
+            scenario=_scenario,
             show_progress=not disable_progress,
             show_progress_scheduler_stats=display_scheduler_stats,
             output_console=not disable_console_outputs,
             output_path=output_path,
             output_extras=output_extras,
-            output_sampling=output_sampling,
-            random_seed=random_seed,
         )
     )
+
+
+def decode_escaped_str(_ctx, _param, value):
+    """
+    Click auto adds characters. For example, when using --pad-char "\n",
+    it parses it as "\\n". This method decodes the string to handle escape
+    sequences correctly.
+    """
+    if value is None:
+        return None
+    try:
+        return codecs.decode(value, "unicode_escape")
+    except Exception as e:
+        raise click.BadParameter(f"Could not decode escape sequences: {e}") from e
 
 
 @cli.command(
@@ -288,6 +328,141 @@ def benchmark(
 )
 def config():
     print_config()
+
+
+@cli.group(help="General preprocessing tools and utilities.")
+def preprocess():
+    pass
+
+
+@preprocess.command(
+    help=(
+        "Convert a dataset to have specific prompt and output token sizes.\n"
+        "DATA: Path to the input dataset or dataset ID.\n"
+        "OUTPUT_PATH: Path to save the converted dataset, including file suffix."
+    ),
+    context_settings={"auto_envvar_prefix": "GUIDELLM"},
+)
+@click.argument(
+    "data",
+    type=str,
+    required=True,
+)
+@click.argument(
+    "output_path",
+    type=click.Path(file_okay=True, dir_okay=False, writable=True, resolve_path=True),
+    required=True,
+)
+@click.option(
+    "--processor",
+    type=str,
+    required=True,
+    help=(
+        "The processor or tokenizer to use to calculate token counts for statistics "
+        "and synthetic data generation."
+    ),
+)
+@click.option(
+    "--processor-args",
+    default=None,
+    callback=cli_tools.parse_json,
+    help=(
+        "A JSON string containing any arguments to pass to the processor constructor "
+        "as a dict with **kwargs."
+    ),
+)
+@click.option(
+    "--data-args",
+    callback=cli_tools.parse_json,
+    help=(
+        "A JSON string containing any arguments to pass to the dataset creation "
+        "as a dict with **kwargs."
+    ),
+)
+@click.option(
+    "--short-prompt-strategy",
+    type=click.Choice([s.value for s in ShortPromptStrategy]),
+    default=ShortPromptStrategy.IGNORE.value,
+    show_default=True,
+    help="Strategy to handle prompts shorter than the target length. ",
+)
+@click.option(
+    "--pad-char",
+    type=str,
+    default="",
+    callback=decode_escaped_str,
+    help="The token to pad short prompts with when using the 'pad' strategy.",
+)
+@click.option(
+    "--concat-delimiter",
+    type=str,
+    default="",
+    help=(
+        "The delimiter to use when concatenating prompts that are too short."
+        " Used when strategy is 'concatenate'."
+    ),
+)
+@click.option(
+    "--prompt-tokens",
+    type=str,
+    default=None,
+    help="Prompt tokens config (JSON, YAML file or key=value string)",
+)
+@click.option(
+    "--output-tokens",
+    type=str,
+    default=None,
+    help="Output tokens config (JSON, YAML file or key=value string)",
+)
+@click.option(
+    "--push-to-hub",
+    is_flag=True,
+    help="Set this flag to push the converted dataset to the Hugging Face Hub.",
+)
+@click.option(
+    "--hub-dataset-id",
+    type=str,
+    default=None,
+    help="The Hugging Face Hub dataset ID to push to. "
+    "Required if --push-to-hub is used.",
+)
+@click.option(
+    "--random-seed",
+    type=int,
+    default=42,
+    show_default=True,
+    help="Random seed for prompt token sampling and output tokens sampling.",
+)
+def dataset(
+    data,
+    output_path,
+    processor,
+    processor_args,
+    data_args,
+    short_prompt_strategy,
+    pad_char,
+    concat_delimiter,
+    prompt_tokens,
+    output_tokens,
+    push_to_hub,
+    hub_dataset_id,
+    random_seed,
+):
+    process_dataset(
+        data=data,
+        output_path=output_path,
+        processor=processor,
+        prompt_tokens=prompt_tokens,
+        output_tokens=output_tokens,
+        processor_args=processor_args,
+        data_args=data_args,
+        short_prompt_strategy=short_prompt_strategy,
+        pad_char=pad_char,
+        concat_delimiter=concat_delimiter,
+        push_to_hub=push_to_hub,
+        hub_dataset_id=hub_dataset_id,
+        random_seed=random_seed,
+    )
 
 
 if __name__ == "__main__":
