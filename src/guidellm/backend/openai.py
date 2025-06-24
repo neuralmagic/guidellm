@@ -157,6 +157,15 @@ class OpenAIHTTPBackend(Backend):
             "chat_completions_path": CHAT_COMPLETIONS_PATH,
         }
 
+    async def reset(self) -> None:
+        """
+        Reset the connection object. This is useful for backends that
+        reuse connections or have state that needs to be cleared.
+        For this backend, it closes the async client if it exists.
+        """
+        if self._async_client is not None:
+            await self._async_client.aclose()
+
     async def check_setup(self):
         """
         Check if the backend is setup correctly and can be used for requests.
@@ -361,7 +370,7 @@ class OpenAIHTTPBackend(Backend):
 
         :return: The async HTTP client.
         """
-        if self._async_client is None:
+        if self._async_client is None or self._async_client.is_closed:
             client = httpx.AsyncClient(
                 http2=self.http2,
                 timeout=self.timeout,

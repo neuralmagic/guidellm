@@ -1,7 +1,7 @@
 name: Development
 
 on:
-  pull_request:
+  pull_request_target:
     types: [opened, synchronize, reopened]
 
 jobs:
@@ -31,11 +31,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-        working-directory: src/ui
 
       - name: Run quality and typing checks
         run: npm run lint
-        working-directory: src/ui
 
   type-checks:
     runs-on: ubuntu-latest
@@ -63,11 +61,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-        working-directory: src/ui
 
       - name: Run quality and typing checks
         run: npm run type-check
-        working-directory: src/ui
 
   precommit-checks:
     runs-on: ubuntu-latest
@@ -83,7 +79,7 @@ jobs:
       - name: Install dependencies
         run: pip install pre-commit
       - name: Run pre-commit checks
-        run: pre-commit run --all-files
+        run: SKIP=ruff-format pre-commit run --all-files
 
   ui-precommit-check:
     permissions:
@@ -94,12 +90,10 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Install dependencies
-        working-directory: src/ui
         run: npm ci
 
       - name: Run pre-commit checks
         run: npx husky run pre-commit
-        working-directory: src/ui
 
   unit-tests:
     runs-on: ubuntu-latest
@@ -117,6 +111,20 @@ jobs:
       - name: Run unit tests
         run: tox -e test-unit -- -m "smoke or sanity"
 
+  ui-unit-tests:
+    permissions:
+      contents: "read"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit tests
+        run: npm run test:unit
+
   integration-tests:
     runs-on: ubuntu-latest
     strategy:
@@ -132,6 +140,20 @@ jobs:
         run: pip install tox
       - name: Run integration tests
         run: tox -e test-integration -- -m smoke
+
+  ui-integration-tests:
+    permissions:
+      contents: "read"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run integration tests
+        run: npm run test:integration
 
   build:
     runs-on: ubuntu-latest

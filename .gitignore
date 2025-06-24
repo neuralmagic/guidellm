@@ -217,7 +217,7 @@ yarn-error.log*
 src/ui/.vercel
 
 # typescript
-src/ui/*.tsbuildinfo
+*.tsbuildinfo
 src/ui/next-env.d.ts
 
 # Root-level UI config files that should be tracked
@@ -225,3 +225,6 @@ src/ui/next-env.d.ts
 !package-lock.json
 !.eslintrc.json
 !tsconfig.json
+!tsconfig.*.json
+!src/ui/lib
+!src/ui/public/manifest.json

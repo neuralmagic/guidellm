@@ -1,0 +1,22 @@
+{
+  "extends": "./tsconfig.base.json",
+
+  /* Extra options that apply only to Node-side files */
+  "compilerOptions": {
+    "types": ["node"], // Buffer, process, __dirname, etc.
+    "allowJs": false,
+    "isolatedModules": true
+  },
+
+  /* Narrow include so we don’t compile the entire repo twice */
+  "include": [
+    "*.ts",
+    "*.cts",
+    "*.mts", // a couple of root-level scripts
+    "scripts/**/*",
+    "types/**/*"
+  ],
+
+  /* Don’t touch the Next.js source or tests from here */
+  "exclude": ["src/ui", "tests", "node_modules"]
+}
