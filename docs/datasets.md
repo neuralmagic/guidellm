@@ -46,7 +46,6 @@ For different use cases, here are the recommended dataset profiles to pass as ar
 - **Summarization**: `--data "prompt_tokens=1024,output_tokens=256"`
 - **Code Generation**: `--data "prompt_tokens=512,output_tokens=512"`
 
-
 #### Example Commands
 
 ```bash
