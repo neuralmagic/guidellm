@@ -263,6 +263,9 @@ jobs:
         if: steps.check-changes.outputs.should_build == 'true'
         run: npm ci
 
+      - name: Reinstall Sharp for Linux
+        run: npm install --platform=linux --arch=x64 sharp
+
       - name: Build app to root
         if: steps.check-changes.outputs.should_build == 'true'
         id: build
