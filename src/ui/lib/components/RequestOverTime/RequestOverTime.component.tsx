@@ -50,7 +50,7 @@ export const Component: FC<RequestOverTimeProps> = ({
             lines={lines}
             width={312}
             height={85}
-            xLegend="time"
+            xLegend="time (sec)"
             margins={{ bottom: 30 }}
             containerSize={containerSize}
           />

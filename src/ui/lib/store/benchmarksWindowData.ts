@@ -1,17 +1,20 @@
-export const benchmarksScript = `window.benchmarks = {
-  "benchmarks": [
+export const benchmarksScript = `window.benchmarks =  [
     {
       "requestsPerSecond": 0.6668550387660497,
       "tpot": {
-        "statistics": {
           "total": 80,
           "mean": 23.00635663936911,
           "median": 22.959455611213805,
           "min": 22.880917503720237,
           "max": 24.14080301920573,
-          "std": 0.18918760384209338
-        },
-        "percentiles": [
+          "std": 0.18918760384209338,
+        "percentiles": {
+          "p50": 22.959455611213805,
+          "p90": 23.01789086962503,
+          "p95": 23.30297423947242,
+          "p99": 24.14080301920573,
+          },
+        "percentileRows": [
           {
             "percentile": "p50",
             "value": 22.959455611213805
@@ -31,15 +34,19 @@ export const benchmarksScript = `window.benchmarks = {
         ]
       },
       "ttft": {
-        "statistics": {
           "total": 80,
           "mean": 49.64659512042999,
           "median": 49.23129081726074,
           "min": 44.538259506225586,
           "max": 55.47308921813965,
-          "std": 1.7735485090634995
-        },
-        "percentiles": [
+          "std": 1.7735485090634995,
+        "percentiles": {
+          "p50": 49.23129081726074,
+          "p90": 50.16160011291504,
+          "p95": 54.918766021728516,
+          "p99": 55.47308921813965,
+          },
+        "percentileRows": [
           {
             "percentile": "p50",
             "value": 49.23129081726074
@@ -59,15 +66,19 @@ export const benchmarksScript = `window.benchmarks = {
         ]
       },
       "throughput": {
-        "statistics": {
           "total": 210,
           "mean": 42.58702991319684,
           "median": 43.536023084668,
           "min": 0.0,
           "max": 43.68247620237872,
-          "std": 4.559764488536857
+          "std": 4.559764488536857,
+        "percentiles": {
+          "p50": 43.536023084668,
+          "p90": 43.62613633999709,
+          "p95": 43.64020767654067,
+          "p99": 43.68202126662431,
         },
-        "percentiles": [
+        "percentileRows": [
           {
             "percentile": "p50",
             "value": 43.536023084668
@@ -87,15 +98,19 @@ export const benchmarksScript = `window.benchmarks = {
         ]
       },
       "timePerRequest": {
-        "statistics": {
           "total": 80,
           "mean": 1496.706646680832,
           "median": 1496.1087703704834,
           "min": 1490.584135055542,
           "max": 1505.8784484863281,
-          "std": 3.4553340533022667
-        },
-        "percentiles": [
+          "std": 3.4553340533022667,
+        "percentiles": {
+          "p50": 1496.1087703704834,
+          "p90": 1500.9305477142334,
+          "p95": 1505.3200721740723,
+          "p99": 1505.8784484863281,
+          },
+        "percentileRows": [
           {
             "percentile": "p50",
             "value": 1496.1087703704834
@@ -118,15 +133,19 @@ export const benchmarksScript = `window.benchmarks = {
     {
       "requestsPerSecond": 28.075330129628725,
       "tpot": {
-        "statistics": {
           "total": 3416,
           "mean": 126.08707076148656,
           "median": 125.30853256346687,
           "min": 23.034303907364134,
           "max": 138.08223756693178,
-          "std": 3.508992115582193
-        },
-        "percentiles": [
+          "std": 3.508992115582193,
+        "percentiles": {
+          "p50": 125.30853256346687,
+          "p90": 129.21135009281218,
+          "p95": 129.52291770059554,
+          "p99": 132.21229490686636,
+          },
+        "percentileRows": [
           {
             "percentile": "p50",
             "value": 125.30853256346687
@@ -146,15 +165,19 @@ export const benchmarksScript = `window.benchmarks = {
         ]
       },
       "ttft": {
-        "statistics": {
           "total": 3416,
           "mean": 8585.486161415694,
           "median": 8965.316534042358,
           "min": 110.53991317749023,
           "max": 12575.379610061646,
-          "std": 1929.5632525234505
-        },
-        "percentiles": [
+          "std": 1929.5632525234505,
+        "percentiles": {
+          "p50": 8965.316534042358,
+          "p90": 9231.79316520691,
+          "p95": 9485.00108718872,
+          "p99": 12096.465587615967,
+          },
+        "percentileRows": [
           {
             "percentile": "p50",
             "value": 8965.316534042358
@@ -174,15 +197,19 @@ export const benchmarksScript = `window.benchmarks = {
         ]
       },
       "throughput": {
-        "statistics": {
           "total": 15981,
           "mean": 1795.4403743554367,
           "median": 670.1236619268253,
           "min": 0.0,
           "max": 838860.8,
-          "std": 5196.545581836957
-        },
-        "percentiles": [
+          "std": 5196.545581836957,
+        "percentiles": {
+          "p50": 670.1236619268253,
+          "p90": 4068.1901066925316,
+          "p95": 6374.322188449848,
+          "p99": 16194.223938223939,
+          },
+        "percentileRows": [
           {
             "percentile": "p50",
             "value": 670.1236619268253
@@ -202,15 +229,19 @@ export const benchmarksScript = `window.benchmarks = {
         ]
       },
       "timePerRequest": {
-        "statistics": {
           "total": 3416,
           "mean": 16526.811318389147,
           "median": 17058.441638946533,
           "min": 1711.3444805145264,
           "max": 20646.55351638794,
-          "std": 2054.9553770234484
-        },
-        "percentiles": [
+          "std": 2054.9553770234484,
+        "percentiles": {
+          "p50": 17058.441638946533,
+          "p90": 17143.84412765503,
+          "p95": 17248.060703277588,
+          "p99": 20116.52660369873,
+          },
+        "percentileRows": [
           {
             "percentile": "p50",
             "value": 17058.441638946533
@@ -233,15 +264,19 @@ export const benchmarksScript = `window.benchmarks = {
     {
       "requestsPerSecond": 4.071681142252993,
       "tpot": {
-        "statistics": {
           "total": 488,
           "mean": 24.898151556004148,
           "median": 24.889995181371294,
           "min": 24.822999560643755,
           "max": 26.217273871103924,
-          "std": 0.11227504505081555
-        },
-        "percentiles": [
+          "std": 0.11227504505081555,
+        "percentiles": {
+          "p50": 24.889995181371294,
+          "p90": 24.90483389960395,
+          "p95": 24.965975019666885,
+          "p99": 25.306613214554325,
+          },
+        "percentileRows": [
           {
             "percentile": "p50",
             "value": 24.889995181371294
@@ -261,15 +296,19 @@ export const benchmarksScript = `window.benchmarks = {
         ]
       },
       "ttft": {
-        "statistics": {
           "total": 488,
           "mean": 58.341102033364976,
           "median": 58.38632583618164,
           "min": 44.857025146484375,
           "max": 111.23061180114746,
-          "std": 8.190008649880411
-        },
-        "percentiles": [
+          "std": 8.190008649880411,
+        "percentiles": {
+          "p50": 58.38632583618164,
+          "p90": 67.66843795776367,
+          "p95": 68.76754760742188,
+          "p99": 71.46525382995605,
+          },
+        "percentileRows": [
           {
             "percentile": "p50",
             "value": 58.38632583618164
@@ -289,15 +328,19 @@ export const benchmarksScript = `window.benchmarks = {
         ]
       },
       "throughput": {
-        "statistics": {
           "total": 11338,
           "mean": 260.42072092623033,
           "median": 47.630070406540995,
           "min": 0.0,
           "max": 838860.8,
-          "std": 886.8274389295076
-        },
-        "percentiles": [
+          "std": 886.8274389295076,
+        "percentiles": {
+          "p50": 47.630070406540995,
+          "p90": 604.8895298528987,
+          "p95": 1621.9273008507348,
+          "p99": 3054.846321922797,
+          },
+        "percentileRows": [
           {
             "percentile": "p50",
             "value": 47.630070406540995
@@ -317,15 +360,19 @@ export const benchmarksScript = `window.benchmarks = {
         ]
       },
       "timePerRequest": {
-        "statistics": {
           "total": 488,
           "mean": 1626.5668087318297,
           "median": 1626.236915588379,
           "min": 1611.9341850280762,
           "max": 1690.2406215667725,
-          "std": 8.871477705542668
-        },
-        "percentiles": [
+          "std": 8.871477705542668,
+        "percentiles": {
+          "p50": 1626.236915588379,
+          "p90": 1635.761022567749,
+          "p95": 1637.390375137329,
+          "p99": 1643.500804901123,
+          },
+        "percentileRows": [
           {
             "percentile": "p50",
             "value": 1626.236915588379
@@ -348,15 +395,19 @@ export const benchmarksScript = `window.benchmarks = {
     {
       "requestsPerSecond": 7.466101414346809,
       "tpot": {
-        "statistics": {
           "total": 895,
           "mean": 27.56459906601014,
           "median": 27.525402250744047,
           "min": 26.69054911686824,
           "max": 29.5785041082473,
-          "std": 0.18545649185329754
-        },
-        "percentiles": [
+          "std": 0.18545649185329754,
+        "percentiles": {
+          "p50": 27.525402250744047,
+          "p90": 27.62497795952691,
+          "p95": 27.947206345815506,
+          "p99": 28.41202157442687,
+          },
+        "percentileRows": [
           {
             "percentile": "p50",
             "value": 27.525402250744047
@@ -376,15 +427,19 @@ export const benchmarksScript = `window.benchmarks = {
         ]
       },
       "ttft": {
-        "statistics": {
           "total": 895,
           "mean": 64.73036744741088,
           "median": 62.484025955200195,
           "min": 48.038482666015625,
           "max": 256.4809322357178,
-          "std": 21.677914089867077
-        },
-        "percentiles": [
+          "std": 21.677914089867077,
+        "percentiles": {
+          "p50": 62.484025955200195,
+          "p90": 72.04723358154297,
+          "p95": 72.50738143920898,
+          "p99": 229.35032844543457,
+          },
+        "percentileRows": [
           {
             "percentile": "p50",
             "value": 62.484025955200195
@@ -404,15 +459,19 @@ export const benchmarksScript = `window.benchmarks = {
         ]
       },
       "throughput": {
-        "statistics": {
           "total": 12465,
           "mean": 477.5134940335642,
           "median": 49.76925541382379,
           "min": 0.0,
           "max": 1677721.6,
-          "std": 2472.852317203968
-        },
-        "percentiles": [
+          "std": 2472.852317203968,
+        "percentiles": {
+          "p50": 49.76925541382379,
+          "p90": 1191.5636363636363,
+          "p95": 2501.075730471079,
+          "p99": 7025.634840871022,
+          },
+        "percentileRows": [
           {
             "percentile": "p50",
             "value": 49.76925541382379
@@ -432,15 +491,19 @@ export const benchmarksScript = `window.benchmarks = {
         ]
       },
       "timePerRequest": {
-        "statistics": {
           "total": 895,
           "mean": 1800.9132816804852,
           "median": 1797.5835800170898,
           "min": 1756.2305927276611,
           "max": 1994.28129196167,
-          "std": 24.24935353039552
-        },
-        "percentiles": [
+          "std": 24.24935353039552,
+        "percentiles": {
+          "p50": 1797.5835800170898,
+          "p90": 1808.2549571990967,
+          "p95": 1813.141107559204,
+          "p99": 1967.8056240081787,
+          },
+        "percentileRows": [
           {
             "percentile": "p50",
             "value": 1797.5835800170898
@@ -463,15 +526,19 @@ export const benchmarksScript = `window.benchmarks = {
     {
       "requestsPerSecond": 10.83989165148388,
       "tpot": {
-        "statistics": {
           "total": 1300,
           "mean": 31.6048062981453,
           "median": 31.577579558841766,
           "min": 30.171105355927438,
           "max": 33.10690323511759,
-          "std": 0.15146862300990216
-        },
-        "percentiles": [
+          "std": 0.15146862300990216,
+        "percentiles": {
+          "p50": 31.577579558841766,
+          "p90": 31.63230986822219,
+          "p95": 31.682415614052424,
+          "p99": 32.138043834317116,
+          },
+        "percentileRows": [
           {
             "percentile": "p50",
             "value": 31.577579558841766
@@ -491,15 +558,19 @@ export const benchmarksScript = `window.benchmarks = {
         ]
       },
       "ttft": {
-        "statistics": {
           "total": 1300,
           "mean": 66.61205951984113,
           "median": 65.78803062438965,
           "min": 51.81550979614258,
           "max": 244.69709396362305,
-          "std": 14.858653160342651
-        },
-        "percentiles": [
+          "std": 14.858653160342651,
+        "percentiles": {
+          "p50": 65.78803062438965,
+          "p90": 76.70044898986816,
+          "p95": 77.78120040893555,
+          "p99": 88.29903602600098,
+          },
+        "percentileRows": [
           {
             "percentile": "p50",
             "value": 65.78803062438965
@@ -519,15 +590,19 @@ export const benchmarksScript = `window.benchmarks = {
         ]
       },
       "throughput": {
-        "statistics": {
           "total": 12708,
           "mean": 693.3695002980695,
           "median": 55.59272071785492,
           "min": 0.0,
           "max": 838860.8,
-          "std": 2454.288991845712
-        },
-        "percentiles": [
+          "std": 2454.288991845712,
+        "percentiles": {
+          "p50": 55.59272071785492,
+          "p90": 1897.875113122172,
+          "p95": 2931.030048916841,
+          "p99": 7108.989830508474,
+          },
+        "percentileRows": [
           {
             "percentile": "p50",
             "value": 55.59272071785492
@@ -547,15 +622,19 @@ export const benchmarksScript = `window.benchmarks = {
         ]
       },
       "timePerRequest": {
-        "statistics": {
           "total": 1300,
           "mean": 2057.3723330864545,
           "median": 2056.5311908721924,
           "min": 2027.0307064056396,
           "max": 2233.853578567505,
-          "std": 16.334707021033957
-        },
-        "percentiles": [
+          "std": 16.334707021033957,
+        "percentiles": {
+          "p50": 2056.5311908721924,
+          "p90": 2065.953254699707,
+          "p95": 2067.810297012329,
+          "p99": 2087.8031253814697,
+          },
+        "percentileRows": [
           {
             "percentile": "p50",
             "value": 2056.5311908721924
@@ -578,15 +657,19 @@ export const benchmarksScript = `window.benchmarks = {
     {
       "requestsPerSecond": 14.211845819540324,
       "tpot": {
-        "statistics": {
           "total": 1704,
           "mean": 35.695500394825224,
           "median": 35.60370869106717,
           "min": 34.798149078611345,
           "max": 38.94662857055664,
-          "std": 0.24967658675392423
-        },
-        "percentiles": [
+          "std": 0.24967658675392423,
+        "percentiles": {
+          "p50": 35.60370869106717,
+          "p90": 35.84100708128914,
+          "p95": 36.09923778041716,
+          "p99": 36.71476489207784,
+          },
+        "percentileRows": [
           {
             "percentile": "p50",
             "value": 35.60370869106717
@@ -606,15 +689,19 @@ export const benchmarksScript = `window.benchmarks = {
         ]
       },
       "ttft": {
-        "statistics": {
           "total": 1704,
           "mean": 74.19940031750102,
           "median": 71.50626182556152,
           "min": 53.643226623535156,
           "max": 322.6609230041504,
-          "std": 23.98415146629138
-        },
-        "percentiles": [
+          "std": 23.98415146629138,
+        "percentiles": {
+          "p50": 71.50626182556152,
+          "p90": 83.71734619140625,
+          "p95": 98.2356071472168,
+          "p99": 113.44718933105469,
+          },
+        "percentileRows": [
           {
             "percentile": "p50",
             "value": 71.50626182556152
@@ -634,15 +721,19 @@ export const benchmarksScript = `window.benchmarks = {
         ]
       },
       "throughput": {
-        "statistics": {
           "total": 15532,
           "mean": 908.715763654939,
           "median": 98.84067397195712,
           "min": 0.0,
           "max": 838860.8,
-          "std": 3628.67537220603
-        },
-        "percentiles": [
+          "std": 3628.67537220603,
+        "percentiles": {
+          "p50": 98.84067397195712,
+          "p90": 2205.2071503680336,
+          "p95": 3775.251125112511,
+          "p99": 10512.040100250626,
+          },
+        "percentileRows": [
           {
             "percentile": "p50",
             "value": 98.84067397195712
@@ -662,15 +753,19 @@ export const benchmarksScript = `window.benchmarks = {
         ]
       },
       "timePerRequest": {
-        "statistics": {
           "total": 1704,
           "mean": 2321.92987861208,
           "median": 2313.3785724639893,
           "min": 2290.93074798584,
           "max": 2594.4881439208984,
-          "std": 29.46118583560937
-        },
-        "percentiles": [
+          "std": 29.46118583560937,
+        "percentiles": {
+          "p50": 2313.3785724639893,
+          "p90": 2339.4439220428467,
+          "p95": 2341.9249057769775,
+          "p99": 2370.450496673584,
+          },
+        "percentileRows": [
           {
             "percentile": "p50",
             "value": 2313.3785724639893
@@ -693,15 +788,19 @@ export const benchmarksScript = `window.benchmarks = {
     {
       "requestsPerSecond": 17.5623040970073,
       "tpot": {
-        "statistics": {
           "total": 2106,
           "mean": 39.546438065771135,
           "median": 39.47442675393725,
           "min": 38.74176740646362,
           "max": 43.32651032341851,
-          "std": 0.3121106751660994
-        },
-        "percentiles": [
+          "std": 0.3121106751660994,
+        "percentiles": {
+          "p50": 39.47442675393725,
+          "p90": 39.722594003828746,
+          "p95": 40.083578654697966,
+          "p99": 40.73049983040231,
+          },
+        "percentileRows": [
           {
             "percentile": "p50",
             "value": 39.47442675393725
@@ -721,15 +820,19 @@ export const benchmarksScript = `window.benchmarks = {
         ]
       },
       "ttft": {
-        "statistics": {
           "total": 2106,
           "mean": 85.68002797259905,
           "median": 89.88213539123535,
           "min": 57.360172271728516,
           "max": 362.8504276275635,
-          "std": 27.802786177158218
-        },
-        "percentiles": [
+          "std": 27.802786177158218,
+        "percentiles": {
+          "p50": 89.88213539123535,
+          "p90": 101.7305850982666,
+          "p95": 103.26790809631348,
+          "p99": 138.88931274414062,
+          },
+        "percentileRows": [
           {
             "percentile": "p50",
             "value": 89.88213539123535
@@ -749,15 +852,19 @@ export const benchmarksScript = `window.benchmarks = {
         ]
       },
       "throughput": {
-        "statistics": {
           "total": 15121,
           "mean": 1123.0284569989917,
           "median": 99.91909855397003,
           "min": 0.0,
           "max": 932067.5555555555,
-          "std": 4358.833642800455
-        },
-        "percentiles": [
+          "std": 4358.833642800455,
+        "percentiles": {
+          "p50": 99.91909855397003,
+          "p90": 2868.8809849521203,
+          "p95": 4848.906358381503,
+          "p99": 12905.55076923077,
+          },
+        "percentileRows": [
           {
             "percentile": "p50",
             "value": 99.91909855397003
@@ -777,15 +884,19 @@ export const benchmarksScript = `window.benchmarks = {
         ]
       },
       "timePerRequest": {
-        "statistics": {
           "total": 2106,
           "mean": 2575.916517267653,
           "median": 2573.6281871795654,
           "min": 2533.904790878296,
           "max": 2894.4458961486816,
-          "std": 33.18594265783404
-        },
-        "percentiles": [
+          "std": 33.18594265783404,
+        "percentiles": {
+          "p50": 2573.6281871795654,
+          "p90": 2588.9015197753906,
+          "p95": 2591.136932373047,
+          "p99": 2700.568437576294,
+          },
+        "percentileRows": [
           {
             "percentile": "p50",
             "value": 2573.6281871795654
@@ -808,15 +919,19 @@ export const benchmarksScript = `window.benchmarks = {
     {
       "requestsPerSecond": 20.885632360055222,
       "tpot": {
-        "statistics": {
           "total": 2505,
           "mean": 44.20494748431818,
           "median": 44.02147020612444,
           "min": 42.981475591659546,
           "max": 52.62617986710345,
-          "std": 1.0422073399474652
-        },
-        "percentiles": [
+          "std": 1.0422073399474652,
+        "percentiles": {
+          "p50": 44.02147020612444,
+          "p90": 44.47330747331892,
+          "p95": 45.131300316482296,
+          "p99": 50.400745301019576,
+          },
+        "percentileRows": [
           {
             "percentile": "p50",
             "value": 44.02147020612444
@@ -836,15 +951,19 @@ export const benchmarksScript = `window.benchmarks = {
         ]
       },
       "ttft": {
-        "statistics": {
           "total": 2505,
           "mean": 98.4621736103903,
           "median": 95.84355354309082,
           "min": 61.09285354614258,
           "max": 524.099588394165,
-          "std": 34.20521833421915
-        },
-        "percentiles": [
+          "std": 34.20521833421915,
+        "percentiles": {
+          "p50": 95.84355354309082,
+          "p90": 109.4822883605957,
+          "p95": 111.46354675292969,
+          "p99": 334.31243896484375,
+          },
+        "percentileRows": [
           {
             "percentile": "p50",
             "value": 95.84355354309082
@@ -864,15 +983,19 @@ export const benchmarksScript = `window.benchmarks = {
         ]
       },
       "throughput": {
-        "statistics": {
           "total": 14779,
           "mean": 1335.7133120200747,
           "median": 104.45284522475407,
           "min": 0.0,
           "max": 1677721.6,
-          "std": 5200.1934248077005
-        },
-        "percentiles": [
+          "std": 5200.1934248077005,
+        "percentiles": {
+          "p50": 104.45284522475407,
+          "p90": 3472.1059602649007,
+          "p95": 5882.6143057503505,
+          "p99": 15768.060150375939,
+          },
+        "percentileRows": [
           {
             "percentile": "p50",
             "value": 104.45284522475407
@@ -892,15 +1015,19 @@ export const benchmarksScript = `window.benchmarks = {
         ]
       },
       "timePerRequest": {
-        "statistics": {
           "total": 2505,
           "mean": 2882.6246785070603,
           "median": 2869.71378326416,
           "min": 2826.8485069274902,
           "max": 3324.9876499176025,
-          "std": 78.07038363701177
-        },
-        "percentiles": [
+          "std": 78.07038363701177,
+        "percentiles": {
+          "p50": 2869.71378326416,
+          "p90": 2888.715982437134,
+          "p95": 2937.7262592315674,
+          "p99": 3282.898426055908,
+          },
+        "percentileRows": [
           {
             "percentile": "p50",
             "value": 2869.71378326416
@@ -923,15 +1050,19 @@ export const benchmarksScript = `window.benchmarks = {
     {
       "requestsPerSecond": 24.179871480414207,
       "tpot": {
-        "statistics": {
           "total": 2900,
           "mean": 51.023722283946924,
           "median": 50.24327550615583,
           "min": 47.58137645143451,
           "max": 60.63385087935651,
-          "std": 2.0749227872708285
-        },
-        "percentiles": [
+          "std": 2.0749227872708285,
+        "percentiles": {
+          "p50": 50.24327550615583,
+          "p90": 52.928451507810564,
+          "p95": 57.28437408568367,
+          "p99": 58.51330454387362,
+          },
+        "percentileRows": [
           {
             "percentile": "p50",
             "value": 50.24327550615583
@@ -951,15 +1082,19 @@ export const benchmarksScript = `window.benchmarks = {
         ]
       },
       "ttft": {
-        "statistics": {
           "total": 2900,
           "mean": 123.56691516678907,
           "median": 115.33927917480469,
           "min": 88.05131912231445,
           "max": 594.1901206970215,
-          "std": 44.50765227271787
-        },
-        "percentiles": [
+          "std": 44.50765227271787,
+        "percentiles": {
+          "p50": 115.33927917480469,
+          "p90": 141.8297290802002,
+          "p95": 144.49095726013184,
+          "p99": 375.5221366882324,
+          },
+        "percentileRows": [
           {
             "percentile": "p50",
             "value": 115.33927917480469
@@ -979,15 +1114,19 @@ export const benchmarksScript = `window.benchmarks = {
         ]
       },
       "throughput": {
-        "statistics": {
           "total": 14925,
           "mean": 1546.3194569459229,
           "median": 138.59511614843208,
           "min": 0.0,
           "max": 1677721.6,
-          "std": 5844.302138842639
-        },
-        "percentiles": [
+          "std": 5844.302138842639,
+        "percentiles": {
+          "p50": 138.59511614843208,
+          "p90": 3916.250233426704,
+          "p95": 6678.828025477707,
+          "p99": 17924.37606837607,
+          },
+        "percentileRows": [
           {
             "percentile": "p50",
             "value": 138.59511614843208
@@ -1007,15 +1146,19 @@ export const benchmarksScript = `window.benchmarks = {
         ]
       },
       "timePerRequest": {
-        "statistics": {
           "total": 2900,
           "mean": 3336.9750574539444,
           "median": 3282.672882080078,
           "min": 3228.010654449463,
           "max": 3863.8863563537598,
-          "std": 141.37106520368962
-        },
-        "percentiles": [
+          "std": 141.37106520368962,
+        "percentiles": {
+          "p50": 3282.672882080078,
+          "p90": 3561.7692470550537,
+          "p95": 3737.921953201294,
+          "p99": 3811.5434646606445,
+          },
+        "percentileRows": [
           {
             "percentile": "p50",
             "value": 3282.672882080078
@@ -1038,15 +1181,19 @@ export const benchmarksScript = `window.benchmarks = {
     {
       "requestsPerSecond": 27.382251189847466,
       "tpot": {
-        "statistics": {
           "total": 3285,
           "mean": 62.44881585866599,
           "median": 60.908238093058266,
           "min": 58.94644298250713,
           "max": 72.59870383699061,
-          "std": 2.9764436606898887
-        },
-        "percentiles": [
+          "std": 2.9764436606898887,
+        "percentiles": {
+          "p50": 60.908238093058266,
+          "p90": 68.3861043718126,
+          "p95": 69.21934324597555,
+          "p99": 70.13290269034249,
+          },
+        "percentileRows": [
           {
             "percentile": "p50",
             "value": 60.908238093058266
@@ -1066,15 +1213,19 @@ export const benchmarksScript = `window.benchmarks = {
         ]
       },
       "ttft": {
-        "statistics": {
           "total": 3285,
           "mean": 142.7834399758953,
           "median": 129.18686866760254,
           "min": 92.2248363494873,
           "max": 802.5562763214111,
-          "std": 54.896961282893
-        },
-        "percentiles": [
+          "std": 54.896961282893,
+        "percentiles": {
+          "p50": 129.18686866760254,
+          "p90": 158.26964378356934,
+          "p95": 166.79859161376953,
+          "p99": 422.8503704071045,
+          },
+        "percentileRows": [
           {
             "percentile": "p50",
             "value": 129.18686866760254
@@ -1094,15 +1245,19 @@ export const benchmarksScript = `window.benchmarks = {
         ]
       },
       "throughput": {
-        "statistics": {
           "total": 15706,
           "mean": 1751.1720673421933,
           "median": 318.5950626661603,
           "min": 0.0,
           "max": 1677721.6,
-          "std": 6434.120608249914
-        },
-        "percentiles": [
+          "std": 6434.120608249914,
+        "percentiles": {
+          "p50": 318.5950626661603,
+          "p90": 4165.147964250248,
+          "p95": 7194.346483704974,
+          "p99": 19878.218009478675,
+          },
+        "percentileRows": [
           {
             "percentile": "p50",
             "value": 318.5950626661603
@@ -1122,15 +1277,19 @@ export const benchmarksScript = `window.benchmarks = {
         ]
       },
       "timePerRequest": {
-        "statistics": {
           "total": 3285,
           "mean": 4076.002237894764,
           "median": 3972.564697265625,
           "min": 3890.990972518921,
           "max": 4623.138666152954,
-          "std": 197.81266460135544
-        },
-        "percentiles": [
+          "std": 197.81266460135544,
+        "percentiles": {
+          "p50": 3972.564697265625,
+          "p90": 4444.445371627808,
+          "p95": 4506.659030914307,
+          "p99": 4553.745985031128,
+          },
+        "percentileRows": [
           {
             "percentile": "p50",
             "value": 3972.564697265625
@@ -1150,5 +1309,4 @@ export const benchmarksScript = `window.benchmarks = {
         ]
       }
     }
-  ]
-};`;
+];`;
