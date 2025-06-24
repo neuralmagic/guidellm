@@ -190,7 +190,6 @@ class TabularDistributionSummary(DistributionSummary):
     """
 
     @computed_field
-    @property
     def percentile_rows(self) -> list[dict[str, float]]:
         rows = [
             {"percentile": name, "value": value}
