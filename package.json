@@ -74,6 +74,9 @@
     "typescript": "^5",
     "typescript-eslint": "^8.34.0"
   },
+  "optionalDependencies": {
+    "sharp": "^0.34.2"
+  },
   "lint-staged": {
     "*.js": "eslint --cache --fix",
     "*.ts": "eslint --cache --fix",
