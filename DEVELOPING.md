@@ -185,7 +185,13 @@ The GuideLLM project includes a frontend UI located in `src/ui`, built using [Ne
 
 ### Getting Started
 
-To start the local development server:
+First, install dependencies:
+
+```bash
+npm install
+```
+
+Then, start the local development server:
 
 ```bash
 npm run dev
@@ -215,6 +221,12 @@ npm run build
   npm run test:integration
   ```
 
+- **Integration+Unit tests with coverage**:
+
+  ```bash
+  npm run coverage
+  ```
+
 - **End-to-end tests** (using Cypress, ensure live dev server):
 
   ```bash
@@ -240,6 +252,20 @@ npm run build
   ```bash
   npm run type-checks
   ```
+
+##### Tagging Tests
+
+Reference [https://www.npmjs.com/package/jest-runner-groups](jest-runner-groups) Add @group with the tag in a docblock at the top of the test file to indicate which types of tests are contained within. Can't distinguish between different types of tests in the same file.
+
+```
+/**
+ * Admin dashboard tests
+ *
+ * @group smoke
+ * @group sanity
+ * @group regression
+ */
+```
 
 ## Additional Resources
 
