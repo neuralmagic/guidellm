@@ -43,7 +43,7 @@ keywords = [
     "vllm",
 ]
 dependencies = [
-    "click",
+    "click>=8.0.0,<8.2.0",
     "datasets",
     "ftfy>=6.0.0",
     "httpx[http2]<1.0.0",
