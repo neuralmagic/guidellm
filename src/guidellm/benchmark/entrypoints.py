@@ -147,6 +147,7 @@ async def benchmark_generative_text(
 
     return report, saved_path
 
+
 def reimport_benchmarks_report(file: Path, output_path: Optional[Path]) -> None:
     """
     The command-line entry point for re-importing and displaying an

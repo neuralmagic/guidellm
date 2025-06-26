@@ -1,9 +1,9 @@
+import filecmp
 import os
 import unittest
 from pathlib import Path
 
 import pytest
-import filecmp
 
 from guidellm.benchmark import reimport_benchmarks_report
 
@@ -18,13 +18,14 @@ def get_test_asset_dir():
 
     return _
 
+
 @pytest.fixture
 def cleanup():
-    to_delete = []
+    to_delete: list[Path] = []
     yield to_delete
     for item in to_delete:
-        if os.path.exists(item):
-            os.remove(item)
+        if item.exists():
+            item.unlink()  # Deletes the file
 
 
 def test_display_entrypoint_json(capfd, get_test_asset_dir):
@@ -58,14 +59,16 @@ def generic_test_display_entrypoint(filename, capfd, get_test_asset_dir):
             expected_output = file.read()
         assert out == expected_output
 
+
 def test_reexporting_benchmark(get_test_asset_dir, cleanup):
     asset_dir = get_test_asset_dir()
     source_file = asset_dir / "benchmarks_stripped.json"
     exported_file = asset_dir / "benchmarks_reexported.json"
-    # If you need to inspect the output to see why it failed, comment out the following statement.
+    # If you need to inspect the output to see why it failed, comment out
+    # the cleanup statement.
     cleanup.append(exported_file)
     if exported_file.exists():
-        os.remove(exported_file)
+        exported_file.unlink()
     reimport_benchmarks_report(source_file, exported_file)
     # The reexported file should exist and be identical to the source.
     assert exported_file.exists()
