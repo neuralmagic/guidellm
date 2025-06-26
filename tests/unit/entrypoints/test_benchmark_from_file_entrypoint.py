@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from guidellm.benchmark import display_benchmarks_report
+from guidellm.benchmark import reimport_benchmarks_report
 
 # Set to true to re-write the expected output.
 REGENERATE_ARTIFACTS = False
@@ -37,7 +37,7 @@ def test_display_entrypoint_yaml(capfd, get_test_asset_dir):
 def generic_test_display_entrypoint(filename, capfd, get_test_asset_dir):
     os.environ["COLUMNS"] = "180"  # CLI output depends on terminal width.
     asset_dir = get_test_asset_dir()
-    display_benchmarks_report(asset_dir / filename)
+    reimport_benchmarks_report(asset_dir / filename)
     out, err = capfd.readouterr()
     expected_output_path = asset_dir / "benchmarks_stripped_output.txt"
     if REGENERATE_ARTIFACTS:

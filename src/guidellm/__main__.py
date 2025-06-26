@@ -3,6 +3,7 @@ import codecs
 import json
 from pathlib import Path
 from typing import get_args
+from click_default_group import DefaultGroup
 
 import click
 
@@ -10,7 +11,7 @@ from guidellm.backend import BackendType
 from guidellm.benchmark import (
     ProfileType,
     benchmark_generative_text,
-    display_benchmarks_report,
+    reimport_benchmarks_report,
 )
 from guidellm.config import print_config
 from guidellm.preprocess.dataset import ShortPromptStrategy, process_dataset
@@ -48,8 +49,18 @@ def parse_number_str(ctx, param, value):  # noqa: ARG001
 def cli():
     pass
 
+@cli.group(
+    help="Commands to run a new benchmark or load a prior one.",
+    cls=DefaultGroup,
+    default="run",
+    default_if_no_args=True,
+)
+def benchmark():
+    pass
 
-@cli.command(
+
+@benchmark.command(
+    "run",
     help="Run a benchmark against a generative model using the specified arguments."
 )
 @click.option(
@@ -234,7 +245,7 @@ def cli():
     type=int,
     help="The random seed to use for benchmarking to ensure reproducibility.",
 )
-def benchmark(
+def run(
     target,
     backend_type,
     backend_args,
@@ -286,14 +297,32 @@ def benchmark(
     )
 
 
-@cli.command(help="Redisplay a saved benchmark report.")
+@benchmark.command(help="Load a saved benchmark report.")
 @click.argument(
     "path",
     type=click.Path(file_okay=True, dir_okay=False, exists=True),
     default=Path.cwd() / "benchmarks.json",
 )
-def display(path):
-    display_benchmarks_report(path)
+@click.option(
+    "--output-path",
+    type=click.Path(file_okay=True, dir_okay=True, exists=False),
+    default=None,
+    is_flag=False,
+    flag_value=Path.cwd() / "benchmarks_reexported.json",
+    help=(
+        "Allows re-exporting the benchmarks to another format."
+        "The path to save the output to. If it is a directory, "
+        "it will save benchmarks.json under it. "
+        "Otherwise, json, yaml, or csv files are supported for output types "
+        "which will be read from the extension for the file path."
+        "Optional. If the output path flag is not provided, the benchmarks "
+        "will not be reexported. If the flag is present but no value is "
+        "specified, it will default to the current directory with the file "
+        "name benchmarks_reexported.json."
+    ),
+)
+def from_file(path, output_path):
+    reimport_benchmarks_report(path, output_path)
 
 
 def decode_escaped_str(_ctx, _param, value):
@@ -311,6 +340,7 @@ def decode_escaped_str(_ctx, _param, value):
 
 
 @cli.command(
+    short_help="Prints environment variable settings.",
     help=(
         "Print out the available configuration settings that can be set "
         "through environment variables."

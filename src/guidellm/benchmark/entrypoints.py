@@ -135,12 +135,18 @@ async def benchmark_generative_text(
 
     return report, saved_path
 
-def display_benchmarks_report(file: Path):
+def reimport_benchmarks_report(file: Path, output_path: Optional[Path]) -> None:
     """
-    The command-line entry point for displaying a benchmarks report.
+    The command-line entry point for re-importing and displaying an
+    existing benchmarks report. Can also specify
     Assumes the file provided exists.
     """
     console = GenerativeBenchmarksConsole(enabled=True)
     report = GenerativeBenchmarksReport.load_file(file)
     console.benchmarks = report.benchmarks
     console.print_full_report()
+
+    if output_path:
+        console.print_line("\nSaving benchmarks report...")
+        saved_path = report.save_file(output_path)
+        console.print_line(f"Benchmarks report saved to {saved_path}")
