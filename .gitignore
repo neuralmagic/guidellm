@@ -179,6 +179,9 @@ cython_debug/
 *.json
 *.yaml
 
+# But not scenarios
+!src/guidellm/benchmark/scenarios/*.json
+!src/guidellm/benchmark/scenarios/*.yaml
 
 # UI Section - Next.js/React application under src/ui/
 # dependencies
@@ -220,8 +223,8 @@ src/ui/next-env.d.ts
 # Root-level UI config files that should be tracked
 !package.json
 !package-lock.json
-!.eslintrc.json
 !tsconfig.json
 !tsconfig.*.json
 !src/ui/lib
 !src/ui/public/manifest.json
+.eslintcache

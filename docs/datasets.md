@@ -39,6 +39,13 @@ GuideLLM supports several types of datasets, each with its own advantages and us
 
 Synthetic datasets allow you to generate data on the fly with customizable parameters. This is useful for controlled experiments, stress testing, and simulating specific scenarios. For example, you might want to evaluate how a model handles long prompts or generates outputs with specific characteristics.
 
+For different use cases, here are the recommended dataset profiles to pass as arguments in GuideLLM:
+
+- **Chat**: `--data "prompt_tokens=512,output_tokens=256"`
+- **RAG**: `--data "prompt_tokens=4096,output_tokens=512"`
+- **Summarization**: `--data "prompt_tokens=1024,output_tokens=256"`
+- **Code Generation**: `--data "prompt_tokens=512,output_tokens=512"`
+
 #### Example Commands
 
 ```bash
