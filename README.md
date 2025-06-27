@@ -64,7 +64,7 @@ vllm serve "neuralmagic/Meta-Llama-3.1-8B-Instruct-quantized.w4a16"
 
 For more information on starting a vLLM server, see the [vLLM Documentation](https://docs.vllm.ai/en/latest/serving/openai_compatible_server.html).
 
-For information on starting other supported inference servers or platforms, see the [Supported Backends documentation](https://github.com/neuralmagic/guidellm/blob/main/docs/backends.md).
+For information on starting other supported inference servers or platforms, see the [Supported Backends Documentation](https://github.com/neuralmagic/guidellm/blob/main/docs/backends.md).
 
 #### 2. Run a GuideLLM Benchmark
 
@@ -92,13 +92,13 @@ After the evaluation is completed, GuideLLM will summarize the results into thre
 
 The sections will look similar to the following: <img alt="Sample GuideLLM benchmark output" src="https://raw.githubusercontent.com/neuralmagic/guidellm/main/docs/assets/sample-output.png" />
 
-For more details about the metrics and definitions, please refer to the [Metrics documentation](https://github.com/neuralmagic/guidellm/blob/main/docs/metrics.md).
+For more details about the metrics and definitions, please refer to the [Metrics Documentation](https://github.com/neuralmagic/guidellm/blob/main/docs/metrics.md).
 
 #### 4. Explore the Results File
 
 By default, the full results, including complete statistics and request data, are saved to a file `benchmarks.json` in the current working directory. This file can be used for further analysis or reporting, and additionally can be reloaded into Python for further analysis using the `guidellm.benchmark.GenerativeBenchmarksReport` class. You can specify a different file name and extension with the `--output` argument.
 
-For more details about the supported output file types, please take a look at the [Outputs documentation](https://github.com/neuralmagic/guidellm/blob/main/docs/outputs.md).
+For more details about the supported output file types, please take a look at the [Outputs Documentation](https://github.com/neuralmagic/guidellm/blob/main/docs/outputs.md).
 
 #### 5. Use the Results
 
@@ -106,7 +106,7 @@ The results from GuideLLM are used to optimize your LLM deployment for performan
 
 For example, when deploying a chat application, we likely want to ensure that our time to first token (TTFT) and inter-token latency (ITL) are under certain thresholds to meet our service level objectives (SLOs) or service level agreements (SLAs). For example, setting TTFT to 200ms and ITL 25ms for the sample data provided in the example above, we can see that even though the server is capable of handling up to 13 requests per second, we would only be able to meet our SLOs for 99% of users at a request rate of 3.5 requests per second. If we relax our constraints on ITL to 50 ms, then we can meet the TTFT SLA for 99% of users at a request rate of approximately 10 requests per second.
 
-For further details on determining the optimal request rate and SLOs, refer to the [SLOs documentation](https://github.com/neuralmagic/guidellm/blob/main/docs/service_level_objectives.md).
+For further details on determining the optimal request rate and SLOs, refer to the [SLOs Documentation](https://github.com/neuralmagic/guidellm/blob/main/docs/service_level_objectives.md).
 
 ### Configurations
 
@@ -199,7 +199,7 @@ In the future this will be replaced by a configurable untracked file for dev use
 
 ### Documentation
 
-Our comprehensive documentation offers detailed guides and resources to help you maximize the benefits of GuideLLM. Whether just getting started or looking to dive deeper into advanced topics, you can find what you need in our [documentation](https://github.com/neuralmagic/guidellm/blob/main/docs).
+Our comprehensive documentation offers detailed guides and resources to help you maximize the benefits of GuideLLM. Whether just getting started or looking to dive deeper into advanced topics, you can find what you need in our [Documentation](https://github.com/neuralmagic/guidellm/blob/main/docs).
 
 ### Core Docs
 
@@ -224,7 +224,7 @@ We appreciate contributions to the code, examples, integrations, documentation, 
 
 ### Releases
 
-Visit our [GitHub Releases page](https://github.com/neuralmagic/guidellm/releases) and review the release notes to stay updated with the latest releases.
+Visit our [GitHub Releases Page](https://github.com/neuralmagic/guidellm/releases) and review the release notes to stay updated with the latest releases.
 
 ### License
 
