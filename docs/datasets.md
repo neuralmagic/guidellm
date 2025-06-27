@@ -20,7 +20,7 @@ The following arguments can be used to configure datasets and their processing:
 ### Example Usage
 
 ```bash
-guidellm benchmark \
+guidellm benchmark run \
     --target "http://localhost:8000" \
     --rate-type "throughput" \
     --max-requests 1000 \
@@ -49,7 +49,7 @@ For different use cases, here are the recommended dataset profiles to pass as ar
 #### Example Commands
 
 ```bash
-guidellm benchmark \
+guidellm benchmark run \
     --target "http://localhost:8000" \
     --rate-type "throughput" \
     --max-requests 1000 \
@@ -59,7 +59,7 @@ guidellm benchmark \
 Or using a JSON string:
 
 ```bash
-guidellm benchmark \
+guidellm benchmark run \
     --target "http://localhost:8000" \
     --rate-type "throughput" \
     --max-requests 1000 \
@@ -90,7 +90,7 @@ GuideLLM supports datasets from the Hugging Face Hub or local directories that f
 #### Example Commands
 
 ```bash
-guidellm benchmark \
+guidellm benchmark run \
     --target "http://localhost:8000" \
     --rate-type "throughput" \
     --max-requests 1000 \
@@ -100,7 +100,7 @@ guidellm benchmark \
 Or using a local dataset:
 
 ```bash
-guidellm benchmark \
+guidellm benchmark run \
     --target "http://localhost:8000" \
     --rate-type "throughput" \
     --max-requests 1000 \
@@ -152,7 +152,7 @@ GuideLLM supports various file formats for datasets, including text, CSV, JSON, 
 #### Example Commands
 
 ```bash
-guidellm benchmark \
+guidellm benchmark run \
     --target "http://localhost:8000" \
     --rate-type "throughput" \
     --max-requests 1000 \
