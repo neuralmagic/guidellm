@@ -2,6 +2,7 @@ import itertools
 from abc import ABC, abstractmethod
 from typing import Generic, TypeVar
 
+from guidellm.backend.response import ResponseSummary
 from guidellm.request.request import GenerationRequest
 
 __all__ = ["RequestSession"]
@@ -26,8 +27,8 @@ class RequestSession(ABC, Generic[RequestT, ResponseT]):
     def complete(self) -> bool: ...
 
 
-# FIXME: Dummy implementation
-class GenerativeRequestSession(RequestSession[GenerationRequest, str]):
+# FIXME: Bad implementation. Can only handle string requests
+class GenerativeRequestSession(RequestSession[GenerationRequest, ResponseSummary]):
     def __init__(self, prompts: list[GenerationRequest]) -> None:
         if not prompts:
             raise ValueError("Prompts cannot be empty")
@@ -52,9 +53,13 @@ class GenerativeRequestSession(RequestSession[GenerationRequest, str]):
 
         return base_request
 
-    def push_response(self, response: str) -> None:
+    def push_response(self, response: ResponseSummary) -> None:
         if len(self.responses) < len(self.prompts):
-            self.responses.append(response)
+            if response.response_output_tokens is not None:
+                self.prompts[len(self.responses)].constraints["output_tokens"] = (
+                    response.response_output_tokens
+                )
+            self.responses.append(response.value)
         else:
             raise ValueError("Response list full")
 
