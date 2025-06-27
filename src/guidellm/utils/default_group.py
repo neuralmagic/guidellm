@@ -32,6 +32,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 __all__ = ["DefaultGroupHandler"]
 
+import collections.abc as cabc
+
 import click
 
 
@@ -43,29 +45,28 @@ class DefaultGroupHandler(click.Group):
 
     def __init__(self, *args, **kwargs):
         # To resolve as the default command.
-        if not kwargs.get('ignore_unknown_options', True):
-            raise ValueError('Default group accepts unknown options')
+        if not kwargs.get("ignore_unknown_options", True):
+            raise ValueError("Default group accepts unknown options")
         self.ignore_unknown_options = True
-        self.default_cmd_name = kwargs.pop('default', None)
-        self.default_if_no_args = kwargs.pop('default_if_no_args', False)
-        super(DefaultGroupHandler, self).__init__(*args, **kwargs)
+        self.default_cmd_name = kwargs.pop("default", None)
+        self.default_if_no_args = kwargs.pop("default_if_no_args", False)
+        super().__init__(*args, **kwargs)
 
     def parse_args(self, ctx, args):
         if not args and self.default_if_no_args:
             args.insert(0, self.default_cmd_name)
-        return super(DefaultGroupHandler, self).parse_args(ctx, args)
+        return super().parse_args(ctx, args)
 
     def get_command(self, ctx, cmd_name):
         if cmd_name not in self.commands:
             # If it doesn't match an existing command, use the default command name.
             ctx.arg0 = cmd_name
             cmd_name = self.default_cmd_name
-        return super(DefaultGroupHandler, self).get_command(ctx, cmd_name)
+        return super().get_command(ctx, cmd_name)
 
     def resolve_command(self, ctx, args):
-        base = super(DefaultGroupHandler, self)
-        cmd_name, cmd, args = base.resolve_command(ctx, args)
-        if hasattr(ctx, 'arg0'):
+        cmd_name, cmd, args = super().resolve_command(ctx, args)
+        if hasattr(ctx, "arg0"):
             args.insert(0, ctx.arg0)
             cmd_name = cmd.name
         return cmd_name, cmd, args
@@ -74,17 +75,17 @@ class DefaultGroupHandler(click.Group):
         """
         Used to wrap the default formatter to clarify which command is the default.
         """
-        formatter = DefaultCommandFormatter(self, formatter, mark=' (default)')
-        return super(DefaultGroupHandler, self).format_commands(ctx, formatter)
+        formatter = DefaultCommandFormatter(self, formatter, mark=" (default)")
+        return super().format_commands(ctx, formatter)
 
 
-class DefaultCommandFormatter(object):
+class DefaultCommandFormatter:
     """
     Wraps a formatter to edit the line for the default command to mark it
     with the specified mark string.
     """
 
-    def __init__(self, group, formatter, mark='*'):
+    def __init__(self, group, formatter, mark="*"):
         self.group = group
         self.formatter = formatter
         self.mark = mark
@@ -93,8 +94,8 @@ class DefaultCommandFormatter(object):
     def __getattr__(self, attr):
         return getattr(self.formatter, attr)
 
-    def write_dl(self, rows, *args, **kwargs):
-        rows_ = []
+    def write_dl(self, rows: cabc.Sequence[tuple[str, str]], *args, **kwargs):
+        rows_: list[tuple[str, str]] = []
         for cmd_name, help_msg in rows:
             if cmd_name == self.group.default_cmd_name:
                 rows_.insert(0, (cmd_name + self.mark, help_msg))
