@@ -37,7 +37,8 @@ LABEL org.opencontainers.image.source="https://github.com/neuralmagic/guidellm" 
 
 # Set the environment variable for the benchmark script
 # TODO: Replace with scenario environment variables
-ENV GUIDELLM_TARGET="http://localhost:8000" \
+ENV GUIDELLM_BIN="/opt/guidellm/bin/guidellm" \
+    GUIDELLM_TARGET="http://localhost:8000" \
     GUIDELLM_MODEL="neuralmagic/Meta-Llama-3.1-8B-Instruct-quantized.w4a16" \
     GUIDELLM_RATE_TYPE="sweep" \
     GUIDELLM_DATA="prompt_tokens=256,output_tokens=128" \
