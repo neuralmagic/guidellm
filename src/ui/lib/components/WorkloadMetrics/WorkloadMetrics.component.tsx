@@ -19,7 +19,6 @@ import { BlockHeader } from '../BlockHeader';
 import { GraphTitle } from '../GraphTitle';
 import { MetricsContainer } from '../MetricsContainer';
 import { GraphsWrapper } from './WorkloadMetrics.styles';
-import { ScaleType } from '../Charts/DashedLine/DashedLine.interfaces';
 
 export const columnContent = (
   rpsValue: number,
@@ -74,7 +73,6 @@ export const Component = () => {
               xLegend="request per sec"
               yLegend="ttft (ms)"
               minX={minX}
-              yScaleType={ScaleType.linear}
             />
           </GraphsWrapper>
         </MetricsContainer>
@@ -95,7 +93,6 @@ export const Component = () => {
               xLegend="request per sec"
               yLegend="tpot (ms)"
               minX={minX}
-              yScaleType={ScaleType.linear}
             />
           </GraphsWrapper>
         </MetricsContainer>
@@ -122,7 +119,6 @@ export const Component = () => {
               xLegend="request per sec"
               yLegend="latency (ms)"
               minX={minX}
-              yScaleType={ScaleType.linear}
             />
           </GraphsWrapper>
         </MetricsContainer>
@@ -142,7 +138,6 @@ export const Component = () => {
               xLegend="request per sec"
               yLegend="throughput (tok/s)"
               minX={minX}
-              yScaleType={ScaleType.linear}
             />
           </GraphsWrapper>
         </MetricsContainer>
