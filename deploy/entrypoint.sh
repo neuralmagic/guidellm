@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Path to the guidellm binary
-guidellm_bin="/opt/guidellm/bin/guidellm"
+# guidellm executable with default
+guidellm_bin="${GUIDELLM_BIN:-/opt/guidellm/bin/guidellm}"
 
 # If we receive any arguments switch to guidellm command
 if [ $# -gt 0 ]; then
