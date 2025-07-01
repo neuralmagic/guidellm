@@ -1,6 +1,7 @@
 import json
 import random
 from collections.abc import Iterable, Iterator
+from itertools import cycle
 from pathlib import Path
 from typing import Any, Literal, Optional, Union
 
@@ -168,6 +169,7 @@ class SyntheticTextItemsGenerator(
         )
         # ensure diff distribution from output tokens
         rand = random.Random(self.random_seed + 2)  # noqa: S311
+        unique_prefix_iter = cycle(self.processor.get_vocab().values())
 
         prefix_index = rand.randint(0, len(self.text_creator.words))
         prefix_tokens = self._create_prompt(self.config.prefix_tokens, prefix_index)
@@ -179,7 +181,10 @@ class SyntheticTextItemsGenerator(
         ):
             start_index = rand.randint(0, len(self.text_creator.words))
             prompt_text = self.processor.decode(
-                prefix_tokens + self._create_prompt(prompt_tokens, start_index),
+                prefix_tokens
+                + self._create_prompt(
+                    prompt_tokens, start_index, next(unique_prefix_iter)
+                ),
                 skip_special_tokens=True,
             )
             yield {
@@ -188,17 +193,20 @@ class SyntheticTextItemsGenerator(
                 "output_tokens_count": output_tokens,
             }
 
-    def _create_prompt(self, prompt_tokens: int, start_index: int) -> list[int]:
+    def _create_prompt(
+        self, prompt_tokens: int, start_index: int, unique_prefix: Optional[int] = None
+    ) -> list[int]:
         if prompt_tokens <= 0:
             return []
 
         left = start_index
         right = start_index + 4 * prompt_tokens
+        start_tokens = [unique_prefix] if unique_prefix else []
 
         while left < right:
             mid = (left + right) // 2
             test_prompt = self.text_creator.create_text(start_index, mid - start_index)
-            test_tokens = self.processor.encode(test_prompt)
+            test_tokens = start_tokens + self.processor.encode(test_prompt)
 
             if len(test_tokens) == prompt_tokens:
                 return test_tokens
@@ -208,7 +216,7 @@ class SyntheticTextItemsGenerator(
                 right = mid
 
         final_text = self.text_creator.create_text(start_index, left - start_index)
-        return self.processor.encode(final_text)
+        return start_tokens + self.processor.encode(final_text)
 
 
 class SyntheticDatasetCreator(DatasetCreator):
