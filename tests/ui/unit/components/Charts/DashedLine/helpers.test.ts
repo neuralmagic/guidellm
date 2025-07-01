@@ -1,4 +1,5 @@
 import {
+  roundDownNice,
   roundNearestNice,
   roundUpNice,
   spacedLogValues,
@@ -51,12 +52,57 @@ describe('roundUpNice', () => {
     expect(roundUpNice(1000)).toBe(1000);
     expect(roundUpNice(1200)).toBe(1200);
   });
+  it("doesn't round down", () => {
+    expect(roundUpNice(1.3)).toBeGreaterThanOrEqual(1.5);
+    expect(roundUpNice(3)).toBeGreaterThanOrEqual(3);
+    expect(roundUpNice(3.3)).toBeGreaterThanOrEqual(3.5);
+    expect(roundUpNice(7.3)).toBeGreaterThanOrEqual(7.5);
+    expect(roundUpNice(11)).toBeGreaterThanOrEqual(11);
+    expect(roundUpNice(19)).toBeGreaterThanOrEqual(19);
+  });
+});
+
+describe('roundDownNice', () => {
+  it('rounds down to a nearby nice number', () => {
+    expect([10]).toContain(roundDownNice(11));
+    expect([20, 25]).toContain(roundDownNice(27));
+    expect([40, 45, 48]).toContain(roundDownNice(49));
+    expect([70, 75]).toContain(roundDownNice(79));
+    expect([75, 80]).toContain(roundDownNice(81));
+    expect([700, 750, 800]).toContain(roundDownNice(810));
+    expect([1200, 1250, 1300]).toContain(roundDownNice(1342));
+  });
+  it("doesn't round some nice numbers", () => {
+    expect(roundDownNice(15)).toBe(15);
+    expect(roundDownNice(20)).toBe(20);
+    expect(roundDownNice(30)).toBe(30);
+    expect(roundDownNice(40)).toBe(40);
+    expect(roundDownNice(75)).toBe(75);
+    expect(roundDownNice(100)).toBe(100);
+    expect(roundDownNice(150)).toBe(150);
+    expect(roundDownNice(200)).toBe(200);
+    expect(roundDownNice(400)).toBe(400);
+    expect(roundDownNice(1000)).toBe(1000);
+    expect(roundDownNice(1200)).toBe(1200);
+  });
+  it("doesn't round up", () => {
+    expect(roundDownNice(1.6)).toBeLessThanOrEqual(1.5);
+    expect(roundDownNice(3)).toBeLessThanOrEqual(3);
+    expect(roundDownNice(3.6)).toBeLessThanOrEqual(3.5);
+    expect(roundDownNice(7.6)).toBeLessThanOrEqual(7.5);
+    expect(roundDownNice(11)).toBeLessThanOrEqual(11);
+    expect(roundDownNice(19)).toBeLessThanOrEqual(19);
+  });
 });
 
 describe('spacedLogValues', () => {
   const checkValuesRoughlyLogSpaced = (values: number[]) => {
+    let i = 1;
+    if (values[0] === 0) {
+      i++;
+    }
     const valuesRatios = [];
-    for (let i = 1; i < values.length; i++) {
+    for (i; i < values.length; i++) {
       valuesRatios.push(values[i] / values[i - 1]);
     }
     const valuesRatiosAvg = valuesRatios.reduce((a, b) => a + b) / valuesRatios.length;
@@ -72,6 +118,10 @@ describe('spacedLogValues', () => {
     checkValuesRoughlyLogSpaced(spacedLogValues(1, 122, 6));
     checkValuesRoughlyLogSpaced(spacedLogValues(1, 122, 9));
   });
+  it('can handle ticks for small numbers', () => {
+    checkValuesRoughlyLogSpaced(spacedLogValues(0, 8, 6));
+  });
+
   it('generates an array of nice round numbers', () => {
     for (const value of spacedLogValues(1, 1000, 4)) {
       expect([roundUpNice(value), roundNearestNice(value)]).toContain(value);
