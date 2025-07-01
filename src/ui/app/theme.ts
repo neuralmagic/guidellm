@@ -50,7 +50,6 @@ import {
   RED_SHADES,
   OUTER_SPACE_GRAY,
 } from '../lib/utils/Colors';
-
 // Spezia
 import SpeziaMedium from './assets/fonts/spezia/Spezia-Medium.otf';
 import SpeziaRegular from './assets/fonts/spezia/Spezia-Regular.otf';

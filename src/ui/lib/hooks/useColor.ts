@@ -10,9 +10,9 @@ export const useColor = (colorType: LineColor | undefined) => {
     case LineColor.Secondary:
       return theme.palette.secondary.main;
     case LineColor.Tertiary:
-      return theme.palette.tertiary.main as string;
+      return theme.palette.tertiary.main;
     case LineColor.Quarternary:
-      return theme.palette.quarternary.main as string;
+      return theme.palette.quarternary.main;
     default:
       return theme.palette.surface.onSurfaceAccent;
   }

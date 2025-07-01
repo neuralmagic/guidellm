@@ -1,12 +1,11 @@
 import { Box, Typography } from '@mui/material';
 import { FC } from 'react';
 
+import { TokenLengthProps } from './TokenLength.interfaces';
 import { MiniCombined } from '../../components/Charts/MiniCombined';
 import ContainerSizeWrapper, {
   ContainerSize,
 } from '../../components/Charts/MiniCombined/components/ContainerSizeWrapper';
-
-import { TokenLengthProps } from './TokenLength.interfaces';
 
 export const Component: FC<TokenLengthProps> = ({ label, tokenCount, bars, lines }) => (
   <Box

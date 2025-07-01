@@ -2,9 +2,9 @@ import { useTheme } from '@mui/material';
 import { ResponsiveLine } from '@nivo/line';
 import React, { FC } from 'react';
 
-import { MetricLineProps } from '.';
 import { useColor } from '@/lib/hooks/useColor';
 
+import { MetricLineProps } from '.';
 import CustomAxes from './components/CustomAxes';
 import ThresholdBar from './components/ThresholdBar';
 import { ScaleType } from '../DashedLine/DashedLine.interfaces';

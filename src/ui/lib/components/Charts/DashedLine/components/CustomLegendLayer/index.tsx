@@ -39,7 +39,7 @@ export const CustomLegendLayer = ({ series, ...rest }: CustomLegendLayerProps) =
               y1="0"
               x2="20"
               y2="0"
-              stroke={getColor(item.solid)}
+              stroke={getColor(Boolean(item.solid))}
               strokeWidth={2}
               strokeDasharray={item?.solid ? '' : '4,4'}
             />

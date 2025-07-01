@@ -2,7 +2,7 @@ import { render, waitFor } from '@testing-library/react';
 
 import Home from '@/app/page';
 
-import mockBenchmarks from '../unit/mocks/mockBenchmarks';
+import { mockBenchmarks } from '../unit/mocks/mockBenchmarks';
 
 const jsonResponse = (data: unknown, status = 200) =>
   Promise.resolve(

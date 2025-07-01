@@ -1,8 +1,7 @@
 import { useTheme } from '@mui/material';
 
-import useLineColors from '../../../common/useLineColors';
-
 import { CustomLegendLayerProps } from './CustomLegendLayer.interfaces';
+import useLineColors from '../../../common/useLineColors';
 
 const LEGEND_HEIGHT = 20;
 

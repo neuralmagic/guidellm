@@ -11,15 +11,12 @@ import {
   selectRequestOverTimeBarData,
   useGetWorkloadDetailsQuery,
 } from '../../store/slices/workloadDetails';
-
 import { formatNumber, parseUrlParts } from '../../utils/helpers';
-
 import { BlockHeader } from '../BlockHeader';
 import { Carousel } from '../Carousel';
 import { DataPanel } from '../DataPanel';
 import { RequestOverTime } from '../RequestOverTime';
 import { SpecBadge } from '../SpecBadge';
-
 import { TokenLength } from '../TokenLength';
 
 const Component = () => {

@@ -36,10 +36,11 @@ test('no local extremas added', () => {
   const ys = xs.map((x) => 1 + Math.sin((3 * Math.PI * x) / 10));
   // check that each interpolated point is between its two bounding points
   const interpolate = createMonotoneSpline(xs, ys);
+  const loopedValuesToTest: { expected: number; actual: number }[] = [];
   for (let i = xs[0]; i < xs[xs.length - 1]; i += 0.01) {
     const upperIndex = xs.findIndex((x) => x >= i);
     if (upperIndex === 0) {
-      expect(interpolate(i)).toBeCloseTo(ys[0]);
+      loopedValuesToTest.push({ expected: interpolate(i), actual: ys[0] });
       continue;
     }
     const lowerY = ys[upperIndex - 1];
@@ -47,4 +48,7 @@ test('no local extremas added', () => {
     expect(interpolate(i)).toBeLessThanOrEqual(Math.max(lowerY, upperY));
     expect(interpolate(i)).toBeGreaterThanOrEqual(Math.min(lowerY, upperY));
   }
+  loopedValuesToTest.forEach((value) => {
+    expect(value.expected).toBeCloseTo(value.actual);
+  });
 });

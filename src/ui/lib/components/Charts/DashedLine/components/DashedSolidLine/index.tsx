@@ -1,8 +1,7 @@
 import { useTheme } from '@mui/material';
 
-import { toNumberValue } from '../../helpers';
-
 import { DashedSolidLineProps } from './DashedSolidLine.interfaces';
+import { toNumberValue } from '../../helpers';
 
 export const DashedSolidLine = ({
   series,
@@ -48,7 +47,7 @@ export const DashedSolidLine = ({
             return linePath !== null ? linePath : undefined;
           })()}
           fill="none"
-          stroke={getColor(solid)}
+          stroke={getColor(Boolean(solid))}
           style={
             !solid
               ? {
@@ -67,7 +66,7 @@ export const DashedSolidLine = ({
               cx={xScale(toNumberValue(d.data.x))}
               cy={yScale(toNumberValue(d.data.y))}
               r={4}
-              fill={getColor(solid)}
+              fill={getColor(Boolean(solid))}
             />
           ))}
       </g>

@@ -1,16 +1,14 @@
 import { ThunkDispatch, UnknownAction } from '@reduxjs/toolkit';
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 
-import { formatNumber } from '../../../utils/helpers';
-
 import { Benchmarks, MetricData } from './benchmarks.interfaces';
+import { formatNumber } from '../../../utils/helpers';
 import { defaultPercentile } from '../slo/slo.constants';
-import { SloState } from '../slo/slo.interfaces';
 import { setSloData } from '../slo/slo.slice';
 
 const USE_MOCK_API = process.env.NEXT_PUBLIC_USE_MOCK_API === 'true';
 
-const fetchBenchmarks = async () => {
+const fetchBenchmarks = () => {
   return { data: window.benchmarks as Benchmarks };
 };
 
@@ -30,7 +28,8 @@ const getAverageValueForPercentile = (
 
 const setDefaultSLOs = (
   data: Benchmarks,
-  dispatch: ThunkDispatch<SloState, unknown, UnknownAction>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  dispatch: ThunkDispatch<any, any, UnknownAction>
 ) => {
   // temporarily set default slo values, long term the backend should set default slos that will not just be the avg at the default percentile
   const firstBM = data.benchmarks[0];
