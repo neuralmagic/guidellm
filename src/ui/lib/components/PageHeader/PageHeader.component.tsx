@@ -32,11 +32,11 @@ const Component = () => {
             variant="metric2"
             withTooltip
           />
-          <SpecBadge
+          {/*<SpecBadge
             label="Model size"
             value={data?.model?.size ? `${modelSize?.size} ${modelSize?.units}` : '0B'}
             variant="body1"
-          />
+          />*/}
         </HeaderCell>
         {/*<HeaderCell item xs={2} withDivider>*/}
         {/*  <SpecBadge*/}
@@ -62,10 +62,10 @@ const Component = () => {
         {/*    key="Version"*/}
         {/*  />*/}
         {/*</HeaderCell>*/}
-        <HeaderCell item xs={2} withDivider>
+        {/*<HeaderCell item xs={2} withDivider>
           <SpecBadge label="Task" value={data?.task || 'n/a'} variant="metric2" />
-        </HeaderCell>
-        <HeaderCell item xs={3} withDivider>
+        </HeaderCell>*/}
+        {/*<HeaderCell item xs={3} withDivider>
           <SpecBadge
             label="Dataset"
             value={data?.dataset?.name || 'n/a'}
@@ -78,7 +78,7 @@ const Component = () => {
               </Link>
             }
           />
-        </HeaderCell>
+        </HeaderCell>*/}
         <HeaderCell item xs={2} sx={{ paddingRight: 0 }}>
           <SpecBadge
             label="Time Stamp"

@@ -6,6 +6,7 @@ src/guidellm/version.py
 benchmarks.json
 benchmarks.yaml
 benchmarks.csv
+benchmarks.html
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -227,4 +228,5 @@ src/ui/next-env.d.ts
 !tsconfig.*.json
 !src/ui/lib
 !src/ui/public/manifest.json
+!src/ui/serve.json
 .eslintcache
