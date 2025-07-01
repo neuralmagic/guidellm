@@ -1,76 +1,72 @@
 // @ts-check
 
 import eslint from '@eslint/js';
-import typescriptPlugin from '@typescript-eslint/eslint-plugin';
-import typescriptParser from '@typescript-eslint/parser';
-import { FlatCompat } from '@eslint/eslintrc';
-import reactPlugin from 'eslint-plugin-react';
-import hooksPlugin from 'eslint-plugin-react-hooks';
+import nextPlugin from '@next/eslint-plugin-next';
+import prettierConfig from 'eslint-config-prettier';
+import cypressPlugin from 'eslint-plugin-cypress';
 import importPlugin from 'eslint-plugin-import';
 import jestPlugin from 'eslint-plugin-jest';
-import noSecretsPlugin from 'eslint-plugin-no-secrets';
 import prettierPlugin from 'eslint-plugin-prettier';
-import prettierConfig from 'eslint-config-prettier';
+import reactPlugin from 'eslint-plugin-react';
+import hooksPlugin from 'eslint-plugin-react-hooks';
 import globals from 'globals';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import tseslint from 'typescript-eslint';
 
+// --- SETUP ---
+// Recreate __dirname for ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const compat = new FlatCompat({
-  baseDirectory: __dirname,
-  recommendedConfig: eslint.configs.recommended,
-});
-
-export default [
-  // Base configuration
-  eslint.configs.recommended,
-
-  // Next.js configuration using FlatCompat
-  ...compat.extends('next/core-web-vitals'),
-
-  // --- Main Configuration ---
+// --- EXPORT ESLINT CONFIG ---
+export default tseslint.config(
+  // 1. Global Ignores
   {
-    files: ['src/**/*.{js,jsx,ts,tsx}', 'tests/**/*.{js,jsx,ts,tsx}'],
+    ignores: ['node_modules/', '.next/', 'dist/', 'coverage/', '.DS_Store'],
+  },
+
+  // 2. Base Configurations (Applied to all files)
+  eslint.configs.recommended,
+  prettierConfig, // Disables ESLint rules that conflict with Prettier. IMPORTANT: Must be after other configs.
+
+  // 3. Configuration for App Source Code (Next.js with Type-Aware Linting)
+  {
+    files: ['src/ui/**/*.{ts,tsx}'],
     languageOptions: {
-      parser: typescriptParser,
-      ecmaVersion: 2024,
-      sourceType: 'module',
+      parser: tseslint.parser,
+      parserOptions: {
+        project: true, // Enable type-aware linting
+        tsconfigRootDir: __dirname,
+      },
       globals: {
         ...globals.browser,
-        ...globals.node,
-        ...globals.jest,
-      },
-      parserOptions: {
-        ecmaFeatures: {
-          jsx: true,
-        },
-        project: [
-          './src/ui/tsconfig.json',
-          './tsconfig.test.json',
-          './tsconfig.cypress.json',
-        ],
-        tsconfigRootDir: import.meta.dirname,
-        noWarnOnMultipleProjects: true,
+        ...globals.node, // Add Node.js globals for `process` etc.
       },
     },
     plugins: {
-      '@typescript-eslint': typescriptPlugin,
+      '@typescript-eslint': tseslint.plugin,
+      '@next/next': nextPlugin,
+      import: importPlugin,
       react: reactPlugin,
       'react-hooks': hooksPlugin,
-      import: importPlugin,
-      jest: jestPlugin,
-      'no-secrets': noSecretsPlugin,
       prettier: prettierPlugin,
     },
     rules: {
-      // Ccustom rules
-      complexity: ['warn', { max: 8 }],
-      curly: ['error', 'all'],
+      // --- Base rules to disable in favor of TS versions ---
       'no-unused-vars': 'off',
 
-      // TypeScript rules
+      // --- Recommended rules from plugins ---
+      ...tseslint.configs.recommendedTypeChecked.rules,
+      ...nextPlugin.configs.recommended.rules,
+      ...nextPlugin.configs['core-web-vitals'].rules,
+      ...reactPlugin.configs.recommended.rules,
+      ...hooksPlugin.configs.recommended.rules,
+
+      // --- Prettier ---
+      'prettier/prettier': 'error',
+
+      // --- Custom Rules & Overrides ---
       '@typescript-eslint/no-unused-vars': [
         'warn',
         {
@@ -79,103 +75,103 @@ export default [
           caughtErrorsIgnorePattern: '^_',
         },
       ],
+      '@typescript-eslint/no-floating-promises': 'error',
+      '@typescript-eslint/no-misused-promises': 'error',
       '@typescript-eslint/no-explicit-any': 'warn',
 
-      // Next.js overrides
-      '@next/next/no-img-element': 'off', // Allow img tags if needed
-      '@next/next/no-page-custom-font': 'warn',
-
-      // React rules
-      'react/react-in-jsx-scope': 'off', // Not needed in Next.js
-      'react/prop-types': 'off', // Using TypeScript
-      'react-hooks/rules-of-hooks': 'error',
-      'react-hooks/exhaustive-deps': 'warn',
-
-      // Import rules
-      'import/no-extraneous-dependencies': [
-        'error',
-        {
-          devDependencies: [
-            '**/*.test.{js,jsx,ts,tsx}',
-            '**/*.d.ts',
-            '**/*.interfaces.ts',
-            '**/*.setup.{js,ts}',
-            '**/*.config.{js,mjs,ts}',
-            'tests/**/*',
-            'cypress/**/*',
-          ],
-          optionalDependencies: false,
-          peerDependencies: false,
-        },
-      ],
       'import/order': [
         'error',
         {
-          groups: [
-            ['builtin', 'external'],
-            ['internal', 'parent', 'sibling', 'index'],
-          ],
-          'newlines-between': 'always-and-inside-groups',
-          pathGroups: [
-            {
-              pattern:
-                '@{app,assets,classes,components,hooks,lib,pages,store,tests,types,utils}/**',
-              group: 'internal',
-              position: 'before',
-            },
-            {
-              pattern: '{.,..}/**',
-              group: 'internal',
-              position: 'after',
-            },
-          ],
-          pathGroupsExcludedImportTypes: ['builtin'],
+          groups: [['builtin', 'external'], 'internal', ['parent', 'sibling', 'index']],
+          'newlines-between': 'always',
           alphabetize: { order: 'asc', caseInsensitive: true },
         },
       ],
 
-      // Security
-      'no-secrets/no-secrets': ['error', { additionalRegexes: {}, ignoreContent: [] }],
+      'react/react-in-jsx-scope': 'off',
+      'react/prop-types': 'off',
 
-      // Prettier
-      'prettier/prettier': 'error',
+      '@next/next/no-html-link-for-pages': 'off',
+      '@next/next/no-img-element': 'off',
+
+      complexity: ['warn', { max: 8 }],
     },
     settings: {
-      next: {
-        rootDir: ['src/ui/', 'tests/ui/'],
-      },
-      'import/resolver': {
-        typescript: {
-          project: [
-            './src/ui/tsconfig.json',
-            './tsconfig.test.json',
-            './tsconfig.cypress.json',
-          ],
-          noWarnOnMultipleProjects: true,
-        },
-      },
-      react: {
-        version: 'detect',
-      },
+      react: { version: 'detect' },
+      'import/resolver': { typescript: true, node: true },
     },
   },
 
-  // Jest-specific rules for test files
+  // 4. Configuration for Jest Test Files (Type-Aware)
+  {
+    files: ['tests/ui/**/*.{test,spec}.{ts,tsx}', 'jest.setup.ts'],
+    languageOptions: {
+      parser: tseslint.parser, // Explicitly set parser
+      parserOptions: {
+        project: './tsconfig.test.json',
+        tsconfigRootDir: __dirname,
+      },
+      globals: {
+        ...globals.jest,
+        ...globals.node, // FIX: Add Node.js globals for `global`, etc.
+      },
+    },
+    plugins: {
+      jest: jestPlugin,
+    },
+    rules: {
+      ...jestPlugin.configs['flat/recommended'].rules,
+      '@typescript-eslint/unbound-method': 'off',
+    },
+  },
+
+  // 5. Configuration for Cypress E2E Test Files (Type-Aware)
   {
     files: [
-      'tests/**/*.{js,jsx,ts,tsx}',
-      '**/*.test.{js,jsx,ts,tsx}',
-      '**/*.spec.{js,jsx,ts,tsx}',
+      'tests/ui/cypress/**/*.{cy,e2e}.{ts,tsx}',
+      'tests/ui/cypress/support/**/*.ts',
     ],
+    languageOptions: {
+      parser: tseslint.parser, // Explicitly set parser
+      parserOptions: {
+        project: './tsconfig.cypress.json',
+        tsconfigRootDir: __dirname,
+      },
+      // FIX: This is the correct way to get globals from the Cypress plugin's recommended config.
+      globals: cypressPlugin.configs.recommended.languageOptions.globals,
+    },
+    plugins: {
+      cypress: cypressPlugin,
+    },
+    // Apply recommended rules and then add our overrides
     rules: {
-      'jest/expect-expect': 'error',
-      'jest/no-focused-tests': 'error',
-      'jest/no-identical-title': 'error',
-      'jest/prefer-to-have-length': 'warn',
-      'jest/valid-expect': 'error',
+      ...cypressPlugin.configs.recommended.rules,
+      'jest/expect-expect': 'off',
+      'jest/no-standalone-expect': 'off',
+      '@typescript-eslint/no-floating-promises': 'off',
     },
   },
 
-  // Prettier config (disables conflicting rules)
-  prettierConfig,
-];
+  // 6. Configuration for JS/TS config files
+  {
+    files: ['**/*.config.{js,mjs,ts}'],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+      },
+    },
+    rules: {
+      '@typescript-eslint/no-var-requires': 'off',
+    },
+  },
+
+  // 7. Configuration for JS/TS mock files and test helpers
+  {
+    files: ['tests/ui/**/__mocks__/**/*.{js,ts}', 'tests/ui/unit/mocks/**/*.ts'],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+      },
+    },
+  }
+);
