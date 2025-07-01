@@ -21,6 +21,7 @@ def create_default_percentiles() -> Percentiles:
         p05=5.0,
         p10=10.0,
         p25=25.0,
+        p50=50.0,
         p75=75.0,
         p90=90.0,
         p95=95.0,
@@ -52,6 +53,7 @@ def test_percentiles_initialization():
     assert percentiles.p05 == 5.0
     assert percentiles.p10 == 10.0
     assert percentiles.p25 == 25.0
+    assert percentiles.p50 == 50.0
     assert percentiles.p75 == 75.0
     assert percentiles.p90 == 90.0
     assert percentiles.p95 == 95.0
@@ -67,6 +69,7 @@ def test_percentiles_invalid_initialization():
         "p05": 5.0,
         "p10": 10.0,
         "p25": 25.0,
+        "p50": 50.0,
         "p75": 75.0,
         "p90": 90.0,
         "p95": 95.0,
@@ -108,6 +111,7 @@ def test_distribution_summary_initilaization():
     assert distribution_summary.percentiles.p05 == 5.0
     assert distribution_summary.percentiles.p10 == 10.0
     assert distribution_summary.percentiles.p25 == 25.0
+    assert distribution_summary.percentiles.p50 == 50.0
     assert distribution_summary.percentiles.p75 == 75.0
     assert distribution_summary.percentiles.p90 == 90.0
     assert distribution_summary.percentiles.p95 == 95.0
@@ -175,6 +179,9 @@ def test_distribution_summary_from_distribution_function():
     assert distribution_summary.percentiles.p25 == pytest.approx(
         np.percentile(values, 25.0)
     )
+    assert distribution_summary.percentiles.p50 == pytest.approx(
+        np.percentile(values, 50.0)
+    )
     assert distribution_summary.percentiles.p75 == pytest.approx(
         np.percentile(values, 75.0)
     )
@@ -225,6 +232,9 @@ def test_distribution_summary_from_values():
     )
     assert distribution_summary.percentiles.p25 == pytest.approx(
         np.percentile(values, 25.0)
+    )
+    assert distribution_summary.percentiles.p50 == pytest.approx(
+        np.percentile(values, 50.0)
     )
     assert distribution_summary.percentiles.p75 == pytest.approx(
         np.percentile(values, 75.0)
@@ -284,6 +294,7 @@ def test_distribution_summary_from_request_times_concurrency():
     assert distribution_summary.percentiles.p05 == pytest.approx(10)
     assert distribution_summary.percentiles.p10 == pytest.approx(10)
     assert distribution_summary.percentiles.p25 == pytest.approx(10)
+    assert distribution_summary.percentiles.p50 == pytest.approx(10)
     assert distribution_summary.percentiles.p75 == pytest.approx(10)
     assert distribution_summary.percentiles.p90 == pytest.approx(10)
     assert distribution_summary.percentiles.p95 == pytest.approx(10)
@@ -318,6 +329,7 @@ def test_distribution_summary_from_request_times_rate():
     assert distribution_summary.percentiles.p05 == pytest.approx(10.0)
     assert distribution_summary.percentiles.p10 == pytest.approx(10.0)
     assert distribution_summary.percentiles.p25 == pytest.approx(10.0)
+    assert distribution_summary.percentiles.p50 == pytest.approx(10.0)
     assert distribution_summary.percentiles.p75 == pytest.approx(10.0)
     assert distribution_summary.percentiles.p90 == pytest.approx(10.0)
     assert distribution_summary.percentiles.p95 == pytest.approx(10.0)
@@ -358,6 +370,7 @@ def test_distribution_summary_from_iterable_request_times():
     assert distribution_summary.percentiles.p05 == pytest.approx(80.0)
     assert distribution_summary.percentiles.p10 == pytest.approx(80.0)
     assert distribution_summary.percentiles.p25 == pytest.approx(80.0)
+    assert distribution_summary.percentiles.p50 == pytest.approx(80.0)
     assert distribution_summary.percentiles.p75 == pytest.approx(80.0)
     assert distribution_summary.percentiles.p90 == pytest.approx(160.0)
     assert distribution_summary.percentiles.p95 == pytest.approx(160.0)
