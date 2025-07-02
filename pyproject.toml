@@ -43,6 +43,7 @@ keywords = [
     "vllm",
 ]
 dependencies = [
+    "build>=1.0.0",
     "click",
     "datasets",
     "ftfy>=6.0.0",
@@ -55,6 +56,8 @@ dependencies = [
     "pydantic-settings>=2.0.0",
     "pyyaml>=6.0.0",
     "rich",
+    "setuptools>=61.0",
+    "setuptools-git-versioning>=2.0,<3",
     "transformers",
 ]
 
