@@ -37,6 +37,9 @@ class InMemoryDatasetCreator(DatasetCreator):
         if not data:
             raise ValueError("Data is empty")
 
+        data = 'prompt_tokens=256,output_tokens=128'
+        print(f"The data is: {data}")
+
         if isinstance(data, dict):
             # assume data is a dictionary of columns and values: {"c1": ["i1", "i2"]}
             data_dict = cls.format_data_dict(data)
