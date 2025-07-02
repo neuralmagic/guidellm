@@ -37,7 +37,8 @@ class InMemoryDatasetCreator(DatasetCreator):
         if not data:
             raise ValueError("Data is empty")
 
-        data = 'prompt_tokens=256,output_tokens=128'
+        #data = 'prompt_tokens=256,output_tokens=128'
+        data = {"prompt_tokens": 256, "output_tokens" : 128}
         print(f"The data is: {data}")
 
         if isinstance(data, dict):
