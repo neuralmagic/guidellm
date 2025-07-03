@@ -4,6 +4,8 @@ from collections.abc import Iterable, Iterator
 from pathlib import Path
 from typing import Any, Literal, Optional, Union
 
+import random
+import time
 import yaml
 from datasets import (
     Dataset,
@@ -138,6 +140,8 @@ class SyntheticTextItemsGenerator(
         self.text_creator = EndlessTextCreator(
             data=config.source,
         )
+        # Add counter for unique prefixes
+        self.request_counter = 0
 
     def __iter__(
         self,
@@ -170,22 +174,42 @@ class SyntheticTextItemsGenerator(
             output_tokens_sampler,
         ):
             start_index = rand.randint(0, len(self.text_creator.words))
+            # Increment counter for each request
+            self.request_counter += 1
             yield {
-                "prompt": self._create_prompt(prompt_tokens, start_index),
+                "prompt": self._create_prompt(prompt_tokens, start_index, self.request_counter),
                 "prompt_tokens_count": prompt_tokens,
                 "output_tokens_count": output_tokens,
             }
 
-    def _create_prompt(self, prompt_tokens: int, start_index: int) -> str:
+    def _create_prompt(self, prompt_tokens: int, start_index: int, request_id: int) -> str:
+        """
+        Create a prompt with unique prefix to prevent vLLM prefix caching.
+        Args:
+            prompt_tokens: Target number of tokens for the prompt
+            start_index: Starting position in the text corpus
+            request_id: Unique identifier for this request (used as prefix)
+        Returns:
+            Generated prompt string with unique prefix
+        """
         if prompt_tokens <= 0:
-            return ""
+            return self._create_unique_prefix(request_id)
+
+        unique_prefix = self._create_unique_prefix(request_id)
+
+        # Calculate how many tokens the prefix uses
+        prefix_tokens = len(self.processor.tokenize(unique_prefix))
+
+        # Adjust target tokens to account for the prefix
+        remaining_tokens = max(1, prompt_tokens - prefix_tokens)
 
         left = start_index
-        right = start_index + 4 * prompt_tokens
+        right = start_index + 4 * remaining_tokens
 
         while left < right:
             mid = (left + right) // 2
-            test_prompt = self.text_creator.create_text(start_index, mid - start_index)
+            base_text = self.text_creator.create_text(start_index, mid - start_index)
+            test_prompt = unique_prefix + base_text
             test_tokens = len(self.processor.tokenize(test_prompt))
 
             if test_tokens == prompt_tokens:
@@ -195,7 +219,23 @@ class SyntheticTextItemsGenerator(
             else:
                 right = mid
 
-        return self.text_creator.create_text(start_index, left - start_index)
+        base_text = self.text_creator.create_text(start_index, left - start_index)
+        return unique_prefix + base_text
+
+    def _create_unique_prefix(self, request_id: int) -> str:
+        """
+        Create a unique prefix that will never match any other request.
+        """
+
+        timestamp = int(time.time() * 1000000)  # microseconds
+        random.seed(request_id + timestamp)
+        random_component = random.randint(100000, 999999)
+
+        prefix_parts = [
+            f"RAND{random_component}",
+        ]
+
+        return f"{'_'.join(prefix_parts)}: "
 
 
 class SyntheticDatasetCreator(DatasetCreator):
