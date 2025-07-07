@@ -35,7 +35,6 @@ import {
   StyledFormControl,
 } from './MetricsSummary.styles';
 import { useSummary } from './useSummary';
-import { ScaleType } from '../Charts/DashedLine/DashedLine.interfaces';
 
 const percentileOptions = ['p50', 'p90', 'p95', 'p99'];
 
@@ -208,7 +207,6 @@ export const Component = () => {
               data={[{ id: 'ttft', data: lineDataByRps.ttft || [] }]}
               threshold={ttftSLO}
               lineColor={LineColor.Primary}
-              yScaleType={ScaleType.linear}
             />
           </GraphContainer>
         </MiddleColumn>
@@ -227,7 +225,6 @@ export const Component = () => {
               data={[{ id: 'tpot', data: lineDataByRps.tpot || [] }]}
               threshold={tpotSLO}
               lineColor={LineColor.Secondary}
-              yScaleType={ScaleType.linear}
             />
           </GraphContainer>
         </MiddleColumn>
@@ -248,7 +245,6 @@ export const Component = () => {
               ]}
               threshold={timePerRequestSLO}
               lineColor={LineColor.Tertiary}
-              yScaleType={ScaleType.linear}
             />
           </GraphContainer>
         </MiddleColumn>
@@ -269,7 +265,6 @@ export const Component = () => {
               data={[{ id: 'throughput', data: lineDataByRps.throughput || [] }]}
               threshold={throughputSLO}
               lineColor={LineColor.Quarternary}
-              yScaleType={ScaleType.linear}
             />
           </GraphContainer>
         </MiddleColumn>
