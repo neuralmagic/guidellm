@@ -37,6 +37,9 @@ class Percentiles(StandardBaseModel):
     p25: float = Field(
         description="The 25th percentile of the distribution.",
     )
+    p50: float = Field(
+        description="The 50th percentile of the distribution.",
+    )
     p75: float = Field(
         description="The 75th percentile of the distribution.",
     )
@@ -159,6 +162,7 @@ class DistributionSummary(StandardBaseModel):
                     p05=cdf[np.argmax(cdf[:, 1] >= 0.05), 0].item(),  # noqa: PLR2004
                     p10=cdf[np.argmax(cdf[:, 1] >= 0.1), 0].item(),  # noqa: PLR2004
                     p25=cdf[np.argmax(cdf[:, 1] >= 0.25), 0].item(),  # noqa: PLR2004
+                    p50=cdf[np.argmax(cdf[:, 1] >= 0.50), 0].item(),  # noqa: PLR2004
                     p75=cdf[np.argmax(cdf[:, 1] >= 0.75), 0].item(),  # noqa: PLR2004
                     p90=cdf[np.argmax(cdf[:, 1] >= 0.9), 0].item(),  # noqa: PLR2004
                     p95=cdf[np.argmax(cdf[:, 1] >= 0.95), 0].item(),  # noqa: PLR2004
@@ -172,6 +176,7 @@ class DistributionSummary(StandardBaseModel):
                     p05=0,
                     p10=0,
                     p25=0,
+                    p50=0,
                     p75=0,
                     p90=0,
                     p95=0,

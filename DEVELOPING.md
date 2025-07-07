@@ -267,6 +267,16 @@ Reference [https://www.npmjs.com/package/jest-runner-groups](jest-runner-groups)
  */
 ```
 
+### 🧪 UI Development Notes
+
+During development, it can be helpful to view sample data. We include a sample benchmark run wired into the Redux store under:
+
+```
+src/ui/lib/store/[runInfo/workloadDetails/benchmarks]WindowData.ts
+```
+
+In the future this will be replaced by a configurable untracked file for dev use.
+
 ## Additional Resources
 
 - [CONTRIBUTING.md](https://github.com/neuralmagic/guidellm/blob/main/CONTRIBUTING.md): Guidelines for contributing to the project.
