@@ -5,7 +5,7 @@ GuideLLM provides flexible options for outputting benchmark results, catering to
 For all of the output formats, `--output-extras` can be used to include additional information. This could include tags, metadata, hardware details, and other relevant information that can be useful for analysis. This must be supplied as a JSON encoded string. For example:
 
 ```bash
-guidellm benchmark run \
+guidellm benchmark \
   --target "http://localhost:8000" \
   --rate-type sweep \
   --max-seconds 30 \
@@ -26,10 +26,10 @@ By default, GuideLLM displays benchmark results and progress directly in the con
 
 ### Disabling Console Output
 
-To disable the progress outputs to the console, use the `disable-progress` flag when running the `guidellm benchmark run` command. For example:
+To disable the progress outputs to the console, use the `disable-progress` flag when running the `guidellm benchmark` command. For example:
 
 ```bash
-guidellm benchmark run \
+guidellm benchmark \
   --target "http://localhost:8000" \
   --rate-type sweep \
   --max-seconds 30 \
@@ -37,10 +37,10 @@ guidellm benchmark run \
   --disable-progress
 ```
 
-To disable console output, use the `--disable-console-outputs` flag when running the `guidellm benchmark run` command. For example:
+To disable console output, use the `--disable-console-outputs` flag when running the `guidellm benchmark` command. For example:
 
 ```bash
-guidellm benchmark run \
+guidellm benchmark \
   --target "http://localhost:8000" \
   --rate-type sweep \
   --max-seconds 30 \
@@ -50,10 +50,10 @@ guidellm benchmark run \
 
 ### Enabling Extra Information
 
-GuideLLM includes the option to display extra information during the benchmark runs to monitor the overheads and performance of the system. This can be enabled by using the `--display-scheduler-stats` flag when running the `guidellm benchmark run` command. For example:
+GuideLLM includes the option to display extra information during the benchmark runs to monitor the overheads and performance of the system. This can be enabled by using the `--display-scheduler-stats` flag when running the `guidellm benchmark` command. For example:
 
 ```bash
-guidellm benchmark run \
+guidellm benchmark \
   --target "http://localhost:8000" \
   --rate-type sweep \
   --max-seconds 30 \
@@ -81,7 +81,7 @@ GuideLLM supports saving benchmark results to files in various formats, includin
 Example command to save results in YAML format:
 
 ```bash
-guidellm benchmark run \
+guidellm benchmark \
   --target "http://localhost:8000" \
   --rate-type sweep \
   --max-seconds 30 \

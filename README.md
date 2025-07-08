@@ -68,12 +68,12 @@ For information on starting other supported inference servers or platforms, see 
 
 #### 2. Run a GuideLLM Benchmark
 
-To run a GuideLLM benchmark, use the `guidellm benchmark run` command with the target set to an OpenAI-compatible server. For this example, the target is set to 'http://localhost:8000', assuming that vLLM is active and running on the same server. Otherwise, update it to the appropriate location. By default, GuideLLM automatically determines the model available on the server and uses it. To target a different model, pass the desired name with the `--model` argument. Additionally, the `--rate-type` is set to `sweep`, which automatically runs a range of benchmarks to determine the minimum and maximum rates that the server and model can support. Each benchmark run under the sweep will run for 30 seconds, as set by the `--max-seconds` argument. Finally, `--data` is set to a synthetic dataset with 256 prompt tokens and 128 output tokens per request. For more arguments, supported scenarios, and configurations, jump to the [Configurations Section](#configurations) or run `guidellm benchmark --help`.
+To run a GuideLLM benchmark, use the `guidellm benchmark` command with the target set to an OpenAI-compatible server. For this example, the target is set to 'http://localhost:8000', assuming that vLLM is active and running on the same server. Otherwise, update it to the appropriate location. By default, GuideLLM automatically determines the model available on the server and uses it. To target a different model, pass the desired name with the `--model` argument. Additionally, the `--rate-type` is set to `sweep`, which automatically runs a range of benchmarks to determine the minimum and maximum rates that the server and model can support. Each benchmark run under the sweep will run for 30 seconds, as set by the `--max-seconds` argument. Finally, `--data` is set to a synthetic dataset with 256 prompt tokens and 128 output tokens per request. For more arguments, supported scenarios, and configurations, jump to the [Configurations Section](#configurations) or run `guidellm benchmark --help`.
 
 Now, to start benchmarking, run the following command:
 
 ```bash
-guidellm benchmark run \
+guidellm benchmark \
   --target "http://localhost:8000" \
   --rate-type sweep \
   --max-seconds 30 \
@@ -110,11 +110,11 @@ For further details on determining the optimal request rate and SLOs, refer to t
 
 ### Configurations
 
-GuideLLM offers a range of configurations through both the benchmark CLI command and environment variables, which provide default values and more granular controls. The most common configurations are listed below. A complete list is easily accessible, though, by running `guidellm benchmark run --help` or `guidellm config` respectively.
+GuideLLM offers a range of configurations through both the benchmark CLI command and environment variables, which provide default values and more granular controls. The most common configurations are listed below. A complete list is easily accessible, though, by running `guidellm benchmark --help` or `guidellm config` respectively.
 
 #### Benchmark CLI
 
-The `guidellm benchmark run` command is used to run benchmarks against a generative AI backend/server. The command accepts a variety of arguments to customize the benchmark run. The most common arguments include:
+The `guidellm benchmark` command is used to run benchmarks against a generative AI backend/server. The command accepts a variety of arguments to customize the benchmark run. The most common arguments include:
 
 - `--target`: Specifies the target path for the backend to run benchmarks against. For example, `http://localhost:8000`. This is required to define the server endpoint.
 
