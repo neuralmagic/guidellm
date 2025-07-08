@@ -320,7 +320,10 @@ def run(
     )
 
 
-@benchmark.command(help="Load a saved benchmark report.")
+@benchmark.command(
+    "from-file",
+    help="Load a saved benchmark report."
+)
 @click.argument(
     "path",
     type=click.Path(file_okay=True, dir_okay=False, exists=True),
