@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/neuralmagic/guidellm/main/docs/assets/guidellm-logo-light.png">
-    <img alt="GuideLLM Logo" src="https://raw.githubusercontent.com/neuralmagic/guidellm/main/docs/assets/guidellm-logo-dark.png" width=55%>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/vllm-project/guidellm/main/docs/assets/guidellm-logo-light.png">
+    <img alt="GuideLLM Logo" src="https://raw.githubusercontent.com/vllm-project/guidellm/main/docs/assets/guidellm-logo-dark.png" width=55%>
   </picture>
 </p>
 
@@ -9,14 +9,14 @@
 Scale Efficiently: Evaluate and Optimize Your LLM Deployments for Real-World Inference
 </h3>
 
-[![GitHub Release](https://img.shields.io/github/release/neuralmagic/guidellm.svg?label=Version)](https://github.com/neuralmagic/guidellm/releases) [![Documentation](https://img.shields.io/badge/Documentation-8A2BE2?logo=read-the-docs&logoColor=%23ffffff&color=%231BC070)](https://github.com/neuralmagic/guidellm/tree/main/docs) [![License](https://img.shields.io/github/license/neuralmagic/guidellm.svg)](https://github.com/neuralmagic/guidellm/blob/main/LICENSE) [![PyPI Release](https://img.shields.io/pypi/v/guidellm.svg?label=PyPI%20Release)](https://pypi.python.org/pypi/guidellm) [![Python Versions](https://img.shields.io/badge/Python-3.9--3.13-orange)](https://pypi.python.org/pypi/guidellm) [![Nightly Build](https://img.shields.io/github/actions/workflow/status/neuralmagic/guidellm/nightly.yml?branch=main&label=Nightly%20Build)](https://github.com/neuralmagic/guidellm/actions/workflows/nightly.yml)
+[![GitHub Release](https://img.shields.io/github/release/vllm-project/guidellm.svg?label=Version)](https://github.com/vllm-project/guidellm/releases) [![Documentation](https://img.shields.io/badge/Documentation-8A2BE2?logo=read-the-docs&logoColor=%23ffffff&color=%231BC070)](https://github.com/vllm-project/guidellm/tree/main/docs) [![License](https://img.shields.io/github/license/vllm-project/guidellm.svg)](https://github.com/vllm-project/guidellm/blob/main/LICENSE) [![PyPI Release](https://img.shields.io/pypi/v/guidellm.svg?label=PyPI%20Release)](https://pypi.python.org/pypi/guidellm) [![Python Versions](https://img.shields.io/badge/Python-3.9--3.13-orange)](https://pypi.python.org/pypi/guidellm) [![Nightly Build](https://img.shields.io/github/actions/workflow/status/vllm-project/guidellm/nightly.yml?branch=main&label=Nightly%20Build)](https://github.com/vllm-project/guidellm/actions/workflows/nightly.yml)
 
 ## Overview
 
 <p>
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/neuralmagic/guidellm/main/docs/assets/guidellm-user-flows-dark.png">
-    <img alt="GuideLLM User Flows" src="https://raw.githubusercontent.com/neuralmagic/guidellm/main/docs/assets/guidellm-user-flows-light.png">
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/vllm-project/guidellm/main/docs/assets/guidellm-user-flows-dark.png">
+    <img alt="GuideLLM User Flows" src="https://raw.githubusercontent.com/vllm-project/guidellm/main/docs/assets/guidellm-user-flows-light.png">
   </picture>
 </p>
 
@@ -47,10 +47,10 @@ pip install guidellm
 Or from source code using pip:
 
 ```bash
-pip install git+https://github.com/neuralmagic/guidellm.git
+pip install git+https://github.com/vllm-project/guidellm.git
 ```
 
-For detailed installation instructions and requirements, see the [Installation Guide](https://github.com/neuralmagic/guidellm/blob/main/docs/install.md).
+For detailed installation instructions and requirements, see the [Installation Guide](https://github.com/vllm-project/guidellm/blob/main/docs/install.md).
 
 ### Quick Start
 
@@ -64,7 +64,7 @@ vllm serve "neuralmagic/Meta-Llama-3.1-8B-Instruct-quantized.w4a16"
 
 For more information on starting a vLLM server, see the [vLLM Documentation](https://docs.vllm.ai/en/latest/serving/openai_compatible_server.html).
 
-For information on starting other supported inference servers or platforms, see the [Supported Backends Documentation](https://github.com/neuralmagic/guidellm/blob/main/docs/backends.md).
+For information on starting other supported inference servers or platforms, see the [Supported Backends Documentation](https://github.com/vllm-project/guidellm/blob/main/docs/backends.md).
 
 #### 2. Run a GuideLLM Benchmark
 
@@ -80,7 +80,7 @@ guidellm benchmark \
   --data "prompt_tokens=256,output_tokens=128"
 ```
 
-The above command will begin the evaluation and provide progress updates similar to the following: <img src= "https://raw.githubusercontent.com/neuralmagic/guidellm/main/docs/assets/sample-benchmarks.gif"/>
+The above command will begin the evaluation and provide progress updates similar to the following: <img src= "https://raw.githubusercontent.com/vllm-project/guidellm/main/docs/assets/sample-benchmarks.gif"/>
 
 #### 3. Analyze the Results
 
@@ -90,15 +90,15 @@ After the evaluation is completed, GuideLLM will summarize the results into thre
 2. Benchmarks Info: A high-level view of each benchmark and the requests that were run, including the type, duration, request statuses, and number of tokens.
 3. Benchmarks Stats: A summary of the statistics for each benchmark run, including the request rate, concurrency, latency, and token-level metrics such as TTFT, ITL, and more.
 
-The sections will look similar to the following: <img alt="Sample GuideLLM benchmark output" src="https://raw.githubusercontent.com/neuralmagic/guidellm/main/docs/assets/sample-output.png" />
+The sections will look similar to the following: <img alt="Sample GuideLLM benchmark output" src="https://raw.githubusercontent.com/vllm-project/guidellm/main/docs/assets/sample-output.png" />
 
-For more details about the metrics and definitions, please refer to the [Metrics Documentation](https://github.com/neuralmagic/guidellm/blob/main/docs/metrics.md).
+For more details about the metrics and definitions, please refer to the [Metrics Documentation](https://github.com/vllm-project/guidellm/blob/main/docs/metrics.md).
 
 #### 4. Explore the Results File
 
 By default, the full results, including complete statistics and request data, are saved to a file `benchmarks.json` in the current working directory. This file can be used for further analysis or reporting, and additionally can be reloaded into Python for further analysis using the `guidellm.benchmark.GenerativeBenchmarksReport` class. You can specify a different file name and extension with the `--output` argument.
 
-For more details about the supported output file types, please take a look at the [Outputs Documentation](https://github.com/neuralmagic/guidellm/blob/main/docs/outputs.md).
+For more details about the supported output file types, please take a look at the [Outputs Documentation](https://github.com/vllm-project/guidellm/blob/main/docs/outputs.md).
 
 #### 5. Use the Results
 
@@ -106,7 +106,7 @@ The results from GuideLLM are used to optimize your LLM deployment for performan
 
 For example, when deploying a chat application, we likely want to ensure that our time to first token (TTFT) and inter-token latency (ITL) are under certain thresholds to meet our service level objectives (SLOs) or service level agreements (SLAs). For example, setting TTFT to 200ms and ITL 25ms for the sample data provided in the example above, we can see that even though the server is capable of handling up to 13 requests per second, we would only be able to meet our SLOs for 99% of users at a request rate of 3.5 requests per second. If we relax our constraints on ITL to 50 ms, then we can meet the TTFT SLA for 99% of users at a request rate of approximately 10 requests per second.
 
-For further details on determining the optimal request rate and SLOs, refer to the [SLOs Documentation](https://github.com/neuralmagic/guidellm/blob/main/docs/service_level_objectives.md).
+For further details on determining the optimal request rate and SLOs, refer to the [SLOs Documentation](https://github.com/vllm-project/guidellm/blob/main/docs/service_level_objectives.md).
 
 ### Configurations
 
@@ -165,16 +165,16 @@ The UI is a WIP, check more recent PRs for the latest updates
 
 ### Documentation
 
-Our comprehensive documentation offers detailed guides and resources to help you maximize the benefits of GuideLLM. Whether just getting started or looking to dive deeper into advanced topics, you can find what you need in our [Documentation](https://github.com/neuralmagic/guidellm/blob/main/docs).
+Our comprehensive documentation offers detailed guides and resources to help you maximize the benefits of GuideLLM. Whether just getting started or looking to dive deeper into advanced topics, you can find what you need in our [Documentation](https://github.com/vllm-project/guidellm/blob/main/docs).
 
 ### Core Docs
 
-- [**Installation Guide**](https://github.com/neuralmagic/guidellm/blob/main/docs/install.md) - This guide provides step-by-step instructions for installing GuideLLM, including prerequisites and setup tips.
-- [**Backends Guide**](https://github.com/neuralmagic/guidellm/blob/main/docs/backends.md) - A comprehensive overview of supported backends and how to set them up for use with GuideLLM.
-- [**Data/Datasets Guide**](https://github.com/neuralmagic/guidellm/blob/main/docs/datasets.md) - Information on supported datasets, including how to use them for benchmarking.
-- [**Metrics Guide**](https://github.com/neuralmagic/guidellm/blob/main/docs/metrics.md) - Detailed explanations of the metrics used in GuideLLM, including definitions and how to interpret them.
-- [**Outputs Guide**](https://github.com/neuralmagic/guidellm/blob/main/docs/outputs.md) - Information on the different output formats supported by GuideLLM and how to use them.
-- [**Architecture Overview**](https://github.com/neuralmagic/guidellm/blob/main/docs/architecture.md) - A detailed look at GuideLLM's design, components, and how they interact.
+- [**Installation Guide**](https://github.com/vllm-project/guidellm/blob/main/docs/install.md) - This guide provides step-by-step instructions for installing GuideLLM, including prerequisites and setup tips.
+- [**Backends Guide**](https://github.com/vllm-project/guidellm/blob/main/docs/backends.md) - A comprehensive overview of supported backends and how to set them up for use with GuideLLM.
+- [**Data/Datasets Guide**](https://github.com/vllm-project/guidellm/blob/main/docs/datasets.md) - Information on supported datasets, including how to use them for benchmarking.
+- [**Metrics Guide**](https://github.com/vllm-project/guidellm/blob/main/docs/metrics.md) - Detailed explanations of the metrics used in GuideLLM, including definitions and how to interpret them.
+- [**Outputs Guide**](https://github.com/vllm-project/guidellm/blob/main/docs/outputs.md) - Information on the different output formats supported by GuideLLM and how to use them.
+- [**Architecture Overview**](https://github.com/vllm-project/guidellm/blob/main/docs/architecture.md) - A detailed look at GuideLLM's design, components, and how they interact.
 
 ### Supporting External Documentation
 
@@ -184,17 +184,17 @@ Our comprehensive documentation offers detailed guides and resources to help you
 
 We appreciate contributions to the code, examples, integrations, documentation, bug reports, and feature requests! Your feedback and involvement are crucial in helping GuideLLM grow and improve. Below are some ways you can get involved:
 
-- [**DEVELOPING.md**](https://github.com/neuralmagic/guidellm/blob/main/DEVELOPING.md) - Development guide for setting up your environment and making contributions.
-- [**CONTRIBUTING.md**](https://github.com/neuralmagic/guidellm/blob/main/CONTRIBUTING.md) - Guidelines for contributing to the project, including code standards, pull request processes, and more.
-- [**CODE_OF_CONDUCT.md**](https://github.com/neuralmagic/guidellm/blob/main/CODE_OF_CONDUCT.md) - Our expectations for community behavior to ensure a welcoming and inclusive environment.
+- [**DEVELOPING.md**](https://github.com/vllm-project/guidellm/blob/main/DEVELOPING.md) - Development guide for setting up your environment and making contributions.
+- [**CONTRIBUTING.md**](https://github.com/vllm-project/guidellm/blob/main/CONTRIBUTING.md) - Guidelines for contributing to the project, including code standards, pull request processes, and more.
+- [**CODE_OF_CONDUCT.md**](https://github.com/vllm-project/guidellm/blob/main/CODE_OF_CONDUCT.md) - Our expectations for community behavior to ensure a welcoming and inclusive environment.
 
 ### Releases
 
-Visit our [GitHub Releases Page](https://github.com/neuralmagic/guidellm/releases) and review the release notes to stay updated with the latest releases.
+Visit our [GitHub Releases Page](https://github.com/vllm-project/guidellm/releases) and review the release notes to stay updated with the latest releases.
 
 ### License
 
-GuideLLM is licensed under the [Apache License 2.0](https://github.com/neuralmagic/guidellm/blob/main/LICENSE).
+GuideLLM is licensed under the [Apache License 2.0](https://github.com/vllm-project/guidellm/blob/main/LICENSE).
 
 ### Cite
 
@@ -205,6 +205,6 @@ If you find GuideLLM helpful in your research or projects, please consider citin
   title={GuideLLM: Scalable Inference and Optimization for Large Language Models},
   author={Neural Magic, Inc.},
   year={2024},
-  howpublished={\url{https://github.com/neuralmagic/guidellm}},
+  howpublished={\url{https://github.com/vllm-project/guidellm}},
 }
 ```
