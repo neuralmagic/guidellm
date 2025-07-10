@@ -11,7 +11,7 @@
     "tests/ui/integration/**/*.ts",
     "tests/ui/integration/**/*.tsx",
     "tests/ui/test.helper.tsx",
-    "tests/ui/__mocks__",
+    "tests/ui/__mocks__/**/*.{ts,tsx,js}",
     "src/ui/app/types",
     "src/ui/types"
   ]
