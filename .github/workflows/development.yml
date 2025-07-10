@@ -157,7 +157,7 @@ jobs:
 
   build:
     # Only build if the PR branch is local
-    if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -210,7 +210,7 @@ jobs:
 
   build-and-push-container:
     # Only build if the PR branch is local
-    if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     permissions:
       packages: write
