@@ -43,7 +43,7 @@ keywords = [
     "vllm",
 ]
 dependencies = [
-    "click",
+    "click>=8.0.0,<8.2.0",
     "datasets",
     "ftfy>=6.0.0",
     "httpx[http2]<1.0.0",
@@ -91,7 +91,6 @@ dev = [
     "mdformat-gfm~=0.3.6",
 
     # type-checking
-    "types-click~=7.1.8",
     "types-PyYAML~=6.0.1",
     "types-requests~=2.32.0",
     "types-toml",

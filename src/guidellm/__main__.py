@@ -19,8 +19,8 @@ from guidellm.scheduler import StrategyType
 from guidellm.utils import DefaultGroupHandler
 from guidellm.utils import cli as cli_tools
 
-STRATEGY_PROFILE_CHOICES = set(
-    list(get_args(ProfileType)) + list(get_args(StrategyType))
+STRATEGY_PROFILE_CHOICES = list(
+    set(list(get_args(ProfileType)) + list(get_args(StrategyType)))
 )
 
 
@@ -320,10 +320,7 @@ def run(
     )
 
 
-@benchmark.command(
-    "from-file",
-    help="Load a saved benchmark report."
-)
+@benchmark.command("from-file", help="Load a saved benchmark report.")
 @click.argument(
     "path",
     type=click.Path(file_okay=True, dir_okay=False, exists=True),
