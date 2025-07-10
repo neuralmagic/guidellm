@@ -9,12 +9,15 @@ Environment Variables:
     - GUIDELLM__LOGGING__DISABLED: Disable logging (default: false).
     - GUIDELLM__LOGGING__CLEAR_LOGGERS: Clear existing loggers
         from loguru (default: true).
-    - GUIDELLM__LOGGING__LOG_LEVEL: Log level for console logging
+    - GUIDELLM__LOGGING__CONSOLE_LOG_LEVEL: Log level for console logging
         (default: none, options: DEBUG, INFO, WARNING, ERROR, CRITICAL).
-    - GUIDELLM__LOGGING__FILE: Path to the log file for file logging
+    - GUIDELLM__LOGGING__LOG_FILE: Path to the log file for file logging
         (default: guidellm.log if log file level set else none)
-    - GUIDELLM__LOGGING__FILE_LEVEL: Log level for file logging
+    - GUIDELLM__LOGGING__LOG_FILE_LEVEL: Log level for file logging
         (default: INFO if log file set else none).
+
+If logging isn't responding to the environment variables, run the `guidellm config`
+command to validate that the environment variables match and are being set correctly.
 
 Usage:
     from guidellm import logger, configure_logger, LoggerConfig
