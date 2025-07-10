@@ -182,7 +182,7 @@ jobs:
         run: npm run test:integration
 
   deploy-ui-build:
-    needs: [ui-quality-checks, ui-precommit-checks, ui-unit-tests, ui-integration-tests]
+    needs: [ui-quality-checks, ui-precommit-checks, ui-unit-tests, ui-type-checks, ui-integration-tests]
     permissions:
       contents: write
     runs-on: ubuntu-latest
