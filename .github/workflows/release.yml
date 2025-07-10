@@ -287,7 +287,7 @@ jobs:
           user_name: ${{ github.actor }}
           user_email: ${{ github.actor }}@users.noreply.github.com
           publish_branch: gh-pages
-
+          
   build-and-push-container:
     needs: [unit-tests, integration-tests, e2e-tests]
     runs-on: ubuntu-latest
