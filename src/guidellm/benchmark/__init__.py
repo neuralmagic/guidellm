@@ -12,7 +12,7 @@ from .benchmark import (
     StatusBreakdown,
 )
 from .benchmarker import Benchmarker, BenchmarkerResult, GenerativeBenchmarker
-from .entrypoints import benchmark_generative_text
+from .entrypoints import benchmark_generative_text, reimport_benchmarks_report
 from .output import GenerativeBenchmarksConsole, GenerativeBenchmarksReport
 from .profile import (
     AsyncProfile,
@@ -63,4 +63,5 @@ __all__ = [
     "ThroughputProfile",
     "benchmark_generative_text",
     "create_profile",
+    "reimport_benchmarks_report",
 ]

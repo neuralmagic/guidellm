@@ -7,12 +7,16 @@ import click
 from pydantic import ValidationError
 
 from guidellm.backend import BackendType
-from guidellm.benchmark import ProfileType
+from guidellm.benchmark import (
+    ProfileType,
+    reimport_benchmarks_report,
+)
 from guidellm.benchmark.entrypoints import benchmark_with_scenario
 from guidellm.benchmark.scenario import GenerativeTextScenario, get_builtin_scenarios
 from guidellm.config import print_config
 from guidellm.preprocess.dataset import ShortPromptStrategy, process_dataset
 from guidellm.scheduler import StrategyType
+from guidellm.utils import DefaultGroupHandler
 from guidellm.utils import cli as cli_tools
 
 STRATEGY_PROFILE_CHOICES = set(
@@ -25,7 +29,17 @@ def cli():
     pass
 
 
-@cli.command(
+@cli.group(
+    help="Commands to run a new benchmark or load a prior one.",
+    cls=DefaultGroupHandler,
+    default="run",
+)
+def benchmark():
+    pass
+
+
+@benchmark.command(
+    "run",
     help="Run a benchmark against a generative model using the specified arguments.",
     context_settings={"auto_envvar_prefix": "GUIDELLM"},
 )
@@ -230,7 +244,7 @@ def cli():
     type=int,
     help="The random seed to use for benchmarking to ensure reproducibility.",
 )
-def benchmark(
+def run(
     scenario,
     target,
     backend_type,
@@ -306,6 +320,37 @@ def benchmark(
     )
 
 
+@benchmark.command(
+    "from-file",
+    help="Load a saved benchmark report."
+)
+@click.argument(
+    "path",
+    type=click.Path(file_okay=True, dir_okay=False, exists=True),
+    default=Path.cwd() / "benchmarks.json",
+)
+@click.option(
+    "--output-path",
+    type=click.Path(file_okay=True, dir_okay=True, exists=False),
+    default=None,
+    is_flag=False,
+    flag_value=Path.cwd() / "benchmarks_reexported.json",
+    help=(
+        "Allows re-exporting the benchmarks to another format. "
+        "The path to save the output to. If it is a directory, "
+        "it will save benchmarks.json under it. "
+        "Otherwise, json, yaml, or csv files are supported for output types "
+        "which will be read from the extension for the file path. "
+        "This input is optional. If the output path flag is not provided, "
+        "the benchmarks will not be reexported. If the flag is present but "
+        "no value is specified, it will default to the current directory "
+        "with the file name `benchmarks_reexported.json`."
+    ),
+)
+def from_file(path, output_path):
+    reimport_benchmarks_report(path, output_path)
+
+
 def decode_escaped_str(_ctx, _param, value):
     """
     Click auto adds characters. For example, when using --pad-char "\n",
@@ -321,10 +366,11 @@ def decode_escaped_str(_ctx, _param, value):
 
 
 @cli.command(
+    short_help="Prints environment variable settings.",
     help=(
         "Print out the available configuration settings that can be set "
         "through environment variables."
-    )
+    ),
 )
 def config():
     print_config()

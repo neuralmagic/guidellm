@@ -242,7 +242,10 @@ class GenerativeBenchmarksReport(StandardBaseModel):
         if path_suffix in [".csv"]:
             return path, "csv"
 
-        raise ValueError(f"Unsupported file extension: {path_suffix} for {path}.")
+        raise ValueError(
+            f"Unsupported file extension: {path_suffix} for {path}; "
+            "expected json, yaml, or csv."
+        )
 
     @staticmethod
     def _benchmark_desc_headers_and_values(
@@ -944,3 +947,20 @@ class GenerativeBenchmarksConsole:
             title="Benchmarks Stats",
             sections=sections,
         )
+
+    def print_full_report(self):
+        """
+        Print out the benchmark statistics to the console.
+        Temporarily enables the console if it's disabled.
+
+        Format:
+        - Metadata
+        - Info
+        - Stats
+        """
+        orig_enabled = self.enabled
+        self.enabled = True
+        self.print_benchmarks_metadata()
+        self.print_benchmarks_info()
+        self.print_benchmarks_stats()
+        self.enabled = orig_enabled
