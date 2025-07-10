@@ -1,7 +1,7 @@
 name: Development
 
 on:
-  pull_request:
+  pull_request_target:
     types: [opened, synchronize, reopened]
 
 jobs:
@@ -348,7 +348,7 @@ jobs:
       - name: Skip build notification
         if: steps.check-changes.outputs.should_build == 'false'
         run: echo "Skipping UI preview build - no relevant files changed"
-        
+
   build-and-push-container:
     runs-on: ubuntu-latest
     permissions:
