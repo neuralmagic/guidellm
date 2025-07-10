@@ -8,7 +8,6 @@ import { Open } from '@assets/icons';
 import { useGetRunInfoQuery } from '../../store/slices/runInfo';
 import { formateDate, getFileSize } from '../../utils/helpers';
 import { SvgContainer } from '../../utils/SvgContainer';
-
 import { SpecBadge } from '../SpecBadge';
 import { HeaderCell, HeaderWrapper } from './PageHeader.styles';
 

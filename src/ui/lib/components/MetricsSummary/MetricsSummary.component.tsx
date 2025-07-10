@@ -2,6 +2,9 @@ import { Box, Button, Typography, useTheme } from '@mui/material';
 import React, { ElementType } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
+import { MetricLine, LineColor } from '@/lib/components/Charts/MetricLine';
+import { selectSloState } from '@/lib/store/slices/slo/slo.selectors';
+import { setCurrentRequestRate } from '@/lib/store/slices/slo/slo.slice';
 import { Expand } from '@assets/icons';
 
 import {
@@ -11,10 +14,6 @@ import {
 } from '../../store/slices/benchmarks';
 import { selectRunInfo } from '../../store/slices/runInfo';
 import { formatNumber } from '../../utils/helpers';
-import { MetricLine, LineColor } from '@/lib/components/Charts/MetricLine';
-import { selectSloState } from '@/lib/store/slices/slo/slo.selectors';
-import { setCurrentRequestRate } from '@/lib/store/slices/slo/slo.slice';
-
 import { BlockHeader } from '../BlockHeader';
 import { Input } from '../Input';
 import { MetricValue } from './components/MetricValue';

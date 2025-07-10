@@ -1,12 +1,12 @@
 import { createSelector } from '@reduxjs/toolkit';
 
+import { Point } from '@/lib/components/Charts/common/interfaces';
+
+import { BenchmarkMetrics, PercentileValues } from './benchmarks.interfaces';
 import { PercentileItem } from '../../../components/DistributionPercentiles';
 import { formatNumber } from '../../../utils/helpers';
 import { createMonotoneSpline } from '../../../utils/interpolation';
 import { RootState } from '../../index';
-import { Point } from '@/lib/components/Charts/common/interfaces';
-
-import { BenchmarkMetrics, PercentileValues } from './benchmarks.interfaces';
 import { selectSloState } from '../slo/slo.selectors';
 
 export const selectBenchmarks = (state: RootState) => state.benchmarks.data;

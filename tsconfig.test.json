@@ -6,7 +6,13 @@
   },
   "include": [
     "jest.setup.ts",
-    "tests/ui/unit/**/*.{ts,tsx}",
-    "tests/ui/integration/**/*.{ts,tsx}"
+    "tests/ui/unit/**/*.ts",
+    "tests/ui/unit/**/*.tsx",
+    "tests/ui/integration/**/*.ts",
+    "tests/ui/integration/**/*.tsx",
+    "tests/ui/test.helper.tsx",
+    "tests/ui/__mocks__/**/*.{ts,tsx,js}",
+    "src/ui/app/types",
+    "src/ui/types"
   ]
 }

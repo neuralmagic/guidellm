@@ -13,11 +13,8 @@ import {
   selectMetricsDetailsLineData,
   useGetBenchmarksQuery,
 } from '../../store/slices/benchmarks';
-
 import { selectSloState } from '../../store/slices/slo/slo.selectors';
-
 import { formatNumber } from '../../utils/helpers';
-
 import { BlockHeader } from '../BlockHeader';
 import { GraphTitle } from '../GraphTitle';
 import { MetricsContainer } from '../MetricsContainer';

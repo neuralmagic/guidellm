@@ -1,10 +1,9 @@
 import { Box, Grid, Typography } from '@mui/material';
 import { FC } from 'react';
 
+import { RequestOverTimeProps } from './RequestOverTime.interfaces';
 import { Badge } from '../../components/Badge';
 import { SpecBadge } from '../../components/SpecBadge';
-
-import { RequestOverTimeProps } from './RequestOverTime.interfaces';
 import { MiniCombined } from '../Charts/MiniCombined';
 import ContainerSizeWrapper, {
   ContainerSize,

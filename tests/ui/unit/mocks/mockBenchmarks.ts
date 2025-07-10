@@ -1,4 +1,4 @@
-export default [
+export const mockBenchmarks = [
   {
     requestsPerSecond: 0.6668550387660497,
     tpot: {
