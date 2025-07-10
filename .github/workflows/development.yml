@@ -147,7 +147,9 @@ jobs:
     steps:
       - name: Check out code
         uses: actions/checkout@v3
-
+        with:
+          ref: "${{ github.event.pull_request.merge_commit_sha }}"
+          
       - name: Set up Node.js 22
         uses: actions/setup-node@v4
         with:
