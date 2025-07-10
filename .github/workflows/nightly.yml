@@ -244,3 +244,27 @@ jobs:
           user_name: ${{ github.actor }}
           user_email: ${{ github.actor }}@users.noreply.github.com
           publish_branch: gh-pages
+          
+  build-and-push-container:
+    needs: [unit-tests, integration-tests, e2e-tests]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Buildah build
+        id: build-image
+        uses: redhat-actions/buildah-build@v2
+        with:
+          image: ${{ github.event.repository.name }}
+          tags: nightly
+          containerfiles: |
+            ./deploy/Containerfile
+      - name: Push To ghcr.io
+        id: push-to-ghcr
+        uses: redhat-actions/push-to-registry@v2
+        with:
+          image: ${{ steps.build-image.outputs.image }}
+          tags: ${{ steps.build-image.outputs.tags }}
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+          registry: ghcr.io/${{ github.repository_owner }}
