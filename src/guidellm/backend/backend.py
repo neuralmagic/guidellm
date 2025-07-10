@@ -7,6 +7,7 @@ from loguru import logger
 from PIL import Image
 
 from guidellm.backend.response import ResponseSummary, StreamingTextResponse
+from guidellm.config import settings
 
 __all__ = [
     "Backend",
@@ -129,10 +130,20 @@ class Backend(ABC):
         if not models:
             raise ValueError("No models available for the backend")
 
-        async for _ in self.text_completions(
-            prompt="Test connection", output_token_count=1
-        ):  # type: ignore[attr-defined]
-            pass
+        # Use the preferred route defined in the global settings when performing the
+        # validation request. This avoids calling an unavailable endpoint (ie
+        # /v1/completions) when the deployment only supports the chat completions
+        # endpoint.
+        if settings.preferred_route == "chat_completions":
+            async for _ in self.chat_completions(  # type: ignore[attr-defined]
+                content="Test connection", output_token_count=1
+            ):
+                pass
+        else:
+            async for _ in self.text_completions(  # type: ignore[attr-defined]
+                prompt="Test connection", output_token_count=1
+            ):
+                pass
 
         await self.reset()
 
