@@ -1,4 +1,5 @@
 from .colors import Colors
+from .default_group import DefaultGroupHandler
 from .hf_datasets import (
     SUPPORTED_TYPES,
     save_dataset_to_file,
@@ -20,6 +21,7 @@ from .text import (
 __all__ = [
     "SUPPORTED_TYPES",
     "Colors",
+    "DefaultGroupHandler",
     "EndlessTextCreator",
     "IntegerRangeSampler",
     "check_load_processor",
