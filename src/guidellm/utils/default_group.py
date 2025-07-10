@@ -68,7 +68,8 @@ class DefaultGroupHandler(click.Group):
         cmd_name, cmd, args = super().resolve_command(ctx, args)
         if hasattr(ctx, "arg0"):
             args.insert(0, ctx.arg0)
-            cmd_name = cmd.name
+            if cmd is not None:
+                cmd_name = cmd.name
         return cmd_name, cmd, args
 
     def format_commands(self, ctx, formatter):
@@ -79,7 +80,7 @@ class DefaultGroupHandler(click.Group):
         return super().format_commands(ctx, formatter)
 
 
-class DefaultCommandFormatter:
+class DefaultCommandFormatter(click.HelpFormatter):
     """
     Wraps a formatter to edit the line for the default command to mark it
     with the specified mark string.
