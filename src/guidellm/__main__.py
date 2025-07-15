@@ -13,7 +13,7 @@ from guidellm.benchmark import (
 )
 from guidellm.benchmark.entrypoints import benchmark_with_scenario
 from guidellm.benchmark.scenario import GenerativeTextScenario, get_builtin_scenarios
-from guidellm.config import print_config
+from guidellm.config import print_config, settings
 from guidellm.preprocess.dataset import ShortPromptStrategy, process_dataset
 from guidellm.scheduler import StrategyType
 from guidellm.utils import DefaultGroupHandler
@@ -84,6 +84,18 @@ def benchmark():
         "A JSON string containing any arguments to pass to the backend as a "
         "dict with **kwargs."
     ),
+)
+@click.option(
+    "--target-header",
+    "target_headers",
+    multiple=True,
+    help="A header to send to the target, e.g., --target-header 'Authorization: Bearer <token>'. Can be specified multiple times.",
+)
+@click.option(
+    "--target-skip-ssl-verify",
+    is_flag=True,
+    default=False,
+    help="Skip SSL certificate verification when sending requests to the target.",
 )
 @click.option(
     "--model",
@@ -249,6 +261,8 @@ def run(
     target,
     backend_type,
     backend_args,
+    target_headers,
+    target_skip_ssl_verify,
     model,
     processor,
     processor_args,
@@ -270,6 +284,21 @@ def run(
     random_seed,
 ):
     click_ctx = click.get_current_context()
+
+    if target_headers:
+        headers = {}
+        for header in target_headers:
+            if ":" not in header:
+                raise click.BadParameter(
+                    f"Invalid header format: {header}. Expected 'Key: Value'.",
+                    ctx=click_ctx,
+                    param_hint="--target-header",
+                )
+            key, value = header.split(":", 1)
+            headers[key.strip()] = value.strip()
+        settings.openai.headers = headers
+    if target_skip_ssl_verify:
+        settings.openai.verify_ssl = False
 
     overrides = cli_tools.set_if_not_default(
         click_ctx,

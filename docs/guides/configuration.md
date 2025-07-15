@@ -1,1 +1,42 @@
-# Coming Soon
+# Configuration
+
+The `guidellm` application can be configured using command-line arguments, environment variables, or a `.env` file. This page details the file-based and environment variable configuration options.
+
+## Configuration Methods
+
+Settings are loaded with the following priority (highest priority first):
+1.  Command-line arguments.
+2.  Environment variables.
+3.  Values in a `.env` file in the directory where the command is run.
+4.  Default values.
+
+## Environment Variable Format
+
+All settings can be configured using environment variables. The variables must be prefixed with `GUIDELLM__`, and nested settings are separated by a double underscore `__`.
+
+For example, to set the `api_key` for the `openai` backend, you would use the following environment variable:
+```bash
+export GUIDELLM__OPENAI__API_KEY="your-api-key"
+```
+
+### Target Configuration
+
+You can configure the connection to the target system using environment variables. This is an alternative to using the `--target-*` command-line flags.
+
+| Environment Variable | Description | Example |
+| --- | --- | --- |
+| `GUIDELLM__OPENAI__HEADERS` | A JSON string representing a dictionary of headers to send to the target. These headers will override any default headers (like `Authorization` from `api_key`). | `export GUIDELLM__OPENAI__HEADERS='{"Authorization": "Bearer my-token", "X-Custom-Header": "value"}'` |
+| `GUIDELLM__OPENAI__ORGANIZATION` | The OpenAI organization to use for requests. | `export GUIDELLM__OPENAI__ORGANIZATION="org-12345"` |
+| `GUIDELLM__OPENAI__PROJECT` | The OpenAI project to use for requests. | `export GUIDELLM__OPENAI__PROJECT="proj-67890"` |
+| `GUIDELLM__OPENAI__VERIFY_SSL` | Set to `false` or `0` to disable SSL certificate verification. | `export GUIDELLM__OPENAI__VERIFY_SSL=false` |
+
+### Using a `.env` file
+
+You can also place these variables in a `.env` file in your project's root directory:
+
+```dotenv
+# .env file
+GUIDELLM__OPENAI__API_KEY="your-api-key"
+GUIDELLM__OPENAI__HEADERS='{"Authorization": "Bearer my-token"}'
+GUIDELLM__OPENAI__VERIFY_SSL=false
+```
