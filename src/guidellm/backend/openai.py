@@ -95,6 +95,8 @@ class OpenAIHTTPBackend(Backend):
         extra_query: Optional[dict] = None,
         extra_body: Optional[dict] = None,
         remove_from_body: Optional[list[str]] = None,
+        headers: Optional[dict] = None,
+        verify: Optional[bool] = None,
     ):
         super().__init__(type_="openai_http")
         self._target = target or settings.openai.base_url
@@ -111,13 +113,32 @@ class OpenAIHTTPBackend(Backend):
 
         self._model = model
 
+        # Start with default headers based on other params
+        default_headers: dict[str, str] = {}
         api_key = api_key or settings.openai.api_key
-        self.authorization = (
-            f"Bearer {api_key}" if api_key else settings.openai.bearer_token
-        )
+        bearer_token = settings.openai.bearer_token
+        if api_key:
+            default_headers["Authorization"] = f"Bearer {api_key}"
+        elif bearer_token:
+            default_headers["Authorization"] = bearer_token
 
         self.organization = organization or settings.openai.organization
+        if self.organization:
+            default_headers["OpenAI-Organization"] = self.organization
+
         self.project = project or settings.openai.project
+        if self.project:
+            default_headers["OpenAI-Project"] = self.project
+
+        # User-provided headers from kwargs or settings override defaults
+        merged_headers = default_headers.copy()
+        merged_headers.update(settings.openai.headers or {})
+        if headers:
+            merged_headers.update(headers)
+
+        # Remove headers with None values for backward compatibility and convenience
+        self.headers = {k: v for k, v in merged_headers.items() if v is not None}
+
         self.timeout = timeout if timeout is not None else settings.request_timeout
         self.http2 = http2 if http2 is not None else settings.request_http2
         self.follow_redirects = (
@@ -125,6 +146,7 @@ class OpenAIHTTPBackend(Backend):
             if follow_redirects is not None
             else settings.request_follow_redirects
         )
+        self.verify = verify if verify is not None else settings.openai.verify
         self.max_output_tokens = (
             max_output_tokens
             if max_output_tokens is not None
@@ -161,9 +183,7 @@ class OpenAIHTTPBackend(Backend):
             "timeout": self.timeout,
             "http2": self.http2,
             "follow_redirects": self.follow_redirects,
-            "authorization": bool(self.authorization),
-            "organization": self.organization,
-            "project": self.project,
+            "headers": self.headers,
             "text_completions_path": TEXT_COMPLETIONS_PATH,
             "chat_completions_path": CHAT_COMPLETIONS_PATH,
         }
@@ -384,6 +404,7 @@ class OpenAIHTTPBackend(Backend):
                 http2=self.http2,
                 timeout=self.timeout,
                 follow_redirects=self.follow_redirects,
+                verify=self.verify,
             )
             self._async_client = client
         else:
@@ -395,16 +416,7 @@ class OpenAIHTTPBackend(Backend):
         headers = {
             "Content-Type": "application/json",
         }
-
-        if self.authorization:
-            headers["Authorization"] = self.authorization
-
-        if self.organization:
-            headers["OpenAI-Organization"] = self.organization
-
-        if self.project:
-            headers["OpenAI-Project"] = self.project
-
+        headers.update(self.headers)
         return headers
 
     def _params(self, endpoint_type: EndpointType) -> dict[str, str]:
