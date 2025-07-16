@@ -3,13 +3,13 @@
 5:I[75082,[],""]
 6:I[26742,["345","static/chunks/app/not-found-4effdac99ac1c2cc.js"],"default"]
 7:I[39065,[],"ClientPageRoot"]
-8:I[75868,["126","static/chunks/126-f279f984be3b9d2d.js","974","static/chunks/app/page-43d6479cc08d6bfe.js"],"default"]
+8:I[75868,["126","static/chunks/126-f279f984be3b9d2d.js","974","static/chunks/app/page-efa8af247f4f77c6.js"],"default"]
 b:I[50700,[],"OutletBoundary"]
 e:I[87748,[],"AsyncMetadataOutlet"]
 10:I[50700,[],"ViewportBoundary"]
 12:I[50700,[],"MetadataBoundary"]
 14:I[69699,[],""]
-:HL["https://neuralmagic.github.io/guidellm/ui/pr/218/_next/static/css/f6d6b7684a851d6f.css","style"]
+:HL["https://blog.vllm.ai/guidellm/ui/pr/218/_next/static/css/27e271a199be88b1.css","style"]
 2:T1cd5,window.workload_details = {
   "prompts": {
     "samples": [
@@ -1887,7 +1887,7 @@ e:I[87748,[],"AsyncMetadataOutlet"]
       ],
     },
   },
-];0:{"P":null,"b":"K3yBR_i2kuyDhFk7Wc09o","p":"https://neuralmagic.github.io/guidellm/ui/pr/218","c":["",""],"i":false,"f":[[["",{"children":["__PAGE__",{}]},"$undefined","$undefined",true],["",["$","$1","c",{"children":[[["$","link","0",{"rel":"stylesheet","href":"https://neuralmagic.github.io/guidellm/ui/pr/218/_next/static/css/f6d6b7684a851d6f.css","precedence":"next","crossOrigin":"$undefined","nonce":"$undefined"}]],["$","html",null,{"lang":"en","children":[["$","head",null,{"children":[["$","script",null,{"dangerouslySetInnerHTML":{"__html":"window.run_info = {\n  \"model\": {\n    \"name\": \"neuralmagic/Qwen2.5-7B-quantized.w8a8\",\n    \"size\": 0\n  },\n  \"task\": \"N/A\",\n  \"dataset\": {\n    \"name\": \"N/A\"\n  },\n  \"timestamp\": 1744310555.0286171\n};"}}],["$","script",null,{"dangerouslySetInnerHTML":{"__html":"$2"}}],["$","script",null,{"dangerouslySetInnerHTML":{"__html":"$3"}}]]}],["$","body",null,{"children":["$","$L4",null,{"parallelRouterKey":"children","error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","$L5",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":[["$","$L6",null,{}],[]],"forbidden":"$undefined","unauthorized":"$undefined"}]}]]}]]}],{"children":["__PAGE__",["$","$1","c",{"children":[["$","$L7",null,{"Component":"$8","searchParams":{},"params":{},"promises":["$@9","$@a"]}],null,["$","$Lb",null,{"children":["$Lc","$Ld",["$","$Le",null,{"promise":"$@f"}]]}]]}],{},null,false]},null,false],["$","$1","h",{"children":[null,["$","$1","xcScEh18q9PdEA__eQPnMv",{"children":[["$","$L10",null,{"children":"$L11"}],null]}],["$","$L12",null,{"children":"$L13"}]]}],false]],"m":"$undefined","G":["$14","$undefined"],"s":false,"S":true}
+];0:{"P":null,"b":"OiPser6NerSeSN0cNz69n","p":"https://blog.vllm.ai/guidellm/ui/pr/218","c":["",""],"i":false,"f":[[["",{"children":["__PAGE__",{}]},"$undefined","$undefined",true],["",["$","$1","c",{"children":[[["$","link","0",{"rel":"stylesheet","href":"https://blog.vllm.ai/guidellm/ui/pr/218/_next/static/css/27e271a199be88b1.css","precedence":"next","crossOrigin":"$undefined","nonce":"$undefined"}]],["$","html",null,{"lang":"en","children":[["$","head",null,{"children":[["$","script",null,{"dangerouslySetInnerHTML":{"__html":"window.run_info = {\n  \"model\": {\n    \"name\": \"neuralmagic/Qwen2.5-7B-quantized.w8a8\",\n    \"size\": 0\n  },\n  \"task\": \"N/A\",\n  \"dataset\": {\n    \"name\": \"N/A\"\n  },\n  \"timestamp\": 1744310555.0286171\n};"}}],["$","script",null,{"dangerouslySetInnerHTML":{"__html":"$2"}}],["$","script",null,{"dangerouslySetInnerHTML":{"__html":"$3"}}]]}],["$","body",null,{"children":["$","$L4",null,{"parallelRouterKey":"children","error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","$L5",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":[["$","$L6",null,{}],[]],"forbidden":"$undefined","unauthorized":"$undefined"}]}]]}]]}],{"children":["__PAGE__",["$","$1","c",{"children":[["$","$L7",null,{"Component":"$8","searchParams":{},"params":{},"promises":["$@9","$@a"]}],null,["$","$Lb",null,{"children":["$Lc","$Ld",["$","$Le",null,{"promise":"$@f"}]]}]]}],{},null,false]},null,false],["$","$1","h",{"children":[null,["$","$1","irA_qHQ8YMsO22vOxyqjkv",{"children":[["$","$L10",null,{"children":"$L11"}],null]}],["$","$L12",null,{"children":"$L13"}]]}],false]],"m":"$undefined","G":["$14","$undefined"],"s":false,"S":true}
 15:"$Sreact.suspense"
 16:I[87748,[],"AsyncMetadata"]
 9:{}
@@ -1896,5 +1896,5 @@ a:{}
 d:null
 11:[["$","meta","0",{"charSet":"utf-8"}],["$","meta","1",{"name":"viewport","content":"width=device-width, initial-scale=1"}],["$","meta","2",{"name":"theme-color","content":"#000000"}]]
 c:null
-f:{"metadata":[["$","title","0",{"children":"GuideLLM"}],["$","meta","1",{"name":"description","content":"LLM Benchmarking Tool"}],["$","link","2",{"rel":"manifest","href":"https://neuralmagic.github.io/guidellm/ui/pr/218/manifest.json","crossOrigin":"$undefined"}],["$","link","3",{"rel":"icon","href":"https://neuralmagic.github.io/guidellm/ui/pr/218/favicon.png"}],["$","link","4",{"rel":"apple-touch-icon","href":"https://neuralmagic.github.io/guidellm/ui/pr/218/favicon-192x192.png"}]],"error":null,"digest":"$undefined"}
+f:{"metadata":[["$","title","0",{"children":"GuideLLM"}],["$","meta","1",{"name":"description","content":"LLM Benchmarking Tool"}],["$","link","2",{"rel":"manifest","href":"https://blog.vllm.ai/guidellm/ui/pr/218/manifest.json","crossOrigin":"$undefined"}],["$","link","3",{"rel":"icon","href":"https://blog.vllm.ai/guidellm/ui/pr/218/favicon.png"}],["$","link","4",{"rel":"apple-touch-icon","href":"https://blog.vllm.ai/guidellm/ui/pr/218/favicon-192x192.png"}]],"error":null,"digest":"$undefined"}
 17:{"metadata":"$f:metadata","error":null,"digest":"$undefined"}
