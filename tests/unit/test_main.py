@@ -2,7 +2,6 @@ import pytest
 from click.testing import CliRunner
 
 from guidellm.__main__ import cli
-from guidellm.config import settings
 
 
 @pytest.mark.smoke
