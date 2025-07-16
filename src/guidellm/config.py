@@ -86,7 +86,7 @@ class OpenAISettings(BaseModel):
     project: Optional[str] = None
     base_url: str = "http://localhost:8000"
     max_output_tokens: int = 16384
-    verify_ssl: bool = True
+    verify: bool = True
 
 
 class Settings(BaseSettings):

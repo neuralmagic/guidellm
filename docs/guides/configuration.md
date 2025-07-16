@@ -31,7 +31,7 @@ You can configure the connection to the target system using environment variable
 | `GUIDELLM__OPENAI__HEADERS` | A JSON string representing a dictionary of headers to send to the target. These headers will override any default headers. | `export GUIDELLM__OPENAI__HEADERS='{"Authorization": "Bearer my-token"}'` |
 | `GUIDELLM__OPENAI__ORGANIZATION` | The OpenAI organization to use for requests. | `export GUIDELLM__OPENAI__ORGANIZATION="org-12345"` |
 | `GUIDELLM__OPENAI__PROJECT` | The OpenAI project to use for requests. | `export GUIDELLM__OPENAI__PROJECT="proj-67890"` |
-| `GUIDELLM__OPENAI__VERIFY_SSL` | Set to `false` or `0` to disable SSL certificate verification. | `export GUIDELLM__OPENAI__VERIFY_SSL=false` |
+| `GUIDELLM__OPENAI__VERIFY` | Set to `false` or `0` to disable certificate verification. | `export GUIDELLM__OPENAI__VERIFY=false` |
 | `GUIDELLM__OPENAI__MAX_OUTPUT_TOKENS` | The default maximum number of tokens to request for completions. | `export GUIDELLM__OPENAI__MAX_OUTPUT_TOKENS=2048` |
 
 ### General HTTP Settings
@@ -54,5 +54,5 @@ You can also place these variables in a `.env` file in your project's root direc
 GUIDELLM__OPENAI__BASE_URL="http://localhost:8080"
 GUIDELLM__OPENAI__API_KEY="your-api-key"
 GUIDELLM__OPENAI__HEADERS='{"Authorization": "Bearer my-token"}'
-GUIDELLM__OPENAI__VERIFY_SSL=false
+GUIDELLM__OPENAI__VERIFY=false
 ```

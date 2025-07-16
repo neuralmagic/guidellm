@@ -7,16 +7,13 @@ from guidellm.config import settings
 @pytest.mark.smoke
 def test_openai_http_backend_default_initialization():
     backend = OpenAIHTTPBackend()
-    assert backend.verify_ssl is True
+    assert backend.verify is True
 
 
 @pytest.mark.smoke
 def test_openai_http_backend_custom_ssl_verification():
-    settings.openai.verify_ssl = False
-    backend = OpenAIHTTPBackend()
-    assert backend.verify_ssl is False
-    # Reset the setting
-    settings.openai.verify_ssl = True
+    backend = OpenAIHTTPBackend(verify=False)
+    assert backend.verify is False
 
 
 @pytest.mark.smoke
@@ -30,10 +27,9 @@ def test_openai_http_backend_custom_headers_override():
         "Authorization": openshift_token,
         "Custom-Header": "Custom-Value",
     }
-    settings.openai.headers = override_headers
 
     # Initialize the backend
-    backend = OpenAIHTTPBackend()
+    backend = OpenAIHTTPBackend(headers=override_headers)
 
     # Check that the override headers are used
     assert backend.headers["Authorization"] == openshift_token
@@ -42,4 +38,27 @@ def test_openai_http_backend_custom_headers_override():
 
     # Reset the settings
     settings.openai.api_key = None
+    settings.openai.headers = None
+
+
+@pytest.mark.smoke
+def test_openai_http_backend_kwarg_headers_override_settings():
+    # Set headers via settings (simulating environment variables)
+    settings.openai.headers = {"Authorization": "Bearer settings-token"}
+
+    # Set different headers via kwargs (simulating --backend-args)
+    override_headers = {
+        "Authorization": "Bearer kwargs-token",
+        "Custom-Header": "Custom-Value",
+    }
+
+    # Initialize the backend with kwargs
+    backend = OpenAIHTTPBackend(headers=override_headers)
+
+    # Check that the kwargs headers took precedence
+    assert backend.headers["Authorization"] == "Bearer kwargs-token"
+    assert backend.headers["Custom-Header"] == "Custom-Value"
+    assert len(backend.headers) == 2
+
+    # Reset the settings
     settings.openai.headers = None
