@@ -101,10 +101,10 @@ dev = [
 ]
 
 [project.urls]
-homepage = "https://github.com/neuralmagic/guidellm"
-source = "https://github.com/neuralmagic/guidellm"
-issues = "https://github.com/neuralmagic/guidellm/issues"
-docs = "https://github.com/neuralmagic/guidellm/tree/main/docs"
+homepage = "https://github.com/vllm-project/guidellm"
+source = "https://github.com/vllm-project/guidellm"
+issues = "https://github.com/vllm-project/guidellm/issues"
+docs = "https://github.com/vllm-project/guidellm/tree/main/docs"
 
 
 [project.entry-points.console_scripts]

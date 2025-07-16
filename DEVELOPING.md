@@ -18,7 +18,7 @@ Before you begin, ensure you have the following installed:
 1. Clone the repository to your local machine:
 
    ```bash
-   git clone https://github.com/neuralmagic/guidellm.git
+   git clone https://github.com/vllm-project/guidellm.git
    cd guidellm
    ```
 
@@ -293,7 +293,7 @@ If logging isn't responding to the environment variables, run the `guidellm conf
 
 ## Additional Resources
 
-- [CONTRIBUTING.md](https://github.com/neuralmagic/guidellm/blob/main/CONTRIBUTING.md): Guidelines for contributing to the project.
-- [CODE_OF_CONDUCT.md](https://github.com/neuralmagic/guidellm/blob/main/CODE_OF_CONDUCT.md): Our expectations for community behavior.
-- [tox.ini](https://github.com/neuralmagic/guidellm/blob/main/tox.ini): Configuration for Tox environments.
-- [.pre-commit-config.yaml](https://github.com/neuralmagic/guidellm/blob/main/.pre-commit-config.yaml): Configuration for pre-commit hooks.
+- [CONTRIBUTING.md](https://github.com/vllm-project/guidellm/blob/main/CONTRIBUTING.md): Guidelines for contributing to the project.
+- [CODE_OF_CONDUCT.md](https://github.com/vllm-project/guidellm/blob/main/CODE_OF_CONDUCT.md): Our expectations for community behavior.
+- [tox.ini](https://github.com/vllm-project/guidellm/blob/main/tox.ini): Configuration for Tox environments.
+- [.pre-commit-config.yaml](https://github.com/vllm-project/guidellm/blob/main/.pre-commit-config.yaml): Configuration for pre-commit hooks.
