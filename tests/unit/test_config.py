@@ -21,7 +21,7 @@ def test_default_settings():
     assert settings.openai == OpenAISettings()
     assert (
         settings.report_generation.source
-        == "https://neuralmagic.github.io/guidellm/ui/latest/index.html"
+        == "https://blog.vllm.ai/guidellm/ui/latest/index.html"
     )
 
 
@@ -54,19 +54,19 @@ def test_report_generation_default_source():
     settings = Settings(env=Environment.DEV)
     assert (
         settings.report_generation.source
-        == "https://neuralmagic.github.io/guidellm/ui/dev/index.html"
+        == "https://blog.vllm.ai/guidellm/ui/dev/index.html"
     )
 
     settings = Settings(env=Environment.STAGING)
     assert (
         settings.report_generation.source
-        == "https://neuralmagic.github.io/guidellm/ui/release/latest/index.html"
+        == "https://blog.vllm.ai/guidellm/ui/release/latest/index.html"
     )
 
     settings = Settings(env=Environment.PROD)
     assert (
         settings.report_generation.source
-        == "https://neuralmagic.github.io/guidellm/ui/latest/index.html"
+        == "https://blog.vllm.ai/guidellm/ui/latest/index.html"
     )
 
 

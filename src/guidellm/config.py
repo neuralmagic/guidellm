@@ -30,9 +30,9 @@ class Environment(str, Enum):
 
 
 ENV_REPORT_MAPPING = {
-    Environment.PROD: "https://neuralmagic.github.io/guidellm/ui/latest/index.html",
-    Environment.STAGING: "https://neuralmagic.github.io/guidellm/ui/release/latest/index.html",
-    Environment.DEV: "https://neuralmagic.github.io/guidellm/ui/dev/index.html",
+    Environment.PROD: "https://blog.vllm.ai/guidellm/ui/latest/index.html",
+    Environment.STAGING: "https://blog.vllm.ai/guidellm/ui/release/latest/index.html",
+    Environment.DEV: "https://blog.vllm.ai/guidellm/ui/dev/index.html",
     Environment.LOCAL: "http://localhost:3000/index.html",
 }
 
