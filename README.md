@@ -167,7 +167,7 @@ Set the output to benchmarks.html for your run:
 
 1. Use the Hosted Build (Recommended for Most Users)
 
-This is preconfigured. The latest stable version of the hosted UI (https://neuralmagic.github.io/guidellm/ui/latest) will be used to build the local html file.
+This is preconfigured. The latest stable version of the hosted UI (https://blog.vllm.ai/guidellm/ui/latest) will be used to build the local html file.
 
 Open benchmarks.html in your browser and you're done—no setup required.
 
