@@ -11,7 +11,7 @@ def test_openai_http_backend_default_initialization():
     backend = OpenAIHTTPBackend()
     assert backend.target == settings.openai.base_url
     assert backend.model is None
-    assert backend.authorization == settings.openai.bearer_token
+    assert backend.headers.get("Authorization") == settings.openai.bearer_token
     assert backend.organization == settings.openai.organization
     assert backend.project == settings.openai.project
     assert backend.timeout == settings.request_timeout
@@ -37,7 +37,7 @@ def test_openai_http_backend_intialization():
     )
     assert backend.target == "http://test-target"
     assert backend.model == "test-model"
-    assert backend.authorization == "Bearer test-key"
+    assert backend.headers.get("Authorization") == "Bearer test-key"
     assert backend.organization == "test-org"
     assert backend.project == "test-proj"
     assert backend.timeout == 10
