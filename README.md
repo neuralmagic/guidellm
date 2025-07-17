@@ -159,12 +159,6 @@ GuideLLM UI is a companion frontend for visualizing the results of a GuideLLM be
 
 ### 🛠 Generating an HTML report with a benchmark run
 
-Set the output to benchmarks.html for your run:
-
-```base
---output-path=benchmarks.html
-```
-
 1. Use the Hosted Build (Recommended for Most Users)
 
 This is preconfigured. The latest stable version of the hosted UI (https://blog.vllm.ai/guidellm/ui/latest) will be used to build the local html file.
@@ -189,9 +183,18 @@ This will start a local server (e.g., at http://localhost:3000). Then set the En
 
 ```bash
 export GUIDELLM__ENV=local
-
-Alternatively, in config.py update the ENV_REPORT_MAPPING used as the asset base for report generation to the LOCAL option.
 ```
+
+Then you can execute your run.
+
+Set the output to benchmarks.html for your run:
+
+```bash
+--output-path=benchmarks.html
+```
+
+
+Alternatively load a saved run using the from-file command and also set the output to benchmarks.html
 
 ## Resources
 

@@ -1,6 +1,7 @@
 import re
 from pathlib import Path
 from typing import Union
+from loguru import logger
 
 from guidellm.config import settings
 from guidellm.utils.text import load_text
@@ -49,7 +50,8 @@ def inject_data(
     """
     head_match = re.search(r"<head[^>]*>(.*?)</head>", html, re.DOTALL | re.IGNORECASE)
     if not head_match:
-        return html  # or raise error?
+        logger.warning("The <head> section is missing in the provided HTML. Returning the original HTML.")
+        return html
 
     head_content = head_match.group(1)
 

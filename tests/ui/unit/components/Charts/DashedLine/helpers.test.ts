@@ -52,7 +52,7 @@ describe('roundUpNice', () => {
     expect(roundUpNice(1000)).toBe(1000);
     expect(roundUpNice(1200)).toBe(1200);
   });
-  it("doesn't round down", () => {
+  it("doesn't unexpectedly round down", () => {
     expect(roundUpNice(1.3)).toBeGreaterThanOrEqual(1.5);
     expect(roundUpNice(3)).toBeGreaterThanOrEqual(3);
     expect(roundUpNice(3.3)).toBeGreaterThanOrEqual(3.5);
@@ -85,7 +85,7 @@ describe('roundDownNice', () => {
     expect(roundDownNice(1000)).toBe(1000);
     expect(roundDownNice(1200)).toBe(1200);
   });
-  it("doesn't round up", () => {
+  it("doesn't unexpectedly round up", () => {
     expect(roundDownNice(1.6)).toBeLessThanOrEqual(1.5);
     expect(roundDownNice(3)).toBeLessThanOrEqual(3);
     expect(roundDownNice(3.6)).toBeLessThanOrEqual(3.5);
