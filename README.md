@@ -193,7 +193,6 @@ Set the output to benchmarks.html for your run:
 --output-path=benchmarks.html
 ```
 
-
 Alternatively load a saved run using the from-file command and also set the output to benchmarks.html
 
 ## Resources
