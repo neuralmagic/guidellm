@@ -1,26 +1,31 @@
 import { ThunkDispatch, UnknownAction } from '@reduxjs/toolkit';
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 
-import { Benchmarks, MetricData } from './benchmarks.interfaces';
+import { Benchmarks, Statistics } from './benchmarks.interfaces';
 import { formatNumber } from '../../../utils/helpers';
 import { defaultPercentile } from '../slo/slo.constants';
 import { setSloData } from '../slo/slo.slice';
 
 const USE_MOCK_API = process.env.NEXT_PUBLIC_USE_MOCK_API === 'true';
 
+// currently the injector requires 'window.benchmarks = {};' to be present in the html, but benchmarks is expected to be null or an array
 const fetchBenchmarks = () => {
-  return { data: window.benchmarks as Benchmarks };
+  let benchmarks = window.benchmarks;
+  if (!Array.isArray(benchmarks)) {
+    benchmarks = [];
+  }
+  return { data: benchmarks as Benchmarks };
 };
 
 const getAverageValueForPercentile = (
-  firstMetric: MetricData,
-  lastMetric: MetricData,
+  firstMetric: Statistics,
+  lastMetric: Statistics,
   percentile: string
 ) => {
-  const firstPercentile = firstMetric.percentiles.find(
+  const firstPercentile = firstMetric?.percentileRows.find(
     (p) => p.percentile === percentile
   );
-  const lastPercentile = lastMetric.percentiles.find(
+  const lastPercentile = lastMetric?.percentileRows.find(
     (p) => p.percentile === percentile
   );
   return ((firstPercentile?.value ?? 0) + (lastPercentile?.value ?? 0)) / 2;
@@ -32,33 +37,33 @@ const setDefaultSLOs = (
   dispatch: ThunkDispatch<any, any, UnknownAction>
 ) => {
   // temporarily set default slo values, long term the backend should set default slos that will not just be the avg at the default percentile
-  const firstBM = data.benchmarks[0];
-  const lastBM = data.benchmarks[data.benchmarks.length - 1];
+  const firstBM = data[0];
+  const lastBM = data[data.length - 1];
 
   const ttftAvg = getAverageValueForPercentile(
-    firstBM.ttft,
-    lastBM.ttft,
+    firstBM?.ttft,
+    lastBM?.ttft,
     defaultPercentile
   );
   const tpotAvg = getAverageValueForPercentile(
-    firstBM.tpot,
-    lastBM.tpot,
+    firstBM?.tpot,
+    lastBM?.tpot,
     defaultPercentile
   );
   const timePerRequestAvg = getAverageValueForPercentile(
-    firstBM.timePerRequest,
-    lastBM.timePerRequest,
+    firstBM?.timePerRequest,
+    lastBM?.timePerRequest,
     defaultPercentile
   );
   const throughputAvg = getAverageValueForPercentile(
-    firstBM.throughput,
-    lastBM.throughput,
+    firstBM?.throughput,
+    lastBM?.throughput,
     defaultPercentile
   );
 
   dispatch(
     setSloData({
-      currentRequestRate: firstBM.requestsPerSecond,
+      currentRequestRate: firstBM?.requestsPerSecond,
       current: {
         ttft: formatNumber(ttftAvg, 0),
         tpot: formatNumber(tpotAvg, 0),
