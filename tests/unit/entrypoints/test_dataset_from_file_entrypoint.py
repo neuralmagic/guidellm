@@ -64,14 +64,12 @@ def test_create_dataset_from_valid_benchmark_json(get_test_asset_dir, cleanup):
     with output_file.open() as f:
         dataset = json.load(f)
     
-    # Verify dataset structure
     assert "version" in dataset
     assert "description" in dataset
     assert "data" in dataset
     assert isinstance(dataset["data"], list)
     assert len(dataset["data"]) > 0
     
-    # Verify each dataset item has required fields
     for item in dataset["data"]:
         assert "prompt" in item
         assert "output_tokens_count" in item
@@ -120,7 +118,6 @@ def test_create_dataset_with_stats_output(capfd, get_test_asset_dir, cleanup):
         enable_console=True,
     )
     
-    # Verify console output includes statistics
     out, err = capfd.readouterr()
     assert "Validating benchmark report file" in out
     assert "Valid benchmark report with" in out
@@ -146,7 +143,6 @@ def test_create_dataset_with_console_disabled(capfd, get_test_asset_dir, cleanup
         enable_console=False,
     )
     
-    # Verify no console output
     out, err = capfd.readouterr()
     assert out == ""
     assert err == ""
@@ -166,7 +162,6 @@ def test_validate_benchmark_file_valid_file(get_test_asset_dir):
 
 def test_validate_benchmark_file_invalid_json(temp_file):
     """Test validation with invalid JSON."""
-    # Write invalid JSON
     temp_file.write_text("This is not JSON")
     
     with pytest.raises(DatasetCreationError) as exc_info:
@@ -178,7 +173,6 @@ def test_validate_benchmark_file_invalid_json(temp_file):
 
 def test_validate_benchmark_file_invalid_structure(temp_file):
     """Test validation with valid JSON but invalid benchmark structure."""
-    # Write valid JSON but wrong structure
     temp_file.write_text('{"invalid": "structure"}')
     
     with pytest.raises(DatasetCreationError) as exc_info:
@@ -189,7 +183,6 @@ def test_validate_benchmark_file_invalid_structure(temp_file):
 
 def test_validate_benchmark_file_no_benchmarks(temp_file):
     """Test validation with valid structure but no benchmarks."""
-    # Write valid structure but empty benchmarks
     temp_file.write_text('{"benchmarks": []}')
     
     with pytest.raises(DatasetCreationError) as exc_info:
@@ -203,15 +196,12 @@ def test_extract_dataset_from_benchmark_report(get_test_asset_dir):
     asset_dir = get_test_asset_dir()
     source_file = asset_dir / "benchmarks_stripped.json"
     
-    # First validate and load the report
     report = validate_benchmark_file(source_file)
     
-    # Extract dataset
     dataset_items = extract_dataset_from_benchmark_report(report)
     
     assert len(dataset_items) > 0
     
-    # Verify structure of extracted items
     for item in dataset_items:
         assert "prompt" in item
         assert "output_tokens" in item
@@ -223,7 +213,6 @@ def test_extract_dataset_from_benchmark_report(get_test_asset_dir):
 
 def test_save_dataset_from_benchmark(cleanup):
     """Test saving dataset to file."""
-    # Create test dataset items
     dataset_items = [
         {
             "prompt": "Test prompt 1",
@@ -240,10 +229,8 @@ def test_save_dataset_from_benchmark(cleanup):
     output_file = Path("test_save_dataset.json")
     cleanup.append(output_file)
     
-    # Save dataset
     save_dataset_from_benchmark(dataset_items, output_file)
     
-    # Verify file exists and has correct structure
     assert output_file.exists()
     
     with output_file.open() as f:
@@ -254,7 +241,6 @@ def test_save_dataset_from_benchmark(cleanup):
     assert "data" in saved_data
     assert len(saved_data["data"]) == 2
     
-    # Verify field names are converted correctly
     for item in saved_data["data"]:
         assert "prompt" in item
         assert "output_tokens_count" in item
@@ -317,7 +303,6 @@ def test_create_dataset_from_file_nonexistent_file():
 
 def test_create_dataset_from_file_no_successful_requests(temp_file):
     """Test handling of benchmark with no successful requests."""
-    # Create benchmark with no successful requests
     benchmark_data = {
         "benchmarks": [{
             "requests": {
