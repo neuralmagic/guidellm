@@ -95,7 +95,7 @@ export const Component = () => {
     },
   ];
 
-  if ((data?.benchmarks?.length ?? 0) <= 1) {
+  if ((data?.length ?? 0) <= 1) {
     return <></>;
   }
 
