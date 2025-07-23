@@ -94,7 +94,8 @@ class OpenAIHTTPBackend(Backend):
         extra_query: Optional[dict] = None,
         extra_body: Optional[dict] = None,
         remove_from_body: Optional[list[str]] = None,
-        **kwargs,
+        headers: Optional[dict] = None,
+        verify: Optional[bool] = None,
     ):
         super().__init__(type_="openai_http")
         self._target = target or settings.openai.base_url
@@ -129,9 +130,9 @@ class OpenAIHTTPBackend(Backend):
             default_headers["OpenAI-Project"] = self.project
 
         # User-provided headers from kwargs or settings override defaults
-        user_headers = kwargs.pop("headers", settings.openai.headers or {})
-        default_headers.update(user_headers)
-        self.headers = default_headers
+        default_headers.update(settings.openai.headers or {})
+        default_headers.update(headers)
+        self.headers = {k: v for k, v in default_headers.items() if v is not None}
 
         self.timeout = timeout if timeout is not None else settings.request_timeout
         self.http2 = http2 if http2 is not None else settings.request_http2
@@ -140,7 +141,7 @@ class OpenAIHTTPBackend(Backend):
             if follow_redirects is not None
             else settings.request_follow_redirects
         )
-        self.verify = kwargs.pop("verify", settings.openai.verify)
+        self.verify = verify or settings.openai.verify
         self.max_output_tokens = (
             max_output_tokens
             if max_output_tokens is not None
