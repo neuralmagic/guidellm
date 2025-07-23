@@ -100,6 +100,10 @@ dev = [
     "mkdocs-linkcheck~=1.0.6",
 ]
 
+# For PEP 735 compliant tools
+[dependency-groups]
+dev = [ "guidellm[dev]" ]
+
 [project.urls]
 homepage = "https://github.com/vllm-project/guidellm"
 source = "https://github.com/vllm-project/guidellm"
