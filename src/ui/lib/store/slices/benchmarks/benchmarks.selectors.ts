@@ -14,7 +14,7 @@ export const selectBenchmarks = (state: RootState) => state.benchmarks.data;
 export const selectMetricsSummaryLineData = createSelector(
   [selectBenchmarks, selectSloState],
   (benchmarks, sloState) => {
-    const sortedByRPS = benchmarks?.benchmarks
+    const sortedByRPS = benchmarks
       ?.slice()
       ?.sort((bm1, bm2) => (bm1.requestsPerSecond > bm2.requestsPerSecond ? 1 : -1));
     const selectedPercentile = sloState.enforcedPercentile;
@@ -34,7 +34,7 @@ export const selectMetricsSummaryLineData = createSelector(
     metrics.forEach((metric) => {
       const data: Point[] = [];
       sortedByRPS?.forEach((benchmark) => {
-        const percentile = benchmark[metric].percentiles.find(
+        const percentile = benchmark[metric].percentileRows.find(
           (p) => p.percentile === selectedPercentile
         );
         data.push({
@@ -58,11 +58,6 @@ const getDefaultMetricValues = () => ({
 export const selectInterpolatedMetrics = createSelector(
   [selectBenchmarks, selectSloState],
   (benchmarks, sloState) => {
-    const sortedByRPS = benchmarks?.benchmarks
-      ?.slice()
-      ?.sort((bm1, bm2) => (bm1.requestsPerSecond > bm2.requestsPerSecond ? 1 : -1));
-    const requestRates = sortedByRPS?.map((bm) => bm.requestsPerSecond) || [];
-    const { enforcedPercentile, currentRequestRate } = sloState;
     const metricData: {
       [K in keyof BenchmarkMetrics | 'mean']: {
         enforcedPercentileValue: number;
@@ -76,6 +71,14 @@ export const selectInterpolatedMetrics = createSelector(
       throughput: getDefaultMetricValues(),
       mean: getDefaultMetricValues(),
     };
+    if ((benchmarks?.length || 0) < 2) {
+      return metricData;
+    }
+    const sortedByRPS = benchmarks
+      ?.slice()
+      ?.sort((bm1, bm2) => (bm1.requestsPerSecond > bm2.requestsPerSecond ? 1 : -1));
+    const requestRates = sortedByRPS?.map((bm) => bm.requestsPerSecond) || [];
+    const { enforcedPercentile, currentRequestRate } = sloState;
     const metrics: (keyof BenchmarkMetrics)[] = [
       'ttft',
       'tpot',
@@ -92,15 +95,13 @@ export const selectInterpolatedMetrics = createSelector(
       return metricData;
     }
     metrics.forEach((metric) => {
-      const meanValues = sortedByRPS.map((bm) => bm[metric].statistics.mean);
+      const meanValues = sortedByRPS.map((bm) => bm[metric].mean);
       const interpolateMeanAt = createMonotoneSpline(requestRates, meanValues);
       const interpolatedMeanValue: number = interpolateMeanAt(currentRequestRate) || 0;
       const percentiles: PercentileValues[] = ['p50', 'p90', 'p95', 'p99'];
       const valuesByPercentile = percentiles.map((p) => {
         const bmValuesAtP = sortedByRPS.map((bm) => {
-          const result =
-            bm[metric].percentiles.find((percentile) => percentile.percentile === p)
-              ?.value || 0;
+          const result = bm[metric].percentiles[p] || 0;
           return result;
         });
         const interpolateValueAtP = createMonotoneSpline(requestRates, bmValuesAtP);
@@ -126,7 +127,7 @@ export const selectMetricsDetailsLineData = createSelector(
   [selectBenchmarks],
   (benchmarks) => {
     const sortedByRPS =
-      benchmarks?.benchmarks
+      benchmarks
         ?.slice()
         ?.sort((bm1, bm2) =>
           bm1.requestsPerSecond > bm2.requestsPerSecond ? 1 : -1
@@ -152,16 +153,16 @@ export const selectMetricsDetailsLineData = createSelector(
       }
       const data: { [key: string]: { data: Point[]; id: string; solid?: boolean } } =
         {};
-      sortedByRPS[0].ttft.percentiles.forEach((p) => {
+      sortedByRPS[0].ttft.percentileRows.forEach((p) => {
         data[p.percentile] = { data: [], id: p.percentile };
       });
       data.mean = { data: [], id: 'mean', solid: true };
       sortedByRPS?.forEach((benchmark) => {
         const rps = benchmark.requestsPerSecond;
-        benchmark[prop].percentiles.forEach((p) => {
+        benchmark[prop].percentileRows.forEach((p) => {
           data[p.percentile].data.push({ x: rps, y: p.value });
         });
-        const mean = benchmark[prop].statistics.mean;
+        const mean = benchmark[prop].mean;
         data.mean.data.push({ x: rps, y: mean });
       });
       lineData[prop] = Object.keys(data).map((key) => {
