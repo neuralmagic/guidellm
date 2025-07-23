@@ -10,6 +10,9 @@ include = ["*"]
 [tool.setuptools.package-data]
 "guidellm.data" = ["*.gz"]
 
+[tool.pdm]
+distribution = true
+
 
 # ************************************************
 # ********** Project Metadata **********
