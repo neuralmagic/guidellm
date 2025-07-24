@@ -236,7 +236,7 @@ def benchmark():
     help=(
         "The path to save the output to. If it is a directory, "
         "it will save benchmarks.json under it. "
-        "Otherwise, json, yaml, or csv files are supported for output types "
+        "Otherwise, json, yaml, csv, or html files are supported for output types "
         "which will be read from the extension for the file path."
     ),
 )

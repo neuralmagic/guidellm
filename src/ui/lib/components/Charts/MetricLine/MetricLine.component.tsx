@@ -59,8 +59,8 @@ export const Component: FC<MetricLineProps> = ({
       xScale={{ type: 'linear', min: minX }}
       yScale={{
         type: yScaleType,
-        min: 'auto',
-        max: 'auto',
+        min: minY,
+        max: maxY,
         ...extraYScaleOptions,
       }}
       axisBottom={null}

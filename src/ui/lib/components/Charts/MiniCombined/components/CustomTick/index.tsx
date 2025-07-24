@@ -1,5 +1,7 @@
 import { useTheme } from '@mui/material';
 
+import { formatNumber } from '@/lib/utils/helpers';
+
 import { CustomTickProps } from './CustomTick.interfaces';
 
 const CustomTick = ({
@@ -45,7 +47,7 @@ const CustomTick = ({
         fontSize={theme.typography.axisLabel.fontSize}
         fill={theme.palette.surface.onSurface}
       >
-        {tick}
+        {formatNumber(tick)}
       </text>
     </>
   );

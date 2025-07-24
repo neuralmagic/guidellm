@@ -159,9 +159,43 @@ The `guidellm benchmark` command is used to run benchmarks against a generative 
 
 GuideLLM UI is a companion frontend for visualizing the results of a GuideLLM benchmark run.
 
-### 🛠 Running the UI
+### 🛠 Generating an HTML report with a benchmark run
 
-The UI is a WIP, check more recent PRs for the latest updates
+1. Use the Hosted Build (Recommended for Most Users)
+
+This is preconfigured. The latest stable version of the hosted UI (https://blog.vllm.ai/guidellm/ui/latest) will be used to build the local html file.
+
+Open benchmarks.html in your browser and you're done—no setup required.
+
+2. Build and Serve the UI Locally (For Development) This option is useful if:
+
+- You are actively developing the UI
+
+- You want to test changes to the UI before publishing
+
+- You want full control over how the report is displayed
+
+```bash
+npm install
+npm run build
+npm run serve
+```
+
+This will start a local server (e.g., at http://localhost:3000). Then set the Environment to LOCAL before running your benchmarks.
+
+```bash
+export GUIDELLM__ENV=local
+```
+
+Then you can execute your run.
+
+Set the output to benchmarks.html for your run:
+
+```bash
+--output-path=benchmarks.html
+```
+
+Alternatively load a saved run using the from-file command and also set the output to benchmarks.html
 
 ## Resources
 

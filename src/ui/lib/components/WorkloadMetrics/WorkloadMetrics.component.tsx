@@ -48,10 +48,8 @@ export const Component = () => {
     throughput: throughputAtRPS,
   } = useSelector(selectInterpolatedMetrics);
 
-  const minX = Math.floor(
-    Math.min(...(data?.benchmarks?.map((bm) => bm.requestsPerSecond) || []))
-  );
-  if ((data?.benchmarks?.length ?? 0) <= 1) {
+  const minX = Math.floor(Math.min(...(data?.map((bm) => bm.requestsPerSecond) || [])));
+  if ((data?.length ?? 0) <= 1) {
     return <></>;
   }
   return (
