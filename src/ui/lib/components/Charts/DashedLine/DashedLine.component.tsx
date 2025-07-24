@@ -7,7 +7,7 @@ import { DashedLineProps, ScaleType } from './DashedLine.interfaces';
 import { spacedLogValues } from './helpers';
 
 export const getMinTick = (data: readonly Serie[]) => {
-  return Math.max(
+  return Math.min(
     ...data.map((lineData) =>
       Math.min(...lineData.data.map((point) => point.y as number))
     )
@@ -80,11 +80,16 @@ export const Component = ({
   let extraLeftAxisOptions = {};
   let extraYScaleOptions = {};
   if (yScaleType === ScaleType.log) {
-    const ticks = spacedLogValues(getMinTick(data), getMaxTick(data), 6);
+    const ticks = spacedLogValues(
+      Math.floor(getMinTick(data)),
+      Math.ceil(getMaxTick(data)),
+      6
+    );
     extraLeftAxisOptions = {
       tickValues: ticks,
     };
     extraYScaleOptions = {
+      min: ticks[0],
       max: ticks[ticks.length - 1],
     };
   }

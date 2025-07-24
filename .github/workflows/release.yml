@@ -215,7 +215,7 @@ jobs:
           export $(grep -v '^#' .env.production | xargs)
 
           # Set asset prefix and base path with git tag
-          ASSET_PREFIX=https://neuralmagic.github.io/guidellm/ui/${TAG}
+          ASSET_PREFIX=https://blog.vllm.ai/guidellm/ui/${TAG}
           BASE_PATH=/ui/${TAG}
           GIT_SHA=${{ github.sha }}
           export ASSET_PREFIX=${ASSET_PREFIX}
@@ -269,7 +269,7 @@ jobs:
           export $(grep -v '^#' .env.production | xargs)
 
           # Set asset prefix and base path with git tag
-          ASSET_PREFIX=https://neuralmagic.github.io/guidellm/ui/latest
+          ASSET_PREFIX=https://blog.vllm.ai/guidellm/ui/latest
           BASE_PATH=/ui/latest
           GIT_SHA=${{ github.sha }}
           export ASSET_PREFIX=${ASSET_PREFIX}

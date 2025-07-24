@@ -1,4 +1,5 @@
 import base64
+import copy
 import json
 import time
 from collections.abc import AsyncGenerator
@@ -428,9 +429,9 @@ class OpenAIHTTPBackend(Backend):
             or MODELS in self.extra_body
             or TEXT_COMPLETIONS in self.extra_body
         ):
-            return self.extra_body.get(endpoint_type, {})
+            return copy.deepcopy(self.extra_body.get(endpoint_type, {}))
 
-        return self.extra_body
+        return copy.deepcopy(self.extra_body)
 
     def _completions_payload(
         self,
