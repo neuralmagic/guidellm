@@ -85,7 +85,9 @@ def test_version_flag_case_sensitivity():
 def test_version_integration_with_actual_version():
     """Integration test to verify version matches what's in version.py."""
     try:
-        from guidellm.version import version as actual_version
+        from guidellm.version import (
+            version as actual_version,
+        )
 
         runner = CliRunner()
         result = runner.invoke(cli, ["--version"])

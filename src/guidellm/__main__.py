@@ -19,6 +19,7 @@ from guidellm.scheduler import StrategyType
 from guidellm.utils import DefaultGroupHandler
 from guidellm.utils import cli as cli_tools
 
+# Import version information
 try:
     from guidellm.version import version
 except ImportError:
@@ -71,7 +72,7 @@ def benchmark():
             readable=True,
             file_okay=True,
             dir_okay=False,
-            path_type=Path,  # type: ignore[type-var]
+            path_type=Path,
         ),
         click.Choice(get_builtin_scenarios()),
     ),
