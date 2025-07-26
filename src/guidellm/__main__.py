@@ -15,7 +15,10 @@ from guidellm.benchmark.entrypoints import benchmark_with_scenario
 from guidellm.benchmark.scenario import GenerativeTextScenario, get_builtin_scenarios
 from guidellm.config import print_config
 from guidellm.preprocess.dataset import ShortPromptStrategy, process_dataset
-from guidellm.preprocess.dataset_from_file import create_dataset_from_file, DatasetCreationError
+from guidellm.preprocess.dataset_from_file import (
+    DatasetCreationError,
+    create_dataset_from_file,
+)
 from guidellm.scheduler import StrategyType
 from guidellm.utils import DefaultGroupHandler
 from guidellm.utils import cli as cli_tools
@@ -515,7 +518,9 @@ def dataset(
     )
 
 
-@preprocess.command("dataset-from-file", help="Create a dataset from a saved benchmark report file.")
+@preprocess.command(
+    "dataset-from-file", help="Create a dataset from a saved benchmark report file."
+)
 @click.argument(
     "benchmark_file",
     type=click.Path(exists=True, file_okay=True, dir_okay=False, path_type=Path),

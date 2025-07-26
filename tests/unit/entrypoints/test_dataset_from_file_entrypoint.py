@@ -1,18 +1,18 @@
 import json
-import os
 import tempfile
 import unittest
 from pathlib import Path
+from typing import Any
 
 import pytest
 
 from guidellm.preprocess.dataset_from_file import (
     DatasetCreationError,
     create_dataset_from_file,
-    validate_benchmark_file,
     extract_dataset_from_benchmark_report,
-    save_dataset_from_benchmark,
     print_dataset_statistics,
+    save_dataset_from_benchmark,
+    validate_benchmark_file,
 )
 
 REGENERATE_ARTIFACTS = False
@@ -38,7 +38,7 @@ def cleanup():
 @pytest.fixture
 def temp_file():
     """Create a temporary file that gets cleaned up automatically."""
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
         temp_path = Path(f.name)
     yield temp_path
     if temp_path.exists():
@@ -51,25 +51,25 @@ def test_create_dataset_from_valid_benchmark_json(get_test_asset_dir, cleanup):
     source_file = asset_dir / "benchmarks_stripped.json"
     output_file = asset_dir / "test_dataset_output.json"
     cleanup.append(output_file)
-    
+
     create_dataset_from_file(
         benchmark_file=source_file,
         output_path=output_file,
         show_stats=False,
         enable_console=False,
     )
-    
+
     assert output_file.exists()
-    
+
     with output_file.open() as f:
         dataset = json.load(f)
-    
+
     assert "version" in dataset
     assert "description" in dataset
     assert "data" in dataset
     assert isinstance(dataset["data"], list)
     assert len(dataset["data"]) > 0
-    
+
     for item in dataset["data"]:
         assert "prompt" in item
         assert "output_tokens_count" in item
@@ -87,19 +87,19 @@ def test_create_dataset_from_valid_benchmark_yaml(get_test_asset_dir, cleanup):
     source_file = asset_dir / "benchmarks_stripped.yaml"
     output_file = asset_dir / "test_dataset_yaml_output.json"
     cleanup.append(output_file)
-    
+
     create_dataset_from_file(
         benchmark_file=source_file,
         output_path=output_file,
         show_stats=False,
         enable_console=False,
     )
-    
+
     assert output_file.exists()
-    
+
     with output_file.open() as f:
         dataset = json.load(f)
-    
+
     assert "data" in dataset
     assert len(dataset["data"]) > 0
 
@@ -110,14 +110,14 @@ def test_create_dataset_with_stats_output(capfd, get_test_asset_dir, cleanup):
     source_file = asset_dir / "benchmarks_stripped.json"
     output_file = asset_dir / "test_dataset_stats_output.json"
     cleanup.append(output_file)
-    
+
     create_dataset_from_file(
         benchmark_file=source_file,
         output_path=output_file,
         show_stats=True,
         enable_console=True,
     )
-    
+
     out, err = capfd.readouterr()
     assert "Validating benchmark report file" in out
     assert "Valid benchmark report with" in out
@@ -135,18 +135,18 @@ def test_create_dataset_with_console_disabled(capfd, get_test_asset_dir, cleanup
     source_file = asset_dir / "benchmarks_stripped.json"
     output_file = asset_dir / "test_dataset_no_console.json"
     cleanup.append(output_file)
-    
+
     create_dataset_from_file(
         benchmark_file=source_file,
         output_path=output_file,
         show_stats=True,
         enable_console=False,
     )
-    
+
     out, err = capfd.readouterr()
     assert out == ""
     assert err == ""
-    
+
     assert output_file.exists()
 
 
@@ -154,7 +154,7 @@ def test_validate_benchmark_file_valid_file(get_test_asset_dir):
     """Test validation with a valid benchmark file."""
     asset_dir = get_test_asset_dir()
     source_file = asset_dir / "benchmarks_stripped.json"
-    
+
     report = validate_benchmark_file(source_file)
     assert report is not None
     assert len(report.benchmarks) > 0
@@ -163,10 +163,10 @@ def test_validate_benchmark_file_valid_file(get_test_asset_dir):
 def test_validate_benchmark_file_invalid_json(temp_file):
     """Test validation with invalid JSON."""
     temp_file.write_text("This is not JSON")
-    
+
     with pytest.raises(DatasetCreationError) as exc_info:
         validate_benchmark_file(temp_file)
-    
+
     assert "Invalid benchmark report file" in str(exc_info.value)
     assert "Expecting value" in str(exc_info.value)
 
@@ -174,20 +174,20 @@ def test_validate_benchmark_file_invalid_json(temp_file):
 def test_validate_benchmark_file_invalid_structure(temp_file):
     """Test validation with valid JSON but invalid benchmark structure."""
     temp_file.write_text('{"invalid": "structure"}')
-    
+
     with pytest.raises(DatasetCreationError) as exc_info:
         validate_benchmark_file(temp_file)
-    
+
     assert "Invalid benchmark report file" in str(exc_info.value)
 
 
 def test_validate_benchmark_file_no_benchmarks(temp_file):
     """Test validation with valid structure but no benchmarks."""
     temp_file.write_text('{"benchmarks": []}')
-    
+
     with pytest.raises(DatasetCreationError) as exc_info:
         validate_benchmark_file(temp_file)
-    
+
     assert "Benchmark report contains no benchmark data" in str(exc_info.value)
 
 
@@ -195,13 +195,13 @@ def test_extract_dataset_from_benchmark_report(get_test_asset_dir):
     """Test extracting dataset from a validated benchmark report."""
     asset_dir = get_test_asset_dir()
     source_file = asset_dir / "benchmarks_stripped.json"
-    
+
     report = validate_benchmark_file(source_file)
-    
+
     dataset_items = extract_dataset_from_benchmark_report(report)
-    
+
     assert len(dataset_items) > 0
-    
+
     for item in dataset_items:
         assert "prompt" in item
         assert "output_tokens" in item
@@ -220,27 +220,27 @@ def test_save_dataset_from_benchmark(cleanup):
             "prompt_tokens": 50,
         },
         {
-            "prompt": "Test prompt 2", 
+            "prompt": "Test prompt 2",
             "output_tokens": 200,
             "prompt_tokens": 75,
-        }
+        },
     ]
-    
+
     output_file = Path("test_save_dataset.json")
     cleanup.append(output_file)
-    
+
     save_dataset_from_benchmark(dataset_items, output_file)
-    
+
     assert output_file.exists()
-    
+
     with output_file.open() as f:
         saved_data = json.load(f)
-    
+
     assert "version" in saved_data
     assert "description" in saved_data
     assert "data" in saved_data
     assert len(saved_data["data"]) == 2
-    
+
     for item in saved_data["data"]:
         assert "prompt" in item
         assert "output_tokens_count" in item
@@ -254,9 +254,9 @@ def test_print_dataset_statistics_with_data(capfd):
         {"prompt": "Test 2", "output_tokens": 200, "prompt_tokens": 75},
         {"prompt": "Test 3", "output_tokens": 150, "prompt_tokens": 60},
     ]
-    
+
     print_dataset_statistics(dataset_items, enable_console=True)
-    
+
     out, err = capfd.readouterr()
     assert "Dataset Statistics:" in out
     assert "Total items: 3" in out
@@ -266,10 +266,10 @@ def test_print_dataset_statistics_with_data(capfd):
 
 def test_print_dataset_statistics_empty_dataset(capfd):
     """Test printing statistics with empty dataset."""
-    dataset_items = []
-    
+    dataset_items: list[dict[str, Any]] = []
+
     print_dataset_statistics(dataset_items, enable_console=True)
-    
+
     out, err = capfd.readouterr()
     assert "No valid items found in dataset" in err
 
@@ -279,9 +279,9 @@ def test_print_dataset_statistics_console_disabled(capfd):
     dataset_items = [
         {"prompt": "Test", "output_tokens": 100, "prompt_tokens": 50},
     ]
-    
+
     print_dataset_statistics(dataset_items, enable_console=False)
-    
+
     out, err = capfd.readouterr()
     assert out == ""
     assert err == ""
@@ -291,7 +291,7 @@ def test_create_dataset_from_file_nonexistent_file():
     """Test error handling for nonexistent file."""
     nonexistent_file = Path("does_not_exist.json")
     output_file = Path("output.json")
-    
+
     with pytest.raises(DatasetCreationError):
         create_dataset_from_file(
             benchmark_file=nonexistent_file,
@@ -303,19 +303,15 @@ def test_create_dataset_from_file_nonexistent_file():
 
 def test_create_dataset_from_file_no_successful_requests(temp_file):
     """Test handling of benchmark with no successful requests."""
-    benchmark_data = {
-        "benchmarks": [{
-            "requests": {
-                "successful": [],
-                "errored": [],
-                "incomplete": []
-            }
-        }]
+    benchmark_data: dict[str, Any] = {
+        "benchmarks": [
+            {"requests": {"successful": [], "errored": [], "incomplete": []}}
+        ]
     }
     temp_file.write_text(json.dumps(benchmark_data))
-    
+
     output_file = Path("output.json")
-    
+
     with pytest.raises(DatasetCreationError) as exc_info:
         create_dataset_from_file(
             benchmark_file=temp_file,
@@ -323,9 +319,9 @@ def test_create_dataset_from_file_no_successful_requests(temp_file):
             show_stats=False,
             enable_console=False,
         )
-    
+
     assert "Invalid benchmark report file" in str(exc_info.value)
 
 
 if __name__ == "__main__":
-    unittest.main() 
+    unittest.main()

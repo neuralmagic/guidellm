@@ -8,7 +8,6 @@ The `guidellm preprocess` command provides utilities to:
 
 - **Extract datasets from benchmark results**: Convert completed benchmark reports into reusable datasets with known prompt and output token counts for consistent comparisons
 
-
 ## Commands
 
 ### `dataset-from-file`
@@ -108,8 +107,8 @@ The generated dataset follows this structure:
 }
 ```
 
-
 Each data item contains:
+
 - `prompt`: The original prompt text
 - `output_tokens_count`: The number of tokens in the model's response
 - `prompt_tokens_count`: The number of tokens in the original prompt
@@ -124,11 +123,10 @@ Dataset Statistics:
 Total items: 95
 Prompt length statistics:
   Min: 8 characters
-  Max: 245 characters  
+  Max: 245 characters
   Mean: 87.3 characters
 Output tokens statistics:
   Min: 1 tokens
   Max: 512 tokens
   Mean: 124.8 tokens
 ```
-
