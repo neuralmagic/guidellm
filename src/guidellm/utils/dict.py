@@ -12,10 +12,12 @@ def recursive_key_update(d, key_update_func):
     updated_key = key_update_func(key)
     if key != updated_key:
       updated_key_pairs.append((key, updated_key ))
+
   for key_pair in updated_key_pairs:
     old_key, updated_key = key_pair
     d[updated_key] = d[old_key]
     del d[old_key]
-  for key, value in d.items():
+
+  for _, value in d.items():
     recursive_key_update(value, key_update_func)
   return d

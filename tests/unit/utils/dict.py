@@ -2,8 +2,9 @@ import pytest
 
 from guidellm.utils.dict import recursive_key_update
 
-def update_str(str):
-  return str + "_updated"
+
+def update_str(string):
+  return string + "_updated"
 
 @pytest.mark.smoke
 def test_recursive_key_update_updates_keys():
@@ -29,8 +30,8 @@ def test_recursive_key_update_updates_keys():
   assert my_dict == my_updated_dict
 
 
-def truncate_str_to_ten(str):
-  return str[:10]
+def truncate_str_to_ten(string):
+  return string[:10]
 
 
 @pytest.mark.smoke
@@ -60,10 +61,16 @@ def test_recursive_key_update_leaves_unchanged_keys():
 @pytest.mark.smoke
 def test_recursive_key_update_updates_dicts_in_list():
   my_dict = {
-    "my_key": [{ "my_list_item_key_1": "someValue" }, { "my_list_item_key_2": "someValue" }, { "my_list_item_key_3": "someValue" }]
+    "my_key":
+      [{ "my_list_item_key_1": "someValue" },
+       { "my_list_item_key_2": "someValue" },
+       { "my_list_item_key_3": "someValue" }]
   }
   my_updated_dict = {
-    "my_key_updated": [{ "my_list_item_key_1_updated": "someValue" }, { "my_list_item_key_2_updated": "someValue" }, { "my_list_item_key_3_updated": "someValue" }]
+    "my_key_updated":
+      [{ "my_list_item_key_1_updated": "someValue" },
+       { "my_list_item_key_2_updated": "someValue" },
+       { "my_list_item_key_3_updated": "someValue" }]
   }
   recursive_key_update(my_dict, update_str)
   assert my_dict == my_updated_dict

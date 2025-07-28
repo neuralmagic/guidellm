@@ -1,8 +1,8 @@
-from copy import deepcopy
 import csv
 import json
 import math
 from collections import OrderedDict
+from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal, Optional, Union
@@ -238,7 +238,7 @@ class GenerativeBenchmarksReport(StandardBaseModel):
         :param path: The path to create the report at.
         :return: The path to the report.
         """
-        
+
         data_builder = UIDataBuilder(self.benchmarks)
         data = data_builder.to_dict()
         camel_data = recursive_key_update(deepcopy(data), camelize_str)
