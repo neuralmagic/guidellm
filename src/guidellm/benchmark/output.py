@@ -1,3 +1,4 @@
+from copy import deepcopy
 import csv
 import json
 import math
@@ -6,7 +7,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal, Optional, Union
 
-import humps  # type: ignore[import-not-found]
 import yaml
 from pydantic import Field
 from rich.console import Console
@@ -30,6 +30,8 @@ from guidellm.presentation import UIDataBuilder
 from guidellm.presentation.injector import create_report
 from guidellm.scheduler import strategy_display_str
 from guidellm.utils import Colors, split_text_list_by_length
+from guidellm.utils.dict import recursive_key_update
+from guidellm.utils.text import camelize_str
 
 __all__ = [
     "GenerativeBenchmarksConsole",
@@ -236,14 +238,14 @@ class GenerativeBenchmarksReport(StandardBaseModel):
         :param path: The path to create the report at.
         :return: The path to the report.
         """
-
+        
         data_builder = UIDataBuilder(self.benchmarks)
         data = data_builder.to_dict()
-        camel_data = humps.camelize(data)
+        camel_data = recursive_key_update(deepcopy(data), camelize_str)
         ui_api_data = {}
         for k, v in camel_data.items():
-            key = f"window.{humps.decamelize(k)} = {{}};"
-            value = f"window.{humps.decamelize(k)} = {json.dumps(v, indent=2)};\n"
+            key = f"window.{k} = {{}};"
+            value = f"window.{k} = {json.dumps(v, indent=2)};\n"
             ui_api_data[key] = value
         return create_report(ui_api_data, path)
 
