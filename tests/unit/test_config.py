@@ -178,9 +178,13 @@ def test_settings_with_env_variables(mocker):
             "GUIDELLM__DATASET__PREFERRED_DATA_COLUMNS": '["custom_column"]',
             "GUIDELLM__OPENAI__API_KEY": "env_api_key",
             "GUIDELLM__TABLE_BORDER_CHAR": "*",
+            "GUIDELLM__OPENAI__HEADERS": '{"Authorization": "Bearer env-token"}',
+            "GUIDELLM__OPENAI__VERIFY": "false",
         },
     )
     settings = Settings()
     assert settings.dataset.preferred_data_columns == ["custom_column"]
     assert settings.openai.api_key == "env_api_key"
     assert settings.table_border_char == "*"
+    assert settings.openai.headers == {"Authorization": "Bearer env-token"}
+    assert settings.openai.verify is False
