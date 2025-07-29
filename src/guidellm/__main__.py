@@ -82,7 +82,9 @@ def benchmark():
     default=GenerativeTextScenario.get_default("backend_args"),
     help=(
         "A JSON string containing any arguments to pass to the backend as a "
-        "dict with **kwargs."
+        "dict with **kwargs. Headers can be removed by setting their value to "
+        "null. For example: "
+        """'{"headers": {"Authorization": null, "Custom-Header": "Custom-Value"}}'"""
     ),
 )
 @click.option(
