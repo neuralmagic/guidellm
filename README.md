@@ -52,6 +52,25 @@ pip install git+https://github.com/vllm-project/guidellm.git
 
 For detailed installation instructions and requirements, see the [Installation Guide](https://github.com/vllm-project/guidellm/blob/main/docs/install.md).
 
+### With Podman / Docker
+
+Alternatively we publish container images at [ghcr.io/vllm-project/guidellm](https://github.com/vllm-project/guidellm/pkgs/container/guidellm). Running a container is (by default) equivalent to `guidellm benchmark run`:
+
+```bash
+podman run \
+  --rm -it \
+  -v "./results:/results:rw" \
+  -e GUIDELLM_TARGET=http://localhost:8000 \
+  -e GUIDELLM_RATE_TYPE=sweep \
+  -e GUIDELLM_MAX_SECONDS=30 \
+  -e GUIDELLM_DATA="prompt_tokens=256,output_tokens=128" \
+  ghcr.io/vllm-project/guidellm:latest
+```
+
+> [!TIP] CLI options can also be specified as ENV variables (E.g. `--rate-type sweep` -> `GUIDELLM_RATE_TYPE=sweep`). If both are specified then the CLI option overrides the the ENV.
+
+Replace `latest` with `stable` for the newest tagged release or set a specific release if desired.
+
 ### Quick Start
 
 #### 1. Start an OpenAI Compatible Server (vLLM)
