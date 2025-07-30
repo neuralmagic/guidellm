@@ -45,4 +45,4 @@ ENV GUIDELLM_TARGET="http://localhost:8000" \
     GUIDELLM_MAX_SECONDS="" \
     GUIDELLM_OUTPUT_PATH="/results/results.json"
 
-ENTRYPOINT [ "/opt/guidellm/bin/entrypoint.sh" ]
+ENTRYPOINT [ "/opt/guidellm/bin/guidellm" ]
