@@ -35,15 +35,8 @@ WORKDIR /results
 LABEL org.opencontainers.image.source="https://github.com/vllm-project/guidellm" \
       org.opencontainers.image.description="GuideLLM Performance Benchmarking Container"
 
-# Set the environment variable for the benchmark script
-# TODO: Replace with scenario environment variables
-ENV GUIDELLM_TARGET="http://localhost:8000" \
-    GUIDELLM_MODEL="neuralmagic/Meta-Llama-3.1-8B-Instruct-quantized.w4a16" \
-    GUIDELLM_RATE_TYPE="sweep" \
-    GUIDELLM_DATA="prompt_tokens=256,output_tokens=128" \
-    GUIDELLM_MAX_REQUESTS="100" \
-    GUIDELLM_MAX_SECONDS="" \
-    GUIDELLM_OUTPUT_PATH="/results/results.json"
+# Argument defaults can be set with GUIDELLM_<ARG>
+ENV GUIDELLM_OUTPUT_PATH="/results/benchmarks.json"
 
 ENTRYPOINT [ "/opt/app-root/guidellm/bin/guidellm" ]
 CMD [ "benchmark", "run" ]
