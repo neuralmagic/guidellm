@@ -1,5 +1,5 @@
 import { Name, WorkloadDetails } from './workloadDetails.interfaces';
-
+import { PercentileValues } from '../benchmarks/benchmarks.interfaces';
 export const name: Readonly<Name> = 'workloadDetails';
 
 export const initialState: WorkloadDetails = {
@@ -13,8 +13,9 @@ export const initialState: WorkloadDetails = {
         median: 0,
         min: 0,
         max: 0,
+        percentiles: {} as Record<PercentileValues, number>,
+        percentileRows: [],
       },
-      percentiles: [],
       buckets: [],
       bucketWidth: 0,
     },
@@ -29,8 +30,9 @@ export const initialState: WorkloadDetails = {
         median: 0,
         min: 0,
         max: 0,
+        percentiles: {} as Record<PercentileValues, number>,
+        percentileRows: [],
       },
-      percentiles: [],
       buckets: [],
       bucketWidth: 0,
     },
@@ -45,8 +47,9 @@ export const initialState: WorkloadDetails = {
         median: 0,
         min: 0,
         max: 0,
+        percentiles: {} as Record<PercentileValues, number>,
+        percentileRows: [],
       },
-      percentiles: [],
       buckets: [],
       bucketWidth: 0,
     },

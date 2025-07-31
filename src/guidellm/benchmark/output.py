@@ -6,6 +6,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal, Optional, Union
 
+import humps  # type: ignore[import-not-found]
 import yaml
 from pydantic import Field
 from rich.console import Console
@@ -25,6 +26,8 @@ from guidellm.objects import (
     StandardBaseModel,
     StatusDistributionSummary,
 )
+from guidellm.presentation import UIDataBuilder
+from guidellm.presentation.injector import create_report
 from guidellm.scheduler import strategy_display_str
 from guidellm.utils import Colors, split_text_list_by_length
 
@@ -67,6 +70,9 @@ class GenerativeBenchmarksReport(StandardBaseModel):
 
         if type_ == "csv":
             raise ValueError(f"CSV file type is not supported for loading: {path}.")
+
+        if type_ == "html":
+            raise ValueError(f"HTML file type is not supported for loading: {path}.")
 
         raise ValueError(f"Unsupported file type: {type_} for {path}.")
 
@@ -113,6 +119,9 @@ class GenerativeBenchmarksReport(StandardBaseModel):
 
         if type_ == "csv":
             return self.save_csv(path)
+
+        if type_ == "html":
+            return self.save_html(path)
 
         raise ValueError(f"Unsupported file type: {type_} for {path}.")
 
@@ -220,11 +229,29 @@ class GenerativeBenchmarksReport(StandardBaseModel):
 
         return path
 
+    def save_html(self, path: Union[str, Path]) -> Path:
+        """
+        Download html, inject report data and save to a file.
+
+        :param path: The path to create the report at.
+        :return: The path to the report.
+        """
+
+        data_builder = UIDataBuilder(self.benchmarks)
+        data = data_builder.to_dict()
+        camel_data = humps.camelize(data)
+        ui_api_data = {}
+        for k, v in camel_data.items():
+            key = f"window.{humps.decamelize(k)} = {{}};"
+            value = f"window.{humps.decamelize(k)} = {json.dumps(v, indent=2)};\n"
+            ui_api_data[key] = value
+        return create_report(ui_api_data, path)
+
     @staticmethod
     def _file_setup(
         path: Union[str, Path],
-        default_file_type: Literal["json", "yaml", "csv"] = "json",
-    ) -> tuple[Path, Literal["json", "yaml", "csv"]]:
+        default_file_type: Literal["json", "yaml", "csv", "html"] = "json",
+    ) -> tuple[Path, Literal["json", "yaml", "csv", "html"]]:
         path = Path(path) if not isinstance(path, Path) else path
 
         if path.is_dir():
@@ -242,9 +269,12 @@ class GenerativeBenchmarksReport(StandardBaseModel):
         if path_suffix in [".csv"]:
             return path, "csv"
 
+        if path_suffix in [".html"]:
+            return path, "html"
+
         raise ValueError(
             f"Unsupported file extension: {path_suffix} for {path}; "
-            "expected json, yaml, or csv."
+            "expected json, yaml, csv, or html."
         )
 
     @staticmethod
