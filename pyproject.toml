@@ -158,6 +158,7 @@ ignore = [
     "RET505", # allow `else` blocks
     "RET506", # allow `else` blocks
     "PD011", # ignore .values usage since ruff assumes it's a Pandas DataFrame
+    "TC003", # ignore imports for only type checking errors
 ]
 select = [
     # Rules reference: https://docs.astral.sh/ruff/rules/
