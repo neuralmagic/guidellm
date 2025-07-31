@@ -180,7 +180,9 @@ class WorkerProcessGroup(Generic[BackendT, RequestT, ResponseT]):
                 updates_queue=self.process_updates_queue,
                 backend=self.backend,
                 request_timings=self.strategy.create_worker_timings(
-                    local_rank=process_rank, local_world_size=num_processes
+                    local_rank=process_rank,
+                    local_world_size=num_processes,
+                    local_max_concurrency=per_process_max_concurrency,
                 ),
                 poll_intervals=settings.scheduler_poll_interval,
             )

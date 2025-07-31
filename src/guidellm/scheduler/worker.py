@@ -290,11 +290,15 @@ class WorkerProcess(Generic[BackendT, RequestT, ResponseT]):
     ]:
         while True:
             try:
-                timings_offset = self.request_timings.next_offset()
                 request, request_info = self.requests_queue.get_nowait()
                 request_info.scheduler_timings.dequeued = time.time()
                 request_info.status = "pending"
 
+                if request_info.scheduler_start_time > time.time():
+                    # Ensure request_timings logic won't start until scheduler is ready
+                    await asyncio.sleep(request_info.scheduler_start_time - time.time())
+
+                timings_offset = self.request_timings.next_offset()
                 target_start = request_info.scheduler_start_time + timings_offset
                 if target_start > time.time():
                     await asyncio.sleep(target_start - time.time())
