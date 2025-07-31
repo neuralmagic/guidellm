@@ -17,10 +17,7 @@ const route = (input: RequestInfo) => {
 
   if (url.endsWith('/run-info')) return jsonResponse({});
   if (url.endsWith('/workload-details')) return jsonResponse({});
-  if (url.endsWith('/benchmarks'))
-    return jsonResponse({
-      benchmarks: mockBenchmarks,
-    });
+  if (url.endsWith('/benchmarks')) return jsonResponse(mockBenchmarks);
 
   /* fall-through → 404 */
   return { ok: false, status: 404, json: () => Promise.resolve({}) };

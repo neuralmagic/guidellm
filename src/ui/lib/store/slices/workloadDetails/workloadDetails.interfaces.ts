@@ -1,18 +1,6 @@
+import { Statistics } from '../benchmarks';
+
 export type Name = 'workloadDetails';
-
-interface Statistics {
-  total: number;
-  mean: number;
-  std: number;
-  median: number;
-  min: number;
-  max: number;
-}
-
-interface Percentile {
-  percentile: string;
-  value: number;
-}
 
 interface Bucket {
   value: number;
@@ -21,7 +9,6 @@ interface Bucket {
 
 interface Distribution {
   statistics: Statistics;
-  percentiles: Percentile[];
   buckets: Bucket[];
   bucketWidth: number;
 }
