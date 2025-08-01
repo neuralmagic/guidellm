@@ -25,6 +25,7 @@ from guidellm.config import settings
 from guidellm.scheduler.constraints import CallableConstraint
 from guidellm.scheduler.objects import (
     RequestT,
+    RequestTimingsT,
     ResponseT,
     ScheduledRequestInfo,
     SchedulerState,
@@ -93,7 +94,7 @@ class Environment(ABC, Generic[RequestT, ResponseT]):
         self,
         response: Optional[ResponseT],
         request: RequestT,
-        request_info: ScheduledRequestInfo,
+        request_info: ScheduledRequestInfo[RequestTimingsT],
     ):
         """
         Update environment state with completed request iteration.
@@ -127,7 +128,9 @@ class Environment(ABC, Generic[RequestT, ResponseT]):
     async def sync_run_end(
         self,
     ) -> AsyncIterator[
-        tuple[ResponseT, RequestT, ScheduledRequestInfo, SchedulerState]
+        tuple[
+            ResponseT, RequestT, ScheduledRequestInfo[RequestTimingsT], SchedulerState
+        ]
     ]:
         """
         Finalize execution and aggregate results from all nodes.
@@ -189,7 +192,7 @@ class NonDistributedEnvironment(Environment):
         self,
         response: Optional[ResponseT],
         request: RequestT,
-        request_info: ScheduledRequestInfo,
+        request_info: ScheduledRequestInfo[RequestTimingsT],
     ):
         """
         No-op for single-node execution (no state synchronization needed).
@@ -209,7 +212,11 @@ class NonDistributedEnvironment(Environment):
 
     async def sync_run_end(
         self,
-    ) -> AsyncIterator[tuple[ResponseT, RequestT, ScheduledRequestInfo]]:
+    ) -> AsyncIterator[
+        tuple[
+            ResponseT, RequestT, ScheduledRequestInfo[RequestTimingsT], SchedulerState
+        ]
+    ]:
         """
         Finalize single-node execution and propagate any stored errors.
 

@@ -26,18 +26,21 @@ from guidellm.scheduler.environment import Environment
 from guidellm.scheduler.objects import (
     BackendT,
     RequestT,
+    RequestTimingsT,
     ResponseT,
     ScheduledRequestInfo,
     SchedulerState,
 )
 from guidellm.scheduler.strategy import SchedulingStrategy
-from guidellm.scheduler.worker import WorkerProcessGroup
+from guidellm.scheduler.worker_group import WorkerProcessGroup
 from guidellm.utils.singleton import ThreadSafeSingletonMixin
 
 __all__ = ["Scheduler"]
 
 
-class Scheduler(Generic[BackendT, RequestT, ResponseT], ThreadSafeSingletonMixin):
+class Scheduler(
+    Generic[BackendT, RequestT, RequestTimingsT, ResponseT], ThreadSafeSingletonMixin
+):
     """
     A generic singleton scheduler for coordinating distributed load testing workloads.
 
@@ -50,20 +53,18 @@ class Scheduler(Generic[BackendT, RequestT, ResponseT], ThreadSafeSingletonMixin
     making it adaptable to various testing scenarios including LLM inference,
     API testing, and other distributed workload patterns.
 
-    Type Parameters:
-        BackendT: The backend type for processing requests (bound to Backend).
-        RequestT: The request type being scheduled and processed.
-        ResponseT: The response type returned from request processing.
-
     Example:
     ::
         from guidellm.scheduler import Scheduler
         from guidellm.backend import (
-            OpenAIBackend, TextGenerationRequest, TextGenerationResponse
+            OpenAIBackend,
+            GenerationRequest,
+            GenerationResponse,
+            GenerationRequestTimings
         )
 
         scheduler = Scheduler[
-            OpenAIBackend, TextGenerationRequest, TextGenerationResponse
+            OpenAIBackend,GenerationRequest,GenerationRequestTimings,GenerationResponse
         ]()
         async for response, request, info, state in scheduler.run(
             requests=request_list,
@@ -95,7 +96,12 @@ class Scheduler(Generic[BackendT, RequestT, ResponseT], ThreadSafeSingletonMixin
             str, Union[int, float, str, Callable[[SchedulerState], Any]]
         ],
     ) -> AsyncIterator[
-        tuple[Optional[ResponseT], RequestT, ScheduledRequestInfo, SchedulerState]
+        tuple[
+            Optional[ResponseT],
+            RequestT,
+            ScheduledRequestInfo[RequestTimingsT],
+            SchedulerState,
+        ]
     ]:
         """
         Execute a request processing run with the provided configuration.
@@ -107,25 +113,6 @@ class Scheduler(Generic[BackendT, RequestT, ResponseT], ThreadSafeSingletonMixin
         The method yields request updates as they become available,
         including requeust queued, request processing start, and request completion,
         allowing for real-time monitoring and processing.
-
-        Example:
-        ::
-            from guidellm.scheduler import Scheduler
-            from guidellm.backend import (
-                OpenAIBackend, TextGenerationRequest, TextGenerationResponse
-            )
-
-            scheduler = Scheduler[
-                OpenAIBackend, TextGenerationRequest, TextGenerationResponse
-            ]()
-            async for response, request, info, state in scheduler.run(
-                requests=request_list,
-                backend=backend,
-                strategy=strategy,
-                env=environment,
-                max_requests=1000
-            ):
-                print(f"Resp: {response}, Req: {request}, Info: {info}, State: {state}")
 
         :param requests: Iterable of the requests to process with multiple formats;
             Iterable[RequestT] for single requests,
@@ -151,7 +138,9 @@ class Scheduler(Generic[BackendT, RequestT, ResponseT], ThreadSafeSingletonMixin
             constraint evaluation are propagated after proper cleanup.
         """
         with self.run_lock:
-            worker_group: WorkerProcessGroup[BackendT, RequestT, ResponseT] = None
+            worker_group: Optional[
+                WorkerProcessGroup[BackendT, RequestT, RequestTimingsT, ResponseT]
+            ] = None
 
             # Any issues during the run will raise an error (local or remote),
             # be caught and passed to the environment,
@@ -166,7 +155,9 @@ class Scheduler(Generic[BackendT, RequestT, ResponseT], ThreadSafeSingletonMixin
                 ) = await env.sync_run_params(requests, strategy, constraints)
 
                 # Setup the worker group, sync start with the environment
-                worker_group = WorkerProcessGroup[BackendT, RequestT, ResponseT](
+                worker_group = WorkerProcessGroup[
+                    BackendT, RequestT, RequestTimingsT, ResponseT
+                ](
                     backend=backend,
                     requests=local_requests,
                     strategy=local_strategy,

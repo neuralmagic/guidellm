@@ -35,6 +35,7 @@ from guidellm.scheduler.constraints import CallableConstraint
 from guidellm.scheduler.objects import (
     BackendT,
     RequestT,
+    RequestTimingsT,
     ResponseT,
     ScheduledRequestInfo,
     SchedulerState,
@@ -45,7 +46,7 @@ from guidellm.scheduler.worker import WorkerProcess, worker_sync_iterable_to_asy
 __all__ = ["WorkerProcessGroup"]
 
 
-class WorkerProcessGroup(Generic[BackendT, RequestT, ResponseT]):
+class WorkerProcessGroup(Generic[BackendT, RequestT, RequestTimingsT, ResponseT]):
     """
     Orchestrates multiple worker processes with shared state management and
     coordination.
@@ -88,7 +89,7 @@ class WorkerProcessGroup(Generic[BackendT, RequestT, ResponseT]):
 
     def __init__(
         self,
-        backend: BackendT,
+        backend: BackendT[RequestT, RequestTimingsT, ResponseT],
         requests: Iterable[RequestT],
         strategy: SchedulingStrategy,
         constraints: dict[str, CallableConstraint],
@@ -109,12 +110,14 @@ class WorkerProcessGroup(Generic[BackendT, RequestT, ResponseT]):
         self.error_event: Event = None
 
         # queues for communication
-        self.process_requests_queue: Queue[tuple[RequestT, ScheduledRequestInfo]] = None
+        self.process_requests_queue: Queue[
+            tuple[RequestT, ScheduledRequestInfo[RequestTimingsT]]
+        ] = None
         self.process_updates_queue: Queue[
-            tuple[Optional[ResponseT], RequestT, ScheduledRequestInfo]
+            tuple[Optional[ResponseT], RequestT, ScheduledRequestInfo[RequestTimingsT]]
         ] = None
         self.async_updates_queue: queue.Queue[
-            tuple[Optional[ResponseT], RequestT, ScheduledRequestInfo]
+            tuple[Optional[ResponseT], RequestT, ScheduledRequestInfo[RequestTimingsT]]
         ] = None
 
         # scheduler state and request management
@@ -164,7 +167,7 @@ class WorkerProcessGroup(Generic[BackendT, RequestT, ResponseT]):
         # Initialize worker processes
         self.processes = []
         for process_rank in range(num_processes):
-            worker = WorkerProcess(
+            worker = WorkerProcess[BackendT, RequestT, RequestTimingsT, ResponseT](
                 local_rank=process_rank,
                 local_world_size=num_processes,
                 async_limit=(
@@ -233,7 +236,12 @@ class WorkerProcessGroup(Generic[BackendT, RequestT, ResponseT]):
     async def request_updates(
         self,
     ) -> AsyncIterator[
-        tuple[Optional[ResponseT], RequestT, ScheduledRequestInfo, SchedulerState]
+        tuple[
+            Optional[ResponseT],
+            RequestT,
+            ScheduledRequestInfo[RequestTimingsT],
+            SchedulerState,
+        ]
     ]:
         """
         Yield request processing updates as they become available.
@@ -344,7 +352,7 @@ class WorkerProcessGroup(Generic[BackendT, RequestT, ResponseT]):
 
         while continue_requests:
             for request in self.requests:
-                request_info = ScheduledRequestInfo(
+                request_info = ScheduledRequestInfo[RequestTimingsT](
                     request_id=getattr(
                         request, "id_", getattr(request, "id", id(request))
                     ),
@@ -393,7 +401,7 @@ class WorkerProcessGroup(Generic[BackendT, RequestT, ResponseT]):
                 last_check_time = time.time()
 
     def _update_scheduler_state(
-        self, request_info: ScheduledRequestInfo
+        self, request_info: ScheduledRequestInfo[RequestTimingsT]
     ) -> tuple[SchedulerState, bool, bool]:
         """
         :param request_info: The request information to update the state with.

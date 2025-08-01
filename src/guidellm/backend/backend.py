@@ -1,13 +1,29 @@
+"""
+Backend interface and registry for generative AI model interactions.
+
+This module provides the abstract base class and interface for implementing
+backends that communicate with generative AI models. Backends handle the
+lifecycle of generation requests, including startup, validation, request
+processing, and shutdown phases.
+
+Classes:
+    Backend: Abstract base class for generative AI backends with registry support.
+
+Type Aliases:
+    BackendType: Literal type defining supported backend implementations.
+"""
+
 from abc import ABC, abstractmethod
-from collections.abc import AsyncGenerator
-from pathlib import Path
-from typing import Any, Literal, Optional, Union
+from collections.abc import AsyncIterator
+from typing import Any, Literal, Optional
 
-from loguru import logger
-from PIL import Image
-
-from guidellm.backend.response import ResponseSummary, StreamingTextResponse
-from guidellm.config import settings
+from guidellm.backend.objects import (
+    GenerationRequest,
+    GenerationRequestTimings,
+    GenerationResponse,
+)
+from guidellm.scheduler import BackendInterface, ScheduledRequestInfo
+from guidellm.utils.registry import RegistryMixin
 
 __all__ = [
     "Backend",
@@ -18,42 +34,47 @@ __all__ = [
 BackendType = Literal["openai_http"]
 
 
-class Backend(ABC):
+class Backend(
+    ABC,
+    RegistryMixin["type[Backend]"],
+    BackendInterface[GenerationRequest, GenerationRequestTimings, GenerationResponse],
+):
     """
-    Abstract base class for generative AI backends.
+    Abstract base class for generative AI backends with registry and lifecycle.
 
-    This class provides a common interface for creating and interacting with different
-    generative AI backends. Subclasses should implement the abstract methods to
-    define specific backend behavior.
+    This class defines the interface for implementing backends that communicate with
+    generative AI models. It combines the registry pattern for automatic discovery
+    with a well-defined lifecycle for process-based distributed execution.
 
-    :cvar _registry: A registration dictionary that maps BackendType to backend classes.
-    :param type_: The type of the backend.
+    The backend lifecycle consists of four main phases:
+    1. Creation and initial configuration (constructor and factory methods)
+    2. Process startup - Initialize resources within a worker process
+    3. Validation - Verify backend readiness and configuration
+    4. Request resolution - Process generation requests iteratively
+    5. Process shutdown - Clean up resources when process terminates
+
+    All backend implementations must ensure that their state (excluding resources
+    created during process_startup) is pickleable to support transfer across
+    process boundaries in distributed execution environments.
+
+    Example:
+    ::
+        # Register a custom backend implementation
+        @Backend.register("my_backend")
+        class MyBackend(Backend):
+            def __init__(self, api_key: str):
+                super().__init__("my_backend")
+                self.api_key = api_key
+
+            async def process_startup(self):
+                # Initialize process-specific resources
+                self.client = MyAPIClient(self.api_key)
+
+            ...
+
+        # Create backend instance using factory method
+        backend = Backend.create("my_backend", api_key="secret")
     """
-
-    _registry: dict[BackendType, "type[Backend]"] = {}
-
-    @classmethod
-    def register(cls, backend_type: BackendType):
-        """
-        A decorator to register a backend class in the backend registry.
-
-        :param backend_type: The type of backend to register.
-        :type backend_type: BackendType
-        :return: The decorated backend class.
-        :rtype: Type[Backend]
-        """
-        if backend_type in cls._registry:
-            raise ValueError(f"Backend type already registered: {backend_type}")
-
-        if not issubclass(cls, Backend):
-            raise TypeError("Only subclasses of Backend can be registered")
-
-        def inner_wrapper(wrapped_class: type["Backend"]):
-            cls._registry[backend_type] = wrapped_class
-            logger.info("Registered backend type: {}", backend_type)
-            return wrapped_class
-
-        return inner_wrapper
 
     @classmethod
     def create(cls, type_: BackendType, **kwargs) -> "Backend":
@@ -61,199 +82,122 @@ class Backend(ABC):
         Factory method to create a backend instance based on the backend type.
 
         :param type_: The type of backend to create.
-        :type type_: BackendType
         :param kwargs: Additional arguments for backend initialization.
         :return: An instance of a subclass of Backend.
-        :rtype: Backend
         :raises ValueError: If the backend type is not registered.
         """
 
-        logger.info("Creating backend of type {}", type_)
+        backend = cls.get_registered_object(type_)
 
-        if type_ not in cls._registry:
-            err = ValueError(f"Unsupported backend type: {type_}")
-            logger.error("{}", err)
-            raise err
-
-        return Backend._registry[type_](**kwargs)
+        return backend(**kwargs)
 
     def __init__(self, type_: BackendType):
-        self._type = type_
+        """
+        Initialize a backend instance with the specified type.
+
+        :param type_: The backend type identifier for this instance.
+        """
+        self.type_ = type_
 
     @property
-    def type_(self) -> BackendType:
+    def processes_limit(self) -> Optional[int]:
         """
-        :return: The type of the backend.
+        :return: The maximum number of worker processes supported by the
+            backend. None if not limited.
         """
-        return self._type
+        return None
 
     @property
+    def requests_limit(self) -> Optional[int]:
+        """
+        :return: The maximum number of concurrent requests that can be processed
+            at once globally by the backend. None if not limited.
+        """
+        return None
+
     @abstractmethod
-    def target(self) -> str:
+    async def process_startup(self):
         """
-        :return: The target location for the backend.
+        Initialize process-specific resources and connections.
+
+        This method is called when a backend instance is transferred to a worker
+        process and needs to establish connections, initialize clients, or set up
+        any other resources required for request processing. All resources created
+        here are process-local and do not need to be pickleable.
+        If there are any errors during startup, this method should raise an
+        appropriate exception.
+
+        Must be called before validate() or resolve() can be used.
         """
         ...
 
-    @property
     @abstractmethod
-    def model(self) -> Optional[str]:
-        """
-        :return: The model used for the backend requests.
-        """
-        ...
-
-    @property
-    @abstractmethod
-    def info(self) -> dict[str, Any]:
-        """
-        :return: The information about the backend.
-        """
-        ...
-
-    @abstractmethod
-    async def reset(self) -> None:
-        """
-        Reset the connection object. This is useful for backends that
-        reuse connections or have state that needs to be cleared.
-        """
-        ...
-
     async def validate(self):
         """
-        Handle final setup and validate the backend is ready for use.
-        If not successful, raises the appropriate exception.
+        Validate backend configuration and readiness for request processing.
+
+        This method verifies that the backend is properly configured and can
+        successfully communicate with the target model service. It should be
+        called after process_startup() and before resolve() to ensure the
+        backend is ready to handle generation requests.
+        If the backend cannot connect to the service or is not ready,
+        this method should raise an appropriate exception.
         """
-        logger.info("{} validating backend {}", self.__class__.__name__, self.type_)
-        await self.check_setup()
-        models = await self.available_models()
-        if not models:
-            raise ValueError("No models available for the backend")
-
-        # Use the preferred route defined in the global settings when performing the
-        # validation request. This avoids calling an unavailable endpoint (ie
-        # /v1/completions) when the deployment only supports the chat completions
-        # endpoint.
-        if settings.preferred_route == "chat_completions":
-            async for _ in self.chat_completions(  # type: ignore[attr-defined]
-                content="Test connection", output_token_count=1
-            ):
-                pass
-        else:
-            async for _ in self.text_completions(  # type: ignore[attr-defined]
-                prompt="Test connection", output_token_count=1
-            ):
-                pass
-
-        await self.reset()
 
     @abstractmethod
-    async def check_setup(self):
+    async def process_shutdown(self):
         """
-        Check the setup for the backend.
-        If unsuccessful, raises the appropriate exception.
+        Clean up process-specific resources and connections.
 
-        :raises ValueError: If the setup check fails.
+        This method is called when the worker process is shutting down and
+        should clean up any resources created during process_startup(). After
+        this method is called, validate() and resolve() should not be used.
         """
         ...
 
     @abstractmethod
-    async def prepare_multiprocessing(self):
-        """
-        Prepare the backend for use in a multiprocessing environment.
-        This is useful for backends that have instance state that can not
-        be shared across processes and should be cleared out and re-initialized
-        for each new process.
-        """
-        ...
-
-    @abstractmethod
-    async def available_models(self) -> list[str]:
-        """
-        Get the list of available models for the backend.
-
-        :return: The list of available models.
-        :rtype: List[str]
-        """
-        ...
-
-    @abstractmethod
-    async def text_completions(
+    async def resolve(
         self,
-        prompt: Union[str, list[str]],
-        request_id: Optional[str] = None,
-        prompt_token_count: Optional[int] = None,
-        output_token_count: Optional[int] = None,
-        **kwargs,
-    ) -> AsyncGenerator[Union[StreamingTextResponse, ResponseSummary], None]:
+        request: GenerationRequest,
+        request_info: ScheduledRequestInfo[GenerationRequestTimings],
+        history: Optional[list[tuple[GenerationRequest, GenerationResponse]]] = None,
+    ) -> AsyncIterator[
+        tuple[GenerationResponse, ScheduledRequestInfo[GenerationRequestTimings]]
+    ]:
         """
-        Generate text only completions for the given prompt.
-        Does not support multiple modalities, complicated chat interfaces,
-        or chat templates. Specifically, it requests with only the prompt.
+        Process a generation request and yield progressive responses.
 
-        :param prompt: The prompt (or list of prompts) to generate a completion for.
-            If a list is supplied, these are concatenated and run through the model
-            for a single prompt.
-        :param request_id: The unique identifier for the request, if any.
-            Added to logging statements and the response for tracking purposes.
-        :param prompt_token_count: The number of tokens measured in the prompt, if any.
-            Returned in the response stats for later analysis, if applicable.
-        :param output_token_count: If supplied, the number of tokens to enforce
-            generation of for the output for this request.
-        :param kwargs: Additional keyword arguments to pass with the request.
-        :return: An async generator that yields a StreamingTextResponse for start,
-            a StreamingTextResponse for each received iteration,
-            and a ResponseSummary for the final response.
+        This method processes a generation request through the backend's model
+        service, yielding intermediate responses as the generation progresses.
+        The final yielded item contains the complete response and timing data.
+
+        The request_info parameter is updated with timing metadata and other
+        tracking information throughout the request processing lifecycle.
+
+        :param request: The generation request containing content and parameters.
+        :param request_info: Request tracking information to be updated with
+            timing and progress metadata during processing.
+        :param history: Optional conversation history for multi-turn requests.
+            Each tuple contains a previous request-response pair that provides
+            context for the current generation.
+        :yields: Tuples of (response, updated_request_info) as the generation
+            progresses. The final tuple contains the complete response.
         """
         ...
 
     @abstractmethod
-    async def chat_completions(
-        self,
-        content: Union[
-            str,
-            list[Union[str, dict[str, Union[str, dict[str, str]]], Path, Image.Image]],
-            Any,
-        ],
-        request_id: Optional[str] = None,
-        prompt_token_count: Optional[int] = None,
-        output_token_count: Optional[int] = None,
-        raw_content: bool = False,
-        **kwargs,
-    ) -> AsyncGenerator[Union[StreamingTextResponse, ResponseSummary], None]:
+    async def info(self) -> dict[str, Any]:
         """
-        Generate chat completions for the given content.
-        Supports multiple modalities, complicated chat interfaces, and chat templates.
-        Specifically, it requests with the content, which can be any combination of
-        text, images, and audio provided the target model supports it,
-        and returns the output text. Additionally, any chat templates
-        for the model are applied within the backend.
+        :return: Dictionary containing backend metadata such as model
+            information, service endpoints, version details, and other
+            configuration data useful for reporting and diagnostics.
+        """
+        ...
 
-        :param content: The content (or list of content) to generate a completion for.
-            This supports any combination of text, images, and audio (model dependent).
-            Supported text only request examples:
-                content="Sample prompt", content=["Sample prompt", "Second prompt"],
-                content=[{"type": "text", "value": "Sample prompt"}.
-            Supported text and image request examples:
-                content=["Describe the image", PIL.Image.open("image.jpg")],
-                content=["Describe the image", Path("image.jpg")],
-                content=["Describe the image", {"type": "image_url",
-                    "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}].
-            Supported text and audio request examples:
-                content=["Transcribe the audio", Path("audio.wav")],
-                content=["Transcribe the audio", {"type": "input_audio",
-                "input_audio": {"data": f"{base64_bytes}", "format": "wav}].
-            Additionally, if raw_content=True then the content is passed directly to the
-            backend without any processing.
-        :param request_id: The unique identifier for the request, if any.
-            Added to logging statements and the response for tracking purposes.
-        :param prompt_token_count: The number of tokens measured in the prompt, if any.
-            Returned in the response stats for later analysis, if applicable.
-        :param output_token_count: If supplied, the number of tokens to enforce
-            generation of for the output for this request.
-        :param kwargs: Additional keyword arguments to pass with the request.
-        :return: An async generator that yields a StreamingTextResponse for start,
-            a StreamingTextResponse for each received iteration,
-            and a ResponseSummary for the final response.
+    @abstractmethod
+    async def default_model(self) -> str:
+        """
+        :return: The model name or identifier that this backend is
+            configured to use by default for generation requests.
         """
         ...

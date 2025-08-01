@@ -4,15 +4,16 @@ Worker process management for multi-process request scheduling and execution.
 This module provides the infrastructure for managing individual worker processes
 that handle request scheduling, processing, and coordination in the GuideLLM toolkit.
 It implements a multiprocessing-based architecture with asyncio/await patterns for
-efficient concurrent request handling.
+efficient concurrent request handling and distributed load balancing.
 
 Classes:
-    WorkerProcess: Individual worker process for handling requests with a specific
-        backend.
+    WorkerProcess: Individual worker process for handling request processing with
+        backend interaction, queue management, and process synchronization.
 
 Functions:
     worker_sync_iterable_to_async: Utility for converting synchronous iterables to
-        async with proper cancellation and error handling.
+        async execution with proper lifecycle management, cancellation handling,
+        and process synchronization primitives.
 """
 
 import asyncio
@@ -29,6 +30,7 @@ from typing import Any, Callable, Generic, Literal, Optional, Union
 from guidellm.scheduler.objects import (
     BackendT,
     RequestT,
+    RequestTimingsT,
     ResponseT,
     ScheduledRequestInfo,
 )
@@ -38,6 +40,15 @@ __all__ = ["WorkerProcess", "worker_sync_iterable_to_async"]
 
 
 def _infinite_iter():
+    """
+    Generate an infinite sequence of None values for polling scenarios.
+
+    This internal utility function creates an infinite iterator that yields None
+    values indefinitely. It is used with worker_sync_iterable_to_async when
+    only polling behavior is needed without processing an actual iterable.
+
+    :return: Generator yielding None values infinitely.
+    """
     while True:
         yield None
 
@@ -51,24 +62,50 @@ async def worker_sync_iterable_to_async(
     **kwargs,
 ) -> tuple[Union[Literal["completed", "canceled", "barrier"], str], Any]:
     """
-    Convert a synchronous iterable to async execution with proper lifecycle management.
+    Convert synchronous iterable to async execution with lifecycle management.
 
-    This utility function allows synchronous iterables to be executed in an async
-    context while respecting process synchronization primitives like barriers and
-    events. It handles cancellation, error propagation, and graceful shutdown
-    scenarios.
+    This utility function enables synchronous iterables to execute within an
+    async context while respecting multiprocessing synchronization primitives
+    such as barriers and events. It provides comprehensive cancellation handling,
+    error propagation, and graceful shutdown coordination for distributed
+    processing scenarios.
 
-    :param iter_func: The iterable function to execute. If None, creates an infinite
-        iterator and only polls for cancellation, events, and barriers.
-    :param exit_events: Optional dictionary of Events to monitor for termination
-        signals to exit the loop.
-    :param exit_barrier: Optional Barrier to wait on before exiting the loop.
-    :param poll_interval: Time in seconds between iteration cycles and barrier checks.
-    :param args: Positional arguments to pass to iter_func.
-    :param kwargs: Keyword arguments to pass to iter_func.
-    :return: A tuple containing the stop reason and the last item yielded by the the
-        iterator before termination.
-    :raises RuntimeError: If error_event is set during iteration.
+    The function monitors multiple exit conditions simultaneously:
+    - Completion of the iterable
+    - Process cancellation requests
+    - External event signals (error, shutdown, etc.)
+    - Barrier synchronization points
+
+    Example:
+    ::
+        from guidellm.scheduler.worker import worker_sync_iterable_to_async
+
+        # Convert a synchronous generator to async execution
+        exit_reason, last_item = await worker_sync_iterable_to_async(
+            iter_func=my_generator_function,
+            exit_events={"shutdown": shutdown_event},
+            exit_barrier=startup_barrier,
+            poll_interval=0.1,
+            generator_arg1="value1"
+        )
+
+        if exit_reason == "completed":
+            print("Generator completed normally")
+        elif exit_reason == "shutdown":
+            print("Shutdown signal received")
+
+    :param iter_func: The iterable function to execute, or "infinite" to create
+        an infinite iterator for polling-only scenarios.
+    :param exit_events: Optional dictionary mapping event names to Event objects
+        for monitoring termination signals.
+    :param exit_barrier: Optional Barrier to synchronize on before exiting.
+    :param poll_interval: Time in seconds between iteration cycles and event
+        checks for responsive cancellation handling.
+    :param args: Positional arguments passed to iter_func.
+    :param kwargs: Keyword arguments passed to iter_func.
+    :return: A tuple containing the exit reason (completion status or event name)
+        and the last item yielded by the iterator before termination.
+    :raises RuntimeError: If an error event is detected during iteration.
     :raises asyncio.CancelledError: If the async operation is cancelled.
     """
     if iter_func == "infinite":
@@ -111,32 +148,45 @@ async def worker_sync_iterable_to_async(
         raise
 
 
-class WorkerProcess(Generic[BackendT, RequestT, ResponseT]):
+class WorkerProcess(Generic[BackendT, RequestT, RequestTimingsT, ResponseT]):
     """
-    Individual worker process for handling request processing with a specific backend.
+    Individual worker process for handling request processing with backend interaction.
 
     This class represents a single worker process designed to operate within a
-    multi-process scheduler system. It manages the lifecycle of requests from
-    queue consumption through backend processing and updates publication.
-    The worker maintains proper synchronization with other processes and handles
-    error conditions gracefully.
+    multi-process scheduler system. It manages the complete lifecycle of requests
+    from queue consumption through backend processing and updates publication,
+    maintaining proper synchronization with other processes in the group.
 
-    :param local_rank: The process number/index for this worker within the group.
-    :param local_world_size: Total number of worker processes in the group.
-    :param async_limit: Maximum number of concurrent requests this worker can handle.
-    :param startup_barrier: Multiprocessing barrier for coordinated startup.
-    :param shutdown_event: Event to signal and monitor for graceful shutdown/stopping.
-    :param error_event: Event to signal/monitor error conditions across processes.
-    :param requests_queue: Queue for receiving requests to process.
-    :param updates_queue: Queue for publishing processing updates, including
-        request queued, request processing start, and request completion.
-    :param backend: Backend instance for processing the requests through
-        utilizing backend.resolve function. Additionally, backend.process_startup,
-        backend.validate, and backend.process_shutdown methods are called
-        for lifecycle management within the worker.
-    :param request_timings: ScheduledRequestTimings instance for designating when to
-        start processing the next request.
-    :param poll_intervals: Time interval for polling operations.
+    The worker handles request timing coordination, backend communication,
+    error propagation, and graceful shutdown scenarios. It operates asynchronously
+    within its own process context and communicates with the parent process
+    through shared queues and synchronization primitives.
+
+    The worker maintains a configurable level of concurrency through an internal
+    semaphore, ensuring that backend resource limits are respected while maximizing
+    throughput. It also implements comprehensive error handling and cancellation
+    support for robust operation in distributed environments.
+
+    Example:
+    ::
+        from guidellm.scheduler.worker import WorkerProcess
+
+        worker = WorkerProcess(
+            local_rank=0,
+            local_world_size=4,
+            async_limit=10,
+            startup_barrier=barrier,
+            shutdown_event=shutdown_event,
+            error_event=error_event,
+            requests_queue=requests_queue,
+            updates_queue=updates_queue,
+            backend=my_backend,
+            request_timings=timings,
+            poll_intervals=0.1
+        )
+
+        # Run in a separate process
+        worker.run()
     """
 
     def __init__(
@@ -147,14 +197,37 @@ class WorkerProcess(Generic[BackendT, RequestT, ResponseT]):
         startup_barrier: Barrier,
         shutdown_event: Event,
         error_event: Event,
-        requests_queue: Queue[tuple[RequestT, ScheduledRequestInfo]],
+        requests_queue: Queue[tuple[RequestT, ScheduledRequestInfo[RequestTimingsT]]],
         updates_queue: Queue[
-            tuple[Optional[ResponseT], RequestT, ScheduledRequestInfo]
+            tuple[Optional[ResponseT], RequestT, ScheduledRequestInfo[RequestTimingsT]]
         ],
         backend: BackendT,
         request_timings: ScheduledRequestTimings,
         poll_intervals: float,
     ):
+        """
+        Initialize a new worker process instance.
+
+        :param local_rank: The process number/index for this worker within the group.
+        :param local_world_size: Total number of worker processes in the group.
+        :param async_limit: Maximum number of concurrent requests this worker can
+            handle simultaneously.
+        :param startup_barrier: Multiprocessing barrier for coordinated startup.
+        :param shutdown_event: Event to signal and monitor for graceful
+            shutdown/stopping.
+        :param error_event: Event to signal/monitor error conditions across
+            processes.
+        :param requests_queue: Queue for receiving requests to process.
+        :param updates_queue: Queue for publishing processing updates, including
+            request queued, request processing start, and request completion.
+        :param backend: Backend instance for processing the requests through
+            utilizing backend.resolve function. Additionally, backend.process_startup,
+            backend.validate, and backend.process_shutdown methods are called
+            for lifecycle management within the worker.
+        :param request_timings: ScheduledRequestTimings instance for designating
+            when to start processing the next request.
+        :param poll_intervals: Time interval for polling operations.
+        """
         self.local_rank = local_rank
         self.local_world_size = local_world_size
         self.async_limit = async_limit
@@ -166,7 +239,9 @@ class WorkerProcess(Generic[BackendT, RequestT, ResponseT]):
         self.backend = backend
         self.request_timings = request_timings
         self.poll_intervals = poll_intervals
-        self.pending_request: Optional[tuple[RequestT, ScheduledRequestInfo]] = None
+        self.pending_request: Optional[
+            tuple[RequestT, ScheduledRequestInfo[RequestTimingsT]]
+        ] = None
 
     def run(self):
         """
@@ -175,6 +250,7 @@ class WorkerProcess(Generic[BackendT, RequestT, ResponseT]):
         Initializes the asyncio event loop and starts the worker's async operations.
         This method is designed to be passed into a ProcessPoolExecutor by reference
         in the main process, allowing it to run in a separate worker process.
+        Blocks until the worker completes its execution or encounters an error.
 
         :raises RuntimeError: If the worker encounters an unrecoverable error during
             execution. The error event is set before raising to notify other processes.
@@ -188,6 +264,17 @@ class WorkerProcess(Generic[BackendT, RequestT, ResponseT]):
             ) from exc
 
     async def run_async(self):
+        """
+        Execute the main asynchronous worker process logic.
+
+        Orchestrates the concurrent execution of request processing and shutdown
+        monitoring tasks. This method runs two primary tasks in parallel:
+        monitoring for shutdown/error signals and processing incoming requests.
+        When either task completes or raises an exception, it handles cleanup
+        and propagates any errors.
+
+        :raises RuntimeError: If worker tasks encounter unrecoverable errors.
+        """
         completed_tasks, pending_tasks = await asyncio.wait(
             [
                 asyncio.create_task(self.run_async_stop_processing()),
@@ -206,6 +293,17 @@ class WorkerProcess(Generic[BackendT, RequestT, ResponseT]):
                     raise task.exception()
 
     async def run_async_stop_processing(self):
+        """
+        Monitor for shutdown and error signals in a continuous loop.
+
+        This method runs in parallel with request processing to monitor
+        for shutdown or error events. When a signal is detected, it raises
+        the appropriate exception to trigger cleanup and shutdown procedures.
+
+        :raises RuntimeError: If an error event is signaled or an unexpected
+            exit reason is encountered.
+        :raises asyncio.CancelledError: If a shutdown event is signaled.
+        """
         exit_reason, _ = await worker_sync_iterable_to_async(
             iter_func="infinite",
             exit_events={
@@ -230,6 +328,26 @@ class WorkerProcess(Generic[BackendT, RequestT, ResponseT]):
             )
 
     async def run_async_requests_processing(self):
+        """
+        Process incoming requests from the queue in an asynchronous manner.
+
+        This method handles the core request processing loop, including:
+        - Backend initialization and validation
+        - Process synchronization at startup
+        - Concurrent request processing with semaphore limiting
+        - Request timing coordination
+        - Graceful shutdown with proper task cleanup
+
+        The method maintains a pool of concurrent request processing tasks
+        up to the configured async_limit, ensuring efficient resource
+        utilization while respecting backend constraints.
+
+        :raises RuntimeError: If backend initialization fails or startup
+            synchronization fails.
+        :raises asyncio.CancelledError: If shutdown is requested during processing.
+        :raises NotImplementedError: If multi-turn requests are encountered
+            (not yet supported).
+        """
         # Ensure backend is ready on this worker
         await self.backend.process_startup()
         await self.backend.validate()
@@ -237,7 +355,7 @@ class WorkerProcess(Generic[BackendT, RequestT, ResponseT]):
         # Wait for all processes to be ready before starting
         barrier_exit_reason, _ = await worker_sync_iterable_to_async(
             iter_func="infinite",
-            barrier=self.startup_barrier,
+            exit_barrier=self.startup_barrier,
         )
         if barrier_exit_reason != "barrier":
             raise RuntimeError(
@@ -285,7 +403,7 @@ class WorkerProcess(Generic[BackendT, RequestT, ResponseT]):
         self,
     ) -> tuple[
         Union[RequestT, Iterable[Union[RequestT, tuple[RequestT, float]]]],
-        ScheduledRequestInfo,
+        ScheduledRequestInfo[RequestTimingsT],
         list[tuple[RequestT, ResponseT]],
     ]:
         while True:
@@ -304,14 +422,14 @@ class WorkerProcess(Generic[BackendT, RequestT, ResponseT]):
                     await asyncio.sleep(target_start - time.time())
 
                 return request, request_info, []
-            except asyncio.QueueEmpty:
+            except queue.Empty:
                 await asyncio.sleep(self.poll_intervals)
                 continue
 
     async def _process_request(
         self,
         request: RequestT,
-        request_info: ScheduledRequestInfo,
+        request_info: ScheduledRequestInfo[RequestTimingsT],
         request_history: list[tuple[RequestT, ResponseT]],
     ):
         last_response: Optional[ResponseT] = None
@@ -332,7 +450,7 @@ class WorkerProcess(Generic[BackendT, RequestT, ResponseT]):
         except asyncio.CancelledError:
             request_info.status = "cancelled"
             cancelled = True
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             request_info.status = "error"
             request_info.error = str(exc)
 
@@ -344,7 +462,7 @@ class WorkerProcess(Generic[BackendT, RequestT, ResponseT]):
 
     async def _cancel_queued_requests(self):
         async def _request_gen() -> AsyncIterator[
-            tuple[RequestT, ScheduledRequestInfo]
+            tuple[RequestT, ScheduledRequestInfo[RequestTimingsT]]
         ]:
             if self.pending_request:
                 yield self.pending_request

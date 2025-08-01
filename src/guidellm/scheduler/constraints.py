@@ -36,7 +36,7 @@ from guidellm.scheduler.objects import (
     SchedulerState,
     SchedulerUpdateAction,
 )
-from guidellm.utils import ClassRegistryMixin
+from guidellm.utils import RegistryMixin
 
 __all__ = [
     "CallableConstraint",
@@ -72,7 +72,7 @@ class ConstraintsResolveArgs(dict[str, Any]):
     """
 
 
-class ConstraintsFactory(ClassRegistryMixin):
+class ConstraintsFactory(RegistryMixin[Callable[..., CallableConstraint]]):
     """
     Factory class for creating and resolving constraint instances.
 
@@ -164,16 +164,12 @@ class ConstraintsFactory(ClassRegistryMixin):
         :return: A callable constraint function.
         :raises ValueError: If the constraint key is not registered in the factory.
         """
-        if key not in cls.registry:
-            raise ValueError(
-                f"Unknown constraint key: {key}. "
-                f"Supported keys are: {list(cls.registry.keys())}."
-            )
+        constraint = cls.get_registered_object(key)
 
         return (
-            cls.registry[key](value)
+            callable(value)
             if not isinstance(value, ConstraintsResolveArgs)
-            else cls.registry[key](**value)
+            else constraint(**value)
         )
 
 
