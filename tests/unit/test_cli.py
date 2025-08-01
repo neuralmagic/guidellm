@@ -83,11 +83,11 @@ def test_version_flag_case_sensitivity():
 
 @pytest.mark.integration
 def test_version_integration_with_actual_version():
-    """Integration test to verify version matches what's in version.py."""
+    """Integration test to verify version matches importlib.metadata."""
+    import importlib.metadata
+
     try:
-        from guidellm.version import (
-            version as actual_version,
-        )
+        actual_version = importlib.metadata.version("guidellm")
 
         runner = CliRunner()
         result = runner.invoke(cli, ["--version"])
@@ -95,9 +95,11 @@ def test_version_integration_with_actual_version():
         assert result.exit_code == 0
         expected_output = f"guidellm version: {actual_version}"
         assert expected_output in result.output
-    except ImportError:
+    except importlib.metadata.PackageNotFoundError:
+        # If package is not installed, the CLI should show an error
+        # This is expected behavior when the package isn't properly installed
         runner = CliRunner()
         result = runner.invoke(cli, ["--version"])
 
-        assert result.exit_code == 0
-        assert "guidellm version: unknown" in result.output
+        # Click will handle the error when package is not found
+        assert result.exit_code != 0

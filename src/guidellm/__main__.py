@@ -19,33 +19,13 @@ from guidellm.scheduler import StrategyType
 from guidellm.utils import DefaultGroupHandler
 from guidellm.utils import cli as cli_tools
 
-# Import version information
-try:
-    from guidellm.version import version
-except ImportError:
-    version = "unknown"
-
 STRATEGY_PROFILE_CHOICES = list(
     set(list(get_args(ProfileType)) + list(get_args(StrategyType)))
 )
 
 
-def _version_callback(ctx: click.Context, _param: click.Parameter, value: bool) -> None:
-    """Callback for --version flag."""
-    if value:
-        click.echo(f"guidellm version: {version}")
-        ctx.exit()
-
-
 @click.group()
-@click.option(
-    "--version",
-    is_flag=True,
-    expose_value=False,
-    is_eager=True,
-    help="Show the version and exit.",
-    callback=_version_callback,
-)
+@click.version_option(package_name="guidellm", message="guidellm version: %(version)s")
 def cli():
     pass
 
