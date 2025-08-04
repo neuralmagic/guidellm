@@ -182,7 +182,7 @@ class WorkerProcessGroup(Generic[BackendT, RequestT, RequestTimingsT, ResponseT]
                 requests_queue=self.process_requests_queue,
                 updates_queue=self.process_updates_queue,
                 backend=self.backend,
-                request_timings=self.strategy.create_worker_timings(
+                request_timings=self.strategy.create_request_timings(
                     local_rank=process_rank,
                     local_world_size=num_processes,
                     local_max_concurrency=per_process_max_concurrency,

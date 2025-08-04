@@ -1,16 +1,40 @@
-from collections.abc import Sequence
-from typing import Literal, Optional, Union
+"""
+Benchmarking profile configurations for coordinating multi-strategy execution.
+
+Provides configurable profile abstractions for orchestrating sequential and
+parallel execution of different scheduling strategies during benchmarking,
+with automatic strategy generation and constraint management.
+
+Classes:
+    Profile: Abstract base for multi-strategy benchmarking profiles.
+    SynchronousProfile: Single synchronous strategy execution profile.
+    ConcurrentProfile: Fixed-concurrency strategy execution profile.
+    ThroughputProfile: Maximum throughput strategy execution profile.
+    AsyncProfile: Rate-based asynchronous strategy execution profile.
+    SweepProfile: Adaptive multi-strategy sweep execution profile.
+
+Type Aliases:
+    ProfileType: Literal type for supported profile configurations.
+"""
+
+from abc import ABC, abstractmethod
+from typing import Any, Generic, Literal, Optional, Union
 
 import numpy as np
 from pydantic import Field, computed_field
 
-from guidellm.config import settings
+from guidellm.benchmark.aggregator import AggregatorT
+from guidellm.benchmark.benchmark import BenchmarkT
 from guidellm.objects import StandardBaseModel
 from guidellm.scheduler import (
     AsyncConstantStrategy,
     AsyncPoissonStrategy,
+    CallableConstraint,
+    CallableConstraintInitializer,
     ConcurrentStrategy,
+    ConstraintsInitializerFactory,
     SchedulingStrategy,
+    StrategyT,
     StrategyType,
     SynchronousStrategy,
     ThroughputStrategy,
@@ -24,386 +48,428 @@ __all__ = [
     "SweepProfile",
     "SynchronousProfile",
     "ThroughputProfile",
-    "create_profile",
 ]
 
 ProfileType = Literal["synchronous", "concurrent", "throughput", "async", "sweep"]
 
 
-class Profile(StandardBaseModel):
-    type_: Literal["profile"] = Field(
-        description="The type of benchmarking profile to use.",
-    )
-    completed_strategies: int = Field(
-        default=0,
-        description="The number of scheduling strategies generated so far.",
-    )
-    measured_rates: list[float] = Field(
-        default_factory=list,
-        description=("The average rates measured for the strategies that have run."),
-    )
-    measured_concurrencies: list[float] = Field(
-        default_factory=list,
-        description=(
-            "The average concurrency measured for the strategies that have run."
-        ),
-    )
+class Profile(StandardBaseModel, ABC, Generic[StrategyT, AggregatorT, BenchmarkT]):
+    """
+    Abstract base for multi-strategy benchmarking execution profiles.
 
-    def completed_strategy(self, average_rate: float, average_concurrency: float):
-        self.measured_rates.append(average_rate)
-        self.measured_concurrencies.append(average_concurrency)
-        self.completed_strategies += 1
+    Coordinates sequential execution of scheduling strategies with automatic
+    strategy generation, constraint management, and completion tracking for
+    comprehensive benchmarking workflows.
+
+    Type Parameters:
+        StrategyT: Type of scheduling strategy to execute.
+        AggregatorT: Type of result aggregator to use.
+        BenchmarkT: Type of benchmark results to generate.
+    """
+
+    @classmethod
+    def create(cls, type_: ProfileType, **kwargs: Any) -> "Profile":
+        """
+        Create a profile instance based on the specified type.
+
+        :param type_: The type of profile to create.
+        :param kwargs: Additional arguments for profile configuration.
+        :return: Configured profile instance for the specified type.
+        """
+
+    type_: Literal["profile"] = Field(
+        description="The type of benchmarking profile to use",
+    )
+    completed_strategies: list[SchedulingStrategy] = Field(
+        default_factory=list,
+        description="The strategies that have completed execution",
+    )
+    constraints: Optional[
+        dict[str, Union[Any, dict[str, Any], CallableConstraintInitializer]]
+    ] = Field(
+        default=None,
+        description="Runtime constraints to apply during strategy execution",
+    )
 
     @computed_field  # type: ignore[misc]
     @property
     def strategy_types(self) -> list[StrategyType]:
-        return []
+        """Get the types of all completed strategies in execution order."""
+        return [strat.type_ for strat in self.completed_strategies]
 
-    def next_strategy(self) -> Optional[SchedulingStrategy]:
-        return None
+    def strategy_completed(
+        self, strategy: StrategyT, aggregator: AggregatorT, benchmark: BenchmarkT
+    ) -> tuple[
+        Optional[StrategyT],
+        Optional[dict[str, Union[Any, dict[str, Any], CallableConstraint]]],
+    ]:
+        """
+        Process strategy completion and generate the next strategy.
+
+        Updates internal state and determines the next strategy to execute
+        based on the completed strategy's results and profile configuration.
+
+        :param strategy: The strategy that just completed execution.
+        :param aggregator: Result aggregator from the completed strategy.
+        :param benchmark: Benchmark results from the completed strategy.
+        :return: Tuple of (next_strategy, constraints) for continued execution,
+            or (None, None) if the profile is complete.
+        """
+        self.completed_strategies.append(strategy)
+        next_strategy = self.next_strategy(
+            prev_strategy=strategy, prev_aggregator=aggregator, prev_benchmark=benchmark
+        )
+
+        return next_strategy, self.next_strategy_constraints(
+            next_strategy=next_strategy,
+            prev_strategy=strategy,
+            prev_aggregator=aggregator,
+            prev_benchmark=benchmark,
+        )
+
+    @abstractmethod
+    def next_strategy(
+        self,
+        prev_strategy: Optional[StrategyT],
+        prev_aggregator: Optional[AggregatorT],
+        prev_benchmark: Optional[BenchmarkT],
+    ) -> Optional[StrategyT]:
+        """
+        Generate the next strategy to execute in the profile sequence.
+
+        :param prev_strategy: The previously completed strategy.
+        :param prev_aggregator: Result aggregator from the previous strategy.
+        :param prev_benchmark: Benchmark results from the previous strategy.
+        :return: Next strategy to execute, or None if profile is complete.
+        """
+        ...
+
+    def next_strategy_constraints(
+        self,
+        next_strategy: Optional[StrategyT],
+        prev_strategy: Optional[StrategyT],
+        prev_aggregator: Optional[AggregatorT],
+        prev_benchmark: Optional[BenchmarkT],
+    ) -> Optional[dict[str, Union[Any, dict[str, Any], CallableConstraint]]]:
+        """
+        Generate constraints for the next strategy execution.
+
+        :param next_strategy: The next strategy to be executed.
+        :param prev_strategy: The previously completed strategy.
+        :param prev_aggregator: Result aggregator from the previous strategy.
+        :param prev_benchmark: Benchmark results from the previous strategy.
+        :return: Constraints dictionary for the next strategy, or None.
+        """
+        return (
+            ConstraintsInitializerFactory.resolve(self.constraints)
+            if next_strategy and self.constraints
+            else None
+        )
 
 
-class SynchronousProfile(Profile):
+class SynchronousProfile(Profile[StrategyT, AggregatorT, BenchmarkT]):
+    """Single synchronous strategy execution profile."""
+
     type_: Literal["synchronous"] = "synchronous"  # type: ignore[assignment]
 
     @property
     def strategy_types(self) -> list[StrategyType]:
+        """Get the single synchronous strategy type."""
         return [self.type_]
 
-    def next_strategy(self) -> Optional[SchedulingStrategy]:
-        if self.completed_strategies >= 1:
+    def next_strategy(
+        self,
+        _prev_strategy: Optional[StrategyT],
+        _prev_aggregator: Optional[AggregatorT],
+        _prev_benchmark: Optional[BenchmarkT],
+    ) -> Optional[StrategyT]:
+        """
+        Generate synchronous strategy or None if already completed.
+
+        :return: SynchronousStrategy for the first execution, None afterward.
+        """
+        if len(self.completed_strategies) >= 1:
             return None
 
         return SynchronousStrategy()
 
-    @staticmethod
-    def from_standard_args(
-        rate_type: Union[StrategyType, ProfileType],
-        rate: Optional[Union[float, Sequence[float]]],
-        **kwargs,
-    ) -> "SynchronousProfile":
-        if rate_type != "synchronous":
-            raise ValueError("Rate type must be 'synchronous' for synchronous profile.")
 
-        if rate is not None:
-            raise ValueError(
-                "Rate does not apply to synchronous profile, it must be set to None."
-            )
+class ConcurrentProfile(Profile[StrategyT, AggregatorT, BenchmarkT]):
+    """Fixed-concurrency strategy execution profile with configurable stream counts."""
 
-        if kwargs:
-            raise ValueError(
-                "No additional arguments are allowed for synchronous profile."
-            )
-
-        return SynchronousProfile()
-
-
-class ConcurrentProfile(Profile):
     type_: Literal["concurrent"] = "concurrent"  # type: ignore[assignment]
-    streams: Union[int, Sequence[int]] = Field(
-        description="The number of concurrent streams to use.",
+    streams: Union[int, list[int]] = Field(
+        description="Number of concurrent streams for request scheduling",
+        gt=0,
+    )
+    startup_duration: float = Field(
+        default=0.0,
+        description=(
+            "Duration in seconds for distributing startup requests "
+            "before completion-based timing"
+        ),
+        ge=0,
     )
 
     @property
     def strategy_types(self) -> list[StrategyType]:
-        num_strategies = len(self.streams) if isinstance(self.streams, Sequence) else 1
-
+        """Get concurrent strategy types for each configured stream count."""
+        num_strategies = len(self.streams) if isinstance(self.streams, list) else 1
         return [self.type_] * num_strategies
 
-    def next_strategy(self) -> Optional[SchedulingStrategy]:
-        streams = self.streams if isinstance(self.streams, Sequence) else [self.streams]
+    def next_strategy(
+        self,
+        _prev_strategy: Optional[StrategyT],
+        _prev_aggregator: Optional[AggregatorT],
+        _prev_benchmark: Optional[BenchmarkT],
+    ) -> Optional[StrategyT]:
+        """
+        Generate concurrent strategy for the next stream count.
 
-        if self.completed_strategies >= len(streams):
+        :return: ConcurrentStrategy with next stream count, or None if complete.
+        """
+        streams = self.streams if isinstance(self.streams, list) else [self.streams]
+
+        if len(self.completed_strategies) >= len(streams):
             return None
 
         return ConcurrentStrategy(
-            streams=streams[self.completed_strategies],
+            streams=streams[len(self.completed_strategies)],
+            startup_duration=self.startup_duration,
         )
 
-    @staticmethod
-    def from_standard_args(
-        rate_type: Union[StrategyType, ProfileType],
-        rate: Optional[Union[float, Sequence[float]]],
-        **kwargs,
-    ) -> "ConcurrentProfile":
-        if rate_type != "concurrent":
-            raise ValueError("Rate type must be 'concurrent' for concurrent profile.")
 
-        if not rate:
-            raise ValueError("Rate (streams) must be provided for concurrent profile.")
+class ThroughputProfile(Profile[StrategyT, AggregatorT, BenchmarkT]):
+    """
+    Maximum throughput strategy execution profile with optional concurrency limits.
+    """
 
-        if not isinstance(rate, Sequence):
-            rate = [rate]
-
-        if not all(stream.is_integer() and stream > 0 for stream in rate):
-            raise ValueError(
-                f"All rate values (streams) must be positive integers, received {rate}"
-            )
-
-        if kwargs:
-            raise ValueError(
-                "No additional arguments are allowed for concurrent profile."
-            )
-
-        return ConcurrentProfile(streams=[int(rat) for rat in rate])
-
-
-class ThroughputProfile(Profile):
     type_: Literal["throughput"] = "throughput"  # type: ignore[assignment]
     max_concurrency: Optional[int] = Field(
         default=None,
-        description="The maximum number of concurrent requests that can be scheduled.",
+        description="Maximum number of concurrent requests to schedule",
+        gt=0,
+    )
+    startup_duration: float = Field(
+        default=0.0,
+        description=(
+            "Duration in seconds for distributing startup requests "
+            "before full throughput scheduling"
+        ),
+        ge=0,
     )
 
     @property
     def strategy_types(self) -> list[StrategyType]:
+        """Get the single throughput strategy type."""
         return [self.type_]
 
-    def next_strategy(self) -> Optional[SchedulingStrategy]:
-        if self.completed_strategies >= 1:
+    def next_strategy(
+        self,
+        _prev_strategy: Optional[StrategyT],
+        _prev_aggregator: Optional[AggregatorT],
+        _prev_benchmark: Optional[BenchmarkT],
+    ) -> Optional[StrategyT]:
+        """
+        Generate throughput strategy or None if already completed.
+
+        :return: ThroughputStrategy for the first execution, None afterward.
+        """
+        if len(self.completed_strategies) >= 1:
             return None
 
         return ThroughputStrategy(
             max_concurrency=self.max_concurrency,
+            startup_duration=self.startup_duration,
         )
 
-    @staticmethod
-    def from_standard_args(
-        rate_type: Union[StrategyType, ProfileType],
-        rate: Optional[Union[float, Sequence[float]]],
-        **kwargs,
-    ) -> "ThroughputProfile":
-        if rate_type != "throughput":
-            raise ValueError("Rate type must be 'throughput' for throughput profile.")
 
-        if rate is not None:
-            raise ValueError(
-                "Rate does not apply to throughput profile, it must be set to None."
-            )
+class AsyncProfile(Profile[StrategyT, AggregatorT, BenchmarkT]):
+    """
+    Rate-based asynchronous strategy execution profile with configurable patterns.
+    """
 
-        return ThroughputProfile(**kwargs)
-
-
-class AsyncProfile(ThroughputProfile):
     type_: Literal["async"] = "async"  # type: ignore[assignment]
     strategy_type: Literal["constant", "poisson"] = Field(
-        description="The type of asynchronous strategy to use.",
+        description="Type of asynchronous strategy pattern to use",
     )
-    rate: Union[float, Sequence[float]] = Field(
-        description="The rate of requests per second to use.",
+    rate: Union[float, list[float]] = Field(
+        description="Request scheduling rate in requests per second",
+        gt=0,
     )
-    initial_burst: bool = Field(
-        default=True,
+    startup_duration: float = Field(
+        default=0.0,
         description=(
-            "True to send an initial burst of requests (math.floor(self.rate)) "
-            "to reach target rate. False to not send an initial burst."
+            "Duration in seconds for distributing startup requests "
+            "to converge quickly to desired rate"
         ),
+        ge=0,
+    )
+    max_concurrency: Optional[int] = Field(
+        default=None,
+        description="Maximum number of concurrent requests to schedule",
+        gt=0,
     )
     random_seed: int = Field(
         default=42,
-        description=(
-            "The random seed to use for the asynchronous strategy. "
-            "This is used to generate random numbers for the Poisson strategy."
-        ),
+        description="Random seed for Poisson distribution strategy",
     )
 
     @property
     def strategy_types(self) -> list[StrategyType]:
-        num_strategies = len(self.rate) if isinstance(self.rate, Sequence) else 1
-
+        """Get async strategy types for each configured rate."""
+        num_strategies = len(self.rate) if isinstance(self.rate, list) else 1
         return [self.strategy_type] * num_strategies
 
-    def next_strategy(self) -> Optional[SchedulingStrategy]:
-        rate = self.rate if isinstance(self.rate, Sequence) else [self.rate]
+    def next_strategy(
+        self,
+        _prev_strategy: Optional[StrategyT],
+        _prev_aggregator: Optional[AggregatorT],
+        _prev_benchmark: Optional[BenchmarkT],
+    ) -> Optional[StrategyT]:
+        """
+        Generate async strategy for the next configured rate.
 
-        if self.completed_strategies >= len(rate):
+        :return: AsyncConstantStrategy or AsyncPoissonStrategy for next rate,
+            or None if all rates completed.
+        :raises ValueError: If strategy_type is neither 'constant' nor 'poisson'.
+        """
+        rate = self.rate if isinstance(self.rate, list) else [self.rate]
+
+        if len(self.completed_strategies) >= len(rate):
             return None
+
+        current_rate = rate[len(self.completed_strategies)]
 
         if self.strategy_type == "constant":
             return AsyncConstantStrategy(
-                rate=rate[self.completed_strategies],
-                initial_burst=self.initial_burst,
+                rate=current_rate,
+                startup_duration=self.startup_duration,
                 max_concurrency=self.max_concurrency,
             )
         elif self.strategy_type == "poisson":
             return AsyncPoissonStrategy(
-                rate=rate[self.completed_strategies],
-                initial_burst=self.initial_burst,
+                rate=current_rate,
+                startup_duration=self.startup_duration,
                 max_concurrency=self.max_concurrency,
                 random_seed=self.random_seed,
             )
         else:
             raise ValueError(f"Invalid strategy type: {self.strategy_type}")
 
-    @staticmethod
-    def from_standard_args(  # type: ignore[override]
-        rate_type: Union[StrategyType, ProfileType],
-        rate: Optional[Union[float, Sequence[float]]],
-        random_seed: int,
-        **kwargs,
-    ) -> "AsyncProfile":
-        if rate_type not in ("async", "constant", "poisson"):
-            raise ValueError(
-                "Rate type must be in ('async', 'constant', 'poisson') "
-                f"for async profile. Received: {rate_type}"
-            )
 
-        if not rate:
-            raise ValueError("Rate must be provided for async profile.")
+class SweepProfile(Profile[StrategyT, AggregatorT, BenchmarkT]):
+    """
+    Adaptive multi-strategy sweep execution profile with rate discovery.
+    """
 
-        if not isinstance(rate, Sequence):
-            rate = [rate]
-
-        if not all(isinstance(r, (float, int)) and r > 0 for r in rate):
-            raise ValueError(
-                f"All rate values must be positive numbers, received {rate}"
-            )
-
-        if rate_type == "async":
-            rate_type = "constant"  # default to constant if not specified
-
-        return AsyncProfile(
-            strategy_type=rate_type,  # type: ignore[arg-type]
-            rate=rate,
-            random_seed=random_seed,
-            **kwargs,
-        )
-
-
-class SweepProfile(AsyncProfile):
     type_: Literal["sweep"] = "sweep"  # type: ignore[assignment]
     sweep_size: int = Field(
-        description="The number of strategies to generate for the sweep.",
+        description="Number of strategies to generate for the sweep",
     )
-    rate: float = -1
     rate_type: Literal["constant", "poisson"] = "constant"
+    startup_duration: float = Field(
+        default=0.0,
+        description=(
+            "Duration in seconds for distributing startup requests "
+            "to converge quickly to desired rate"
+        ),
+        ge=0,
+    )
+    max_concurrency: Optional[int] = Field(
+        default=None,
+        description="Maximum number of concurrent requests to schedule",
+        gt=0,
+    )
+    random_seed: int = Field(
+        default=42,
+        description="Random seed for Poisson distribution strategy",
+    )
+    synchronous_rate: float = Field(
+        default=-1.0,
+        description="Measured rate from synchronous strategy execution",
+    )
+    throughput_rate: float = Field(
+        default=-1.0,
+        description="Measured rate from throughput strategy execution",
+    )
+    async_rates: list[float] = Field(
+        default_factory=list,
+        description="Generated rates for async strategy sweep",
+    )
 
     @property
     def strategy_types(self) -> list[StrategyType]:
-        return (
-            ["synchronous"] + ["throughput"] + [self.rate_type] * (self.sweep_size - 2)  # type: ignore[return-value]
-        )
+        """Get strategy types for the complete sweep sequence."""
+        types = ["synchronous", "throughput"]
+        types += [self.rate_type] * (self.sweep_size - len(types))
+        return types
 
-    def next_strategy(self) -> Optional[SchedulingStrategy]:
-        if self.completed_strategies >= self.sweep_size:
-            return None
+    def next_strategy(
+        self,
+        prev_strategy: Optional[StrategyT],
+        _prev_aggregator: Optional[AggregatorT],
+        prev_benchmark: Optional[BenchmarkT],
+    ) -> Optional[StrategyT]:
+        """
+        Generate the next strategy in the adaptive sweep sequence.
 
-        if self.completed_strategies == 0:
+        Executes synchronous and throughput strategies first to measure
+        baseline rates, then generates interpolated rates for async strategies.
+
+        :param prev_strategy: The previously completed strategy.
+        :param prev_benchmark: Benchmark results from the previous strategy.
+        :return: Next strategy in sweep sequence, or None if complete.
+        :raises ValueError: If rate_type is neither 'constant' nor 'poisson'.
+        """
+        if prev_strategy is None:
             return SynchronousStrategy()
 
-        if self.completed_strategies == 1:
-            return ThroughputStrategy(
-                max_concurrency=self.max_concurrency,
+        if prev_strategy.type_ == "synchronous":
+            self.synchronous_rate = (
+                prev_benchmark.metrics.requests_per_second.successful.mean
             )
 
-        min_rate = self.measured_rates[0]
-        max_rate = self.measured_rates[1]
-        rates = np.linspace(min_rate, max_rate, self.sweep_size - 1)[1:]
+            return ThroughputStrategy(
+                max_concurrency=self.max_concurrency,
+                startup_duration=self.startup_duration,
+            )
+
+        if prev_strategy.type_ == "throughput":
+            self.throughput_rate = (
+                prev_benchmark.metrics.requests_per_second.successful.mean
+            )
+            self.measured_rates = list(
+                np.linspace(
+                    self.synchronous_rate,
+                    self.throughput_rate,
+                    self.sweep_size - 1,
+                )
+            )[1:]  # don't rerun synchronous
+
+        if len(self.completed_strategies) >= self.sweep_size:
+            return None
+
+        next_rate_index = len(
+            [
+                strat
+                for strat in self.completed_strategies
+                if strat.type_ == self.rate_type
+            ]
+        )
 
         if self.rate_type == "constant":
             return AsyncConstantStrategy(
-                rate=rates[self.completed_strategies - 2],
-                initial_burst=self.initial_burst,
+                rate=self.measured_rates[next_rate_index],
+                startup_duration=self.startup_duration,
                 max_concurrency=self.max_concurrency,
             )
         elif self.rate_type == "poisson":
             return AsyncPoissonStrategy(
-                rate=rates[self.completed_strategies - 2],
-                initial_burst=self.initial_burst,
+                rate=self.measured_rates[next_rate_index],
+                startup_duration=self.startup_duration,
                 max_concurrency=self.max_concurrency,
+                random_seed=self.random_seed,
             )
         else:
             raise ValueError(f"Invalid strategy type: {self.rate_type}")
-
-    @staticmethod
-    def from_standard_args(  # type: ignore[override]
-        rate_type: Union[StrategyType, ProfileType],
-        rate: Optional[Union[float, Sequence[float]]],
-        random_seed: int,
-        **kwargs,
-    ) -> "SweepProfile":
-        if rate_type != "sweep":
-            raise ValueError("Rate type must be 'sweep' for sweep profile.")
-
-        if "sweep_size" in kwargs:
-            raise ValueError("Sweep size must not be provided, use rate instead.")
-
-        if isinstance(rate, Sequence):
-            if len(rate) != 1:
-                raise ValueError(
-                    "Rate must be a single value for sweep profile, received "
-                    f"{len(rate)} values."
-                )
-            rate = rate[0]
-
-        if not rate:
-            rate = settings.default_sweep_number
-
-        if not rate:
-            raise ValueError(
-                "Rate (sweep_size) must be provided for concurrent profile."
-            )
-
-        if (
-            not isinstance(rate, (int, float))
-            or (isinstance(rate, float) and not rate.is_integer())
-            or rate <= 1
-        ):
-            raise ValueError(
-                f"Rate (sweep_size) must be a positive integer > 1, received {rate} "
-                f"with type {type(rate)}"
-            )
-
-        if not kwargs:
-            kwargs = {}
-
-        if "strategy_type" not in kwargs:
-            kwargs["strategy_type"] = "constant"
-
-        return SweepProfile(sweep_size=int(rate), random_seed=random_seed, **kwargs)
-
-
-def create_profile(
-    rate_type: Union[StrategyType, ProfileType],
-    rate: Optional[Union[float, Sequence[float]]],
-    random_seed: int = 42,
-    **kwargs,
-) -> "Profile":
-    if rate_type == "synchronous":
-        return SynchronousProfile.from_standard_args(
-            rate_type=rate_type,
-            rate=rate,
-            **kwargs,
-        )
-
-    if rate_type == "concurrent":
-        return ConcurrentProfile.from_standard_args(
-            rate_type=rate_type,
-            rate=rate,
-            **kwargs,
-        )
-
-    if rate_type == "throughput":
-        return ThroughputProfile.from_standard_args(
-            rate_type=rate_type,
-            rate=rate,
-            **kwargs,
-        )
-
-    if rate_type in ("async", "constant", "poisson"):
-        return AsyncProfile.from_standard_args(
-            rate_type=rate_type,
-            rate=rate,
-            random_seed=random_seed,
-            **kwargs,
-        )
-
-    if rate_type == "sweep":
-        return SweepProfile.from_standard_args(
-            rate_type=rate_type,
-            rate=rate,
-            random_seed=random_seed,
-            **kwargs,
-        )
-
-    raise ValueError(f"Invalid profile type: {rate_type}")

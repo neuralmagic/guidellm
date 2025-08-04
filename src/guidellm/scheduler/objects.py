@@ -1,25 +1,22 @@
 """
 Core data structures and interfaces for the GuideLLM scheduler system.
 
-This module defines the fundamental objects, timing models, and interfaces used
-throughout the GuideLLM scheduler. It provides type-safe abstractions for
-requests, responses, scheduling state, and backend interfaces that enable
-distributed request processing and benchmarking.
+Provides type-safe abstractions for distributed request processing, timing
+measurements, and backend interfaces for benchmarking operations.
 
 Classes:
-    RequestSchedulerTimings: Timing data for request lifecycle in the scheduler.
-    RequestTimings: Base timing data for individual requests.
-    ScheduledRequestInfo: Complete information about a scheduled request including
-        status, timings, and metadata.
-    BackendInterface: Abstract interface for request processing backends.
-    SchedulerState: Comprehensive state tracking for scheduler operations.
-    SchedulerUpdateAction: Action directives for scheduler behavior control.
+    RequestSchedulerTimings: Scheduler-level request timing measurements.
+    RequestTimings: Base backend request timing measurements.
+    ScheduledRequestInfo: Complete request lifecycle information.
+    BackendInterface: Abstract backend processing interface.
+    SchedulerState: Scheduler operation state tracking.
+    SchedulerUpdateAction: Scheduler behavior control directives.
 
 Type Variables:
-    RequestT: Generic type variable for request objects.
-    ResponseT: Generic type variable for response objects.
-    RequestTimingsT: Generic type variable for request timing objects.
-    BackendT: Generic type variable for backend interface implementations.
+    RequestT: Generic request object type.
+    ResponseT: Generic response object type.
+    RequestTimingsT: Generic request timing object type.
+    BackendT: Generic backend interface type.
 """
 
 from abc import ABC, abstractmethod
@@ -54,13 +51,7 @@ ResponseT = TypeVar("ResponseT")
 
 
 class RequestSchedulerTimings(StandardBaseModel):
-    """
-    Timing measurements for request lifecycle within the scheduler system.
-
-    Tracks key timestamps throughout the request processing pipeline from initial
-    targeting through final completion. All timing values are Unix timestamps
-    (seconds since epoch) for precise temporal analysis and debugging.
-    """
+    """Scheduler-level timing measurements for request lifecycle tracking."""
 
     targeted_start: Optional[float] = Field(
         default=None,
@@ -87,13 +78,7 @@ class RequestSchedulerTimings(StandardBaseModel):
 
 
 class RequestTimings(StandardBaseModel):
-    """
-    Base timing measurements for individual request processing.
-
-    Provides foundational timing data that can be extended by specific backend
-    implementations to track additional timing metrics relevant to their
-    processing models.
-    """
+    """Base timing measurements for backend request processing."""
 
     request_start: Optional[float] = Field(
         default=None, description="When the backend began processing the request"
@@ -107,13 +92,7 @@ RequestTimingsT = TypeVar("RequestTimingsT", bound=RequestTimings)
 
 
 class ScheduledRequestInfo(StandardBaseModel, Generic[RequestTimingsT]):
-    """
-    Comprehensive information about a scheduled request throughout its lifecycle.
-
-    Encapsulates all metadata, status, timing information, and processing context
-    for a request within the scheduler system. Supports generic request timing
-    types to accommodate different backend-specific timing requirements.
-    """
+    """Complete request information including status, timings, and metadata."""
 
     request_id: str = Field(description="Unique identifier for the request")
     status: Literal[
@@ -144,13 +123,9 @@ class ScheduledRequestInfo(StandardBaseModel, Generic[RequestTimingsT]):
     @property
     def started_at(self) -> Optional[float]:
         """
-        Get the effective start time for request processing.
+        Get the effective request processing start time.
 
-        Returns the backend-specific request start time if available, otherwise
-        falls back to the scheduler's resolve start time.
-
-        :return: Unix timestamp when request processing effectively began,
-            or None if not yet started.
+        :return: Unix timestamp when processing began, or None if not started.
         """
         request_start = (
             self.request_timings.request_start if self.request_timings else None
@@ -161,13 +136,9 @@ class ScheduledRequestInfo(StandardBaseModel, Generic[RequestTimingsT]):
     @property
     def completed_at(self) -> Optional[float]:
         """
-        Get the effective completion time for request processing.
+        Get the effective request processing completion time.
 
-        Returns the backend-specific request end time if available, otherwise
-        falls back to the scheduler's resolve end time.
-
-        :return: Unix timestamp when request processing effectively completed,
-            or None if not yet completed.
+        :return: Unix timestamp when processing completed, or None if not completed.
         """
         request_end = self.request_timings.request_end if self.request_timings else None
 
@@ -176,34 +147,24 @@ class ScheduledRequestInfo(StandardBaseModel, Generic[RequestTimingsT]):
 
 class BackendInterface(ABC, Generic[RequestT, RequestTimingsT, ResponseT]):
     """
-    Abstract interface for request processing backends in the scheduler system.
-
-    Defines the contract that all backend implementations must fulfill to integrate
-    with the GuideLLM scheduler. Backends handle the actual processing of requests
-    and manage their own resource constraints and lifecycle operations.
+    Abstract interface for request processing backends. Note: before process_startup
+    is invoked, the implementation must ensure all properties are pickleable.
     """
 
     @property
     @abstractmethod
     def processes_limit(self) -> Optional[int]:
-        """
-        :return: Maximum worker processes supported, or None if unlimited.
-        """
+        """Maximum worker processes supported, or None if unlimited."""
 
     @property
     @abstractmethod
     def requests_limit(self) -> Optional[int]:
-        """
-        :return: Maximum concurrent requests supported, or None if unlimited.
-        """
+        """Maximum concurrent requests supported, or None if unlimited."""
 
     @abstractmethod
     async def process_startup(self) -> None:
         """
         Perform backend initialization and startup procedures.
-
-        Called once per worker process before any request processing begins.
-        Should establish connections, load models, and prepare resources.
 
         :raises: Implementation-specific exceptions for startup failures.
         """
@@ -211,10 +172,7 @@ class BackendInterface(ABC, Generic[RequestT, RequestTimingsT, ResponseT]):
     @abstractmethod
     async def validate(self) -> None:
         """
-        Validate that the backend is properly configured and operational.
-
-        Called after startup to ensure the backend can successfully process
-        requests. Should perform health checks and connectivity validation.
+        Validate backend configuration and operational status.
 
         :raises: Implementation-specific exceptions for validation failures.
         """
@@ -223,9 +181,6 @@ class BackendInterface(ABC, Generic[RequestT, RequestTimingsT, ResponseT]):
     async def process_shutdown(self) -> None:
         """
         Perform backend cleanup and shutdown procedures.
-
-        Called once per worker process after all request processing completes.
-        Should clean up resources, close connections, and finalize state.
 
         :raises: Implementation-specific exceptions for shutdown failures.
         """
@@ -238,11 +193,7 @@ class BackendInterface(ABC, Generic[RequestT, RequestTimingsT, ResponseT]):
         history: Optional[list[tuple[RequestT, ResponseT]]] = None,
     ) -> AsyncIterator[tuple[ResponseT, ScheduledRequestInfo[RequestTimingsT]]]:
         """
-        Process a request and yield response updates with timing information.
-
-        The primary request processing method that handles individual requests
-        and yields incremental responses as they become available. Supports
-        streaming responses and multi-turn conversations through history.
+        Process a request and yield incremental response updates.
 
         :param request: The request object to process.
         :param request_info: Scheduling metadata and timing information.
@@ -256,13 +207,7 @@ BackendT = TypeVar("BackendT", bound="BackendInterface")
 
 
 class SchedulerState(StandardBaseModel):
-    """
-    Comprehensive state tracking for scheduler operations and request processing.
-
-    Maintains detailed statistics and timing information for the entire scheduler
-    system, including request counts, processing states, and termination criteria.
-    Used for monitoring, debugging, and implementing stopping conditions.
-    """
+    """Scheduler operation state tracking and statistics."""
 
     node_id: int = Field(description="Unique identifier for this scheduler node")
     num_processes: int = Field(
@@ -311,13 +256,7 @@ class SchedulerState(StandardBaseModel):
 
 
 class SchedulerUpdateAction(StandardBaseModel):
-    """
-    Action directives for controlling scheduler behavior during operation.
-
-    Provides fine-grained control over scheduler operations, allowing external
-    systems to influence queuing and processing behavior based on real-time
-    conditions or policy decisions.
-    """
+    """Scheduler behavior control directives and actions."""
 
     request_queuing: Literal["continue", "stop"] = Field(
         default="continue", description="Action to take for request queuing operations"

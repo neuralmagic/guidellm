@@ -5,16 +5,15 @@ from collections.abc import AsyncGenerator, Iterable
 from pathlib import Path
 from typing import (
     Any,
+    Callable,
     Generic,
-    Literal,
     Optional,
     Union,
 )
 
-from pydantic import Field
 from transformers import PreTrainedTokenizerBase  # type: ignore  # noqa: PGH003
 
-from guidellm.backend import Backend, ResponseSummary
+from guidellm.backend import Backend
 from guidellm.benchmark.aggregator import (
     AggregatorT,
     BenchmarkT,
@@ -22,134 +21,60 @@ from guidellm.benchmark.aggregator import (
 )
 from guidellm.benchmark.benchmark import BenchmarkArgs, GenerativeBenchmark
 from guidellm.benchmark.profile import Profile
-from guidellm.objects import StandardBaseModel
 from guidellm.request import (
-    GenerationRequest,
     GenerativeRequestLoaderDescription,
-    RequestLoaderDescription,
 )
 from guidellm.scheduler import (
-    GenerativeRequestsWorker,
-    RequestsWorker,
+    BackendT,
+    Environment,
     RequestT,
     ResponseT,
-    Scheduler,
-    SchedulerRequestResult,
+    ScheduledRequestInfo,
+    SchedulerState,
+    SchedulerUpdateAction,
     SchedulingStrategy,
 )
+from guidellm.utils import ThreadSafeSingletonMixin
 
-__all__ = ["Benchmarker", "BenchmarkerResult", "GenerativeBenchmarker"]
+__all__ = ["Benchmarker", "GenerativeBenchmarker"]
 
 
-class BenchmarkerResult(
-    StandardBaseModel, Generic[AggregatorT, BenchmarkT, RequestT, ResponseT]
+"""
+Scheduler:
+        requests: Iterable[
+            Union[RequestT, Iterable[Union[RequestT, tuple[RequestT, float]]]]
+        ],
+        backend: BackendT[RequestT, ResponseT],
+        strategy: SchedulingStrategy,
+        env: Environment,
+        **constraints: dict[
+            str, Union[int, float, str, ConstraintsResolveArgs, CallableConstraint]
+        ],
+
+CallableConstraint = Callable[
+    [SchedulerState, ScheduledRequestInfo], SchedulerUpdateAction
+]
+"""
+
+
+CallableConstraintInitializer = Callable[
+    [AggregatorT, BenchmarkT],
+    Callable[[SchedulerState, ScheduledRequestInfo], SchedulerUpdateAction],
+]
+
+
+class Benchmarker(
+    Generic[AggregatorT, BenchmarkT, RequestT, ResponseT], ABC, ThreadSafeSingletonMixin
 ):
-    type_: Literal[
-        "run_start",
-        "run_complete",
-        "scheduler_start",
-        "scheduler_update",
-        "scheduler_complete",
-        "benchmark_compiled",
-    ]
-    start_time: float
-    end_number: int
-    profile: Profile
-    current_index: int
-    current_strategy: Optional[SchedulingStrategy] = None
-    current_aggregator: Optional[AggregatorT] = None
-    current_benchmark: Optional[BenchmarkT] = None
-    current_result: Optional[SchedulerRequestResult[RequestT, ResponseT]] = None
-
-
-class BenchmarkerStrategyLimits(StandardBaseModel):
-    requests_loader_size: Optional[int] = Field(
-        description="Size of the request loader.",
-    )
-    max_number_per_strategy: Optional[int] = Field(
-        description="Maximum number of requests to process per strategy.",
-        ge=0,
-    )
-    max_duration_per_strategy: Optional[float] = Field(
-        description="Maximum duration (in seconds) to process requests per strategy.",
-        ge=0,
-    )
-    warmup_percent_per_strategy: Optional[float] = Field(
-        description="Percentage of requests to use for warmup.",
-        ge=0,
-        le=1,
-    )
-    cooldown_percent_per_strategy: Optional[float] = Field(
-        description="Percentage of requests to use for cooldown.",
-        ge=0,
-        le=1,
-    )
-
-    @property
-    def max_number(self) -> Optional[int]:
-        if self.max_number_per_strategy is not None:
-            return self.max_number_per_strategy
-
-        if self.requests_loader_size is not None:
-            return self.requests_loader_size
-
-        return None
-
-    @property
-    def max_duration(self) -> Optional[float]:
-        return self.max_duration_per_strategy
-
-    @property
-    def warmup_number(self) -> Optional[int]:
-        if self.warmup_percent_per_strategy is None or self.max_number is None:
-            return None
-
-        return int(self.warmup_percent_per_strategy * self.max_number)
-
-    @property
-    def warmup_duration(self) -> Optional[float]:
-        if self.warmup_percent_per_strategy is None or self.max_duration is None:
-            return None
-
-        return self.warmup_percent_per_strategy * self.max_duration
-
-    @property
-    def cooldown_number(self) -> Optional[int]:
-        if self.cooldown_percent_per_strategy is None or self.max_number is None:
-            return None
-
-        return int(self.cooldown_percent_per_strategy * self.max_number)
-
-    @property
-    def cooldown_duration(self) -> Optional[float]:
-        if self.cooldown_percent_per_strategy is None or self.max_duration is None:
-            return None
-
-        return self.cooldown_percent_per_strategy * self.max_duration
-
-
-class Benchmarker(Generic[AggregatorT, BenchmarkT, RequestT, ResponseT], ABC):
-    def __init__(
-        self,
-        worker: RequestsWorker[RequestT, ResponseT],
-        request_loader: Iterable[RequestT],
-        requests_loader_description: RequestLoaderDescription,
-        benchmark_save_extras: Optional[dict[str, Any]] = None,
-    ):
-        self.worker = worker
-        self.scheduler: Scheduler[RequestT, ResponseT] = Scheduler(
-            worker=worker, request_loader=request_loader
-        )
-        self.requests_loader_description = requests_loader_description
-        self.benchmark_save_extras = benchmark_save_extras
-
     async def run(
         self,
+        requests: Iterable[
+            Union[RequestT, Iterable[Union[RequestT, tuple[RequestT, float]]]]
+        ],
+        backend: BackendT[RequestT, ResponseT],
         profile: Profile,
-        max_number_per_strategy: Optional[int],
-        max_duration_per_strategy: Optional[float],
-        warmup_percent_per_strategy: Optional[float],
-        cooldown_percent_per_strategy: Optional[float],
+        environment: Environment,
+        aggregator: type[AggregatorT],
     ) -> AsyncGenerator[
         BenchmarkerResult[AggregatorT, BenchmarkT, RequestT, ResponseT], None
     ]:

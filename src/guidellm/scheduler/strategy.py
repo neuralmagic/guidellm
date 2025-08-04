@@ -34,12 +34,7 @@ import math
 import random
 import time
 from abc import ABC, abstractmethod
-from typing import (
-    Any,
-    Literal,
-    Optional,
-    Union,
-)
+from typing import Literal, Optional, TypeVar, Union
 
 from pydantic import Field
 
@@ -56,6 +51,7 @@ __all__ = [
     "PoissonRateRequestTimings",
     "ScheduledRequestTimings",
     "SchedulingStrategy",
+    "StrategyT",
     "StrategyType",
     "SynchronousStrategy",
     "ThroughputStrategy",
@@ -64,6 +60,25 @@ __all__ = [
 
 
 StrategyType = Literal["synchronous", "concurrent", "throughput", "constant", "poisson"]
+
+
+def _exponential_decay_tau(max_progress: float, convergence: float = 0.99) -> float:
+    """
+    :param max_progress: The max progress value to reach
+    :param convergence: The target convergence level for reaching max_progress.
+        Default 0.99 represents at 99% exponential decay reach max_progress.
+    :return: The calculated tau value for the given max_progress and convergence.
+    """
+    return max_progress / (-math.log(1 - convergence))
+
+
+def _exponential_decay_fraction(progress: float, tau: float = 1.0) -> float:
+    """
+    :param progress: The current progress value (>=0)
+    :param tau: The scale factor for the exponential decay (default: 1.0)
+    :return: The fraction of completion based on exponential decay (0 -> 1)
+    """
+    return 1 - math.exp(-progress / tau)
 
 
 class ScheduledRequestTimings(StandardBaseModel, ABC):
@@ -128,7 +143,7 @@ class LastCompletionRequestTimings(ScheduledRequestTimings):
         default=0.0,
         description=(
             "Delay in seconds used to add to the offset for each request "
-            "within the startup phase (_num_requests <= startup_requests)."
+            "within the startup phase (_requests_count <= startup_requests)."
         ),
         ge=0,
     )
@@ -142,9 +157,9 @@ class LastCompletionRequestTimings(ScheduledRequestTimings):
         """
         :return: The current offset value in seconds from scheduler start time.
         """
-        self._num_request_offsets += 1
+        self._requests_count += 1
 
-        if self._num_request_offsets <= self.startup_requests:
+        if self._requests_count <= self.startup_requests:
             self.offset += self.startup_requests_delay
 
         return self.offset
@@ -157,7 +172,7 @@ class LastCompletionRequestTimings(ScheduledRequestTimings):
             timing details and completion status.
         """
         if (
-            self._num_request_offsets > self.startup_requests
+            self._requests_count > self.startup_requests
             and request_info.completed_at is not None
         ):
             # set the next sync offset to the time when the previous request completed
@@ -176,7 +191,7 @@ class NoDelayRequestTimings(ScheduledRequestTimings):
 
     offset: float = Field(
         default=0.0,
-        description="The current time offset in seconds from scheduler start time.",
+        description="The time offset to apply in seconds from scheduler start time.",
         ge=0,
     )
     startup_duration: float = Field(
@@ -187,14 +202,18 @@ class NoDelayRequestTimings(ScheduledRequestTimings):
         ),
         ge=0,
     )
-    startup_tau: float = Field(
+    startup_target_requests: int = Field(
         default=1.0,
         description=(
             "The target average time between requests during the startup phase."
         ),
         gt=0,
     )
-    _start_time: float = Field(
+    startup_convergence: float = Field(
+        default=0.99,
+        description=("The target convergence rate during the startup phase."),
+    )
+    _start_time: Optional[float] = Field(
         default=None,
         description="The start time of the request processing phase.",
     )
@@ -206,28 +225,25 @@ class NoDelayRequestTimings(ScheduledRequestTimings):
 
     def next_offset(self) -> float:
         """
-        Get the offset for the next request with no delay.
-
-        :return: Always returns 0.0 to schedule requests immediately.
+        :return: Static offset plus any startup adjustment.
         """
         if self._start_time is None:
             self._start_time = time.time()
 
         self._requests_count += 1
+        elapsed = time.time() - self._start_time
 
-        if (
-            self.startup_duration > 0
-            and time.time() < self._start_time + self.startup_duration
-        ):
-            # Gradually ramp up the request processing during start up phase
-            # using exponential decay to the startup_duration
-            return self.offset + self.startup_duration * (
-                1 - math.exp(-self._requests_count / self.startup_tau)
+        if self.startup_duration > 0 and elapsed < self.startup_duration:
+            startup_percent = _exponential_decay_fraction(
+                self._requests_count,
+                _exponential_decay_tau(
+                    self.startup_target_requests, self.startup_convergence
+                ),
             )
-        elif self.startup_duration > 0:
-            return self.offset + self.startup_duration
         else:
-            return self.offset
+            startup_percent = 1.0
+
+        return self.offset + startup_percent * self.startup_duration
 
     def request_completed(self, request_info: ScheduledRequestInfo):
         """
@@ -250,6 +266,11 @@ class ConstantRateRequestTimings(ScheduledRequestTimings):
         description="The target rate in requests per second. Must be positive.",
         gt=0,
     )
+    offset: float = Field(
+        default=0.0,
+        description="The time offset to apply in seconds from scheduler start time.",
+        ge=0,
+    )
     startup_duration: float = Field(
         default=0.0,
         description=(
@@ -259,9 +280,9 @@ class ConstantRateRequestTimings(ScheduledRequestTimings):
         ),
         ge=0,
     )
-    _start_time: float = Field(
-        default=None,
-        description="The start time of the request processing phase.",
+    startup_convergence: float = Field(
+        default=0.99,
+        description=("The target convergence rate during the startup phase."),
     )
     _requests_count: int = Field(
         default=0,
@@ -278,25 +299,19 @@ class ConstantRateRequestTimings(ScheduledRequestTimings):
 
         :return: The offset in seconds for the next request.
         """
-        if self._start_time is None:
-            self._start_time = time.time()
-
         self._requests_count += 1
         interval = 1.0 / self.rate
+        startup_requests = self.startup_duration * self.rate
 
-        if (
-            self.startup_duration > 0
-            and time.time() - self._start_time < self.startup_duration
-        ):
-            # Adjust the rate during the startup phase to exponentially decay
-            # to the desired rate
-            tau = (self.rate * self.startup_duration) / (
-                -1 * math.log(0.01)
-            )  # target 99% convergence
-            adjust_fraction = 1 - math.exp(-self._requests_count / tau)
-            interval *= adjust_fraction
+        if self._requests_count <= startup_requests:
+            startup_percent = _exponential_decay_fraction(
+                self._requests_count,
+                _exponential_decay_tau(startup_requests, self.startup_convergence),
+            )
+        else:
+            startup_percent = 1.0
 
-        return self.offset + interval * self._requests_count
+        return self.offset + startup_percent * interval * self._requests_count
 
     def request_completed(self, request_info: ScheduledRequestInfo):
         """
@@ -328,7 +343,7 @@ class PoissonRateRequestTimings(ScheduledRequestTimings):
     )
     offset: float = Field(
         default=0.0,
-        description="The cumulative time offset in seconds from scheduler start time.",
+        description="The time offset to apply in seconds from scheduler start time.",
     )
     startup_duration: float = Field(
         default=0.0,
@@ -339,16 +354,16 @@ class PoissonRateRequestTimings(ScheduledRequestTimings):
         ),
         ge=0,
     )
-    _start_time: float = Field(
-        default=None,
-        description="The start time of the request processing phase.",
+    startup_convergence: float = Field(
+        default=0.99,
+        description=("The target convergence rate during the startup phase."),
     )
     _requests_count: int = Field(
         default=0,
         description="Internal counter tracking the number of offsets generated.",
         ge=0,
     )
-    _random: Any = Field(
+    _random: Optional[random.Random] = Field(
         default=None,
         description="Random number generator instance for Poisson distribution.",
         exclude=True,  # Don't include in serialization
@@ -364,29 +379,21 @@ class PoissonRateRequestTimings(ScheduledRequestTimings):
 
         :return: The cumulative offset in seconds for the next request.
         """
-        if self._start_time is None:
-            self._start_time = time.time()
-
         if self._random is None:
             self._random = random.Random(self.random_seed)
 
-        self._requests_count += 1
-
         next_delay = self._random.expovariate(self.rate)
+        startup_requests = self.startup_duration * self.rate
 
-        if (
-            self.startup_duration > 0
-            and time.time() - self._start_time < self.startup_duration
-        ):
-            # Adjust the rate during the startup phase to exponentially decay
-            # to the desired rate
-            tau = (self.rate * self.startup_duration) / (
-                -1 * math.log(0.01)
-            )  # target 99% convergence
-            adjust_fraction = 1 - math.exp(-self._requests_count / tau)
-            next_delay *= adjust_fraction
+        if self._requests_count <= startup_requests:
+            startup_percent = _exponential_decay_fraction(
+                self._requests_count,
+                _exponential_decay_tau(startup_requests, self.startup_convergence),
+            )
+        else:
+            startup_percent = 1.0
 
-        self.offset += next_delay
+        self.offset += startup_percent * next_delay
 
         return self.offset
 
@@ -424,7 +431,7 @@ class SchedulingStrategy(StandardBaseModel):
         """
         return None
 
-    def create_worker_timings(
+    def create_request_timings(
         self, local_rank: int, local_world_size: int, local_max_concurrency: int
     ) -> ScheduledRequestTimings:
         """
@@ -440,6 +447,9 @@ class SchedulingStrategy(StandardBaseModel):
         raise NotImplementedError(
             "create_worker_timings method must be implemented by subclasses."
         )
+
+
+StrategyT = TypeVar("StrategyT", bound=SchedulingStrategy)
 
 
 class SynchronousStrategy(SchedulingStrategy):
@@ -475,16 +485,16 @@ class SynchronousStrategy(SchedulingStrategy):
         """
         return 1
 
-    def create_worker_timings(
-        self, local_rank: int, local_world_size: int, local_max_concurrency: int
+    def create_request_timings(
+        self, local_rank: int, local_world_size: int, _local_max_concurrency: int
     ) -> ScheduledRequestTimings:
         """
         Create timing implementation for synchronous request scheduling.
 
         :param local_rank: The rank of the worker process. Must be 0.
         :param local_world_size: Total number of worker processes. Must be 1.
-        :param local_max_concurrency: The maximum number of concurrent requests
-            for the worker process.
+        :param _local_max_concurrency: The maximum number of concurrent requests
+            for the worker process. Unused in this strategy.
         :return: LastCompletionRequestTimings instance for sequential processing.
         :raises ValueError: If multiple workers or non-zero rank is specified.
         """
@@ -546,8 +556,8 @@ class ConcurrentStrategy(SchedulingStrategy):
         """
         return self.streams
 
-    def create_worker_timings(
-        self, local_rank: int, local_world_size: int, local_max_concurrency: int
+    def create_request_timings(
+        self, local_rank: int, local_world_size: int, _local_max_concurrency: int
     ) -> LastCompletionRequestTimings:
         """
         Create timing implementation for concurrent request scheduling.
@@ -555,8 +565,8 @@ class ConcurrentStrategy(SchedulingStrategy):
         :param local_rank: The rank of the worker process. Must be less than streams.
         :param local_world_size: Total number of worker processes. Must not exceed
             streams.
-        :param local_max_concurrency: The maximum number of concurrent requests
-            for the worker process.
+        :param _local_max_concurrency: The maximum number of concurrent requests
+            for the worker process. Unused in this strategy.
         :return: LastCompletionRequestTimings instance for stream-based processing.
         :raises ValueError: If worker configuration exceeds stream limits.
         """
@@ -649,7 +659,7 @@ class ThroughputStrategy(SchedulingStrategy):
         """
         return self.max_concurrency
 
-    def create_worker_timings(
+    def create_request_timings(
         self, local_rank: int, local_world_size: int, local_max_concurrency: int
     ) -> ScheduledRequestTimings:
         """
@@ -709,8 +719,8 @@ class AsyncConstantStrategy(ThroughputStrategy):
         ge=0,
     )
 
-    def create_worker_timings(
-        self, local_rank: int, local_world_size: int, local_max_concurrency: int
+    def create_request_timings(
+        self, _local_rank: int, local_world_size: int, _local_max_concurrency: int
     ) -> ScheduledRequestTimings:
         """
         Create timing implementation for constant-rate request scheduling.
@@ -718,9 +728,9 @@ class AsyncConstantStrategy(ThroughputStrategy):
         Divides the total rate evenly across all worker processes to maintain
         the specified aggregate rate.
 
-        :param local_rank: The rank of the worker process (unused for rate calculation).
+        :param _local_rank: The rank of the worker process (unused).
         :param local_world_size: Total number of worker processes for rate division.
-        :param local_max_concurrency: The maximum number of concurrent requests
+        :param _local_max_concurrency: The maximum number of concurrent requests
             for the worker process.
         :return: ConstantRateRequestTimings instance with per-worker rate.
         """
@@ -769,8 +779,8 @@ class AsyncPoissonStrategy(ThroughputStrategy):
         description=("The random seed to use for the Poisson distribution."),
     )
 
-    def create_worker_timings(
-        self, local_rank: int, local_world_size: int, local_max_concurrency: int
+    def create_request_timings(
+        self, local_rank: int, local_world_size: int, _local_max_concurrency: int
     ) -> ScheduledRequestTimings:
         """
         Create timing implementation for Poisson-distributed request scheduling.
@@ -780,7 +790,7 @@ class AsyncPoissonStrategy(ThroughputStrategy):
 
         :param local_rank: The rank of the worker process for seed generation.
         :param local_world_size: Total number of worker processes for rate division.
-        :param local_max_concurrency: The maximum number of concurrent requests
+        :param _local_max_concurrency: The maximum number of concurrent requests
             for the worker process.
         :return: PoissonRateRequestTimings instance with per-worker rate and
             unique seed.
@@ -816,14 +826,14 @@ def strategy_display_str(strategy: Union[StrategyType, SchedulingStrategy]) -> s
         >>> strategy_display_str(AsyncConstantStrategy(rate=10.5))
         "constant@10.50"
     """
-    strategy_type = strategy if isinstance(strategy, str) else strategy.type_
-    strategy_instance = strategy if isinstance(strategy, SchedulingStrategy) else None
+    if isinstance(strategy, str):
+        return strategy
+
+    strategy_type = strategy.type_
 
     if strategy_type == "concurrent":
-        rate = f"@{strategy_instance.streams}" if strategy_instance else "@##"  # type: ignore[attr-defined]
+        return f"{strategy_type}@{strategy.streams}"  # type: ignore[attr-defined]
     elif strategy_type in ("constant", "poisson"):
-        rate = f"@{strategy_instance.rate:.2f}" if strategy_instance else "@#.##"  # type: ignore[attr-defined]
+        return f"{strategy_type}@{strategy.rate:.2f}"  # type: ignore[attr-defined]
     else:
-        rate = ""
-
-    return f"{strategy_type}{rate}"
+        return strategy_type

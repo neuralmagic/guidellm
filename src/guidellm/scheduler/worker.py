@@ -416,6 +416,7 @@ class WorkerProcess(Generic[BackendT, RequestT, RequestTimingsT, ResponseT]):
                     # Ensure request_timings logic won't start until scheduler is ready
                     await asyncio.sleep(request_info.scheduler_start_time - time.time())
 
+                # current way of passing through the start_time to request_timings
                 timings_offset = self.request_timings.next_offset()
                 target_start = request_info.scheduler_start_time + timings_offset
                 if target_start > time.time():

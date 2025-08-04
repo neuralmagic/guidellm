@@ -1,27 +1,21 @@
 """
 Scheduler for coordinating distributed load testing and benchmarking workloads.
 
-This module provides the main Scheduler class responsible for orchestrating benchmarking
-and evaluation operations across multiple worker processes and environments.
-The scheduler manages request distribution, timing coordination,
-and result aggregation while ensuring thread-safe singleton behavior.
+This module provides a thread-safe singleton scheduler for orchestrating
+benchmarking operations across worker processes and distributed environments.
 
 Classes:
-    Scheduler: Singleton scheduler for coordinating distributed request processing
-        workloads with generic support for backends, request types, and responses.
+    Scheduler: Generic singleton scheduler for distributed request processing.
 """
 
 import threading
 from collections.abc import AsyncIterator, Iterable
-from typing import (
-    Any,
-    Callable,
-    Generic,
-    Optional,
-    Union,
-)
+from typing import Any, Generic, Optional, Union
 
-from guidellm.scheduler.constraints import ConstraintsFactory
+from guidellm.scheduler.constraints import (
+    CallableConstraint,
+    ConstraintsInitializerFactory,
+)
 from guidellm.scheduler.environment import Environment
 from guidellm.scheduler.objects import (
     BackendT,
@@ -42,16 +36,12 @@ class Scheduler(
     Generic[BackendT, RequestT, RequestTimingsT, ResponseT], ThreadSafeSingletonMixin
 ):
     """
-    A generic singleton scheduler for coordinating distributed load testing workloads.
+    Generic singleton scheduler for coordinating distributed load testing workloads.
 
-    The Scheduler orchestrates benchmarking operations by managing request distribution
-    across worker processes, coordinating timing with distributed environments, and
-    aggregating results. It implements the singleton pattern to ensure consistent
-    state management across the application.
-
-    The scheduler supports generic backend types, request formats, and response types,
-    making it adaptable to various testing scenarios including LLM inference,
-    API testing, and other distributed workload patterns.
+    Orchestrates benchmarking operations by managing request distribution across
+    worker processes, coordinating timing with distributed environments, and
+    aggregating results. Supports generic backend types for adaptability to
+    various testing scenarios including LLM inference and API testing.
 
     Example:
     ::
@@ -64,7 +54,10 @@ class Scheduler(
         )
 
         scheduler = Scheduler[
-            OpenAIBackend,GenerationRequest,GenerationRequestTimings,GenerationResponse
+            OpenAIBackend,
+            GenerationRequest,
+            GenerationRequestTimings,
+            GenerationResponse
         ]()
         async for response, request, info, state in scheduler.run(
             requests=request_list,
@@ -73,13 +66,11 @@ class Scheduler(
             env=environment,
             max_requests=1000
         ):
-            print(f"Resp: {response}, Req: {request}, Info: {info}, State: {state}")
+            print(f"Response: {response}")
     """
 
     def __init__(self):
-        """
-        Initialize the scheduler singleton instance.
-        """
+        """Initialize the scheduler singleton instance."""
         if not self.initialized:
             self.run_lock = threading.Lock()
         super().__init__()
@@ -92,9 +83,7 @@ class Scheduler(
         backend: BackendT[RequestT, ResponseT],
         strategy: SchedulingStrategy,
         env: Environment,
-        **constraints: dict[
-            str, Union[int, float, str, Callable[[SchedulerState], Any]]
-        ],
+        **constraints: dict[str, Union[Any, dict[str, Any], CallableConstraint]],
     ) -> AsyncIterator[
         tuple[
             Optional[ResponseT],
@@ -104,38 +93,24 @@ class Scheduler(
         ]
     ]:
         """
-        Execute a request processing run with the provided configuration.
+        Execute request processing with the provided configuration.
 
-        Coordinates the execution of requests across worker processes with the specified
-        backend and scheduling strategy, on the targeted environment, and until
-        completion as defined by the constraints.
-        It does this while managing timing, synchronization, and resource cleanup.
-        The method yields request updates as they become available,
-        including requeust queued, request processing start, and request completion,
-        allowing for real-time monitoring and processing.
+        Coordinates execution across worker processes with the specified backend
+        and scheduling strategy. Manages timing, synchronization, and resource
+        cleanup while yielding real-time updates.
 
-        :param requests: Iterable of the requests to process with multiple formats;
-            Iterable[RequestT] for single requests,
-            Iterable[Iterable] for multi-turn requests where each item is either
-            a RequestT for immediately processing the next request in the sequence,
-            or a tuple of (RequestT, float) where the float is the delay in seconds
-            before processing the next request in the sequence.
-        :param backend: Backend instance for processing requests, must be compatible
-            with the request and response types.
-        :param strategy: Scheduling strategy defining how requests are timed
-            for processing within the backend.
-        :param env: Environment for coordinating optional distributed execution,
-            handling synchronization and parameter sharing.
-        :param **constraints: Required constraints for controlling execution behavior
-            to define stopping conditions,
-            such as maximum requests, duration limits, or custom.
-            Values can be primitives matching to available keys in ConstraintsFactory,
-            or callable functions receiving scheduler and request state and returning
-            the action to take for the scheduler.
-        :yields: Tuples containing (response, request, scheduling_info, scheduler_state)
-            for each processed request. Response may be None for failed requests.
-        :raises: Any exceptions from worker processes, environment coordination, or
-            constraint evaluation are propagated after proper cleanup.
+        :param requests: Requests to process. Supports single requests
+            (Iterable[RequestT]) or multi-turn sequences (Iterable[Iterable]) where
+            each item is either a RequestT or tuple of (RequestT, delay_seconds).
+        :param backend: Backend instance for processing requests.
+        :param strategy: Scheduling strategy for request timing.
+        :param env: Environment for distributed execution coordination.
+        :param constraints: Execution control constraints (max_requests, duration,
+            etc.). Values can be primitives or callable functions.
+        :yields: Tuples of (response, request, scheduling_info, scheduler_state).
+            Response may be None for failed requests.
+        :raises Exception: Worker process, environment, or constraint evaluation errors
+            are propagated after cleanup.
         """
         with self.run_lock:
             worker_group: Optional[
@@ -147,7 +122,9 @@ class Scheduler(
             # and will ensure clean up before raising the error.
             try:
                 # Setup local run parameters, sync with the environment
-                constraints = ConstraintsFactory.resolve_constraints(constraints)
+                constraints = ConstraintsInitializerFactory.resolve_constraints(
+                    constraints
+                )
                 (
                     local_requests,
                     local_strategy,
