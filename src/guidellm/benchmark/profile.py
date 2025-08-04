@@ -277,6 +277,10 @@ class SweepProfile(AsyncProfile):
     )
     rate: float = -1
     rate_type: Literal["constant", "poisson"] = "constant"
+    max_rate_adjustment: float = Field(
+        default=1.1,
+        description="Multiplier to over-estimate the measured throughput.",
+    )
 
     @property
     def strategy_types(self) -> list[StrategyType]:
@@ -297,8 +301,10 @@ class SweepProfile(AsyncProfile):
             )
 
         min_rate = self.measured_rates[0]
-        max_rate = self.measured_rates[1]
-        rates = np.linspace(min_rate, max_rate, self.sweep_size - 1)[1:]
+        max_rate = self.measured_rates[1] * self.max_rate_adjustment
+
+        halving_fractions = 0.5 ** np.arrange(self.sweep_size - 1)
+        rates = ((max_rate - min_rate) * halving_fractions + min_rate)[1:]
 
         if self.rate_type == "constant":
             return AsyncConstantStrategy(
@@ -359,6 +365,9 @@ class SweepProfile(AsyncProfile):
 
         if "strategy_type" not in kwargs:
             kwargs["strategy_type"] = "constant"
+
+        if "max_rate_percent_adjustment" not in kwargs:
+            kwargs["max_rate_percent_adjustment"] = 25.0
 
         return SweepProfile(sweep_size=int(rate), random_seed=random_seed, **kwargs)
 
