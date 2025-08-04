@@ -366,9 +366,6 @@ class SweepProfile(AsyncProfile):
         if "strategy_type" not in kwargs:
             kwargs["strategy_type"] = "constant"
 
-        if "max_rate_percent_adjustment" not in kwargs:
-            kwargs["max_rate_percent_adjustment"] = 25.0
-
         return SweepProfile(sweep_size=int(rate), random_seed=random_seed, **kwargs)
 
 
