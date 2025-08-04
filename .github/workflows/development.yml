@@ -124,7 +124,7 @@ jobs:
       - name: Install dependencies
         run: pip install tox
       - name: Run unit tests
-        run: tox -e test-unit -- -m "smoke or sanity"
+        run: tox -e test-unit
 
   ui-unit-tests:
     permissions:
