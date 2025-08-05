@@ -10,6 +10,7 @@
     "**/*.tsx",
     ".next/types/**/*.ts",
     "app",
-    "./app/types/images.d.ts"
+    "./app/types/images.d.ts",
+    "next.config.mjs"
   ]
 }
