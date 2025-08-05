@@ -1,15 +1,13 @@
 'use client';
 import { Box, Typography } from '@mui/material';
-import dynamic from 'next/dynamic';
 
 import { useGetRunInfoQuery } from '../../store/slices/runInfo';
 import { formateDate } from '../../utils/helpers';
 import { SpecBadge } from '../SpecBadge';
 import { HeaderCell, HeaderWrapper } from './PageHeader.styles';
 
-const Component = () => {
+export const Component = () => {
   const { data } = useGetRunInfoQuery();
-
   return (
     <Box py={2}>
       <Typography variant="subtitle2" color="surface.onSurfaceAccent">
@@ -38,9 +36,3 @@ const Component = () => {
     </Box>
   );
 };
-
-const DynamicComponent = dynamic(() => Promise.resolve(Component), {
-  ssr: false,
-});
-
-export { DynamicComponent as Component };

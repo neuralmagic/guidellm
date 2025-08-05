@@ -1,12 +1,13 @@
-import type { NextConfig } from 'next';
-
-const nextConfig: NextConfig = {
+const nextConfig = {
   images: { unoptimized: true },
   output: 'export',
   assetPrefix: process.env.ASSET_PREFIX || '',
+  experimental: {
+    esmExternals: 'loose',
+  },
   webpack(config) {
     // Grab the existing rule that handles SVG imports
-    const fileLoaderRule = config.module.rules.find((rule: any) =>
+    const fileLoaderRule = config.module.rules.find((rule) =>
       rule.test?.test?.('.svg')
     );
 
