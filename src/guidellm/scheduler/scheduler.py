@@ -8,7 +8,6 @@ Classes:
     Scheduler: Generic singleton scheduler for distributed request processing.
 """
 
-import threading
 from collections.abc import AsyncIterator, Iterable
 from typing import Any, Generic, Optional, Union
 
@@ -69,12 +68,6 @@ class Scheduler(
             print(f"Response: {response}")
     """
 
-    def __init__(self):
-        """Initialize the scheduler singleton instance."""
-        if not self.initialized:
-            self.run_lock = threading.Lock()
-        super().__init__()
-
     async def run(
         self,
         requests: Iterable[
@@ -112,7 +105,7 @@ class Scheduler(
         :raises Exception: Worker process, environment, or constraint evaluation errors
             are propagated after cleanup.
         """
-        with self.run_lock:
+        with self.thread_lock:
             worker_group: Optional[
                 WorkerProcessGroup[BackendT, RequestT, RequestTimingsT, ResponseT]
             ] = None

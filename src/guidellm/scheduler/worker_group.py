@@ -1,19 +1,12 @@
 """
-Worker process group management for multi-process request scheduling and execution.
+Multi-process worker group orchestration for distributed request scheduling.
 
-This module provides the infrastructure for orchestrating multiple worker processes
-that handle request scheduling, processing, and coordination in the GuideLLM toolkit.
-It implements a multiprocessing-based architecture with asyncio/await patterns for
-efficient concurrent request handling and distributed load balancing.
-
-The module centers around the WorkerProcessGroup class, which manages the complete
-lifecycle of worker processes including initialization, request distribution,
-response collection, state synchronization, and graceful shutdown coordination.
+Provides infrastructure for coordinating worker processes with shared state
+management, inter-process communication, and lifecycle coordination.
 
 Classes:
-    WorkerProcessGroup: Orchestrates multiple worker processes with shared state
-        management, inter-process communication, and centralized coordination for
-        distributed request processing.
+    WorkerProcessGroup: Orchestrates multiple worker processes for distributed
+        request processing with centralized coordination.
 """
 
 import asyncio
@@ -48,38 +41,11 @@ __all__ = ["WorkerProcessGroup"]
 
 class WorkerProcessGroup(Generic[BackendT, RequestT, RequestTimingsT, ResponseT]):
     """
-    Orchestrates multiple worker processes with shared state management and
-    coordination.
+    Orchestrates multiple worker processes for distributed request processing.
 
-    This class manages a group of worker processes that collectively handle request
-    processing for a distributed scheduling system. It provides centralized control
-    over process lifecycle, request distribution, response collection, and state
-    synchronization across all workers.
-
-    The process group handles dynamic scaling, load balancing, constraint evaluation,
-    and graceful shutdown coordination. It maintains shared queues for inter-process
-    communication and tracks the overall system state including throughput metrics
-    and constraint satisfaction.
-
-    Example:
-    ::
-        from guidellm.scheduler.worker import WorkerProcessGroup
-
-        group = WorkerProcessGroup(
-            backend=my_backend,
-            requests=request_iterable,
-            strategy=scheduling_strategy,
-            constraints={"max_requests": max_requests_constraint}
-        )
-
-        await group.create_processes()
-        await group.start(time.time())
-
-        async for response, request, info, state in group.request_updates():
-            # Process each completed request
-            handle_response(response, request, info, state)
-
-        await group.shutdown()
+    Manages process lifecycle, request distribution, response collection, and state
+    synchronization across workers. Handles dynamic scaling, load balancing, and
+    constraint evaluation with graceful shutdown coordination.
 
     :param backend: Backend instance for processing requests.
     :param requests: Iterable of requests to process.
@@ -130,13 +96,10 @@ class WorkerProcessGroup(Generic[BackendT, RequestT, RequestTimingsT, ResponseT]
         """
         Initialize and start the worker process group.
 
-        Sets up the multiprocessing infrastructure including process pool executor,
-        synchronization primitives, communication queues, and individual worker
-        processes. Determines optimal process count and concurrency limits based
-        on strategy constraints, backend capabilities, and system configuration.
+        Sets up multiprocessing infrastructure and worker processes based on
+        strategy constraints, backend capabilities, and system configuration.
 
-        :raises RuntimeError: If process initialization fails or if workers encounter
-            errors during startup.
+        :raises RuntimeError: If process initialization or startup fails.
         """
         # Processes limits and params
         num_processes = min(
@@ -211,13 +174,11 @@ class WorkerProcessGroup(Generic[BackendT, RequestT, RequestTimingsT, ResponseT]
         """
         Begin request processing at the specified start time.
 
-        Initializes the scheduler state, creates background tasks for request
-        population and response handling, and waits until the specified start
-        time before beginning operations.
+        Initializes scheduler state and background tasks, then waits until the
+        specified start time before beginning operations.
 
         :param start_time: Unix timestamp when processing should begin.
-        :raises RuntimeError: If workers encounter errors during startup or if
-            initialization fails.
+        :raises RuntimeError: If workers encounter errors during startup.
         """
         self.state_update_lock = threading.Lock()
         self.scheduler_state = SchedulerState(
@@ -246,19 +207,13 @@ class WorkerProcessGroup(Generic[BackendT, RequestT, RequestTimingsT, ResponseT]
         """
         Yield request processing updates as they become available.
 
-        Returns an async iterator that yields tuples containing request processing
-        updates, including the response (if available), the original request,
-        scheduling metadata, and the current scheduler state.
-        Updates occur on request queued, request processing start, and
-        request completion, allowing for real-time monitoring and processing.
-        The iterator continues until all requests have been processed or an error
-        occurs.
+        Returns an async iterator of request updates including response, request,
+        scheduling metadata, and scheduler state. Updates occur on request queued,
+        processing start, and completion.
 
         :return: Async iterator yielding (response, request, request_info, state)
-            tuples for each request update; response is None until the request
-            processing is complete.
-        :raises RuntimeError: If workers encounter unrecoverable errors during
-            processing.
+            tuples; response is None until processing is complete.
+        :raises RuntimeError: If workers encounter unrecoverable errors.
         """
         last_state: SchedulerState = None
         last_check_time = time.time()
@@ -291,13 +246,10 @@ class WorkerProcessGroup(Generic[BackendT, RequestT, RequestTimingsT, ResponseT]
         """
         Gracefully shut down the worker process group and clean up resources.
 
-        Performs a safe shutdown of all worker processes, background tasks,
-        and multiprocessing resources to release system resources.
-        Returns any errors encountered during the shutdown process,
-        either during shutdown or previously occurred in worker processes.
+        Performs safe shutdown of worker processes, background tasks, and
+        multiprocessing resources.
 
-        :return: A list of any exceptions raised while running or shutting down
-            the worker processes. If no errors occurred, returns an empty list.
+        :return: List of exceptions encountered during shutdown; empty if no errors.
         """
         exceptions = []
 
@@ -309,7 +261,7 @@ class WorkerProcessGroup(Generic[BackendT, RequestT, RequestTimingsT, ResponseT]
             try:
                 for task in [
                     self.populate_requests_task,
-                    self.populate_responses_task,
+                    self.populate_updates_task,
                 ]:
                     if task is not None and not task.done():
                         task.cancel()
@@ -317,7 +269,7 @@ class WorkerProcessGroup(Generic[BackendT, RequestT, RequestTimingsT, ResponseT]
             except Exception as err:
                 exceptions.append(err)
             self.populate_requests_task = None
-            self.populate_responses_task = None
+            self.populate_updates_task = None
 
             for process in self.processes:
                 try:
@@ -335,7 +287,7 @@ class WorkerProcessGroup(Generic[BackendT, RequestT, RequestTimingsT, ResponseT]
         self.error_event = None
         self.process_requests_queue = None
         self.process_updates_queue = None
-        self.async_responses_queue = None
+        self.async_updates_queue = None
 
         return exceptions
 
@@ -403,12 +355,6 @@ class WorkerProcessGroup(Generic[BackendT, RequestT, RequestTimingsT, ResponseT]
     def _update_scheduler_state(
         self, request_info: ScheduledRequestInfo[RequestTimingsT]
     ) -> tuple[SchedulerState, bool, bool]:
-        """
-        :param request_info: The request information to update the state with.
-        :return: A tuple containing the updated scheduler state,
-            whether to continue adding requests,
-            and whether to continue processing requests.
-        """
         with self.state_update_lock:
             if request_info.status == "queued":
                 self.scheduler_state.created_requests += 1

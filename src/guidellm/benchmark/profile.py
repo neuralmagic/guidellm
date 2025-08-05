@@ -18,6 +18,7 @@ Type Aliases:
 """
 
 from abc import ABC, abstractmethod
+from collections.abc import Generator
 from typing import Any, Generic, Literal, Optional, Union
 
 import numpy as np
@@ -39,6 +40,7 @@ from guidellm.scheduler import (
     SynchronousStrategy,
     ThroughputStrategy,
 )
+from guidellm.utils import RegistryMixin
 
 __all__ = [
     "AsyncProfile",
@@ -53,29 +55,64 @@ __all__ = [
 ProfileType = Literal["synchronous", "concurrent", "throughput", "async", "sweep"]
 
 
-class Profile(StandardBaseModel, ABC, Generic[StrategyT, AggregatorT, BenchmarkT]):
+class Profile(
+    StandardBaseModel,
+    ABC,
+    Generic[StrategyT, AggregatorT, BenchmarkT],
+    RegistryMixin,
+):
     """
     Abstract base for multi-strategy benchmarking execution profiles.
 
     Coordinates sequential execution of scheduling strategies with automatic
     strategy generation, constraint management, and completion tracking for
     comprehensive benchmarking workflows.
-
-    Type Parameters:
-        StrategyT: Type of scheduling strategy to execute.
-        AggregatorT: Type of result aggregator to use.
-        BenchmarkT: Type of benchmark results to generate.
     """
 
     @classmethod
-    def create(cls, type_: ProfileType, **kwargs: Any) -> "Profile":
+    def create(
+        cls,
+        rate_type: str,
+        rate: Optional[Union[float, int, list[float, int]]],
+        random_seed: int,
+        **kwargs: Any,
+    ) -> "Profile":
         """
         Create a profile instance based on the specified type.
 
-        :param type_: The type of profile to create.
+        :param rate_type: The type of profile to create.
+        :param rate: Rate parameter for profile configuration.
+        :param random_seed: Random seed for stochastic strategies.
         :param kwargs: Additional arguments for profile configuration.
         :return: Configured profile instance for the specified type.
+        :raises ValueError: If the profile type is not registered.
         """
+        profile_class: type[Profile] = cls.get_registered_object(rate_type)
+        resolved_kwargs = profile_class.resolve_args(
+            rate_type=rate_type, rate=rate, random_seed=random_seed, **kwargs
+        )
+
+        return profile_class(**resolved_kwargs)
+
+    @classmethod
+    @abstractmethod
+    def resolve_args(
+        cls,
+        rate_type: str,
+        rate: Optional[Union[float, int, list[float, int]]],
+        random_seed: int,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        """
+        Resolve and validate arguments for profile construction.
+
+        :param rate_type: The type of the profile.
+        :param rate: Rate parameter for configuration.
+        :param random_seed: Random seed for stochastic strategies.
+        :param kwargs: Additional arguments to resolve.
+        :return: Dictionary of resolved arguments for profile construction.
+        """
+        ...
 
     type_: Literal["profile"] = Field(
         description="The type of benchmarking profile to use",
@@ -97,35 +134,40 @@ class Profile(StandardBaseModel, ABC, Generic[StrategyT, AggregatorT, BenchmarkT
         """Get the types of all completed strategies in execution order."""
         return [strat.type_ for strat in self.completed_strategies]
 
-    def strategy_completed(
-        self, strategy: StrategyT, aggregator: AggregatorT, benchmark: BenchmarkT
-    ) -> tuple[
-        Optional[StrategyT],
-        Optional[dict[str, Union[Any, dict[str, Any], CallableConstraint]]],
+    def strategies_generator(
+        self,
+    ) -> Generator[
+        tuple[
+            Optional[StrategyT],
+            Optional[dict[str, Union[Any, dict[str, Any], CallableConstraint]]],
+        ],
+        tuple[AggregatorT, BenchmarkT],
+        None,
     ]:
         """
-        Process strategy completion and generate the next strategy.
+        Generate strategies and constraints for sequential profile execution.
 
-        Updates internal state and determines the next strategy to execute
-        based on the completed strategy's results and profile configuration.
-
-        :param strategy: The strategy that just completed execution.
-        :param aggregator: Result aggregator from the completed strategy.
-        :param benchmark: Benchmark results from the completed strategy.
-        :return: Tuple of (next_strategy, constraints) for continued execution,
-            or (None, None) if the profile is complete.
+        :return: Generator yielding (strategy, constraints) tuples and
+            receiving (aggregator, benchmark) results from each execution.
         """
-        self.completed_strategies.append(strategy)
-        next_strategy = self.next_strategy(
-            prev_strategy=strategy, prev_aggregator=aggregator, prev_benchmark=benchmark
-        )
+        prev_strategy: Optional[StrategyT] = None
+        prev_aggregator: Optional[AggregatorT] = None
+        prev_benchmark: Optional[BenchmarkT] = None
 
-        return next_strategy, self.next_strategy_constraints(
-            next_strategy=next_strategy,
-            prev_strategy=strategy,
-            prev_aggregator=aggregator,
-            prev_benchmark=benchmark,
-        )
+        while (
+            strategy := self.next_strategy(
+                prev_strategy, prev_aggregator, prev_benchmark
+            )
+        ) is not None:
+            constraints = self.next_strategy_constraints(
+                strategy, prev_strategy, prev_aggregator, prev_benchmark
+            )
+            prev_aggregator, prev_benchmark = yield (
+                strategy,
+                constraints,
+            )
+            prev_strategy = strategy
+            self.completed_strategies.append(prev_strategy)
 
     @abstractmethod
     def next_strategy(
@@ -167,10 +209,34 @@ class Profile(StandardBaseModel, ABC, Generic[StrategyT, AggregatorT, BenchmarkT
         )
 
 
+@Profile.register("synchronous")
 class SynchronousProfile(Profile[StrategyT, AggregatorT, BenchmarkT]):
     """Single synchronous strategy execution profile."""
 
     type_: Literal["synchronous"] = "synchronous"  # type: ignore[assignment]
+
+    @classmethod
+    def resolve_args(
+        cls,
+        rate_type: str,
+        rate: Optional[Union[float, int, list[float, int]]],
+        random_seed: int,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        """
+        Resolve arguments for synchronous profile construction.
+
+        :param rate_type: The type/strategy of the profile (ignored).
+        :param rate: Rate parameter (must be None, will be stripped).
+        :param random_seed: Random seed (ignored and stripped).
+        :param kwargs: Additional arguments to pass through.
+        :return: Dictionary of resolved arguments.
+        :raises ValueError: If rate is not None.
+        """
+        if rate is not None:
+            raise ValueError("SynchronousProfile does not accept a rate parameter")
+
+        return kwargs
 
     @property
     def strategy_types(self) -> list[StrategyType]:
@@ -179,13 +245,16 @@ class SynchronousProfile(Profile[StrategyT, AggregatorT, BenchmarkT]):
 
     def next_strategy(
         self,
-        _prev_strategy: Optional[StrategyT],
-        _prev_aggregator: Optional[AggregatorT],
-        _prev_benchmark: Optional[BenchmarkT],
+        prev_strategy: Optional[StrategyT],
+        prev_aggregator: Optional[AggregatorT],
+        prev_benchmark: Optional[BenchmarkT],
     ) -> Optional[StrategyT]:
         """
         Generate synchronous strategy or None if already completed.
 
+        :param prev_strategy: The previously completed strategy (unused).
+        :param prev_aggregator: Result aggregator from the previous strategy (unused).
+        :param prev_benchmark: Benchmark results from the previous strategy (unused).
         :return: SynchronousStrategy for the first execution, None afterward.
         """
         if len(self.completed_strategies) >= 1:
@@ -194,6 +263,7 @@ class SynchronousProfile(Profile[StrategyT, AggregatorT, BenchmarkT]):
         return SynchronousStrategy()
 
 
+@Profile.register("concurrent")
 class ConcurrentProfile(Profile[StrategyT, AggregatorT, BenchmarkT]):
     """Fixed-concurrency strategy execution profile with configurable stream counts."""
 
@@ -211,6 +281,27 @@ class ConcurrentProfile(Profile[StrategyT, AggregatorT, BenchmarkT]):
         ge=0,
     )
 
+    @classmethod
+    def resolve_args(
+        cls,
+        rate_type: str,
+        rate: Optional[Union[float, int, list[float, int]]],
+        random_seed: int,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        """
+        Resolve arguments for concurrent profile construction.
+
+        :param rate_type: The type/strategy of the profile (ignored).
+        :param rate: Rate parameter, remapped to streams.
+        :param random_seed: Random seed (ignored and stripped).
+        :param kwargs: Additional arguments to pass through.
+        :return: Dictionary of resolved arguments.
+        :raises ValueError: If rate is None.
+        """
+        kwargs["streams"] = rate
+        return kwargs
+
     @property
     def strategy_types(self) -> list[StrategyType]:
         """Get concurrent strategy types for each configured stream count."""
@@ -219,13 +310,16 @@ class ConcurrentProfile(Profile[StrategyT, AggregatorT, BenchmarkT]):
 
     def next_strategy(
         self,
-        _prev_strategy: Optional[StrategyT],
-        _prev_aggregator: Optional[AggregatorT],
-        _prev_benchmark: Optional[BenchmarkT],
+        prev_strategy: Optional[StrategyT],
+        prev_aggregator: Optional[AggregatorT],
+        prev_benchmark: Optional[BenchmarkT],
     ) -> Optional[StrategyT]:
         """
         Generate concurrent strategy for the next stream count.
 
+        :param prev_strategy: The previously completed strategy (unused).
+        :param prev_aggregator: Result aggregator from the previous strategy (unused).
+        :param prev_benchmark: Benchmark results from the previous strategy (unused).
         :return: ConcurrentStrategy with next stream count, or None if complete.
         """
         streams = self.streams if isinstance(self.streams, list) else [self.streams]
@@ -239,6 +333,7 @@ class ConcurrentProfile(Profile[StrategyT, AggregatorT, BenchmarkT]):
         )
 
 
+@Profile.register("throughput")
 class ThroughputProfile(Profile[StrategyT, AggregatorT, BenchmarkT]):
     """
     Maximum throughput strategy execution profile with optional concurrency limits.
@@ -259,6 +354,29 @@ class ThroughputProfile(Profile[StrategyT, AggregatorT, BenchmarkT]):
         ge=0,
     )
 
+    @classmethod
+    def resolve_args(
+        cls,
+        rate_type: str,
+        rate: Optional[Union[float, int, list[float, int]]],
+        random_seed: int,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        """
+        Resolve arguments for throughput profile construction.
+
+        :param rate_type: The type/strategy of the profile (ignored).
+        :param rate: Rate parameter to remap to max_concurrency.
+        :param random_seed: Random seed (ignored and stripped).
+        :param kwargs: Additional arguments to pass through.
+        :return: Dictionary of resolved arguments.
+        """
+        # Remap rate to max_concurrency, strip out random_seed
+        kwargs.pop("random_seed", None)
+        if rate is not None:
+            kwargs["max_concurrency"] = rate
+        return kwargs
+
     @property
     def strategy_types(self) -> list[StrategyType]:
         """Get the single throughput strategy type."""
@@ -266,13 +384,16 @@ class ThroughputProfile(Profile[StrategyT, AggregatorT, BenchmarkT]):
 
     def next_strategy(
         self,
-        _prev_strategy: Optional[StrategyT],
-        _prev_aggregator: Optional[AggregatorT],
-        _prev_benchmark: Optional[BenchmarkT],
+        prev_strategy: Optional[StrategyT],
+        prev_aggregator: Optional[AggregatorT],
+        prev_benchmark: Optional[BenchmarkT],
     ) -> Optional[StrategyT]:
         """
         Generate throughput strategy or None if already completed.
 
+        :param prev_strategy: The previously completed strategy (unused).
+        :param prev_aggregator: Result aggregator from the previous strategy (unused).
+        :param prev_benchmark: Benchmark results from the previous strategy (unused).
         :return: ThroughputStrategy for the first execution, None afterward.
         """
         if len(self.completed_strategies) >= 1:
@@ -284,6 +405,7 @@ class ThroughputProfile(Profile[StrategyT, AggregatorT, BenchmarkT]):
         )
 
 
+@Profile.register(["async", "constant", "poisson"])
 class AsyncProfile(Profile[StrategyT, AggregatorT, BenchmarkT]):
     """
     Rate-based asynchronous strategy execution profile with configurable patterns.
@@ -315,6 +437,36 @@ class AsyncProfile(Profile[StrategyT, AggregatorT, BenchmarkT]):
         description="Random seed for Poisson distribution strategy",
     )
 
+    @classmethod
+    def resolve_args(
+        cls,
+        rate_type: Union[ProfileType, StrategyT],
+        rate: Optional[Union[float, int, list[float, int]]],
+        random_seed: int,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        """
+        Resolve arguments for async profile construction.
+
+        :param rate_type: The type/strategy of the profile.
+        :param rate: Rate parameter for the profile.
+        :param random_seed: Random seed for stochastic strategies.
+        :param kwargs: Additional arguments to pass through.
+        :return: Dictionary of resolved arguments.
+        :raises ValueError: If rate is None.
+        """
+        if rate is None:
+            raise ValueError("AsyncProfile requires a rate parameter")
+
+        kwargs["strategy_type"] = (
+            rate_type
+            if rate_type in ["constant", "poisson"]
+            else kwargs.get("strategy_type", "constant")
+        )
+        kwargs["rate"] = rate
+        kwargs["random_seed"] = random_seed
+        return kwargs
+
     @property
     def strategy_types(self) -> list[StrategyType]:
         """Get async strategy types for each configured rate."""
@@ -323,13 +475,16 @@ class AsyncProfile(Profile[StrategyT, AggregatorT, BenchmarkT]):
 
     def next_strategy(
         self,
-        _prev_strategy: Optional[StrategyT],
-        _prev_aggregator: Optional[AggregatorT],
-        _prev_benchmark: Optional[BenchmarkT],
+        prev_strategy: Optional[StrategyT],
+        prev_aggregator: Optional[AggregatorT],
+        prev_benchmark: Optional[BenchmarkT],
     ) -> Optional[StrategyT]:
         """
         Generate async strategy for the next configured rate.
 
+        :param prev_strategy: The previously completed strategy (unused).
+        :param prev_aggregator: Result aggregator from the previous strategy (unused).
+        :param prev_benchmark: Benchmark results from the previous strategy (unused).
         :return: AsyncConstantStrategy or AsyncPoissonStrategy for next rate,
             or None if all rates completed.
         :raises ValueError: If strategy_type is neither 'constant' nor 'poisson'.
@@ -358,6 +513,7 @@ class AsyncProfile(Profile[StrategyT, AggregatorT, BenchmarkT]):
             raise ValueError(f"Invalid strategy type: {self.strategy_type}")
 
 
+@Profile.register("sweep")
 class SweepProfile(Profile[StrategyT, AggregatorT, BenchmarkT]):
     """
     Adaptive multi-strategy sweep execution profile with rate discovery.
@@ -367,7 +523,7 @@ class SweepProfile(Profile[StrategyT, AggregatorT, BenchmarkT]):
     sweep_size: int = Field(
         description="Number of strategies to generate for the sweep",
     )
-    rate_type: Literal["constant", "poisson"] = "constant"
+    strategy_type: Literal["constant", "poisson"] = "constant"
     startup_duration: float = Field(
         default=0.0,
         description=(
@@ -397,18 +553,45 @@ class SweepProfile(Profile[StrategyT, AggregatorT, BenchmarkT]):
         default_factory=list,
         description="Generated rates for async strategy sweep",
     )
+    measured_rates: list[float] = Field(
+        default_factory=list,
+        description="Calculated interpolated rates between synchronous and throughput",
+    )
+
+    @classmethod
+    def resolve_args(
+        cls,
+        rate_type: str,
+        rate: Optional[Union[float, int, list[float, int]]],
+        random_seed: int,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        """
+        Resolve arguments for sweep profile construction.
+
+        :param rate_type: The type/strategy for async strategies in the sweep.
+        :param rate: Rate parameter (ignored for sweep).
+        :param random_seed: Random seed for stochastic strategies.
+        :param kwargs: Additional arguments to pass through.
+        :return: Dictionary of resolved arguments.
+        """
+        kwargs["sweep_size"] = kwargs.get("sweep_size", rate)
+        kwargs["random_seed"] = random_seed
+        if rate_type in ["constant", "poisson"]:
+            kwargs["strategy_type"] = rate_type
+        return kwargs
 
     @property
     def strategy_types(self) -> list[StrategyType]:
         """Get strategy types for the complete sweep sequence."""
         types = ["synchronous", "throughput"]
-        types += [self.rate_type] * (self.sweep_size - len(types))
+        types += [self.strategy_type] * (self.sweep_size - len(types))
         return types
 
     def next_strategy(
         self,
         prev_strategy: Optional[StrategyT],
-        _prev_aggregator: Optional[AggregatorT],
+        prev_aggregator: Optional[AggregatorT],
         prev_benchmark: Optional[BenchmarkT],
     ) -> Optional[StrategyT]:
         """
@@ -418,9 +601,10 @@ class SweepProfile(Profile[StrategyT, AggregatorT, BenchmarkT]):
         baseline rates, then generates interpolated rates for async strategies.
 
         :param prev_strategy: The previously completed strategy.
+        :param prev_aggregator: Result aggregator from the previous strategy (unused).
         :param prev_benchmark: Benchmark results from the previous strategy.
         :return: Next strategy in sweep sequence, or None if complete.
-        :raises ValueError: If rate_type is neither 'constant' nor 'poisson'.
+        :raises ValueError: If strategy_type is neither 'constant' nor 'poisson'.
         """
         if prev_strategy is None:
             return SynchronousStrategy()
@@ -454,17 +638,17 @@ class SweepProfile(Profile[StrategyT, AggregatorT, BenchmarkT]):
             [
                 strat
                 for strat in self.completed_strategies
-                if strat.type_ == self.rate_type
+                if strat.type_ == self.strategy_type
             ]
         )
 
-        if self.rate_type == "constant":
+        if self.strategy_type == "constant":
             return AsyncConstantStrategy(
                 rate=self.measured_rates[next_rate_index],
                 startup_duration=self.startup_duration,
                 max_concurrency=self.max_concurrency,
             )
-        elif self.rate_type == "poisson":
+        elif self.strategy_type == "poisson":
             return AsyncPoissonStrategy(
                 rate=self.measured_rates[next_rate_index],
                 startup_duration=self.startup_duration,
@@ -472,4 +656,4 @@ class SweepProfile(Profile[StrategyT, AggregatorT, BenchmarkT]):
                 random_seed=self.random_seed,
             )
         else:
-            raise ValueError(f"Invalid strategy type: {self.rate_type}")
+            raise ValueError(f"Invalid strategy type: {self.strategy_type}")
