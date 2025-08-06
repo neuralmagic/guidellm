@@ -92,6 +92,48 @@ class GenerationResponse(StandardBaseModel):
         default=None, description="Actual output token count reported by the backend."
     )
 
+    @property
+    def prompt_tokens(self) -> Optional[int]:
+        """
+        :return: The number of prompt tokens used in the request
+            (response_prompt_tokens if available, otherwise request_prompt_tokens).
+        """
+        return self.response_prompt_tokens or self.request_prompt_tokens
+
+    @property
+    def output_tokens(self) -> Optional[int]:
+        """
+        :return: The number of output tokens generated in the response
+            (response_output_tokens if available, otherwise request_output_tokens).
+        """
+        return self.response_output_tokens or self.request_output_tokens
+
+    @property
+    def total_tokens(self) -> Optional[int]:
+        """
+        :return: The total number of tokens used in the request and response.
+            Sum of prompt_tokens and output_tokens.
+        """
+        if self.prompt_tokens is None or self.output_tokens is None:
+            return None
+        return self.prompt_tokens + self.output_tokens
+
+    def preferred_prompt_tokens(
+        self, preferred_source: Literal["request", "response"]
+    ) -> Optional[int]:
+        if preferred_source == "request":
+            return self.request_prompt_tokens or self.response_prompt_tokens
+        else:
+            return self.response_prompt_tokens or self.request_prompt_tokens
+
+    def preferred_output_tokens(
+        self, preferred_source: Literal["request", "response"]
+    ) -> Optional[int]:
+        if preferred_source == "request":
+            return self.request_output_tokens or self.response_output_tokens
+        else:
+            return self.response_output_tokens or self.request_output_tokens
+
 
 class GenerationRequestTimings(RequestTimings):
     """Timing model for tracking generation request lifecycle events."""

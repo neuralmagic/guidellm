@@ -7,6 +7,7 @@ from .hf_datasets import (
 from .hf_transformers import (
     check_load_processor,
 )
+from .mixins import InfoMixin
 from .random import IntegerRangeSampler
 from .registry import RegistryMixin
 from .singleton import SingletonMixin, ThreadSafeSingletonMixin
@@ -25,6 +26,7 @@ __all__ = [
     "Colors",
     "DefaultGroupHandler",
     "EndlessTextCreator",
+    "InfoMixin",
     "IntegerRangeSampler",
     "RegistryMixin",
     "SingletonMixin",

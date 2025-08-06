@@ -24,15 +24,14 @@ from typing import Any, Generic, Literal, Optional, Union
 import numpy as np
 from pydantic import Field, computed_field
 
-from guidellm.benchmark.aggregator import AggregatorT
 from guidellm.benchmark.benchmark import BenchmarkT
 from guidellm.objects import StandardBaseModel
 from guidellm.scheduler import (
     AsyncConstantStrategy,
     AsyncPoissonStrategy,
-    CallableConstraint,
-    CallableConstraintInitializer,
     ConcurrentStrategy,
+    Constraint,
+    ConstraintInitializer,
     ConstraintsInitializerFactory,
     SchedulingStrategy,
     StrategyT,
@@ -58,7 +57,7 @@ ProfileType = Literal["synchronous", "concurrent", "throughput", "async", "sweep
 class Profile(
     StandardBaseModel,
     ABC,
-    Generic[StrategyT, AggregatorT, BenchmarkT],
+    Generic[StrategyT, BenchmarkT],
     RegistryMixin,
 ):
     """
@@ -122,7 +121,7 @@ class Profile(
         description="The strategies that have completed execution",
     )
     constraints: Optional[
-        dict[str, Union[Any, dict[str, Any], CallableConstraintInitializer]]
+        dict[str, Union[Any, dict[str, Any], ConstraintInitializer]]
     ] = Field(
         default=None,
         description="Runtime constraints to apply during strategy execution",
@@ -131,7 +130,9 @@ class Profile(
     @computed_field  # type: ignore[misc]
     @property
     def strategy_types(self) -> list[StrategyType]:
-        """Get the types of all completed strategies in execution order."""
+        """
+        :return: List of all strategy types expected to be executed in this profile.
+        """
         return [strat.type_ for strat in self.completed_strategies]
 
     def strategies_generator(
@@ -139,30 +140,27 @@ class Profile(
     ) -> Generator[
         tuple[
             Optional[StrategyT],
-            Optional[dict[str, Union[Any, dict[str, Any], CallableConstraint]]],
+            Optional[dict[str, Union[Any, dict[str, Any], Constraint]]],
         ],
-        tuple[AggregatorT, BenchmarkT],
+        BenchmarkT,
         None,
     ]:
         """
         Generate strategies and constraints for sequential profile execution.
 
         :return: Generator yielding (strategy, constraints) tuples and
-            receiving (aggregator, benchmark) results from each execution.
+            receiving benchmark results from each execution.
         """
         prev_strategy: Optional[StrategyT] = None
-        prev_aggregator: Optional[AggregatorT] = None
         prev_benchmark: Optional[BenchmarkT] = None
 
         while (
-            strategy := self.next_strategy(
-                prev_strategy, prev_aggregator, prev_benchmark
-            )
+            strategy := self.next_strategy(prev_strategy, prev_benchmark)
         ) is not None:
             constraints = self.next_strategy_constraints(
-                strategy, prev_strategy, prev_aggregator, prev_benchmark
+                strategy, prev_strategy, prev_benchmark
             )
-            prev_aggregator, prev_benchmark = yield (
+            prev_benchmark = yield (
                 strategy,
                 constraints,
             )
@@ -173,14 +171,12 @@ class Profile(
     def next_strategy(
         self,
         prev_strategy: Optional[StrategyT],
-        prev_aggregator: Optional[AggregatorT],
         prev_benchmark: Optional[BenchmarkT],
     ) -> Optional[StrategyT]:
         """
         Generate the next strategy to execute in the profile sequence.
 
         :param prev_strategy: The previously completed strategy.
-        :param prev_aggregator: Result aggregator from the previous strategy.
         :param prev_benchmark: Benchmark results from the previous strategy.
         :return: Next strategy to execute, or None if profile is complete.
         """
@@ -190,15 +186,13 @@ class Profile(
         self,
         next_strategy: Optional[StrategyT],
         prev_strategy: Optional[StrategyT],
-        prev_aggregator: Optional[AggregatorT],
         prev_benchmark: Optional[BenchmarkT],
-    ) -> Optional[dict[str, Union[Any, dict[str, Any], CallableConstraint]]]:
+    ) -> Optional[dict[str, Union[Any, dict[str, Any], Constraint]]]:
         """
         Generate constraints for the next strategy execution.
 
         :param next_strategy: The next strategy to be executed.
         :param prev_strategy: The previously completed strategy.
-        :param prev_aggregator: Result aggregator from the previous strategy.
         :param prev_benchmark: Benchmark results from the previous strategy.
         :return: Constraints dictionary for the next strategy, or None.
         """
@@ -210,7 +204,7 @@ class Profile(
 
 
 @Profile.register("synchronous")
-class SynchronousProfile(Profile[StrategyT, AggregatorT, BenchmarkT]):
+class SynchronousProfile(Profile[StrategyT, BenchmarkT]):
     """Single synchronous strategy execution profile."""
 
     type_: Literal["synchronous"] = "synchronous"  # type: ignore[assignment]
@@ -246,14 +240,12 @@ class SynchronousProfile(Profile[StrategyT, AggregatorT, BenchmarkT]):
     def next_strategy(
         self,
         prev_strategy: Optional[StrategyT],
-        prev_aggregator: Optional[AggregatorT],
         prev_benchmark: Optional[BenchmarkT],
     ) -> Optional[StrategyT]:
         """
         Generate synchronous strategy or None if already completed.
 
         :param prev_strategy: The previously completed strategy (unused).
-        :param prev_aggregator: Result aggregator from the previous strategy (unused).
         :param prev_benchmark: Benchmark results from the previous strategy (unused).
         :return: SynchronousStrategy for the first execution, None afterward.
         """
@@ -264,7 +256,7 @@ class SynchronousProfile(Profile[StrategyT, AggregatorT, BenchmarkT]):
 
 
 @Profile.register("concurrent")
-class ConcurrentProfile(Profile[StrategyT, AggregatorT, BenchmarkT]):
+class ConcurrentProfile(Profile[StrategyT, BenchmarkT]):
     """Fixed-concurrency strategy execution profile with configurable stream counts."""
 
     type_: Literal["concurrent"] = "concurrent"  # type: ignore[assignment]
@@ -311,14 +303,12 @@ class ConcurrentProfile(Profile[StrategyT, AggregatorT, BenchmarkT]):
     def next_strategy(
         self,
         prev_strategy: Optional[StrategyT],
-        prev_aggregator: Optional[AggregatorT],
         prev_benchmark: Optional[BenchmarkT],
     ) -> Optional[StrategyT]:
         """
         Generate concurrent strategy for the next stream count.
 
         :param prev_strategy: The previously completed strategy (unused).
-        :param prev_aggregator: Result aggregator from the previous strategy (unused).
         :param prev_benchmark: Benchmark results from the previous strategy (unused).
         :return: ConcurrentStrategy with next stream count, or None if complete.
         """
@@ -334,7 +324,7 @@ class ConcurrentProfile(Profile[StrategyT, AggregatorT, BenchmarkT]):
 
 
 @Profile.register("throughput")
-class ThroughputProfile(Profile[StrategyT, AggregatorT, BenchmarkT]):
+class ThroughputProfile(Profile[StrategyT, BenchmarkT]):
     """
     Maximum throughput strategy execution profile with optional concurrency limits.
     """
@@ -385,14 +375,12 @@ class ThroughputProfile(Profile[StrategyT, AggregatorT, BenchmarkT]):
     def next_strategy(
         self,
         prev_strategy: Optional[StrategyT],
-        prev_aggregator: Optional[AggregatorT],
         prev_benchmark: Optional[BenchmarkT],
     ) -> Optional[StrategyT]:
         """
         Generate throughput strategy or None if already completed.
 
         :param prev_strategy: The previously completed strategy (unused).
-        :param prev_aggregator: Result aggregator from the previous strategy (unused).
         :param prev_benchmark: Benchmark results from the previous strategy (unused).
         :return: ThroughputStrategy for the first execution, None afterward.
         """
@@ -406,7 +394,7 @@ class ThroughputProfile(Profile[StrategyT, AggregatorT, BenchmarkT]):
 
 
 @Profile.register(["async", "constant", "poisson"])
-class AsyncProfile(Profile[StrategyT, AggregatorT, BenchmarkT]):
+class AsyncProfile(Profile[StrategyT, BenchmarkT]):
     """
     Rate-based asynchronous strategy execution profile with configurable patterns.
     """
@@ -476,14 +464,12 @@ class AsyncProfile(Profile[StrategyT, AggregatorT, BenchmarkT]):
     def next_strategy(
         self,
         prev_strategy: Optional[StrategyT],
-        prev_aggregator: Optional[AggregatorT],
         prev_benchmark: Optional[BenchmarkT],
     ) -> Optional[StrategyT]:
         """
         Generate async strategy for the next configured rate.
 
         :param prev_strategy: The previously completed strategy (unused).
-        :param prev_aggregator: Result aggregator from the previous strategy (unused).
         :param prev_benchmark: Benchmark results from the previous strategy (unused).
         :return: AsyncConstantStrategy or AsyncPoissonStrategy for next rate,
             or None if all rates completed.
@@ -514,7 +500,7 @@ class AsyncProfile(Profile[StrategyT, AggregatorT, BenchmarkT]):
 
 
 @Profile.register("sweep")
-class SweepProfile(Profile[StrategyT, AggregatorT, BenchmarkT]):
+class SweepProfile(Profile[StrategyT, BenchmarkT]):
     """
     Adaptive multi-strategy sweep execution profile with rate discovery.
     """
@@ -591,7 +577,6 @@ class SweepProfile(Profile[StrategyT, AggregatorT, BenchmarkT]):
     def next_strategy(
         self,
         prev_strategy: Optional[StrategyT],
-        prev_aggregator: Optional[AggregatorT],
         prev_benchmark: Optional[BenchmarkT],
     ) -> Optional[StrategyT]:
         """
@@ -601,7 +586,6 @@ class SweepProfile(Profile[StrategyT, AggregatorT, BenchmarkT]):
         baseline rates, then generates interpolated rates for async strategies.
 
         :param prev_strategy: The previously completed strategy.
-        :param prev_aggregator: Result aggregator from the previous strategy (unused).
         :param prev_benchmark: Benchmark results from the previous strategy.
         :return: Next strategy in sweep sequence, or None if complete.
         :raises ValueError: If strategy_type is neither 'constant' nor 'poisson'.

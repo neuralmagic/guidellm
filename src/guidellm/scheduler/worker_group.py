@@ -24,7 +24,7 @@ from multiprocessing.synchronize import Barrier, Event
 from typing import Generic, Optional
 
 from guidellm.config import settings
-from guidellm.scheduler.constraints import CallableConstraint
+from guidellm.scheduler.constraints import Constraint
 from guidellm.scheduler.objects import (
     BackendT,
     RequestT,
@@ -58,7 +58,7 @@ class WorkerProcessGroup(Generic[BackendT, RequestT, RequestTimingsT, ResponseT]
         backend: BackendT[RequestT, RequestTimingsT, ResponseT],
         requests: Iterable[RequestT],
         strategy: SchedulingStrategy,
-        constraints: dict[str, CallableConstraint],
+        constraints: dict[str, Constraint],
     ):
         self.backend = backend
         self.requests = requests

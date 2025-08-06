@@ -19,7 +19,7 @@ from typing import (
 )
 
 from guidellm.config import settings
-from guidellm.scheduler.constraints import CallableConstraint
+from guidellm.scheduler.constraints import Constraint
 from guidellm.scheduler.objects import (
     RequestT,
     RequestTimingsT,
@@ -46,11 +46,11 @@ class Environment(ABC, Generic[RequestT, ResponseT]):
         self,
         requests: Iterable[RequestT],
         strategy: SchedulingStrategy,
-        constraints: dict[str, CallableConstraint],
+        constraints: dict[str, Constraint],
     ) -> tuple[
         Iterable[RequestT],
         SchedulingStrategy,
-        dict[str, CallableConstraint],
+        dict[str, Constraint],
     ]:
         """
         Synchronize run parameters across nodes and resolve local execution scope.
@@ -152,8 +152,8 @@ class NonDistributedEnvironment(Environment):
         self,
         requests: Iterable[RequestT],
         strategy: SchedulingStrategy,
-        constraints: dict[str, CallableConstraint],
-    ) -> tuple[Iterable[RequestT], SchedulingStrategy, dict[str, CallableConstraint]]:
+        constraints: dict[str, Constraint],
+    ) -> tuple[Iterable[RequestT], SchedulingStrategy, dict[str, Constraint]]:
         """
         Return parameters unchanged for single-node execution.
 

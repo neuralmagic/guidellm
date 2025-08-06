@@ -1,9 +1,8 @@
 """
 Constraint system for scheduler behavior control and request processing limits.
 
-Provides flexible constraints for managing scheduler behavior in GuideLLM,
-enabling limits on request queuing and processing based on time, error rates,
-and request counts with configurable thresholds and evaluation windows.
+Provides flexible constraints for managing scheduler behavior with configurable
+thresholds based on time, error rates, and request counts.
 
 Classes:
     ConstraintsInitializerFactory: Registry for constraint initializer functions.
@@ -19,12 +18,12 @@ Classes:
     MaxGlobalErrorRateConstraintInitializer: Factory for MaxGlobalErrorRateConstraint.
 
 Type Aliases:
-    CallableConstraint: Function signature for constraint evaluation.
-    CallableConstraintInitializer: Function signature for constraint factory.
+    Constraint: Function signature for constraint evaluation.
+    ConstraintInitializer: Function signature for constraint factory.
 """
 
 import time
-from typing import Any, Callable, Optional, Union
+from typing import Any, Optional, Protocol, Union, runtime_checkable
 
 from pydantic import Field
 
@@ -38,8 +37,8 @@ from guidellm.scheduler.objects import (
 from guidellm.utils import RegistryMixin
 
 __all__ = [
-    "CallableConstraint",
-    "CallableConstraintInitializer",
+    "Constraint",
+    "ConstraintInitializer",
     "ConstraintsInitializerFactory",
     "MaxDurationConstraint",
     "MaxDurationConstraintInitializer",
@@ -53,30 +52,45 @@ __all__ = [
     "MaxNumberConstraintInitializer",
 ]
 
-CallableConstraint = Callable[
-    [SchedulerState, ScheduledRequestInfo], SchedulerUpdateAction
-]
 
-CallableConstraintInitializer = Callable[..., CallableConstraint]
+@runtime_checkable
+class Constraint(Protocol):
+    """Protocol for constraint evaluation functions."""
+
+    def __call__(
+        self, state: SchedulerState, request: ScheduledRequestInfo
+    ) -> SchedulerUpdateAction:
+        """
+        Evaluate constraint against scheduler state and request information.
+
+        :param state: Current scheduler state with metrics and timing.
+        :param request: Individual request information and metadata.
+        :return: Action indicating whether to continue or stop operations.
+        """
 
 
-class ConstraintsInitializerFactory(RegistryMixin[CallableConstraintInitializer]):
-    """
-    Registry factory for creating and managing constraint initializers.
+@runtime_checkable
+class ConstraintInitializer(Protocol):
+    """Protocol for constraint initializer factory functions."""
 
-    Provides a centralized registry for constraint initializer functions, enabling
-    dynamic constraint creation from configuration keys and parameters. Supports
-    resolution of mixed constraint specifications including callables, dictionaries,
-    and scalar values.
-    """
+    def __call__(self, **kwargs) -> Constraint:
+        """
+        Create a constraint instance from configuration parameters.
+
+        :param kwargs: Configuration parameters for constraint creation.
+        :return: Configured constraint evaluation function.
+        """
+
+
+class ConstraintsInitializerFactory(RegistryMixin[ConstraintInitializer]):
+    """Registry factory for creating and managing constraint initializers."""
 
     @classmethod
-    def create(cls, key: str, *args, **kwargs) -> CallableConstraintInitializer:
+    def create(cls, key: str, *args, **kwargs) -> ConstraintInitializer:
         """
         Create a constraint initializer for the specified key.
 
         :param key: Registered constraint initializer key.
-        :param args: Positional arguments for initializer creation.
         :param kwargs: Keyword arguments for initializer creation.
         :return: Configured constraint initializer function.
         :raises ValueError: If the key is not registered in the factory.
@@ -87,95 +101,79 @@ class ConstraintsInitializerFactory(RegistryMixin[CallableConstraintInitializer]
         return cls.get_registered_object(key)(*args, **kwargs)
 
     @classmethod
-    def resolve(
-        cls,
-        initializers: dict[
-            str, Union[Any, dict[str, Any], CallableConstraintInitializer]
-        ],
-    ) -> dict[str, CallableConstraint]:
-        """
-        Resolve a dictionary of mixed constraint specifications to callable constraints.
-
-        Handles three types of specifications:
-        - Callable objects: Used directly as constraints
-        - Dictionary values: Expanded as keyword arguments to initializers
-        - Scalar values: Passed as single arguments to initializers
-
-        :param initializers: Dictionary mapping constraint keys to specifications.
-        :return: Dictionary mapping constraint keys to callable constraint functions.
-        :raises ValueError: If any key is not registered in the factory.
-        """
-        return {
-            key: (
-                val
-                if callable(val)
-                else cls.create(key, **val)
-                if isinstance(val, dict)
-                else cls.create(key, val)
-            )
-            for key, val in initializers.items()
-        }
-
-    @classmethod
-    def create_constraint(cls, key: str, *args, **kwargs) -> CallableConstraint:
+    def create_constraint(cls, key: str, *args, **kwargs) -> Constraint:
         """
         Create a constraint instance for the specified key.
 
         :param key: Registered constraint initializer key.
-        :param args: Positional arguments for constraint creation.
         :param kwargs: Keyword arguments for constraint creation.
         :return: Configured constraint function ready for evaluation.
         :raises ValueError: If the key is not registered in the factory.
         """
-        initializer = cls.create(key)
+        return cls.create(key, *args, **kwargs)()
 
-        return initializer(*args, **kwargs)
+    @classmethod
+    def resolve(
+        cls,
+        initializers: dict[
+            str,
+            Union[Any, dict[str, Any], Constraint, ConstraintInitializer],
+        ],
+    ) -> dict[str, Constraint]:
+        """
+        Resolve mixed constraint specifications to callable constraints.
+
+        :param initializers: Dictionary mapping constraint keys to specifications.
+        :return: Dictionary mapping constraint keys to callable functions.
+        :raises ValueError: If any key is not registered in the factory.
+        """
+        constraints = {}
+
+        for key, val in initializers.items():
+            if isinstance(val, Constraint):
+                constraints[key] = val
+            elif isinstance(val, ConstraintInitializer):
+                constraints[key] = val()
+            elif isinstance(val, dict):
+                constraints[key] = cls.create_constraint(key, **val)
+            else:
+                constraints[key] = cls.create_constraint(key, val)
+
+        return constraints
 
     @classmethod
     def resolve_constraints(
         cls,
-        constraints: dict[str, Union[Any, dict[str, Any], CallableConstraint]],
-    ) -> dict[str, CallableConstraint]:
+        constraints: dict[str, Union[Any, dict[str, Any], Constraint]],
+    ) -> dict[str, Constraint]:
         """
-        Resolve constraints from a dictionary of mixed constraint specifications.
-
-        Handles three types of constraint specifications:
-        - Callable objects: Used directly as constraints
-        - Dictionary values: Expanded as keyword arguments to constraint initializers
-        - Scalar values: Passed as single arguments to constraint initializers
+        Resolve constraints from mixed constraint specifications.
 
         :param constraints: Dictionary mapping constraint keys to specifications.
-        :return: Dictionary mapping constraint keys to callable constraint functions.
-        :raises ValueError: If any constraint key is not registered in the factory.
+        :return: Dictionary mapping constraint keys to callable functions.
+        :raises ValueError: If any constraint key is not registered.
         """
-        return {
-            key: (
-                val
-                if callable(val)
-                else cls.create_constraint(key, **val)
-                if isinstance(val, dict)
-                else cls.create_constraint(key, val)
-            )
-            for key, val in constraints.items()
-        }
+        constraints = {}
+
+        for key, val in constraints.items():
+            if isinstance(val, Constraint):
+                constraints[key] = val
+            elif isinstance(val, dict):
+                constraints[key] = cls.create_constraint(key, **val)
+            else:
+                constraints[key] = cls.create_constraint(key, val)
+
+        return constraints
 
 
 class _MaxNumberBase(StandardBaseModel):
-    """Base configuration for maximum number constraints."""
-
     max_num: Union[int, float] = Field(
         ge=0, description="Maximum number of requests allowed"
     )
 
 
-class MaxNumberConstraint(_MaxNumberBase, CallableConstraint):
-    """
-    Constraint that limits execution based on maximum request counts.
-
-    Stops request queuing when the number of created requests reaches the limit,
-    and stops processing when the number of processed requests reaches the limit.
-    Supports both integer and floating-point limits for flexibility.
-    """
+class MaxNumberConstraint(_MaxNumberBase, Constraint):
+    """Constraint that limits execution based on maximum request counts."""
 
     def __call__(
         self, state: SchedulerState, _request_info: ScheduledRequestInfo
@@ -204,10 +202,10 @@ class MaxNumberConstraint(_MaxNumberBase, CallableConstraint):
 
 
 @ConstraintsInitializerFactory.register("max_number")
-class MaxNumberConstraintInitializer(_MaxNumberBase, CallableConstraintInitializer):
-    """Factory for creating MaxNumberConstraint instances from configuration."""
+class MaxNumberConstraintInitializer(_MaxNumberBase, ConstraintInitializer):
+    """Factory for creating MaxNumberConstraint instances."""
 
-    def __call__(self, **_kwargs) -> CallableConstraint:
+    def __call__(self, **_kwargs) -> Constraint:
         """
         Create a MaxNumberConstraint instance.
 
@@ -220,21 +218,13 @@ class MaxNumberConstraintInitializer(_MaxNumberBase, CallableConstraintInitializ
 
 
 class _MaxDurationBase(StandardBaseModel):
-    """Base configuration for maximum duration constraints."""
-
     max_duration: Union[int, float] = Field(
         ge=0, description="Maximum duration in seconds"
     )
 
 
-class MaxDurationConstraint(_MaxDurationBase, CallableConstraint):
-    """
-    Constraint that limits execution based on maximum time duration.
-
-    Stops both request queuing and processing when the elapsed time since
-    scheduler startup exceeds the configured maximum duration. Uses wall-clock
-    time for accurate duration measurement regardless of processing load.
-    """
+class MaxDurationConstraint(_MaxDurationBase, Constraint):
+    """Constraint that limits execution based on maximum time duration."""
 
     def __call__(
         self, state: SchedulerState, _request_info: ScheduledRequestInfo
@@ -264,10 +254,10 @@ class MaxDurationConstraint(_MaxDurationBase, CallableConstraint):
 
 
 @ConstraintsInitializerFactory.register("max_duration")
-class MaxDurationConstraintInitializer(_MaxDurationBase, CallableConstraintInitializer):
-    """Factory for creating MaxDurationConstraint instances from configuration."""
+class MaxDurationConstraintInitializer(_MaxDurationBase, ConstraintInitializer):
+    """Factory for creating MaxDurationConstraint instances."""
 
-    def __call__(self, **_kwargs) -> CallableConstraint:
+    def __call__(self, **_kwargs) -> Constraint:
         """
         Create a MaxDurationConstraint instance.
 
@@ -280,21 +270,13 @@ class MaxDurationConstraintInitializer(_MaxDurationBase, CallableConstraintIniti
 
 
 class _MaxErrorsBase(StandardBaseModel):
-    """Base configuration for maximum errors constraints."""
-
     max_errors: Union[int, float] = Field(
         gt=0, description="Maximum number of errors allowed"
     )
 
 
-class MaxErrorsConstraint(_MaxErrorsBase, CallableConstraint):
-    """
-    Constraint that limits execution based on absolute error count.
-
-    Stops both request queuing and processing (across all nodes) when the
-    total number of errored requests exceeds the configured threshold.
-    Uses global stop to prevent error propagation across distributed nodes.
-    """
+class MaxErrorsConstraint(_MaxErrorsBase, Constraint):
+    """Constraint that limits execution based on absolute error count."""
 
     def __call__(
         self, state: SchedulerState, _request_info: ScheduledRequestInfo
@@ -320,10 +302,10 @@ class MaxErrorsConstraint(_MaxErrorsBase, CallableConstraint):
 
 
 @ConstraintsInitializerFactory.register("max_errors")
-class MaxErrorsConstraintInitializer(_MaxErrorsBase, CallableConstraintInitializer):
-    """Factory for creating MaxErrorsConstraint instances from configuration."""
+class MaxErrorsConstraintInitializer(_MaxErrorsBase, ConstraintInitializer):
+    """Factory for creating MaxErrorsConstraint instances."""
 
-    def __call__(self, **_kwargs) -> CallableConstraint:
+    def __call__(self, **_kwargs) -> Constraint:
         """
         Create a MaxErrorsConstraint instance.
 
@@ -336,8 +318,6 @@ class MaxErrorsConstraintInitializer(_MaxErrorsBase, CallableConstraintInitializ
 
 
 class _MaxErrorRateBase(StandardBaseModel):
-    """Base configuration for sliding window error rate constraints."""
-
     max_error_rate: Union[int, float] = Field(
         ge=0, le=1, description="Maximum error rate allowed (0.0 to 1.0)"
     )
@@ -348,14 +328,8 @@ class _MaxErrorRateBase(StandardBaseModel):
     )
 
 
-class MaxErrorRateConstraint(_MaxErrorRateBase, CallableConstraint):
-    """
-    Constraint that limits execution based on sliding window error rate.
-
-    Maintains a sliding window of recent request outcomes and stops execution
-    when the error rate within that window exceeds the configured threshold.
-    Provides more responsive error detection than global error rate constraints.
-    """
+class MaxErrorRateConstraint(_MaxErrorRateBase, Constraint):
+    """Constraint that limits execution based on sliding window error rate."""
 
     error_window: list[bool] = Field(
         default_factory=list,
@@ -367,9 +341,6 @@ class MaxErrorRateConstraint(_MaxErrorRateBase, CallableConstraint):
     ) -> SchedulerUpdateAction:
         """
         Evaluate constraint against sliding window error rate.
-
-        Updates the error window with the current request status and calculates
-        the error rate within the window. Stops execution if rate exceeds threshold.
 
         :param state: Current scheduler state with request counts.
         :param request_info: Individual request with completion status.
@@ -412,12 +383,10 @@ class MaxErrorRateConstraint(_MaxErrorRateBase, CallableConstraint):
 
 
 @ConstraintsInitializerFactory.register("max_error_rate")
-class MaxErrorRateConstraintInitializer(
-    _MaxErrorRateBase, CallableConstraintInitializer
-):
-    """Factory for creating MaxErrorRateConstraint instances from configuration."""
+class MaxErrorRateConstraintInitializer(_MaxErrorRateBase, ConstraintInitializer):
+    """Factory for creating MaxErrorRateConstraint instances."""
 
-    def __call__(self, **_kwargs) -> CallableConstraint:
+    def __call__(self, **_kwargs) -> Constraint:
         """
         Create a MaxErrorRateConstraint instance.
 
@@ -431,8 +400,6 @@ class MaxErrorRateConstraintInitializer(
 
 
 class _MaxGlobalErrorRateBase(StandardBaseModel):
-    """Base configuration for global error rate constraints."""
-
     max_error_rate: Union[int, float] = Field(
         ge=0, le=1, description="Maximum error rate allowed (0.0 to 1.0)"
     )
@@ -445,14 +412,8 @@ class _MaxGlobalErrorRateBase(StandardBaseModel):
     )
 
 
-class MaxGlobalErrorRateConstraint(_MaxGlobalErrorRateBase, CallableConstraint):
-    """
-    Constraint that limits execution based on global error rate.
-
-    Calculates error rate across all processed requests and stops execution
-    when the rate exceeds the threshold, but only after a minimum number of
-    requests have been processed to ensure statistical significance.
-    """
+class MaxGlobalErrorRateConstraint(_MaxGlobalErrorRateBase, Constraint):
+    """Constraint that limits execution based on global error rate."""
 
     def __call__(
         self, state: SchedulerState, _request_info: ScheduledRequestInfo
@@ -490,11 +451,11 @@ class MaxGlobalErrorRateConstraint(_MaxGlobalErrorRateBase, CallableConstraint):
 
 @ConstraintsInitializerFactory.register("max_global_error_rate")
 class MaxGlobalErrorRateConstraintInitializer(
-    _MaxGlobalErrorRateBase, CallableConstraintInitializer
+    _MaxGlobalErrorRateBase, ConstraintInitializer
 ):
     """Factory for creating MaxGlobalErrorRateConstraint instances."""
 
-    def __call__(self, **_kwargs) -> CallableConstraint:
+    def __call__(self, **_kwargs) -> Constraint:
         """
         Create a MaxGlobalErrorRateConstraint instance.
 

@@ -109,8 +109,8 @@ class Backend(
     @abstractmethod
     def info(self) -> dict[str, Any]:
         """
-        :return: Backend metadata including model information, endpoints, and
-            configuration data for reporting and diagnostics.
+        :return: Backend metadata including model any initializaiton and
+            configuration information.
         """
         ...
 

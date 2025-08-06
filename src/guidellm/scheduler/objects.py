@@ -162,6 +162,14 @@ class BackendInterface(ABC, Generic[RequestT, RequestTimingsT, ResponseT]):
         """Maximum concurrent requests supported, or None if unlimited."""
 
     @abstractmethod
+    def info(self) -> dict[str, Any]:
+        """
+        :return: Backend metadata including model any initializaiton and
+            configuration information.
+        """
+        ...
+
+    @abstractmethod
     async def process_startup(self) -> None:
         """
         Perform backend initialization and startup procedures.
@@ -214,6 +222,9 @@ class SchedulerState(StandardBaseModel):
         description="Number of worker processes in this scheduler"
     )
     start_time: float = Field(description="Unix timestamp when the scheduler started")
+    end_time: Optional[float] = Field(
+        default=None, description="Unix timestamp when the scheduler stopped"
+    )
     end_queuing_time: Optional[float] = Field(
         default=None, description="When request queuing stopped, if applicable"
     )
@@ -227,6 +238,19 @@ class SchedulerState(StandardBaseModel):
     end_processing_constraints: dict[str, dict[str, Any]] = Field(
         default_factory=dict,
         description="Constraints that triggered processing termination",
+    )
+
+    remaining_fraction: Optional[float] = Field(
+        default=None,
+        description="Estimated fraction for the remaining progress of the scheduler run, if known",
+    )
+    remaining_requests: Optional[int] = Field(
+        default=None,
+        description="Estimated number of requests remaining to be processed, if known",
+    )
+    remaining_duration: Optional[float] = Field(
+        default=None,
+        description="Estimated time remaining in seconds for the scheduler run, if known",
     )
 
     created_requests: int = Field(

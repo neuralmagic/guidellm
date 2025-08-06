@@ -12,7 +12,7 @@ from collections.abc import AsyncIterator, Iterable
 from typing import Any, Generic, Optional, Union
 
 from guidellm.scheduler.constraints import (
-    CallableConstraint,
+    Constraint,
     ConstraintsInitializerFactory,
 )
 from guidellm.scheduler.environment import Environment
@@ -76,7 +76,7 @@ class Scheduler(
         backend: BackendT[RequestT, ResponseT],
         strategy: SchedulingStrategy,
         env: Environment,
-        **constraints: dict[str, Union[Any, dict[str, Any], CallableConstraint]],
+        **constraints: dict[str, Union[Any, dict[str, Any], Constraint]],
     ) -> AsyncIterator[
         tuple[
             Optional[ResponseT],
