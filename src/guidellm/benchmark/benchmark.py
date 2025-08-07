@@ -1,3 +1,25 @@
+"""
+Benchmark data models and metrics for performance measurement and analysis.
+
+Provides comprehensive data structures for capturing, storing, and analyzing
+benchmark results from scheduler executions. Includes timing measurements,
+token statistics, and performance metrics for generative AI workloads.
+
+Classes:
+    BenchmarkSchedulerStats: Scheduler timing and performance statistics.
+    BenchmarkMetrics: Core benchmark metrics and distributions.
+    BenchmarkRequestStats: Individual request processing statistics.
+    Benchmark: Base benchmark result container with generic metrics.
+    GenerativeRequestStats: Request statistics for generative AI workloads.
+    GenerativeMetrics: Comprehensive metrics for generative benchmarks.
+    GenerativeBenchmark: Complete generative benchmark results and analysis.
+
+Type Variables:
+    BenchmarkMetricsT: Generic benchmark metrics type.
+    BenchmarkRequestStatsT: Generic request statistics type.
+    BenchmarkT: Generic benchmark container type.
+"""
+
 import uuid
 from typing import Any, Generic, Literal, Optional, TypedDict, TypeVar, Union
 
@@ -41,32 +63,42 @@ __all__ = [
 
 
 class BenchmarkSchedulerStats(StandardBaseModel):
-    """
-    A serializable model representing the run process statistics for the
-    entire benchmark run across all requests including warmup and cooldown.
-    """
+    """Scheduler timing and performance statistics for benchmark execution."""
 
     start_time: float = Field(
-        description="The start time of the benchmark run.",
+        description="Unix timestamp when the benchmark run started"
     )
-    end_time: float = Field(
-        description="The end time of the benchmark run.",
-    )
+    end_time: float = Field(description="Unix timestamp when the benchmark run ended")
     requests_made: StatusBreakdown[int, int, int, int] = Field(
-        description=(
-            "The number of requests made for the benchmark run broken down by "
-            "status including successful, incomplete, errored, and the sum of all three"
-        )
+        description="Request counts by status: successful, incomplete, errored, total"
     )
-    queued_time_avg: float = Field()
-    worker_resolve_start_delay_avg: float = Field()
-    worker_resolve_time_avg: float = Field()
-    worker_resolve_end_delay_avg: float = Field()
-    finalized_delay_avg: float = Field()
-    worker_targeted_start_delay_avg: float = Field()
-    request_start_delay_avg: float = Field()
-    request_time_avg: float = Field()
-    request_targeted_delay_avg: float = Field()
+    queued_time_avg: float = Field(
+        description="Avg time requests spent in the queue (seconds)"
+    )
+    worker_resolve_start_delay_avg: float = Field(
+        description="Avg delay before worker begins resolving req after dequeue (sec)"
+    )
+    worker_resolve_time_avg: float = Field(
+        description="Avg time for worker to resolve requests (seconds)"
+    )
+    worker_resolve_end_delay_avg: float = Field(
+        description="Avg delay after request end till worker resolves (seconds)"
+    )
+    finalized_delay_avg: float = Field(
+        description="Avg delay after resolve til finalized with in scheduler (sec)"
+    )
+    worker_targeted_start_delay_avg: float = Field(
+        description="Avg delay from targeted start to actual worker start (seconds)"
+    )
+    request_start_delay_avg: float = Field(
+        description="Avg delay after resolve til request start (seconds)"
+    )
+    request_time_avg: float = Field(
+        description="Avg request processing time (seconds)"
+    )
+    request_targeted_delay_avg: float = Field(
+        description="Avg delay from targeted start to actual request start"
+    )
 
 
 class SchedulerDict(TypedDict, total=False):
@@ -98,18 +130,16 @@ class BenchmarkerDict(TypedDict, total=False):
 
 
 class BenchmarkMetrics(StandardBaseModel):
-    """
-    A serializable model representing the metrics for a benchmark run.
-    """
+    """Core benchmark metrics and statistical distributions."""
 
     requests_per_second: StatusDistributionSummary = Field(
-        description="The distribution of requests per second for the benchmark.",
+        description="Distribution of requests per second across benchmark execution"
     )
     request_concurrency: StatusDistributionSummary = Field(
-        description="The distribution of requests concurrency for the benchmark.",
+        description="Distribution of concurrent request counts during execution"
     )
     request_latency: StatusDistributionSummary = Field(
-        description="The distribution of latencies for the completed requests.",
+        description="Distribution of request latencies for completed requests"
     )
 
 
@@ -117,10 +147,10 @@ BenchmarkMetricsT = TypeVar("BenchmarkMetricsT", bound=BenchmarkMetrics)
 
 
 class BenchmarkRequestStats(StandardBaseModel):
+    """Individual request processing statistics and scheduling metadata."""
+
     scheduler_info: ScheduledRequestInfo[GenerationRequestTimings] = Field(
-        description=(
-            "The info about the request from the scheduler about how it was run."
-        ),
+        description="Scheduler metadata and timing information for the request"
     )
 
 
@@ -129,69 +159,61 @@ BenchmarkRequestStatsT = TypeVar("BenchmarkRequestStatsT", bound=BenchmarkReques
 
 class Benchmark(StandardBaseModel, Generic[BenchmarkMetricsT, BenchmarkRequestStatsT]):
     """
-    The base serializable model representing a benchmark run and its results.
-    Specific benchmarker implementations should extend this model to include
-    additional information or metadata as needed.
+    Base benchmark result container with execution metadata and performance metrics.
 
-    Note, requests_per_second and request_concurrency are kept at this level
-    and are expected to be populated by the subclass implementation to ensure
-    the logic for Profiles can include more complicated logic for determining
-    what rates and concurrency values to use for subsequent strategies.
+    Generic container for benchmark results that can be specialized for different
+    types of workloads and metrics. Includes execution timing, request statistics,
+    and configurable metrics aggregation.
     """
 
-    # Benchmark run information
     type_: Literal["benchmark"] = "benchmark"
     id_: str = Field(
         default_factory=lambda: str(uuid.uuid4()),
-        description="The unique identifier for the benchmark.",
+        description="Unique identifier for this benchmark execution",
     )
     run_id: str = Field(
-        description=(
-            "The unique identifier for the encompasing benchmarker run that this "
-            "benchmark was a part of."
-        )
+        description="Identifier for the benchmarker run containing this benchmark"
     )
     run_index: int = Field(
-        description=("The index of this benchmark in the benchmarker run.")
+        description="Sequential index of this benchmark within the benchmarker run"
     )
-    scheduler: SchedulerDict = Field()
-    benchmarker: BenchmarkerDict = Field()
-    env_args: dict[str, Any] = Field()
-    extras: dict[str, Any] = Field()
-
-    # Benchmark stats and metrics
-    run_stats: BenchmarkSchedulerStats = Field()
+    scheduler: SchedulerDict = Field(
+        description="Scheduler configuration and execution state"
+    )
+    benchmarker: BenchmarkerDict = Field(
+        description="Benchmarker configuration and component settings"
+    )
+    env_args: dict[str, Any] = Field(
+        description="Environment arguments and runtime configuration"
+    )
+    extras: dict[str, Any] = Field(
+        description="Additional metadata and custom benchmark parameters"
+    )
+    run_stats: BenchmarkSchedulerStats = Field(
+        description="Scheduler timing and performance statistics"
+    )
     start_time: float = Field(
-        description="The start time of the first request for the benchmark.",
-        default=-1.0,
+        default=-1.0, description="Unix timestamp when the first request was initiated"
     )
     end_time: float = Field(
-        description="The end time of the last request for the benchmark.",
-        default=-1.0,
+        default=-1.0, description="Unix timestamp when the last request completed"
     )
 
     @computed_field  # type: ignore[misc]
     @property
     def duration(self) -> float:
         """
-        :return: The duration of the benchmark in seconds from the start of the
-            first request to the end of the last request.
+        Benchmark execution duration in seconds.
+
+        :return: Time elapsed from first request start to last request completion.
         """
         return self.end_time - self.start_time
 
     metrics: BenchmarkMetricsT = Field(
-        description=(
-            "The metrics for the benchmark run represented as a distribution of "
-            "various per-request statistics."
-        ),
+        description="Performance metrics and statistical distributions"
     )
-
-    # Benchmark response stats (ordered at the end for readability)
     request_totals: StatusBreakdown[int, int, int, int] = Field(
-        description=(
-            "The number of requests made for the benchmark broken down by status "
-            "including successful, incomplete, errored, and the sum of all three"
-        )
+        description="Request counts by status: successful, incomplete, errored, total"
     )
     requests: StatusBreakdown[
         list[BenchmarkRequestStatsT],
@@ -199,10 +221,7 @@ class Benchmark(StandardBaseModel, Generic[BenchmarkMetricsT, BenchmarkRequestSt
         list[BenchmarkRequestStatsT],
         None,
     ] = Field(
-        description=(
-            "The breakdown of requests for the benchmark run including successful, "
-            "incomplete, and errored requests."
-        ),
+        description="Request details grouped by status: successful, incomplete, errored"
     )
 
 
@@ -210,42 +229,50 @@ BenchmarkT = TypeVar("BenchmarkT", bound=Benchmark)
 
 
 class GenerativeRequestStats(BenchmarkRequestStats):
-    """
-    A serializable model representing the request values, response values, and
-    statistics for a generative text response.
-    """
+    """Request statistics and metadata for generative AI text generation workloads."""
 
     type_: Literal["generative_request_stats"] = "generative_request_stats"
-    request_id: str = Field(
-        description="The unique identifier for the request.",
-    )
+    request_id: str = Field(description="Unique identifier for the request")
     request_type: Literal["text_completions", "chat_completions"] = Field(
-        description="The type of request made to the generative backend."
+        description="Type of generative request: text or chat completion"
     )
-    prompt: str = Field(
-        description="The text prompt used for the generative request.",
-    )
+    prompt: str = Field(description="Input text prompt for generation")
     request_args: dict[str, Any] = Field(
-        description="The parameters used for the generative request.",
+        description="Generation parameters and configuration options"
     )
     output: Optional[str] = Field(
-        description="The generated text output from the generative request.",
+        description="Generated text output, if request completed successfully"
     )
     iterations: int = Field(
-        description="The number of iterations the request went through.",
+        description="Number of processing iterations for the request"
     )
     prompt_tokens: Optional[int] = Field(
-        description="The number of tokens in the prompt text.",
+        description="Number of tokens in the input prompt"
     )
     output_tokens: Optional[int] = Field(
-        description="The number of tokens in the generated output text.",
+        description="Number of tokens in the generated output"
     )
+
+    @computed_field  # type: ignore[misc]
+    @property
+    def total_tokens(self) -> Optional[int]:
+        """
+        Total token count including prompt and output tokens.
+
+        :return: Sum of prompt and output tokens, or None if either is unavailable.
+        """
+        if self.prompt_tokens is None or self.output_tokens is None:
+            return None
+
+        return self.prompt_tokens + self.output_tokens
 
     @computed_field  # type: ignore[misc]
     @property
     def request_latency(self) -> Optional[float]:
         """
-        :return: The duration of the request in seconds from the start to the end.
+        End-to-end request processing latency in seconds.
+
+        :return: Duration from request start to completion, or None if unavailable.
         """
         if (
             not self.scheduler_info.request_timings.request_end
@@ -262,8 +289,9 @@ class GenerativeRequestStats(BenchmarkRequestStats):
     @property
     def time_to_first_token_ms(self) -> Optional[float]:
         """
-        :return: The time in milliseconds from the start of the request to the first
-            token received.
+        Time to first token generation in milliseconds.
+
+        :return: Latency from request start to first token, or None if unavailable.
         """
         if (
             not self.scheduler_info.request_timings.first_iteration
@@ -280,8 +308,11 @@ class GenerativeRequestStats(BenchmarkRequestStats):
     @property
     def time_per_output_token_ms(self) -> Optional[float]:
         """
-        :return: The average time in milliseconds per output token generated.
-            This includes the time to generate the first token and all other tokens.
+        Average time per output token in milliseconds.
+
+        Includes time for first token and all subsequent tokens.
+
+        :return: Average milliseconds per output token, or None if unavailable.
         """
         if (
             not self.scheduler_info.request_timings.request_start
@@ -303,8 +334,11 @@ class GenerativeRequestStats(BenchmarkRequestStats):
     @property
     def inter_token_latency_ms(self) -> Optional[float]:
         """
-        :return: The average time in milliseconds between generating tokens in the
-            output text. Note, does not include the time to generate the first token.
+        Average inter-token latency in milliseconds.
+
+        Measures time between token generations, excluding first token.
+
+        :return: Average milliseconds between tokens, or None if unavailable.
         """
         if (
             not self.scheduler_info.request_timings.first_iteration
@@ -327,23 +361,22 @@ class GenerativeRequestStats(BenchmarkRequestStats):
     @property
     def tokens_per_second(self) -> Optional[float]:
         """
-        :return: The average number of tokens generated per second in the prompt and
-            output text.
+        Overall token throughput including prompt and output tokens.
+
+        :return: Total tokens per second, or None if unavailable.
         """
-        if (
-            not (latency := self.request_latency)
-            or not self.prompt_tokens
-            or not self.output_tokens
-        ):
+        if not (latency := self.request_latency) or not (tokens := self.total_tokens):
             return None
 
-        return (self.prompt_tokens + self.output_tokens) / latency
+        return tokens / latency
 
     @computed_field  # type: ignore[misc]
     @property
     def output_tokens_per_second(self) -> Optional[float]:
         """
-        :return: The average number of output tokens generated per second.
+        Output token generation throughput.
+
+        :return: Output tokens per second, or None if unavailable.
         """
         if not (latency := self.request_latency) or not self.output_tokens:
             return None
@@ -352,60 +385,32 @@ class GenerativeRequestStats(BenchmarkRequestStats):
 
 
 class GenerativeMetrics(BenchmarkMetrics):
-    """
-    A serializable model representing the metrics for a generative benchmark run.
-    """
+    """Comprehensive metrics and distributions for generative AI benchmarks."""
 
     prompt_token_count: StatusDistributionSummary = Field(
-        description=(
-            "The distribution of token counts in the prompts for completed, "
-            "errored, and all requests."
-        )
+        description="Distribution of prompt token counts by request status"
     )
     output_token_count: StatusDistributionSummary = Field(
-        description=(
-            "The distribution of token counts in the outputs for completed, "
-            "errored, and all requests."
-        )
+        description="Distribution of output token counts by request status"
     )
     time_to_first_token_ms: StatusDistributionSummary = Field(
-        description=(
-            "The distribution of latencies to receiving the first token in "
-            "milliseconds for completed, errored, and all requests."
-        ),
+        description="Distribution of first token latencies in milliseconds"
     )
     time_per_output_token_ms: StatusDistributionSummary = Field(
-        description=(
-            "The distribution of latencies per output token in milliseconds for "
-            "completed, errored, and all requests. "
-            "This includes the time to generate the first token and all other tokens."
-        ),
+        description="Distribution of average time per output token in milliseconds"
     )
     inter_token_latency_ms: StatusDistributionSummary = Field(
-        description=(
-            "The distribution of latencies between tokens in milliseconds for "
-            "completed, errored, and all requests."
-        ),
+        description="Distribution of inter-token latencies in milliseconds"
     )
     output_tokens_per_second: StatusDistributionSummary = Field(
-        description=(
-            "The distribution of output tokens per second for completed, "
-            "errored, and all requests."
-        ),
+        description="Distribution of output token generation rates"
     )
     tokens_per_second: StatusDistributionSummary = Field(
-        description=(
-            "The distribution of tokens per second, including prompt and output tokens "
-            "for completed, errored, and all requests."
-        ),
+        description="Distribution of total token throughput including prompt and output"
     )
 
 
 class GenerativeBenchmark(Benchmark[GenerativeMetrics, GenerativeRequestStats]):
-    """
-    A serializable model representing a benchmark run and its results for generative
-    requests and responses. Includes the completed and errored requests, the start
-    and end times for the benchmark, and the statistics for the requests and responses.
-    """
+    """Complete generative AI benchmark results with specialized metrics."""
 
     type_: Literal["generative_benchmark"] = "generative_benchmark"  # type: ignore[assignment]

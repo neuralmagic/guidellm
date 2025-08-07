@@ -7,17 +7,37 @@ from transformers import (  # type: ignore[import]
     PreTrainedTokenizerBase,
 )
 
-from guidellm.backend import Backend, BackendType
-from guidellm.benchmark.benchmarker import GenerativeBenchmarker
+from guidellm.backend import (
+    Backend,
+    BackendType,
+    GenerationRequest,
+    GenerationRequestTimings,
+    GenerationResponse,
+)
+from guidellm.benchmark.benchmarker import Benchmarker
+from guidellm.benchmark.benchmark import GenerativeBenchmark
 from guidellm.benchmark.output import (
     GenerativeBenchmarksConsole,
     GenerativeBenchmarksReport,
 )
-from guidellm.benchmark.profile import ProfileType, create_profile
+from guidellm.benchmark.profile import Profile, ProfileType
 from guidellm.benchmark.progress import GenerativeTextBenchmarkerProgressDisplay
 from guidellm.benchmark.scenario import GenerativeTextScenario, Scenario
 from guidellm.request import GenerativeRequestLoader
 from guidellm.scheduler import StrategyType
+from guidellm.scheduler.environment import NonDistributedEnvironment
+from guidellm.benchmark.aggregator import (
+    SchedulerStatsAggregator,
+    GenerativeRequestsAggregator,
+    GenerativeRequestsStatsProgressAggregator,
+)
+
+
+__all__ = [
+    "benchmark_with_scenario",
+    "benchmark_generative_text",
+    "reimport_benchmarks_report",
+]
 
 
 async def benchmark_with_scenario(scenario: Scenario, **kwargs):
@@ -53,6 +73,9 @@ async def benchmark_generative_text(
     rate: Optional[Union[float, list[float]]],
     max_seconds: Optional[float],
     max_requests: Optional[int],
+    max_errors: Optional[int],
+    max_error_rate: Optional[float],
+    max_global_error_rate: Optional[float],
     warmup_percent: Optional[float],
     cooldown_percent: Optional[float],
     output_path: Optional[Union[str, Path]],
@@ -64,17 +87,12 @@ async def benchmark_generative_text(
     output_console: bool = True,
 ) -> tuple[GenerativeBenchmarksReport, Optional[Path]]:
     console = GenerativeBenchmarksConsole(enabled=show_progress)
-    console.print_line("Creating backend...")
     backend = Backend.create(
         backend_type, target=target, model=model, **(backend_args or {})
     )
-    await backend.validate()
-    console.print_line(
-        f"Backend {backend_type} connected to {target} for model {backend.model}."
-    )
 
     if processor is None:
-        processor = backend.model
+        processor = await backend.default_model()
 
     console.print_line("Creating request loader...")
     request_loader = GenerativeRequestLoader(
@@ -83,11 +101,6 @@ async def benchmark_generative_text(
         processor=processor,
         processor_args=processor_args,
         shuffle=data_sampler == "random",
-        iter_type=(
-            "finite"  # assume a finite dataset is our limit
-            if max_requests is None and max_seconds is None
-            else "infinite"  # default to infinite so we don't run out of data
-        ),
         random_seed=random_seed,
     )
     unique_requests = request_loader.num_unique_items(raise_err=False)
@@ -97,14 +110,22 @@ async def benchmark_generative_text(
         else f"Created loader with unknown number unique requests from {data}.\n\n"
     )
 
-    profile = create_profile(rate_type=rate_type, rate=rate)
-    benchmarker = GenerativeBenchmarker(
-        backend=backend,
-        request_loader=request_loader,
-        request_loader_description=request_loader.description,
-        benchmark_save_extras=output_extras,
-        processor=processor,
-        processor_args=processor_args,
+    constraints = {}
+    if max_requests is not None:
+        constraints["max_requests"] = max_requests
+    if max_seconds is not None:
+        constraints["max_seconds"] = max_seconds
+    if max_errors is not None:
+        constraints["max_errors"] = max_errors
+    if max_error_rate is not None:
+        constraints["max_error_rate"] = max_error_rate
+    if max_global_error_rate is not None:
+        constraints["max_global_error_rate"] = max_global_error_rate
+    profile = Profile.create(
+        rate_type=rate_type,
+        rate=rate,
+        random_seed=random_seed,
+        constraints=constraints,
     )
     progress = (
         GenerativeTextBenchmarkerProgressDisplay(
@@ -115,22 +136,41 @@ async def benchmark_generative_text(
     )
     report = GenerativeBenchmarksReport()
 
-    async for result in benchmarker.run(
+    async for aggregator_update, benchmark, strategy, scheduler_state in Benchmarker[
+        GenerativeBenchmark,
+        GenerationRequest,
+        GenerationRequestTimings,
+        GenerationResponse,
+    ].run(
+        requests=request_loader,
+        backend=backend,
         profile=profile,
-        max_number_per_strategy=max_requests,
-        max_duration_per_strategy=max_seconds,
-        warmup_percent_per_strategy=warmup_percent,
-        cooldown_percent_per_strategy=cooldown_percent,
+        environment=NonDistributedEnvironment(),
+        benchmark_aggregators={
+            "scheduler_stats": SchedulerStatsAggregator(),
+            "requests_progress": GenerativeRequestsStatsProgressAggregator(),
+            "requests": GenerativeRequestsAggregator(
+                warmup_requests=(
+                    int(max_requests * warmup_percent) if warmup_percent else None
+                ),
+                warmup_duration=(
+                    max_seconds * warmup_percent if warmup_percent else None
+                ),
+                cooldown_requests=(
+                    int(max_requests * cooldown_percent) if cooldown_percent else None
+                ),
+                cooldown_duration=(
+                    max_seconds * cooldown_percent if cooldown_percent else None
+                ),
+            ),
+        },
+        benchmark_class=GenerativeBenchmark,
     ):
         if progress:
-            progress.update(result)
+            progress.update(aggregator_update, benchmark, strategy, scheduler_state)
 
-        if result.type_ == "benchmark_compiled":
-            if result.current_benchmark is None:
-                raise ValueError("Current benchmark is None")
-            report.benchmarks.append(
-                result.current_benchmark.set_sample_size(output_sampling)
-            )
+        if benchmark:
+            report.benchmarks.append(benchmark)
 
     if output_console:
         console.benchmarks = report.benchmarks

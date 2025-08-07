@@ -951,7 +951,7 @@ class GenerativeBenchmarksConsole:
         for benchmark in self.benchmarks:
             rows.append(
                 [
-                    strategy_display_str(benchmark.args.strategy),
+                    strategy_display_str(benchmark.scheduler["strategy"]),
                     f"{benchmark.metrics.requests_per_second.successful.mean:.2f}",
                     f"{benchmark.metrics.request_concurrency.successful.mean:.2f}",
                     f"{benchmark.metrics.output_tokens_per_second.successful.mean:.1f}",
