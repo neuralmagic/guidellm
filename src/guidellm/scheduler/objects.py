@@ -239,6 +239,10 @@ class SchedulerState(StandardBaseModel):
         default_factory=dict,
         description="Constraints that triggered processing termination",
     )
+    scheduler_constraints: dict[str, dict[str, Any]] = Field(
+        default_factory=dict,
+        description="The latest state from all constraints applied during the scheduler run",
+    )
 
     remaining_fraction: Optional[float] = Field(
         default=None,

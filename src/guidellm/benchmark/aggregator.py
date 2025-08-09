@@ -63,7 +63,6 @@ __all__ = [
     "GenerativeRequestsStatsProgressAggregator",
     "SchedulerStatsAggregator",
     "add_aggregate_metric",
-    
 ]
 
 
@@ -187,7 +186,7 @@ class SchedulerStatsAggregator(
             "worker_resolve_start_delay",
             agg_state,
             request_info.scheduler_timings.resolve_start,
-            request_info.scheduler_timings.dequeued,
+            request_info.scheduler_timings.scheduled,
         )
         add_aggregate_metric(
             "worker_resolve_time",
@@ -226,7 +225,7 @@ class SchedulerStatsAggregator(
             request_info.request_timings.request_start,
         )
         add_aggregate_metric(
-            "request_targeted_delay",
+            "request_targeted_start_delay",
             agg_state,
             request_info.request_timings.request_start,
             request_info.scheduler_timings.targeted_start,
@@ -325,6 +324,34 @@ class GenerativeRequestsStatsProgressAggregator(
             return None
 
         if (
+            request_info.status == "completed"
+            and request_info.request_timings.request_end is not None
+        ):
+            agg_state["requests_per_second"] = scheduler_state.successful_requests / (
+                request_info.request_timings.request_end - scheduler_state.start_time
+            )
+            add_aggregate_metric(
+                "request_latency",
+                agg_state,
+                request_info.request_timings.request_end,
+                request_info.request_timings.request_start,
+            )
+
+        if (
+            request_info.status == "completed"
+            and request_info.request_timings.first_iteration is not None
+            and request_info.request_timings.last_iteration is not None
+            and response.output_tokens
+        ):
+            add_aggregate_metric(
+                "time_per_output_token",
+                agg_state,
+                request_info.request_timings.last_iteration,
+                request_info.request_timings.request_start,
+                count=response.output_tokens,
+            )
+
+        if (
             request_info.request_timings.first_iteration is not None
             and request_info.request_timings.request_start is not None
         ):
@@ -339,23 +366,15 @@ class GenerativeRequestsStatsProgressAggregator(
             request_info.request_timings.first_iteration is not None
             and request_info.request_timings.last_iteration is not None
             and response.output_tokens is not None
+            and response.output_tokens > 1
         ):
             add_aggregate_metric(
-                "time_per_output_token",
+                "inter_token_latency",
                 agg_state,
                 request_info.request_timings.last_iteration,
-                request_info.request_timings.request_start,
-                count=response.output_tokens,
+                request_info.request_timings.first_iteration,
+                count=response.output_tokens - 1,
             )
-
-            if response.output_tokens > 1:
-                add_aggregate_metric(
-                    "inter_token_latency",
-                    agg_state,
-                    request_info.request_timings.last_iteration,
-                    request_info.request_timings.first_iteration,
-                    count=response.output_tokens - 1,
-                )
 
         if response.prompt_tokens is not None:
             add_aggregate_metric(
@@ -363,6 +382,13 @@ class GenerativeRequestsStatsProgressAggregator(
                 agg_state,
                 response.prompt_tokens,
             )
+            if request_info.request_timings.request_end is not None:
+                agg_state["prompt_tokens_per_second"] = agg_state[
+                    "prompt_tokens_total"
+                ] / (
+                    request_info.request_timings.request_end
+                    - scheduler_state.start_time
+                )
 
         if response.output_tokens is not None:
             add_aggregate_metric(
@@ -370,6 +396,13 @@ class GenerativeRequestsStatsProgressAggregator(
                 agg_state,
                 response.output_tokens,
             )
+            if request_info.request_timings.request_end is not None:
+                agg_state["output_tokens_per_second"] = agg_state[
+                    "output_tokens_total"
+                ] / (
+                    request_info.request_timings.request_end
+                    - scheduler_state.start_time
+                )
 
         if response.total_tokens is not None:
             add_aggregate_metric(
@@ -377,6 +410,13 @@ class GenerativeRequestsStatsProgressAggregator(
                 agg_state,
                 response.total_tokens,
             )
+            if request_info.request_timings.request_end is not None:
+                agg_state["total_tokens_per_second"] = agg_state[
+                    "total_tokens_total"
+                ] / (
+                    request_info.request_timings.request_end
+                    - scheduler_state.start_time
+                )
 
         return agg_state
 
@@ -411,6 +451,8 @@ class GenerativeRequestsAggregator(
         default=None,
         description="Cooldown duration in seconds to ignore at benchmark end",
     )
+    _in_cooldown: bool = False
+    _in_warmup: bool = False
 
     def __call__(
         self,
@@ -433,6 +475,11 @@ class GenerativeRequestsAggregator(
         :param scheduler_state: Current scheduler execution state.
         :return: None, as this aggregator only collects for final compilation.
         """
+        status = {
+            "requests_in_warmup": False,
+            "requests_in_cooldown": False,
+        }
+
         if (
             response is None
             or request_info.status not in {"completed", "canceled", "errored"}
@@ -440,15 +487,12 @@ class GenerativeRequestsAggregator(
         ):
             # Ignore requests that don't have a response yet.
             # Ignore requests that were canceled before they started.
-            return None
+            return status
 
         if (
             self.warmup_requests is not None
             and self.warmup_requests >= scheduler_state.processed_requests
-        ):
-            return None
-
-        if (
+        ) or (
             self.warmup_duration is not None
             and request_info.request_timings.request_end is not None
             and (
@@ -456,21 +500,20 @@ class GenerativeRequestsAggregator(
                 >= request_info.request_timings.request_end
             )
         ):
-            return None
+            status["requests_in_warmup"] = True
+
+            return status
 
         if (
             self.cooldown_requests is not None
             and scheduler_state.remaining_requests is not None
             and self.cooldown_requests >= scheduler_state.remaining_requests
-        ):
-            return None
-
-        if (
+        ) or (
             self.cooldown_duration is not None
             and scheduler_state.remaining_duration is not None
             and self.cooldown_duration >= scheduler_state.remaining_duration
         ):
-            return None
+            return status["requests_in_cooldown"]
 
         if "completed" not in agg_state:
             agg_state["completed"] = []
@@ -484,7 +527,7 @@ class GenerativeRequestsAggregator(
         else:
             agg_state["errored"].append((response, request, request_info))
 
-        return None
+        return status
 
     def compile(
         self, agg_state: dict[str, Any], scheduler_state: SchedulerState
@@ -623,6 +666,22 @@ class GenerativeRequestsAggregator(
                             for req in total
                             if req.output_tokens is not None
                         ],
+                    )
+                ),
+                total_token_count=(
+                    StatusDistributionSummary.from_values(
+                        value_types=[
+                            type_
+                            for type_, req in zip(total_types, total)
+                            if req.prompt_tokens is not None
+                            or req.output_tokens is not None
+                        ],
+                        values=(
+                            (req.prompt_tokens or 0) + (req.output_tokens or 0)
+                            for req in total
+                            if req.prompt_tokens is not None
+                            or req.output_tokens is not None
+                        ),
                     )
                 ),
                 time_to_first_token_ms=(

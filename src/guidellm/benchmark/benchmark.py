@@ -13,6 +13,7 @@ Classes:
     GenerativeRequestStats: Request statistics for generative AI workloads.
     GenerativeMetrics: Comprehensive metrics for generative benchmarks.
     GenerativeBenchmark: Complete generative benchmark results and analysis.
+    GenerativeBenchmarksReport: Container for multiple benchmark results.
 
 Type Variables:
     BenchmarkMetricsT: Generic benchmark metrics type.
@@ -20,9 +21,12 @@ Type Variables:
     BenchmarkT: Generic benchmark container type.
 """
 
+import json
 import uuid
-from typing import Any, Generic, Literal, Optional, TypedDict, TypeVar, Union
+from pathlib import Path
+from typing import Any, ClassVar, Generic, Literal, Optional, TypedDict, TypeVar, Union
 
+import yaml
 from pydantic import Field, computed_field
 
 from guidellm.backend import GenerationRequestTimings
@@ -56,14 +60,14 @@ __all__ = [
     "BenchmarkSchedulerStats",
     "BenchmarkT",
     "GenerativeBenchmark",
+    "GenerativeBenchmarksReport",
     "GenerativeMetrics",
     "GenerativeRequestStats",
-    "StatusBreakdown",
 ]
 
 
 class BenchmarkSchedulerStats(StandardBaseModel):
-    """Scheduler timing and performance statistics for benchmark execution."""
+    """Scheduler timing and performance statistics."""
 
     start_time: float = Field(
         description="Unix timestamp when the benchmark run started"
@@ -93,15 +97,15 @@ class BenchmarkSchedulerStats(StandardBaseModel):
     request_start_delay_avg: float = Field(
         description="Avg delay after resolve til request start (seconds)"
     )
-    request_time_avg: float = Field(
-        description="Avg request processing time (seconds)"
-    )
+    request_time_avg: float = Field(description="Avg request processing time (seconds)")
     request_targeted_delay_avg: float = Field(
         description="Avg delay from targeted start to actual request start"
     )
 
 
 class SchedulerDict(TypedDict, total=False):
+    """Scheduler configuration and execution state dictionary."""
+
     strategy: Union[
         AsyncConstantStrategy,
         AsyncPoissonStrategy,
@@ -115,6 +119,8 @@ class SchedulerDict(TypedDict, total=False):
 
 
 class BenchmarkerDict(TypedDict, total=False):
+    """Benchmarker configuration and component settings dictionary."""
+
     profile: Union[
         AsyncProfile,
         ConcurrentProfile,
@@ -158,13 +164,7 @@ BenchmarkRequestStatsT = TypeVar("BenchmarkRequestStatsT", bound=BenchmarkReques
 
 
 class Benchmark(StandardBaseModel, Generic[BenchmarkMetricsT, BenchmarkRequestStatsT]):
-    """
-    Base benchmark result container with execution metadata and performance metrics.
-
-    Generic container for benchmark results that can be specialized for different
-    types of workloads and metrics. Includes execution timing, request statistics,
-    and configurable metrics aggregation.
-    """
+    """Base benchmark result container with execution metadata."""
 
     type_: Literal["benchmark"] = "benchmark"
     id_: str = Field(
@@ -229,7 +229,7 @@ BenchmarkT = TypeVar("BenchmarkT", bound=Benchmark)
 
 
 class GenerativeRequestStats(BenchmarkRequestStats):
-    """Request statistics and metadata for generative AI text generation workloads."""
+    """Request statistics for generative AI text generation workloads."""
 
     type_: Literal["generative_request_stats"] = "generative_request_stats"
     request_id: str = Field(description="Unique identifier for the request")
@@ -385,13 +385,16 @@ class GenerativeRequestStats(BenchmarkRequestStats):
 
 
 class GenerativeMetrics(BenchmarkMetrics):
-    """Comprehensive metrics and distributions for generative AI benchmarks."""
+    """Comprehensive metrics for generative AI benchmarks."""
 
     prompt_token_count: StatusDistributionSummary = Field(
         description="Distribution of prompt token counts by request status"
     )
     output_token_count: StatusDistributionSummary = Field(
         description="Distribution of output token counts by request status"
+    )
+    total_token_count: StatusDistributionSummary = Field(
+        description="Distribution of total token counts by request status"
     )
     time_to_first_token_ms: StatusDistributionSummary = Field(
         description="Distribution of first token latencies in milliseconds"
@@ -414,3 +417,76 @@ class GenerativeBenchmark(Benchmark[GenerativeMetrics, GenerativeRequestStats]):
     """Complete generative AI benchmark results with specialized metrics."""
 
     type_: Literal["generative_benchmark"] = "generative_benchmark"  # type: ignore[assignment]
+
+
+class GenerativeBenchmarksReport(StandardBaseModel):
+    """Container for multiple benchmark results with load/save functionality."""
+
+    DEFAULT_FILE: ClassVar[str] = "benchmarks.json"
+
+    @staticmethod
+    def load_file(
+        path: Union[str, Path], type_: Literal["json", "yaml"] | None = None
+    ) -> "GenerativeBenchmarksReport":
+        """
+        Load a report from a file.
+
+        :param path: The path to load the report from.
+        :param type_: File type override, auto-detected from extension if None.
+        :return: The loaded report.
+        :raises ValueError: If file type is unsupported.
+        """
+        path = Path(path) if not isinstance(path, Path) else path
+
+        if path.is_dir():
+            path = path / GenerativeBenchmarksReport.DEFAULT_FILE
+
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path_suffix = path.suffix.lower()[1:]
+
+        with path.open("r") as file:
+            if (type_ or path_suffix) == "json":
+                model_dict = json.loads(file.read())
+            elif (type_ or path_suffix) in ["yaml", "yml"]:
+                model_dict = yaml.safe_load(file)
+            else:
+                raise ValueError(f"Unsupported file type: {type_} for {path}.")
+
+        return GenerativeBenchmarksReport.model_validate(model_dict)
+
+    benchmarks: list[GenerativeBenchmark] = Field(
+        description="The list of completed benchmarks contained within the report.",
+        default_factory=list,
+    )
+
+    def save_file(
+        self, path: Union[str, Path], type_: Literal["json", "yaml"] | None = None
+    ) -> Path:
+        """
+        Save the report to a file.
+
+        :param path: The path to save the report to.
+        :param type_: File type override, auto-detected from extension if None.
+        :return: The path to the saved report.
+        :raises ValueError: If file type is unsupported.
+        """
+        path = Path(path) if not isinstance(path, Path) else path
+
+        if path.is_dir():
+            path = path / GenerativeBenchmarksReport.DEFAULT_FILE
+
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path_suffix = path.suffix.lower()[1:]
+        model_dict = self.model_dump()
+
+        if (type_ or path_suffix) == "json":
+            save_str = json.dumps(model_dict)
+        elif (type_ or path_suffix) in ["yaml", "yml"]:
+            save_str = yaml.dump(model_dict)
+        else:
+            raise ValueError(f"Unsupported file type: {type_} for {path}.")
+
+        with path.open("w") as file:
+            file.write(save_str)
+
+        return path
