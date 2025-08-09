@@ -1,334 +1,240 @@
-import time
+"""
+Benchmark execution orchestration and lifecycle management.
+
+Provides the core benchmarking engine that coordinates request scheduling,
+data aggregation, and result compilation across different execution strategies
+and environments.
+
+Classes:
+    Benchmarker: Abstract benchmark orchestrator for request processing workflows.
+
+Type Variables:
+    BenchmarkT: Generic benchmark result type.
+    RequestT: Generic request object type.
+    RequestTimingsT: Generic request timing object type.
+    ResponseT: Generic response object type.
+"""
+
 import uuid
-from abc import ABC, abstractmethod
-from collections.abc import AsyncGenerator, Iterable
-from pathlib import Path
+from abc import ABC
+from collections.abc import AsyncIterator, Iterable
 from typing import (
     Any,
     Generic,
-    Literal,
     Optional,
     Union,
 )
 
-from pydantic import Field
-from transformers import PreTrainedTokenizerBase  # type: ignore  # noqa: PGH003
-
-from guidellm.backend import Backend, ResponseSummary
-from guidellm.benchmark.aggregator import (
-    AggregatorT,
-    BenchmarkT,
-    GenerativeBenchmarkAggregator,
-)
-from guidellm.benchmark.benchmark import BenchmarkArgs, GenerativeBenchmark
+from guidellm.benchmark.aggregator import Aggregator, CompilableAggregator
+from guidellm.benchmark.benchmark import BenchmarkT
 from guidellm.benchmark.profile import Profile
-from guidellm.objects import StandardBaseModel
-from guidellm.request import (
-    GenerationRequest,
-    GenerativeRequestLoaderDescription,
-    RequestLoaderDescription,
-)
 from guidellm.scheduler import (
-    GenerativeRequestsWorker,
-    RequestsWorker,
+    BackendT,
+    Constraint,
+    Environment,
     RequestT,
+    RequestTimingsT,
     ResponseT,
     Scheduler,
-    SchedulerRequestResult,
+    SchedulerState,
     SchedulingStrategy,
 )
+from guidellm.utils import InfoMixin, ThreadSafeSingletonMixin
 
-__all__ = ["Benchmarker", "BenchmarkerResult", "GenerativeBenchmarker"]
+__all__ = ["Benchmarker"]
 
 
-class BenchmarkerResult(
-    StandardBaseModel, Generic[AggregatorT, BenchmarkT, RequestT, ResponseT]
+class Benchmarker(
+    Generic[BenchmarkT, RequestT, RequestTimingsT, ResponseT],
+    ABC,
+    ThreadSafeSingletonMixin,
 ):
-    type_: Literal[
-        "run_start",
-        "run_complete",
-        "scheduler_start",
-        "scheduler_update",
-        "scheduler_complete",
-        "benchmark_compiled",
-    ]
-    start_time: float
-    end_number: int
-    profile: Profile
-    current_index: int
-    current_strategy: Optional[SchedulingStrategy] = None
-    current_aggregator: Optional[AggregatorT] = None
-    current_benchmark: Optional[BenchmarkT] = None
-    current_result: Optional[SchedulerRequestResult[RequestT, ResponseT]] = None
+    """
+    Abstract benchmark orchestrator for request processing workflows.
 
+    Coordinates the execution of benchmarking runs across different scheduling
+    strategies, aggregating metrics and compiling results. Manages the complete
+    benchmark lifecycle from request submission through result compilation.
 
-class BenchmarkerStrategyLimits(StandardBaseModel):
-    requests_loader_size: Optional[int] = Field(
-        description="Size of the request loader.",
-    )
-    max_number_per_strategy: Optional[int] = Field(
-        description="Maximum number of requests to process per strategy.",
-        ge=0,
-    )
-    max_duration_per_strategy: Optional[float] = Field(
-        description="Maximum duration (in seconds) to process requests per strategy.",
-        ge=0,
-    )
-    warmup_percent_per_strategy: Optional[float] = Field(
-        description="Percentage of requests to use for warmup.",
-        ge=0,
-        le=1,
-    )
-    cooldown_percent_per_strategy: Optional[float] = Field(
-        description="Percentage of requests to use for cooldown.",
-        ge=0,
-        le=1,
-    )
-
-    @property
-    def max_number(self) -> Optional[int]:
-        if self.max_number_per_strategy is not None:
-            return self.max_number_per_strategy
-
-        if self.requests_loader_size is not None:
-            return self.requests_loader_size
-
-        return None
-
-    @property
-    def max_duration(self) -> Optional[float]:
-        return self.max_duration_per_strategy
-
-    @property
-    def warmup_number(self) -> Optional[int]:
-        if self.warmup_percent_per_strategy is None or self.max_number is None:
-            return None
-
-        return int(self.warmup_percent_per_strategy * self.max_number)
-
-    @property
-    def warmup_duration(self) -> Optional[float]:
-        if self.warmup_percent_per_strategy is None or self.max_duration is None:
-            return None
-
-        return self.warmup_percent_per_strategy * self.max_duration
-
-    @property
-    def cooldown_number(self) -> Optional[int]:
-        if self.cooldown_percent_per_strategy is None or self.max_number is None:
-            return None
-
-        return int(self.cooldown_percent_per_strategy * self.max_number)
-
-    @property
-    def cooldown_duration(self) -> Optional[float]:
-        if self.cooldown_percent_per_strategy is None or self.max_duration is None:
-            return None
-
-        return self.cooldown_percent_per_strategy * self.max_duration
-
-
-class Benchmarker(Generic[AggregatorT, BenchmarkT, RequestT, ResponseT], ABC):
-    def __init__(
-        self,
-        worker: RequestsWorker[RequestT, ResponseT],
-        request_loader: Iterable[RequestT],
-        requests_loader_description: RequestLoaderDescription,
-        benchmark_save_extras: Optional[dict[str, Any]] = None,
-    ):
-        self.worker = worker
-        self.scheduler: Scheduler[RequestT, ResponseT] = Scheduler(
-            worker=worker, request_loader=request_loader
-        )
-        self.requests_loader_description = requests_loader_description
-        self.benchmark_save_extras = benchmark_save_extras
+    Implements thread-safe singleton pattern to ensure consistent state across
+    concurrent benchmark operations.
+    """
 
     async def run(
         self,
+        requests: Iterable[
+            Union[RequestT, Iterable[Union[RequestT, tuple[RequestT, float]]]]
+        ],
+        backend: BackendT[RequestT, RequestTimingsT, ResponseT],
         profile: Profile,
-        max_number_per_strategy: Optional[int],
-        max_duration_per_strategy: Optional[float],
-        warmup_percent_per_strategy: Optional[float],
-        cooldown_percent_per_strategy: Optional[float],
-    ) -> AsyncGenerator[
-        BenchmarkerResult[AggregatorT, BenchmarkT, RequestT, ResponseT], None
+        environment: Environment,
+        benchmark_aggregators: dict[
+            str,
+            Union[
+                Aggregator[ResponseT, RequestT, RequestTimingsT],
+                CompilableAggregator[ResponseT, RequestT, RequestTimingsT],
+            ],
+        ],
+        benchmark_class: type[BenchmarkT],
+    ) -> AsyncIterator[
+        tuple[
+            dict[str, Any],
+            Optional[BenchmarkT],
+            SchedulingStrategy,
+            Optional[SchedulerState],
+        ]
     ]:
-        try:
-            requests_loader_size = len(self.scheduler.request_loader)  # type: ignore[arg-type]
-        except Exception:  # noqa: BLE001
-            requests_loader_size = None
+        """
+        Execute benchmark runs across multiple scheduling strategies.
 
-        strategy_limits = BenchmarkerStrategyLimits(
-            requests_loader_size=requests_loader_size,
-            max_number_per_strategy=max_number_per_strategy,
-            max_duration_per_strategy=max_duration_per_strategy,
-            warmup_percent_per_strategy=warmup_percent_per_strategy,
-            cooldown_percent_per_strategy=cooldown_percent_per_strategy,
-        )
-        start_time = time.time()
-        end_number = len(profile.strategy_types)
-        current_index = -1
-        run_id = str(uuid.uuid4())
+        Orchestrates the complete benchmark workflow: iterates through scheduling
+        strategies from the profile, executes requests through the scheduler,
+        aggregates metrics, and compiles final benchmark results.
 
-        yield BenchmarkerResult(
-            type_="run_start",
-            start_time=start_time,
-            end_number=end_number,
-            profile=profile,
-            current_index=current_index,
-            current_strategy=None,
-            current_aggregator=None,
-            current_benchmark=None,
-            current_result=None,
-        )
+        :param requests: Request datasets for processing across strategies.
+        :param backend: Backend interface for request processing.
+        :param profile: Benchmark profile defining strategies and constraints.
+        :param environment: Execution environment for coordination.
+        :param benchmark_aggregators: Metric aggregation functions by name.
+        :param benchmark_class: Class for constructing final benchmark objects.
+        :yield: Tuples of (metrics_update, benchmark_result, strategy, state).
+        :raises Exception: If benchmark execution or compilation fails.
+        """
+        with self.thread_lock:
+            run_id = str(uuid.uuid4())
+            strategies_generator = profile.strategies_generator()
+            strategy, constraints = next(strategies_generator)
 
-        while scheduling_strategy := profile.next_strategy():
-            current_index += 1
-            aggregator = self.create_benchmark_aggregator(
-                run_id=run_id,
-                profile=profile,
-                strategy_index=current_index,
-                strategy=scheduling_strategy,
-                limits=strategy_limits,
-            )
+            while strategy is not None:
+                yield {}, None, strategy, None
+                aggregators_state = {key: {} for key in benchmark_aggregators}
 
-            async for result in self.scheduler.run(
-                scheduling_strategy=scheduling_strategy,
-                max_number=max_number_per_strategy,
-                max_duration=max_duration_per_strategy,
-            ):
-                if result.type_ == "run_start":
-                    yield BenchmarkerResult(
-                        type_="scheduler_start",
-                        start_time=start_time,
-                        end_number=end_number,
-                        profile=profile,
-                        current_index=current_index,
-                        current_strategy=scheduling_strategy,
-                        current_aggregator=aggregator,
-                        current_benchmark=None,
-                        current_result=None,
-                    )
-                elif result.type_ == "run_complete":
-                    yield BenchmarkerResult(
-                        type_="scheduler_complete",
-                        start_time=start_time,
-                        end_number=end_number,
-                        profile=profile,
-                        current_index=current_index,
-                        current_strategy=scheduling_strategy,
-                        current_aggregator=aggregator,
-                        current_benchmark=None,
-                        current_result=None,
-                    )
-                elif isinstance(result, SchedulerRequestResult):
-                    aggregator.add_result(result)
+                async for (
+                    response,
+                    request,
+                    request_info,
+                    scheduler_state,
+                ) in Scheduler[BackendT, RequestT, RequestTimingsT, ResponseT].run(
+                    requests=requests,
+                    backend=backend,
+                    strategy=strategy,
+                    env=environment,
+                    **constraints,
+                ):
+                    aggregators_update = {}
+                    for key, aggregator in benchmark_aggregators.items():
+                        update = aggregator(
+                            aggregators_state[key],
+                            response,
+                            request,
+                            request_info,
+                            scheduler_state,
+                        )
+                        if update:
+                            aggregators_update.update(update)
+                    yield aggregators_update, None, strategy, scheduler_state
 
-                    yield BenchmarkerResult(
-                        type_="scheduler_update",
-                        start_time=start_time,
-                        end_number=end_number,
-                        profile=profile,
-                        current_index=current_index,
-                        current_strategy=scheduling_strategy,
-                        current_aggregator=aggregator,
-                        current_benchmark=None,
-                        current_result=result,
-                    )
-                else:
-                    raise ValueError(f"Unexpected result type: {type(result)}")
+                benchmark_kwargs = self._compile_benchmark_kwargs(
+                    run_id=run_id,
+                    run_index=len(profile.completed_strategies),
+                    profile=profile,
+                    requests=requests,
+                    backend=backend,
+                    environment=environment,
+                    aggregators=benchmark_aggregators,
+                    aggregators_state=aggregators_state,
+                    strategy=strategy,
+                    constraints=constraints,
+                    scheduler_state=scheduler_state,
+                )
+                benchmark = benchmark_class(**benchmark_kwargs)
+                yield {}, benchmark, strategy, None
 
-            benchmark: BenchmarkT = aggregator.compile()
-            profile.completed_strategy(
-                average_rate=benchmark.metrics.requests_per_second.successful.mean,
-                average_concurrency=benchmark.metrics.request_concurrency.successful.mean,
-            )
+                strategy, constraints = strategies_generator.send(benchmark)
 
-            yield BenchmarkerResult(
-                type_="benchmark_compiled",
-                start_time=start_time,
-                end_number=end_number,
-                profile=profile,
-                current_index=current_index,
-                current_strategy=scheduling_strategy,
-                current_aggregator=None,
-                current_benchmark=benchmark,
-                current_result=None,
-            )
-
-        yield BenchmarkerResult(
-            type_="run_complete",
-            start_time=start_time,
-            end_number=end_number,
-            profile=profile,
-            current_index=current_index,
-            current_strategy=None,
-            current_aggregator=None,
-            current_benchmark=None,
-            current_result=None,
-        )
-
-    @abstractmethod
-    def create_benchmark_aggregator(
-        self,
+    @classmethod
+    def _compile_benchmark_kwargs(
+        cls,
         run_id: str,
+        run_index: int,
         profile: Profile,
-        strategy_index: int,
+        requests: Iterable[
+            Union[RequestT, Iterable[Union[RequestT, tuple[RequestT, float]]]]
+        ],
+        backend: BackendT[RequestT, RequestTimingsT, ResponseT],
+        environment: Environment,
+        aggregators: dict[
+            str,
+            Union[
+                Aggregator[ResponseT, RequestT, RequestTimingsT],
+                CompilableAggregator[ResponseT, RequestT, RequestTimingsT],
+            ],
+        ],
+        aggregators_state: dict[str, dict[str, Any]],
         strategy: SchedulingStrategy,
-        limits: BenchmarkerStrategyLimits,
-    ) -> AggregatorT: ...
+        constraints: dict[str, Union[Any, dict[str, Any], Constraint]],
+        scheduler_state: Optional[SchedulerState],
+    ) -> dict[str, Any]:
+        """
+        Compile benchmark construction parameters from execution results.
 
+        Aggregates metadata from scheduler execution and compiles it into
+        structured parameters for benchmark object construction.
 
-class GenerativeBenchmarker(
-    Benchmarker[
-        GenerativeBenchmarkAggregator,
-        GenerativeBenchmark,
-        GenerationRequest,
-        ResponseSummary,
-    ],
-):
-    def __init__(
-        self,
-        backend: Backend,
-        request_loader: Iterable[GenerationRequest],
-        request_loader_description: GenerativeRequestLoaderDescription,
-        benchmark_save_extras: Optional[dict[str, Any]] = None,
-        processor: Optional[Union[str, Path, PreTrainedTokenizerBase]] = None,
-        processor_args: Optional[dict[str, Any]] = None,
-    ):
-        super().__init__(
-            worker=GenerativeRequestsWorker(backend),
-            request_loader=request_loader,
-            requests_loader_description=request_loader_description,
-            benchmark_save_extras=benchmark_save_extras,
-        )
-        self.processor = processor
-        self.processor_args = processor_args
+        :param run_id: Unique identifier for the benchmark run.
+        :param run_index: Index of this strategy in the benchmark profile.
+        :param profile: Benchmark profile containing strategy configuration.
+        :param requests: Request datasets used for the benchmark.
+        :param backend: Backend interface used for request processing.
+        :param environment: Execution environment for coordination.
+        :param aggregators: Metric aggregation functions by name.
+        :param aggregators_state: Current state of metric aggregators.
+        :param strategy: Scheduling strategy that was executed.
+        :param constraints: Runtime constraints applied during execution.
+        :param scheduler_state: Final state of scheduler execution.
+        :return: Dictionary of parameters for benchmark object construction.
+        :raises ValueError: If aggregator output conflicts with existing keys.
+        """
+        benchmark_kwargs = {
+            "run_id": run_id,
+            "run_index": run_index,
+            "scheduler": {
+                "strategy": strategy,
+                "constraints": {
+                    key: InfoMixin.extract_from_obj(val) for key, val in constraints
+                },
+                "state": scheduler_state,
+            },
+            "benchmarker": {
+                "profile": profile,
+                "requests": InfoMixin.extract_from_obj(requests),
+                "backend": InfoMixin.extract_from_obj(backend),
+                "environment": InfoMixin.extract_from_obj(environment),
+                "aggregators": {
+                    key: InfoMixin.extract_from_obj(aggregator)
+                    for key, aggregator in aggregators.items()
+                },
+            },
+            "system": {},
+            "extras": {},
+        }
+        for key, aggregator in aggregators.items():
+            if not isinstance(aggregator, CompilableAggregator):
+                continue
 
-    def create_benchmark_aggregator(
-        self,
-        run_id: str,
-        profile: Profile,
-        strategy_index: int,
-        strategy: SchedulingStrategy,
-        limits: BenchmarkerStrategyLimits,
-    ) -> GenerativeBenchmarkAggregator:
-        return GenerativeBenchmarkAggregator(
-            run_id=run_id,
-            args=BenchmarkArgs(
-                profile=profile,
-                strategy_index=strategy_index,
-                strategy=strategy,
-                max_number=limits.max_number,
-                max_duration=limits.max_duration,
-                warmup_number=limits.warmup_number,
-                warmup_duration=limits.warmup_duration,
-                cooldown_number=limits.cooldown_number,
-                cooldown_duration=limits.cooldown_duration,
-            ),
-            worker_description=self.worker.description,  # type: ignore[arg-type]
-            request_loader_description=self.requests_loader_description,  # type: ignore[arg-type]
-            extras=self.benchmark_save_extras or {},
-            processor=self.processor,
-            processor_args=self.processor_args,
-        )
+            compiled = aggregator.compile(aggregators_state[key])
+
+            if key not in benchmark_kwargs:
+                benchmark_kwargs[key] = compiled
+                continue
+
+            existing_val = benchmark_kwargs[key]
+            if not (isinstance(existing_val, dict) and isinstance(compiled, dict)):
+                raise ValueError(
+                    f"Key '{key}' already exists with value {existing_val} "
+                    f"(type: {type(existing_val).__name__}) and cannot be "
+                    f"overwritten with {compiled} (type: {type(compiled).__name__})"
+                )
+            existing_val.update(compiled)
+
+        return benchmark_kwargs

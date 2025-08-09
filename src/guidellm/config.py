@@ -138,12 +138,8 @@ class Settings(BaseSettings):
     dataset: DatasetSettings = DatasetSettings()
 
     # Request/stats settings
-    preferred_prompt_tokens_source: Optional[
-        Literal["request", "response", "local"]
-    ] = "response"
-    preferred_output_tokens_source: Optional[
-        Literal["request", "response", "local"]
-    ] = "response"
+    preferred_prompt_tokens_source: Literal["request", "response"] = "response"
+    preferred_output_tokens_source: Literal["request", "response"] = "response"
     preferred_backend: Literal["openai"] = "openai"
     preferred_route: Literal["text_completions", "chat_completions"] = (
         "text_completions"
