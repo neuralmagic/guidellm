@@ -25,6 +25,7 @@ from .objects import (
     ScheduledRequestInfo,
     SchedulerState,
     SchedulerUpdateAction,
+    SchedulerUpdateActionProgress,
 )
 from .scheduler import Scheduler
 from .strategy import (
@@ -41,9 +42,8 @@ from .strategy import (
     StrategyType,
     SynchronousStrategy,
     ThroughputStrategy,
-    strategy_display_str,
 )
-from .worker import WorkerProcess, worker_sync_iterable_to_async
+from .worker import WorkerProcess
 from .worker_group import WorkerProcessGroup
 
 __all__ = [
@@ -81,6 +81,7 @@ __all__ = [
     "Scheduler",
     "SchedulerState",
     "SchedulerUpdateAction",
+    "SchedulerUpdateActionProgress",
     "SchedulingStrategy",
     "StrategyT",
     "StrategyType",
@@ -88,6 +89,4 @@ __all__ = [
     "ThroughputStrategy",
     "WorkerProcess",
     "WorkerProcessGroup",
-    "strategy_display_str",
-    "worker_sync_iterable_to_async",
 ]

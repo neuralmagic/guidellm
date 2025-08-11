@@ -8,6 +8,8 @@ Classes:
     Scheduler: Generic singleton scheduler for distributed request processing.
 """
 
+from __future__ import annotations
+
 from collections.abc import AsyncIterator, Iterable
 from typing import Any, Generic, Optional, Union
 

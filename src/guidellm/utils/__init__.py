@@ -21,6 +21,7 @@ from .text import (
     split_text,
     split_text_list_by_length,
 )
+from .threading import synchronous_to_exitable_async
 
 __all__ = [
     "SUPPORTED_TYPES",
@@ -41,4 +42,5 @@ __all__ = [
     "save_dataset_to_file",
     "split_text",
     "split_text_list_by_length",
+    "synchronous_to_exitable_async",
 ]

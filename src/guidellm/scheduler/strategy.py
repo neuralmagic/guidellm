@@ -25,18 +25,15 @@ Classes:
     ThroughputStrategy: Unrestricted request processing for maximum system throughput
     AsyncConstantStrategy: Asynchronous request scheduling at a constant rate
     AsyncPoissonStrategy: Asynchronous request scheduling with Poisson distribution
-
-Functions:
-    strategy_display_str: Generate human-readable string representations of strategies
 """
 
 import math
 import random
 import time
 from abc import ABC, abstractmethod
-from typing import Literal, Optional, TypeVar, Union
+from typing import Literal, Optional, TypeVar
 
-from pydantic import Field
+from pydantic import Field, PrivateAttr
 
 from guidellm.objects import StandardBaseModel
 from guidellm.scheduler.objects import ScheduledRequestInfo
@@ -55,7 +52,6 @@ __all__ = [
     "StrategyType",
     "SynchronousStrategy",
     "ThroughputStrategy",
-    "strategy_display_str",
 ]
 
 
@@ -147,11 +143,7 @@ class LastCompletionRequestTimings(ScheduledRequestTimings):
         ),
         ge=0,
     )
-    _requests_count: int = Field(
-        default=0,
-        description="Internal counter tracking the number of offsets generated.",
-        ge=0,
-    )
+    _requests_count: int = PrivateAttr(0)
 
     def next_offset(self) -> float:
         """
@@ -205,7 +197,7 @@ class NoDelayRequestTimings(ScheduledRequestTimings):
     startup_target_requests: int = Field(
         default=1.0,
         description=(
-            "The target average time between requests during the startup phase."
+            "The target number of requests to converge to in the startup phase."
         ),
         gt=0,
     )
@@ -213,15 +205,8 @@ class NoDelayRequestTimings(ScheduledRequestTimings):
         default=0.99,
         description=("The target convergence rate during the startup phase."),
     )
-    _start_time: Optional[float] = Field(
-        default=None,
-        description="The start time of the request processing phase.",
-    )
-    _requests_count: int = Field(
-        default=0,
-        description="Internal counter tracking the number of offsets generated.",
-        ge=0,
-    )
+    _start_time: Optional[float] = PrivateAttr(None)
+    _requests_count: int = PrivateAttr(0)
 
     def next_offset(self) -> float:
         """
@@ -271,24 +256,7 @@ class ConstantRateRequestTimings(ScheduledRequestTimings):
         description="The time offset to apply in seconds from scheduler start time.",
         ge=0,
     )
-    startup_duration: float = Field(
-        default=0.0,
-        description=(
-            "Duration in seconds over which startup requests are distributed "
-            "to converge quickly to the desired rate before switching to "
-            "constant-rate scheduling."
-        ),
-        ge=0,
-    )
-    startup_convergence: float = Field(
-        default=0.99,
-        description=("The target convergence rate during the startup phase."),
-    )
-    _requests_count: int = Field(
-        default=0,
-        description="Internal counter tracking the number of offsets generated.",
-        ge=0,
-    )
+    _requests_count: int = PrivateAttr(0)
 
     def next_offset(self) -> float:
         """
@@ -299,19 +267,11 @@ class ConstantRateRequestTimings(ScheduledRequestTimings):
 
         :return: The offset in seconds for the next request.
         """
+        num_requests = self._requests_count
         self._requests_count += 1
         interval = 1.0 / self.rate
-        startup_requests = self.startup_duration * self.rate
 
-        if self._requests_count <= startup_requests:
-            startup_percent = _exponential_decay_fraction(
-                self._requests_count,
-                _exponential_decay_tau(startup_requests, self.startup_convergence),
-            )
-        else:
-            startup_percent = 1.0
-
-        return self.offset + startup_percent * interval * self._requests_count
+        return self.offset + interval * num_requests
 
     def request_completed(self, request_info: ScheduledRequestInfo):
         """
@@ -345,29 +305,8 @@ class PoissonRateRequestTimings(ScheduledRequestTimings):
         default=0.0,
         description="The time offset to apply in seconds from scheduler start time.",
     )
-    startup_duration: float = Field(
-        default=0.0,
-        description=(
-            "Duration in seconds over which startup requests are distributed "
-            "to converge quickly to the desired rate before switching to "
-            "constant-rate scheduling."
-        ),
-        ge=0,
-    )
-    startup_convergence: float = Field(
-        default=0.99,
-        description=("The target convergence rate during the startup phase."),
-    )
-    _requests_count: int = Field(
-        default=0,
-        description="Internal counter tracking the number of offsets generated.",
-        ge=0,
-    )
-    _random: Optional[random.Random] = Field(
-        default=None,
-        description="Random number generator instance for Poisson distribution.",
-        exclude=True,  # Don't include in serialization
-    )
+    _requests_count: int = PrivateAttr(0)
+    _random: Optional[random.Random] = PrivateAttr(None)
 
     def next_offset(self) -> float:
         """
@@ -379,21 +318,13 @@ class PoissonRateRequestTimings(ScheduledRequestTimings):
 
         :return: The cumulative offset in seconds for the next request.
         """
+        self._requests_count += 1
+
         if self._random is None:
             self._random = random.Random(self.random_seed)
-
-        next_delay = self._random.expovariate(self.rate)
-        startup_requests = self.startup_duration * self.rate
-
-        if self._requests_count <= startup_requests:
-            startup_percent = _exponential_decay_fraction(
-                self._requests_count,
-                _exponential_decay_tau(startup_requests, self.startup_convergence),
-            )
         else:
-            startup_percent = 1.0
-
-        self.offset += startup_percent * next_delay
+            next_delay = self._random.expovariate(self.rate)
+            self.offset += next_delay
 
         return self.offset
 
@@ -467,6 +398,10 @@ class SynchronousStrategy(SchedulingStrategy):
 
     type_: Literal["synchronous"] = "synchronous"  # type: ignore[assignment]
 
+    def __str__(self) -> str:
+        """Return string representation of the strategy."""
+        return "synchronous"
+
     @property
     def processes_limit(self) -> Optional[int]:
         """
@@ -537,6 +472,10 @@ class ConcurrentStrategy(SchedulingStrategy):
         ),
         ge=0,
     )
+
+    def __str__(self) -> str:
+        """Return string representation of the strategy."""
+        return f"concurrent@{self.streams}"
 
     @property
     def processes_limit(self) -> int:
@@ -639,6 +578,10 @@ class ThroughputStrategy(SchedulingStrategy):
         ge=0,
     )
 
+    def __str__(self) -> str:
+        """Return string representation of the strategy."""
+        return "throughput"
+
     @property
     def processes_limit(self) -> Optional[int]:
         """
@@ -668,21 +611,22 @@ class ThroughputStrategy(SchedulingStrategy):
         :param local_rank: The rank of the worker process (unused for throughput).
         :param local_world_size: Total number of worker processes (unused for
             throughput).
+        :param local_max_concurrency: The maximum number of concurrent requests
+            for the worker process.
         :return: NoDelayRequestTimings instance for immediate request scheduling.
         """
         if self.startup_duration > 0:
             # Vary offset by up to 5% of the startup duration for a bit of variance
             offset = 0.05 * self.startup_duration * (local_rank / local_world_size)
-            # set convergence of tau to target reaching 99% of the startup_duration
-            # at local_max_concurrency
-            tau = local_max_concurrency / (-1 * math.log(0.01))
+            # Use local_max_concurrency as the target requests for startup convergence
+            startup_target_requests = local_max_concurrency
         else:
             offset = 0.0
-            tau = 1.0
+            startup_target_requests = 1
 
         return NoDelayRequestTimings(
             startup_duration=self.startup_duration,
-            startup_tau=tau,
+            startup_target_requests=startup_target_requests,
             offset=offset,
         )
 
@@ -719,6 +663,10 @@ class AsyncConstantStrategy(ThroughputStrategy):
         ge=0,
     )
 
+    def __str__(self) -> str:
+        """Return string representation of the strategy."""
+        return f"constant@{self.rate:.2f}"
+
     def create_request_timings(
         self, _local_rank: int, local_world_size: int, _local_max_concurrency: int
     ) -> ScheduledRequestTimings:
@@ -739,7 +687,6 @@ class AsyncConstantStrategy(ThroughputStrategy):
 
         return ConstantRateRequestTimings(
             rate=worker_rate,
-            startup_duration=self.startup_duration,
         )
 
 
@@ -779,6 +726,10 @@ class AsyncPoissonStrategy(ThroughputStrategy):
         description=("The random seed to use for the Poisson distribution."),
     )
 
+    def __str__(self) -> str:
+        """Return string representation of the strategy."""
+        return f"poisson@{self.rate:.2f}"
+
     def create_request_timings(
         self, local_rank: int, local_world_size: int, _local_max_concurrency: int
     ) -> ScheduledRequestTimings:
@@ -802,38 +753,4 @@ class AsyncPoissonStrategy(ThroughputStrategy):
         return PoissonRateRequestTimings(
             rate=worker_rate,
             random_seed=worker_seed,
-            startup_duration=self.startup_duration,
         )
-
-
-def strategy_display_str(strategy: Union[StrategyType, SchedulingStrategy]) -> str:
-    """
-    Generate a human-readable string representation of a scheduling strategy.
-
-    Creates concise string representations that include the strategy type and
-    relevant configuration parameters (e.g., rate for async strategies, streams
-    for concurrent strategies). Useful for logging, debugging, and user interfaces.
-
-    :param strategy: A strategy type string or SchedulingStrategy instance to format.
-    :return: A formatted string representation of the strategy with configuration
-        details when available.
-
-    Examples:
-        >>> strategy_display_str("synchronous")
-        "synchronous"
-        >>> strategy_display_str(ConcurrentStrategy(streams=4))
-        "concurrent@4"
-        >>> strategy_display_str(AsyncConstantStrategy(rate=10.5))
-        "constant@10.50"
-    """
-    if isinstance(strategy, str):
-        return strategy
-
-    strategy_type = strategy.type_
-
-    if strategy_type == "concurrent":
-        return f"{strategy_type}@{strategy.streams}"  # type: ignore[attr-defined]
-    elif strategy_type in ("constant", "poisson"):
-        return f"{strategy_type}@{strategy.rate:.2f}"  # type: ignore[attr-defined]
-    else:
-        return strategy_type

@@ -9,6 +9,8 @@ Classes:
         request processing with centralized coordination.
 """
 
+from __future__ import annotations
+
 import asyncio
 import contextlib
 import math
@@ -34,7 +36,8 @@ from guidellm.scheduler.objects import (
     SchedulerState,
 )
 from guidellm.scheduler.strategy import SchedulingStrategy
-from guidellm.scheduler.worker import WorkerProcess, worker_sync_iterable_to_async
+from guidellm.scheduler.worker import WorkerProcess
+from guidellm.utils import synchronous_to_exitable_async
 
 __all__ = ["WorkerProcessGroup"]
 
@@ -155,8 +158,8 @@ class WorkerProcessGroup(Generic[BackendT, RequestT, RequestTimingsT, ResponseT]
             future = self.executor.submit(worker.run)
             self.processes.append(future)
 
-        startup_exit_reason, _ = await worker_sync_iterable_to_async(
-            iter_func="infinite",
+        startup_exit_reason, _ = await synchronous_to_exitable_async(
+            synchronous=None,
             exit_events={
                 "error_event": self.error_event,
                 "shutdown_event": self.shutdown_event,

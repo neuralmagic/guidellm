@@ -27,7 +27,6 @@ from typing import Any, Optional, Protocol, Union, runtime_checkable
 
 from pydantic import Field
 
-from guidellm.config import settings
 from guidellm.objects import StandardBaseModel
 from guidellm.scheduler.objects import (
     ScheduledRequestInfo,
@@ -73,7 +72,7 @@ class Constraint(Protocol):
 class ConstraintInitializer(Protocol):
     """Protocol for constraint initializer factory functions."""
 
-    def __call__(self, **kwargs) -> Constraint:
+    def create_constraint(self, **kwargs) -> Constraint:
         """
         Create a constraint instance from configuration parameters.
 
@@ -91,6 +90,7 @@ class ConstraintsInitializerFactory(RegistryMixin[ConstraintInitializer]):
         Create a constraint initializer for the specified key.
 
         :param key: Registered constraint initializer key.
+        :param args: Positional arguments for initializer creation.
         :param kwargs: Keyword arguments for initializer creation.
         :return: Configured constraint initializer function.
         :raises ValueError: If the key is not registered in the factory.
@@ -98,7 +98,14 @@ class ConstraintsInitializerFactory(RegistryMixin[ConstraintInitializer]):
         if not cls.is_registered(key):
             raise ValueError(f"Unknown constraint initializer key: {key}")
 
-        return cls.get_registered_object(key)(*args, **kwargs)
+        initializer_class = cls.get_registered_object(key)
+
+        # Handle simple scalar values by delegating to the initializer class
+        if (len(args) == 1 and not kwargs and
+            hasattr(initializer_class, "from_simple_value")):
+            return initializer_class.from_simple_value(args[0])
+
+        return initializer_class(*args, **kwargs)
 
     @classmethod
     def create_constraint(cls, key: str, *args, **kwargs) -> Constraint:
@@ -110,7 +117,7 @@ class ConstraintsInitializerFactory(RegistryMixin[ConstraintInitializer]):
         :return: Configured constraint function ready for evaluation.
         :raises ValueError: If the key is not registered in the factory.
         """
-        return cls.create(key, *args, **kwargs)()
+        return cls.create(key, *args, **kwargs).create_constraint()
 
     @classmethod
     def resolve(
@@ -133,7 +140,7 @@ class ConstraintsInitializerFactory(RegistryMixin[ConstraintInitializer]):
             if isinstance(val, Constraint):
                 constraints[key] = val
             elif isinstance(val, ConstraintInitializer):
-                constraints[key] = val()
+                constraints[key] = val.create_constraint()
             elif isinstance(val, dict):
                 constraints[key] = cls.create_constraint(key, **val)
             else:
@@ -153,26 +160,26 @@ class ConstraintsInitializerFactory(RegistryMixin[ConstraintInitializer]):
         :return: Dictionary mapping constraint keys to callable functions.
         :raises ValueError: If any constraint key is not registered.
         """
-        constraints = {}
+        resolved_constraints = {}
 
         for key, val in constraints.items():
             if isinstance(val, Constraint):
-                constraints[key] = val
+                resolved_constraints[key] = val
             elif isinstance(val, dict):
-                constraints[key] = cls.create_constraint(key, **val)
+                resolved_constraints[key] = cls.create_constraint(key, **val)
             else:
-                constraints[key] = cls.create_constraint(key, val)
+                resolved_constraints[key] = cls.create_constraint(key, val)
 
-        return constraints
+        return resolved_constraints
 
 
 class _MaxNumberBase(StandardBaseModel):
     max_num: Union[int, float] = Field(
-        ge=0, description="Maximum number of requests allowed"
+        gt=0, description="Maximum number of requests allowed"
     )
 
 
-class MaxNumberConstraint(_MaxNumberBase, Constraint):
+class MaxNumberConstraint(_MaxNumberBase):
     """Constraint that limits execution based on maximum request counts."""
 
     def __call__(
@@ -198,14 +205,32 @@ class MaxNumberConstraint(_MaxNumberBase, Constraint):
                 "created_requests": state.created_requests,
                 "processed_requests": state.processed_requests,
             },
+            progress={
+                "remaining_fraction": max(
+                    0.0, 1.0 - state.processed_requests / float(self.max_num)
+                ),
+                "remaining_requests": max(0, self.max_num - state.processed_requests),
+            },
         )
 
 
 @ConstraintsInitializerFactory.register("max_number")
-class MaxNumberConstraintInitializer(_MaxNumberBase, ConstraintInitializer):
+class MaxNumberConstraintInitializer(_MaxNumberBase):
     """Factory for creating MaxNumberConstraint instances."""
 
-    def __call__(self, **_kwargs) -> Constraint:
+    @classmethod
+    def from_simple_value(
+        cls, value: Union[int, float]
+    ) -> "MaxNumberConstraintInitializer":
+        """
+        Create a MaxNumberConstraintInitializer from a simple scalar value.
+
+        :param value: Maximum number of requests allowed.
+        :return: Configured MaxNumberConstraintInitializer instance.
+        """
+        return cls(max_num=value)
+
+    def create_constraint(self, **_kwargs) -> Constraint:
         """
         Create a MaxNumberConstraint instance.
 
@@ -219,11 +244,11 @@ class MaxNumberConstraintInitializer(_MaxNumberBase, ConstraintInitializer):
 
 class _MaxDurationBase(StandardBaseModel):
     max_duration: Union[int, float] = Field(
-        ge=0, description="Maximum duration in seconds"
+        gt=0, description="Maximum duration in seconds"
     )
 
 
-class MaxDurationConstraint(_MaxDurationBase, Constraint):
+class MaxDurationConstraint(_MaxDurationBase):
     """Constraint that limits execution based on maximum time duration."""
 
     def __call__(
@@ -250,14 +275,32 @@ class MaxDurationConstraint(_MaxDurationBase, Constraint):
                 "start_time": state.start_time,
                 "current_time": current_time,
             },
+            progress={
+                "remaining_fraction": max(
+                    0.0, 1.0 - elapsed / float(self.max_duration)
+                ),
+                "remaining_duration": max(0.0, self.max_duration - elapsed),
+            },
         )
 
 
 @ConstraintsInitializerFactory.register("max_duration")
-class MaxDurationConstraintInitializer(_MaxDurationBase, ConstraintInitializer):
+class MaxDurationConstraintInitializer(_MaxDurationBase):
     """Factory for creating MaxDurationConstraint instances."""
 
-    def __call__(self, **_kwargs) -> Constraint:
+    @classmethod
+    def from_simple_value(
+        cls, value: Union[int, float]
+    ) -> "MaxDurationConstraintInitializer":
+        """
+        Create a MaxDurationConstraintInitializer from a simple scalar value.
+
+        :param value: Maximum duration in seconds.
+        :return: Configured MaxDurationConstraintInitializer instance.
+        """
+        return cls(max_duration=value)
+
+    def create_constraint(self, **_kwargs) -> Constraint:
         """
         Create a MaxDurationConstraint instance.
 
@@ -275,7 +318,7 @@ class _MaxErrorsBase(StandardBaseModel):
     )
 
 
-class MaxErrorsConstraint(_MaxErrorsBase, Constraint):
+class MaxErrorsConstraint(_MaxErrorsBase):
     """Constraint that limits execution based on absolute error count."""
 
     def __call__(
@@ -302,10 +345,22 @@ class MaxErrorsConstraint(_MaxErrorsBase, Constraint):
 
 
 @ConstraintsInitializerFactory.register("max_errors")
-class MaxErrorsConstraintInitializer(_MaxErrorsBase, ConstraintInitializer):
+class MaxErrorsConstraintInitializer(_MaxErrorsBase):
     """Factory for creating MaxErrorsConstraint instances."""
 
-    def __call__(self, **_kwargs) -> Constraint:
+    @classmethod
+    def from_simple_value(
+        cls, value: Union[int, float]
+    ) -> "MaxErrorsConstraintInitializer":
+        """
+        Create a MaxErrorsConstraintInitializer from a simple scalar value.
+
+        :param value: Maximum number of errors allowed.
+        :return: Configured MaxErrorsConstraintInitializer instance.
+        """
+        return cls(max_errors=value)
+
+    def create_constraint(self, **_kwargs) -> Constraint:
         """
         Create a MaxErrorsConstraint instance.
 
@@ -319,16 +374,16 @@ class MaxErrorsConstraintInitializer(_MaxErrorsBase, ConstraintInitializer):
 
 class _MaxErrorRateBase(StandardBaseModel):
     max_error_rate: Union[int, float] = Field(
-        ge=0, le=1, description="Maximum error rate allowed (0.0 to 1.0)"
+        gt=0, le=1, description="Maximum error rate allowed (0.0 to 1.0)"
     )
     window_size: Union[int, float] = Field(
-        default_factory=lambda: settings.constraint_max_error_rate_min_processed,
+        default=50,
         gt=0,
         description="Size of sliding window for calculating error rate",
     )
 
 
-class MaxErrorRateConstraint(_MaxErrorRateBase, Constraint):
+class MaxErrorRateConstraint(_MaxErrorRateBase):
     """Constraint that limits execution based on sliding window error rate."""
 
     error_window: list[bool] = Field(
@@ -352,10 +407,9 @@ class MaxErrorRateConstraint(_MaxErrorRateBase, Constraint):
                 self.error_window.pop(0)
 
         error_count = sum(self.error_window)
+        window_requests = len(self.error_window)
         error_rate = (
-            error_count / float(state.processed_requests)
-            if state.processed_requests > 0
-            else 0.0
+            error_count / float(window_requests) if window_requests > 0 else 0.0
         )
         exceeded_min_processed = state.processed_requests >= self.window_size
         exceeded_error_rate = error_rate >= self.max_error_rate
@@ -383,10 +437,22 @@ class MaxErrorRateConstraint(_MaxErrorRateBase, Constraint):
 
 
 @ConstraintsInitializerFactory.register("max_error_rate")
-class MaxErrorRateConstraintInitializer(_MaxErrorRateBase, ConstraintInitializer):
+class MaxErrorRateConstraintInitializer(_MaxErrorRateBase):
     """Factory for creating MaxErrorRateConstraint instances."""
 
-    def __call__(self, **_kwargs) -> Constraint:
+    @classmethod
+    def from_simple_value(
+        cls, value: Union[int, float]
+    ) -> "MaxErrorRateConstraintInitializer":
+        """
+        Create a MaxErrorRateConstraintInitializer from a simple scalar value.
+
+        :param value: Maximum error rate allowed (0.0 to 1.0).
+        :return: Configured MaxErrorRateConstraintInitializer instance.
+        """
+        return cls(max_error_rate=value)
+
+    def create_constraint(self, **_kwargs) -> Constraint:
         """
         Create a MaxErrorRateConstraint instance.
 
@@ -401,10 +467,10 @@ class MaxErrorRateConstraintInitializer(_MaxErrorRateBase, ConstraintInitializer
 
 class _MaxGlobalErrorRateBase(StandardBaseModel):
     max_error_rate: Union[int, float] = Field(
-        ge=0, le=1, description="Maximum error rate allowed (0.0 to 1.0)"
+        gt=0, le=1, description="Maximum error rate allowed (0.0 to 1.0)"
     )
     min_processed: Optional[Union[int, float]] = Field(
-        default_factory=lambda: settings.constraint_max_error_rate_min_processed,
+        default=50,
         gt=30,
         description=(
             "Minimum number of processed requests before applying error rate constraint"
@@ -412,7 +478,7 @@ class _MaxGlobalErrorRateBase(StandardBaseModel):
     )
 
 
-class MaxGlobalErrorRateConstraint(_MaxGlobalErrorRateBase, Constraint):
+class MaxGlobalErrorRateConstraint(_MaxGlobalErrorRateBase):
     """Constraint that limits execution based on global error rate."""
 
     def __call__(
@@ -450,12 +516,22 @@ class MaxGlobalErrorRateConstraint(_MaxGlobalErrorRateBase, Constraint):
 
 
 @ConstraintsInitializerFactory.register("max_global_error_rate")
-class MaxGlobalErrorRateConstraintInitializer(
-    _MaxGlobalErrorRateBase, ConstraintInitializer
-):
+class MaxGlobalErrorRateConstraintInitializer(_MaxGlobalErrorRateBase):
     """Factory for creating MaxGlobalErrorRateConstraint instances."""
 
-    def __call__(self, **_kwargs) -> Constraint:
+    @classmethod
+    def from_simple_value(
+        cls, value: Union[int, float]
+    ) -> "MaxGlobalErrorRateConstraintInitializer":
+        """
+        Create a MaxGlobalErrorRateConstraintInitializer from a simple scalar value.
+
+        :param value: Maximum error rate allowed (0.0 to 1.0).
+        :return: Configured MaxGlobalErrorRateConstraintInitializer instance.
+        """
+        return cls(max_error_rate=value)
+
+    def create_constraint(self, **_kwargs) -> Constraint:
         """
         Create a MaxGlobalErrorRateConstraint instance.
 

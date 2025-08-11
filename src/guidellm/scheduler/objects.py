@@ -28,8 +28,9 @@ from typing import (
     Optional,
     TypeVar,
 )
+from typing_extensions import TypedDict
 
-from pydantic import Field
+from pydantic import computed_field, Field
 
 from guidellm.objects import StandardBaseModel
 
@@ -44,6 +45,7 @@ __all__ = [
     "ScheduledRequestInfo",
     "SchedulerState",
     "SchedulerUpdateAction",
+    "SchedulerUpdateActionProgress",
 ]
 
 RequestT = TypeVar("RequestT")
@@ -64,6 +66,9 @@ class RequestSchedulerTimings(StandardBaseModel):
     dequeued: Optional[float] = Field(
         default=None,
         description="When the request was removed from the queue for processing",
+    )
+    scheduled_at: Optional[float] = Field(
+        default=None, description="When the request was scheduled for processing"
     )
     resolve_start: Optional[float] = Field(
         default=None, description="When backend resolution of the request began"
@@ -120,6 +125,7 @@ class ScheduledRequestInfo(StandardBaseModel, Generic[RequestTimingsT]):
         description="Backend-specific timing measurements for request processing",
     )
 
+    @computed_field
     @property
     def started_at(self) -> Optional[float]:
         """
@@ -133,6 +139,7 @@ class ScheduledRequestInfo(StandardBaseModel, Generic[RequestTimingsT]):
 
         return request_start or self.scheduler_timings.resolve_start
 
+    @computed_field
     @property
     def completed_at(self) -> Optional[float]:
         """
@@ -211,7 +218,7 @@ class BackendInterface(ABC, Generic[RequestT, RequestTimingsT, ResponseT]):
         """
 
 
-BackendT = TypeVar("BackendT", bound="BackendInterface")
+BackendT = TypeVar("BackendT", bound=BackendInterface)
 
 
 class SchedulerState(StandardBaseModel):
@@ -283,6 +290,14 @@ class SchedulerState(StandardBaseModel):
     )
 
 
+class SchedulerUpdateActionProgress(TypedDict, total=False):
+    """Progress information for a scheduler update action."""
+
+    remaining_fraction: float
+    remaining_requests: float
+    remaining_duration: float
+
+
 class SchedulerUpdateAction(StandardBaseModel):
     """Scheduler behavior control directives and actions."""
 
@@ -296,4 +311,8 @@ class SchedulerUpdateAction(StandardBaseModel):
     metadata: dict[str, Any] = Field(
         default_factory=dict,
         description="Additional context and data for the scheduler action",
+    )
+    progress: SchedulerUpdateActionProgress = Field(
+        default_factory=dict,
+        description="Progress information for the scheduler action",
     )

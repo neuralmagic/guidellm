@@ -209,3 +209,6 @@ class NonDistributedEnvironment(Environment):
         """
         if self.run_err:
             raise self.run_err
+        # Return empty async iterator for non-distributed environment
+        return
+        yield
