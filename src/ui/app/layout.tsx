@@ -1,10 +1,10 @@
-import type { Metadata, Viewport } from 'next';
+import type { Metadata } from 'next';
+import { Viewport } from 'next/dist/lib/metadata/types/extra-types';
 import React from 'react';
 
 import { benchmarksScript } from '@/lib/store/benchmarksWindowData';
 import { runInfoScript } from '@/lib/store/runInfoWindowData';
 import { workloadDetailsScript } from '@/lib/store/workloadDetailsWindowData';
-import './globals.css';
 
 export async function generateMetadata(): Promise<Metadata> {
   const assetPrefix = process.env.ASSET_PREFIX || '';
@@ -22,7 +22,6 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export const viewport: Viewport = {
   initialScale: 1,
-  themeColor: '#000000',
   width: 'device-width',
 };
 
@@ -60,7 +59,6 @@ export default function RootLayout({
   );
   const dataScript =
     process.env.USE_MOCK_DATA === 'true' ? mockDataScript : emptyDataScript;
-
   return (
     <html lang="en">
       <head>{dataScript}</head>

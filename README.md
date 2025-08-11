@@ -52,6 +52,25 @@ pip install git+https://github.com/vllm-project/guidellm.git
 
 For detailed installation instructions and requirements, see the [Installation Guide](https://github.com/vllm-project/guidellm/blob/main/docs/install.md).
 
+### With Podman / Docker
+
+Alternatively we publish container images at [ghcr.io/vllm-project/guidellm](https://github.com/vllm-project/guidellm/pkgs/container/guidellm). Running a container is (by default) equivalent to `guidellm benchmark run`:
+
+```bash
+podman run \
+  --rm -it \
+  -v "./results:/results:rw" \
+  -e GUIDELLM_TARGET=http://localhost:8000 \
+  -e GUIDELLM_RATE_TYPE=sweep \
+  -e GUIDELLM_MAX_SECONDS=30 \
+  -e GUIDELLM_DATA="prompt_tokens=256,output_tokens=128" \
+  ghcr.io/vllm-project/guidellm:latest
+```
+
+> [!TIP] CLI options can also be specified as ENV variables (E.g. `--rate-type sweep` -> `GUIDELLM_RATE_TYPE=sweep`). If both are specified then the CLI option overrides the the ENV.
+
+Replace `latest` with `stable` for the newest tagged release or set a specific release if desired.
+
 ### Quick Start
 
 #### 1. Start an OpenAI Compatible Server (vLLM)
@@ -159,11 +178,19 @@ GuideLLM UI is a companion frontend for visualizing the results of a GuideLLM be
 
 ### 🛠 Generating an HTML report with a benchmark run
 
+For either pathway below you'll need to set the output path to benchmarks.html for your run:
+
+```bash
+--output-path=benchmarks.html
+```
+
+Alternatively load a saved run using the from-file command and also set the output to benchmarks.html
+
 1. Use the Hosted Build (Recommended for Most Users)
 
 This is preconfigured. The latest stable version of the hosted UI (https://blog.vllm.ai/guidellm/ui/latest) will be used to build the local html file.
 
-Open benchmarks.html in your browser and you're done—no setup required.
+Execute your run, then open benchmarks.html in your browser and you're done—no further setup required.
 
 2. Build and Serve the UI Locally (For Development) This option is useful if:
 
@@ -186,14 +213,6 @@ export GUIDELLM__ENV=local
 ```
 
 Then you can execute your run.
-
-Set the output to benchmarks.html for your run:
-
-```bash
---output-path=benchmarks.html
-```
-
-Alternatively load a saved run using the from-file command and also set the output to benchmarks.html
 
 ## Resources
 

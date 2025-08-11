@@ -1,6 +1,6 @@
 'use client';
+
 import { Box, Grid } from '@mui/material';
-import dynamic from 'next/dynamic';
 import { useSelector } from 'react-redux';
 
 import {
@@ -19,7 +19,7 @@ import { RequestOverTime } from '../RequestOverTime';
 import { SpecBadge } from '../SpecBadge';
 import { TokenLength } from '../TokenLength';
 
-const Component = () => {
+export const Component = () => {
   const { data } = useGetWorkloadDetailsQuery();
   const promptsBarData = useSelector(selectPromptsHistogramBarData);
   const promptsLineData = useSelector(selectPromptsHistogramLineData);
@@ -106,9 +106,3 @@ const Component = () => {
     </>
   );
 };
-
-const DynamicComponent = dynamic(() => Promise.resolve(Component), {
-  ssr: false,
-});
-
-export { DynamicComponent as Component };

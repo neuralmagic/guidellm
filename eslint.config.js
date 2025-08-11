@@ -137,8 +137,6 @@ export default tseslint.config(
         project: './tsconfig.cypress.json',
         tsconfigRootDir: __dirname,
       },
-      // FIX: This is the correct way to get globals from the Cypress plugin's recommended config.
-      globals: cypressPlugin.configs.recommended.languageOptions.globals,
     },
     plugins: {
       cypress: cypressPlugin,

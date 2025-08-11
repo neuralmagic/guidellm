@@ -81,10 +81,12 @@ class OpenAISettings(BaseModel):
 
     api_key: Optional[str] = None
     bearer_token: Optional[str] = None
+    headers: Optional[dict[str, str]] = None
     organization: Optional[str] = None
     project: Optional[str] = None
     base_url: str = "http://localhost:8000"
     max_output_tokens: int = 16384
+    verify: bool = True
 
 
 class ReportGenerationSettings(BaseModel):

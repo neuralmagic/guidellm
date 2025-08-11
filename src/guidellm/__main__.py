@@ -25,6 +25,7 @@ STRATEGY_PROFILE_CHOICES = list(
 
 
 @click.group()
+@click.version_option(package_name="guidellm", message="guidellm version: %(version)s")
 def cli():
     pass
 
@@ -51,7 +52,7 @@ def benchmark():
             readable=True,
             file_okay=True,
             dir_okay=False,
-            path_type=Path,  # type: ignore[type-var]
+            path_type=Path,
         ),
         click.Choice(get_builtin_scenarios()),
     ),
@@ -82,7 +83,9 @@ def benchmark():
     default=GenerativeTextScenario.get_default("backend_args"),
     help=(
         "A JSON string containing any arguments to pass to the backend as a "
-        "dict with **kwargs."
+        "dict with **kwargs. Headers can be removed by setting their value to "
+        "null. For example: "
+        """'{"headers": {"Authorization": null, "Custom-Header": "Custom-Value"}}'"""
     ),
 )
 @click.option(
