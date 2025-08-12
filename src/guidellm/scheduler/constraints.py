@@ -101,8 +101,11 @@ class ConstraintsInitializerFactory(RegistryMixin[ConstraintInitializer]):
         initializer_class = cls.get_registered_object(key)
 
         # Handle simple scalar values by delegating to the initializer class
-        if (len(args) == 1 and not kwargs and
-            hasattr(initializer_class, "from_simple_value")):
+        if (
+            len(args) == 1
+            and not kwargs
+            and hasattr(initializer_class, "from_simple_value")
+        ):
             return initializer_class.from_simple_value(args[0])
 
         return initializer_class(*args, **kwargs)

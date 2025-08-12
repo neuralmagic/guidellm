@@ -12,7 +12,7 @@ from typing import Any, Literal, Optional
 from pydantic import Field
 
 from guidellm.objects.pydantic import StandardBaseModel
-from guidellm.scheduler import RequestTimings
+from guidellm.scheduler import MeasuredRequestTimings
 
 __all__ = [
     "GenerationRequest",
@@ -135,7 +135,7 @@ class GenerationResponse(StandardBaseModel):
             return self.response_output_tokens or self.request_output_tokens
 
 
-class GenerationRequestTimings(RequestTimings):
+class GenerationRequestTimings(MeasuredRequestTimings):
     """Timing model for tracking generation request lifecycle events."""
 
     first_iteration: Optional[float] = Field(

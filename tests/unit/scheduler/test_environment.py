@@ -2,7 +2,7 @@ import inspect
 import time
 from abc import ABC
 from typing import Generic
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 

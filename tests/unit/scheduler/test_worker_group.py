@@ -48,5 +48,5 @@ class TestWorkerProcessGroup:
 
     @pytest.mark.smoke
     def test_lifecycle(self):
-        # TODO: implement tests to ensure the entire lifecycle of the WorkerProcessGroup is tested, including creation, starting, processing requests, and shutdown with proper 
+        # TODO: implement tests to ensure the entire lifecycle of the WorkerProcessGroup is tested, including creation, starting, processing requests, and shutdown with proper
         pass

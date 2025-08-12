@@ -468,9 +468,7 @@ class TestPoissonRateRequestTimings:
         expected_mean_interval = 1.0 / rate
         actual_mean_interval = statistics.mean(intervals)
         tolerance = 0.2 * expected_mean_interval
-        assert (
-            abs(actual_mean_interval - expected_mean_interval) < tolerance
-        )
+        assert abs(actual_mean_interval - expected_mean_interval) < tolerance
 
     @pytest.mark.smoke
     def test_marshalling(self, valid_instances: tuple[PoissonRateRequestTimings, dict]):

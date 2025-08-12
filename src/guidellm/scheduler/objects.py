@@ -28,19 +28,19 @@ from typing import (
     Optional,
     TypeVar,
 )
-from typing_extensions import TypedDict
 
-from pydantic import computed_field, Field
+from pydantic import Field, computed_field
+from typing_extensions import TypedDict
 
 from guidellm.objects import StandardBaseModel
 
 __all__ = [
     "BackendInterface",
     "BackendT",
+    "MeasuredRequestTimings",
+    "MeasuredRequestTimingsT",
     "RequestSchedulerTimings",
     "RequestT",
-    "RequestTimings",
-    "RequestTimingsT",
     "ResponseT",
     "ScheduledRequestInfo",
     "SchedulerState",
@@ -82,7 +82,7 @@ class RequestSchedulerTimings(StandardBaseModel):
     )
 
 
-class RequestTimings(StandardBaseModel):
+class MeasuredRequestTimings(StandardBaseModel):
     """Base timing measurements for backend request processing."""
 
     request_start: Optional[float] = Field(
@@ -93,10 +93,12 @@ class RequestTimings(StandardBaseModel):
     )
 
 
-RequestTimingsT = TypeVar("RequestTimingsT", bound=RequestTimings)
+MeasuredRequestTimingsT = TypeVar(
+    "MeasuredRequestTimingsT", bound=MeasuredRequestTimings
+)
 
 
-class ScheduledRequestInfo(StandardBaseModel, Generic[RequestTimingsT]):
+class ScheduledRequestInfo(StandardBaseModel, Generic[MeasuredRequestTimingsT]):
     """Complete request information including status, timings, and metadata."""
 
     request_id: str = Field(description="Unique identifier for the request")
@@ -120,7 +122,7 @@ class ScheduledRequestInfo(StandardBaseModel, Generic[RequestTimingsT]):
         default_factory=RequestSchedulerTimings,
         description="Scheduler-level timing measurements for request lifecycle",
     )
-    request_timings: Optional[RequestTimingsT] = Field(
+    request_timings: Optional[MeasuredRequestTimingsT] = Field(
         default=None,
         description="Backend-specific timing measurements for request processing",
     )
@@ -152,7 +154,7 @@ class ScheduledRequestInfo(StandardBaseModel, Generic[RequestTimingsT]):
         return request_end or self.scheduler_timings.resolve_end
 
 
-class BackendInterface(ABC, Generic[RequestT, RequestTimingsT, ResponseT]):
+class BackendInterface(ABC, Generic[RequestT, MeasuredRequestTimingsT, ResponseT]):
     """
     Abstract interface for request processing backends. Note: before process_startup
     is invoked, the implementation must ensure all properties are pickleable.
@@ -204,9 +206,9 @@ class BackendInterface(ABC, Generic[RequestT, RequestTimingsT, ResponseT]):
     async def resolve(
         self,
         request: RequestT,
-        request_info: ScheduledRequestInfo[RequestTimingsT],
+        request_info: ScheduledRequestInfo[MeasuredRequestTimingsT],
         history: Optional[list[tuple[RequestT, ResponseT]]] = None,
-    ) -> AsyncIterator[tuple[ResponseT, ScheduledRequestInfo[RequestTimingsT]]]:
+    ) -> AsyncIterator[tuple[ResponseT, ScheduledRequestInfo[MeasuredRequestTimingsT]]]:
         """
         Process a request and yield incremental response updates.
 

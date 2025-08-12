@@ -991,9 +991,7 @@ class TestMaxGlobalErrorRateConstraint:
         with pytest.raises(ValidationError):
             MaxGlobalErrorRateConstraint(max_error_rate=1.5)
         with pytest.raises(ValidationError):
-            MaxGlobalErrorRateConstraint(
-                max_error_rate=0.5, min_processed=30
-            )
+            MaxGlobalErrorRateConstraint(max_error_rate=0.5, min_processed=30)
         with pytest.raises(ValidationError):
             MaxGlobalErrorRateConstraint(max_error_rate="invalid")
 

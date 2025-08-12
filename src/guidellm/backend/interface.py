@@ -3,23 +3,19 @@ from collections.abc import AsyncIterator
 from typing import (
     Any,
     Generic,
-    Literal,
     Optional,
     TypeVar,
 )
 
-from pydantic import Field
-
-from guidellm.objects import StandardBaseModel
 from guidellm.scheduler import (
+    MeasuredRequestTimingsT,
     RequestT,
-    RequestTimingsT,
     ResponseT,
     ScheduledRequestInfo,
 )
 
 
-class BackendInterface(ABC, Generic[RequestT, RequestTimingsT, ResponseT]):
+class BackendInterface(ABC, Generic[RequestT, MeasuredRequestTimingsT, ResponseT]):
     """
     Abstract interface for request processing backends. Note: before process_startup
     is invoked, the implementation must ensure all properties are pickleable.
@@ -71,9 +67,9 @@ class BackendInterface(ABC, Generic[RequestT, RequestTimingsT, ResponseT]):
     async def resolve(
         self,
         request: RequestT,
-        request_info: ScheduledRequestInfo[RequestTimingsT],
+        request_info: ScheduledRequestInfo[MeasuredRequestTimingsT],
         history: Optional[list[tuple[RequestT, ResponseT]]] = None,
-    ) -> AsyncIterator[tuple[ResponseT, ScheduledRequestInfo[RequestTimingsT]]]:
+    ) -> AsyncIterator[tuple[ResponseT, ScheduledRequestInfo[MeasuredRequestTimingsT]]]:
         """
         Process a request and yield incremental response updates.
 

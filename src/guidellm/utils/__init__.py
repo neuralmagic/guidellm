@@ -1,5 +1,6 @@
 from .colors import Colors
 from .default_group import DefaultGroupHandler
+from .encoding import MsgpackEncoding
 from .hf_datasets import (
     SUPPORTED_TYPES,
     save_dataset_to_file,
@@ -30,6 +31,7 @@ __all__ = [
     "EndlessTextCreator",
     "InfoMixin",
     "IntegerRangeSampler",
+    "MsgpackEncoding",
     "RegistryMixin",
     "SingletonMixin",
     "ThreadSafeSingletonMixin",

@@ -21,8 +21,8 @@ from typing import (
 from guidellm.config import settings
 from guidellm.scheduler.constraints import Constraint
 from guidellm.scheduler.objects import (
+    MeasuredRequestTimingsT,
     RequestT,
-    RequestTimingsT,
     ResponseT,
     ScheduledRequestInfo,
     SchedulerState,
@@ -84,7 +84,7 @@ class Environment(ABC, Generic[RequestT, ResponseT]):
         self,
         response: Optional[ResponseT],
         request: RequestT,
-        request_info: ScheduledRequestInfo[RequestTimingsT],
+        request_info: ScheduledRequestInfo[MeasuredRequestTimingsT],
     ):
         """
         Update environment state with completed request iteration.
@@ -116,7 +116,10 @@ class Environment(ABC, Generic[RequestT, ResponseT]):
         self,
     ) -> AsyncIterator[
         tuple[
-            ResponseT, RequestT, ScheduledRequestInfo[RequestTimingsT], SchedulerState
+            ResponseT,
+            RequestT,
+            ScheduledRequestInfo[MeasuredRequestTimingsT],
+            SchedulerState,
         ]
     ]:
         """
@@ -176,7 +179,7 @@ class NonDistributedEnvironment(Environment):
         self,
         response: Optional[ResponseT],
         request: RequestT,
-        request_info: ScheduledRequestInfo[RequestTimingsT],
+        request_info: ScheduledRequestInfo[MeasuredRequestTimingsT],
     ):
         """
         No-op for single-node execution.
@@ -198,7 +201,10 @@ class NonDistributedEnvironment(Environment):
         self,
     ) -> AsyncIterator[
         tuple[
-            ResponseT, RequestT, ScheduledRequestInfo[RequestTimingsT], SchedulerState
+            ResponseT,
+            RequestT,
+            ScheduledRequestInfo[MeasuredRequestTimingsT],
+            SchedulerState,
         ]
     ]:
         """

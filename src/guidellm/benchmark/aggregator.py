@@ -49,8 +49,8 @@ from guidellm.objects import (
     StatusDistributionSummary,
 )
 from guidellm.scheduler import (
+    MeasuredRequestTimingsT,
     RequestT,
-    RequestTimingsT,
     ResponseT,
     ScheduledRequestInfo,
     SchedulerState,
@@ -67,7 +67,7 @@ __all__ = [
 
 
 @runtime_checkable
-class Aggregator(Protocol[ResponseT, RequestT, RequestTimingsT]):
+class Aggregator(Protocol[ResponseT, RequestT, MeasuredRequestTimingsT]):
     """
     Protocol for processing benchmark data updates during execution.
 
@@ -81,7 +81,7 @@ class Aggregator(Protocol[ResponseT, RequestT, RequestTimingsT]):
         agg_state: dict[str, Any],
         response: Optional[ResponseT],
         request: RequestT,
-        request_info: ScheduledRequestInfo[RequestTimingsT],
+        request_info: ScheduledRequestInfo[MeasuredRequestTimingsT],
         scheduler_state: SchedulerState,
     ) -> Optional[dict[str, Any]]:
         """
@@ -98,7 +98,7 @@ class Aggregator(Protocol[ResponseT, RequestT, RequestTimingsT]):
 
 
 @runtime_checkable
-class CompilableAggregator(Aggregator[ResponseT, RequestT, RequestTimingsT]):
+class CompilableAggregator(Aggregator[ResponseT, RequestT, MeasuredRequestTimingsT]):
     """
     Protocol for aggregators that compile final results from aggregated state.
 
@@ -146,7 +146,7 @@ def add_aggregate_metric(
 
 
 class SchedulerStatsAggregator(
-    CompilableAggregator[ResponseT, RequestT, RequestTimingsT]
+    CompilableAggregator[ResponseT, RequestT, MeasuredRequestTimingsT]
 ):
     """
     Aggregates scheduler timing and performance metrics.
@@ -160,7 +160,7 @@ class SchedulerStatsAggregator(
         agg_state: dict[str, Any],
         response: Optional[ResponseT],
         request: RequestT,
-        request_info: ScheduledRequestInfo[RequestTimingsT],
+        request_info: ScheduledRequestInfo[MeasuredRequestTimingsT],
         scheduler_state: SchedulerState,
     ) -> Optional[dict[str, Any]]:
         """

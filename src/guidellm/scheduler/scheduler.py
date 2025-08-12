@@ -20,8 +20,8 @@ from guidellm.scheduler.constraints import (
 from guidellm.scheduler.environment import Environment
 from guidellm.scheduler.objects import (
     BackendT,
+    MeasuredRequestTimingsT,
     RequestT,
-    RequestTimingsT,
     ResponseT,
     ScheduledRequestInfo,
     SchedulerState,
@@ -34,7 +34,8 @@ __all__ = ["Scheduler"]
 
 
 class Scheduler(
-    Generic[BackendT, RequestT, RequestTimingsT, ResponseT], ThreadSafeSingletonMixin
+    Generic[BackendT, RequestT, MeasuredRequestTimingsT, ResponseT],
+    ThreadSafeSingletonMixin,
 ):
     """
     Generic singleton scheduler for coordinating distributed load testing workloads.
@@ -83,7 +84,7 @@ class Scheduler(
         tuple[
             Optional[ResponseT],
             RequestT,
-            ScheduledRequestInfo[RequestTimingsT],
+            ScheduledRequestInfo[MeasuredRequestTimingsT],
             SchedulerState,
         ]
     ]:
@@ -109,7 +110,9 @@ class Scheduler(
         """
         with self.thread_lock:
             worker_group: Optional[
-                WorkerProcessGroup[BackendT, RequestT, RequestTimingsT, ResponseT]
+                WorkerProcessGroup[
+                    BackendT, RequestT, MeasuredRequestTimingsT, ResponseT
+                ]
             ] = None
 
             # Any issues during the run will raise an error (local or remote),
@@ -128,7 +131,7 @@ class Scheduler(
 
                 # Setup the worker group, sync start with the environment
                 worker_group = WorkerProcessGroup[
-                    BackendT, RequestT, RequestTimingsT, ResponseT
+                    BackendT, RequestT, MeasuredRequestTimingsT, ResponseT
                 ](
                     backend=backend,
                     requests=local_requests,

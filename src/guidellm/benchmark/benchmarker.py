@@ -32,8 +32,8 @@ from guidellm.scheduler import (
     BackendT,
     Constraint,
     Environment,
+    MeasuredRequestTimingsT,
     RequestT,
-    RequestTimingsT,
     ResponseT,
     Scheduler,
     SchedulerState,
@@ -45,7 +45,7 @@ __all__ = ["Benchmarker"]
 
 
 class Benchmarker(
-    Generic[BenchmarkT, RequestT, RequestTimingsT, ResponseT],
+    Generic[BenchmarkT, RequestT, MeasuredRequestTimingsT, ResponseT],
     ABC,
     ThreadSafeSingletonMixin,
 ):
@@ -65,14 +65,14 @@ class Benchmarker(
         requests: Iterable[
             Union[RequestT, Iterable[Union[RequestT, tuple[RequestT, float]]]]
         ],
-        backend: BackendT[RequestT, RequestTimingsT, ResponseT],
+        backend: BackendT[RequestT, MeasuredRequestTimingsT, ResponseT],
         profile: Profile,
         environment: Environment,
         benchmark_aggregators: dict[
             str,
             Union[
-                Aggregator[ResponseT, RequestT, RequestTimingsT],
-                CompilableAggregator[ResponseT, RequestT, RequestTimingsT],
+                Aggregator[ResponseT, RequestT, MeasuredRequestTimingsT],
+                CompilableAggregator[ResponseT, RequestT, MeasuredRequestTimingsT],
             ],
         ],
         benchmark_class: type[BenchmarkT],
@@ -114,7 +114,9 @@ class Benchmarker(
                     request,
                     request_info,
                     scheduler_state,
-                ) in Scheduler[BackendT, RequestT, RequestTimingsT, ResponseT].run(
+                ) in Scheduler[
+                    BackendT, RequestT, MeasuredRequestTimingsT, ResponseT
+                ].run(
                     requests=requests,
                     backend=backend,
                     strategy=strategy,
@@ -161,13 +163,13 @@ class Benchmarker(
         requests: Iterable[
             Union[RequestT, Iterable[Union[RequestT, tuple[RequestT, float]]]]
         ],
-        backend: BackendT[RequestT, RequestTimingsT, ResponseT],
+        backend: BackendT[RequestT, MeasuredRequestTimingsT, ResponseT],
         environment: Environment,
         aggregators: dict[
             str,
             Union[
-                Aggregator[ResponseT, RequestT, RequestTimingsT],
-                CompilableAggregator[ResponseT, RequestT, RequestTimingsT],
+                Aggregator[ResponseT, RequestT, MeasuredRequestTimingsT],
+                CompilableAggregator[ResponseT, RequestT, MeasuredRequestTimingsT],
             ],
         ],
         aggregators_state: dict[str, dict[str, Any]],
