@@ -6,7 +6,7 @@ Unit tests for OpenAIHTTPBackend implementation.
 
 import base64
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import httpx
 import pytest
@@ -843,5 +843,309 @@ class TestOpenAICompletions:
             body = call_args[1]["json"]
             expected_messages = [{"role": "user", "content": "Hello world"}]
             assert body["messages"] == expected_messages
+        finally:
+            await backend.process_shutdown()
+
+    @pytest.mark.regression
+    @pytest.mark.asyncio
+    async def test_openai_backend_validate_no_models_available(self):
+        """Test validate method when no models are available.
+
+        ### WRITTEN BY AI ###
+        """
+        backend = OpenAIHTTPBackend(target="http://test")
+        await backend.process_startup()
+
+        try:
+            # Mock endpoints to fail, then available_models to return empty list
+            def mock_get_fail(*args, **kwargs):
+                raise httpx.HTTPStatusError("Error", request=Mock(), response=Mock())
+
+            with (
+                patch.object(backend._async_client, "get", side_effect=mock_get_fail),
+                patch.object(backend, "available_models", return_value=[]),
+                patch.object(backend, "text_completions", side_effect=mock_get_fail),
+                pytest.raises(
+                    RuntimeError,
+                    match="No model available and could not set a default model",
+                ),
+            ):
+                await backend.validate()
+        finally:
+            await backend.process_shutdown()
+
+    @pytest.mark.sanity
+    @pytest.mark.asyncio
+    async def test_text_completions_streaming(self):
+        """Test text_completions with streaming enabled."""
+        backend = OpenAIHTTPBackend(target="http://test", model="gpt-4")
+        await backend.process_startup()
+
+        try:
+            # Mock streaming response
+            mock_stream = Mock()
+            mock_stream.raise_for_status = Mock()
+
+            async def mock_aiter_lines():
+                lines = [
+                    'data: {"choices":[{"text":"Hello"}], "usage":{"prompt_tokens":5,"completion_tokens":1}}',  # noqa: E501
+                    'data: {"choices":[{"text":" world"}], "usage":{"prompt_tokens":5,"completion_tokens":2}}',  # noqa: E501
+                    'data: {"choices":[{"text":"!"}], "usage":{"prompt_tokens":5,"completion_tokens":3}}',  # noqa: E501
+                    "data: [DONE]",
+                ]
+                for line in lines:
+                    yield line
+
+            mock_stream.aiter_lines = mock_aiter_lines
+
+            mock_client_stream = AsyncMock()
+            mock_client_stream.__aenter__ = AsyncMock(return_value=mock_stream)
+            mock_client_stream.__aexit__ = AsyncMock(return_value=None)
+
+            with patch.object(
+                backend._async_client, "stream", return_value=mock_client_stream
+            ):
+                results = []
+                async for result in backend.text_completions(
+                    prompt="test prompt", request_id="req-123", stream_response=True
+                ):
+                    results.append(result)
+
+            # Should get initial None, then tokens, then final with usage
+            assert len(results) >= 3
+            assert results[0] == (None, None)  # Initial yield
+            assert all(
+                isinstance(result[0], str) for result in results[1:]
+            )  # Has text content
+            assert all(
+                isinstance(result[1], UsageStats) for result in results[1:]
+            )  # Has usage stats
+            assert all(
+                result[1].output_tokens == i for i, result in enumerate(results[1:], 1)
+            )
+        finally:
+            await backend.process_shutdown()
+
+    @pytest.mark.sanity
+    @pytest.mark.asyncio
+    async def test_chat_completions_streaming(self):
+        """Test chat_completions with streaming enabled.
+
+        ### WRITTEN BY AI ###
+        """
+        backend = OpenAIHTTPBackend(target="http://test", model="gpt-4")
+        await backend.process_startup()
+
+        try:
+            # Mock streaming response
+            mock_stream = Mock()
+            mock_stream.raise_for_status = Mock()
+
+            async def mock_aiter_lines():
+                lines = [
+                    'data: {"choices":[{"delta":{"content":"Hi"}}]}',
+                    'data: {"choices":[{"delta":{"content":" there"}}]}',
+                    'data: {"choices":[{"delta":{"content":"!"}}]}',
+                    'data: {"usage":{"prompt_tokens":3,"completion_tokens":3}}',
+                    "data: [DONE]",
+                ]
+                for line in lines:
+                    yield line
+
+            mock_stream.aiter_lines = mock_aiter_lines
+
+            mock_client_stream = AsyncMock()
+            mock_client_stream.__aenter__ = AsyncMock(return_value=mock_stream)
+            mock_client_stream.__aexit__ = AsyncMock(return_value=None)
+
+            with patch.object(
+                backend._async_client, "stream", return_value=mock_client_stream
+            ):
+                results = []
+                async for result in backend.chat_completions(
+                    content="Hello", request_id="req-456", stream_response=True
+                ):
+                    results.append(result)
+
+            # Should get initial None, then deltas, then final with usage
+            assert len(results) >= 3
+            assert results[0] == (None, None)  # Initial yield
+            assert any(result[0] for result in results if result[0])  # Has content
+            assert any(result[1] for result in results if result[1])  # Has usage stats
+        finally:
+            await backend.process_shutdown()
+
+    @pytest.mark.regression
+    @pytest.mark.asyncio
+    async def test_streaming_response_edge_cases(self):
+        """Test streaming response edge cases for line processing.
+
+        ### WRITTEN BY AI ###
+        """
+        backend = OpenAIHTTPBackend(target="http://test", model="gpt-4")
+        await backend.process_startup()
+
+        try:
+            # Mock streaming response with edge cases
+            mock_stream = Mock()
+            mock_stream.raise_for_status = Mock()
+
+            async def mock_aiter_lines():
+                lines = [
+                    "",  # Empty line
+                    "   ",  # Whitespace only
+                    "not data line",  # Line without data prefix
+                    'data: {"choices":[{"text":"Hello"}]}',  # Valid data
+                    "data: [DONE]",  # End marker
+                ]
+                for line in lines:
+                    yield line
+
+            mock_stream.aiter_lines = mock_aiter_lines
+
+            mock_client_stream = AsyncMock()
+            mock_client_stream.__aenter__ = AsyncMock(return_value=mock_stream)
+            mock_client_stream.__aexit__ = AsyncMock(return_value=None)
+
+            with patch.object(
+                backend._async_client, "stream", return_value=mock_client_stream
+            ):
+                results = []
+                async for result in backend.text_completions(
+                    prompt="test", request_id="req-123", stream_response=True
+                ):
+                    results.append(result)
+
+            # Should get initial None and the valid response
+            assert len(results) == 2
+            assert results[0] == (None, None)
+            assert results[1][0] == "Hello"
+        finally:
+            await backend.process_shutdown()
+
+    @pytest.mark.sanity
+    def test_openai_backend_get_chat_message_media_item_jpeg_file(self):
+        """Test _get_chat_message_media_item with JPEG file path.
+
+        ### WRITTEN BY AI ###
+        """
+        backend = OpenAIHTTPBackend(target="http://test")
+
+        # Create a mock Path object for JPEG file
+        mock_jpeg_path = Mock(spec=Path)
+        mock_jpeg_path.suffix.lower.return_value = ".jpg"
+
+        # Mock Image.open to return a mock image
+        mock_image = Mock(spec=Image.Image)
+        mock_image.tobytes.return_value = b"fake_jpeg_data"
+
+        with patch("guidellm.backend.openai.Image.open", return_value=mock_image):
+            result = backend._get_chat_message_media_item(mock_jpeg_path)
+
+        expected_data = base64.b64encode(b"fake_jpeg_data").decode("utf-8")
+        expected = {
+            "type": "image",
+            "image": {"url": f"data:image/jpeg;base64,{expected_data}"},
+        }
+        assert result == expected
+
+    @pytest.mark.sanity
+    def test_openai_backend_get_chat_message_media_item_wav_file(self):
+        """Test _get_chat_message_media_item with WAV file path.
+
+        ### WRITTEN BY AI ###
+        """
+        backend = OpenAIHTTPBackend(target="http://test")
+
+        # Create a mock Path object for WAV file
+        mock_wav_path = Mock(spec=Path)
+        mock_wav_path.suffix.lower.return_value = ".wav"
+        mock_wav_path.read_bytes.return_value = b"fake_wav_data"
+
+        result = backend._get_chat_message_media_item(mock_wav_path)
+
+        expected_data = base64.b64encode(b"fake_wav_data").decode("utf-8")
+        expected = {
+            "type": "input_audio",
+            "input_audio": {"data": expected_data, "format": "wav"},
+        }
+        assert result == expected
+
+    @pytest.mark.sanity
+    def test_openai_backend_get_chat_messages_with_pil_image(self):
+        """Test _get_chat_messages with PIL Image in content list.
+
+        ### WRITTEN BY AI ###
+        """
+        backend = OpenAIHTTPBackend(target="http://test")
+
+        # Create a mock PIL Image
+        mock_image = Mock(spec=Image.Image)
+        mock_image.tobytes.return_value = b"fake_image_bytes"
+
+        content = ["Hello", mock_image, "world"]
+
+        result = backend._get_chat_messages(content)
+
+        # Should have one user message with mixed content
+        assert len(result) == 1
+        assert result[0]["role"] == "user"
+        assert len(result[0]["content"]) == 3
+
+        # Check text items
+        assert result[0]["content"][0] == {"type": "text", "text": "Hello"}
+        assert result[0]["content"][2] == {"type": "text", "text": "world"}
+
+        # Check image item
+        image_item = result[0]["content"][1]
+        assert image_item["type"] == "image"
+        assert "data:image/jpeg;base64," in image_item["image"]["url"]
+
+    @pytest.mark.regression
+    @pytest.mark.asyncio
+    async def test_resolve_timing_edge_cases(self):
+        """Test resolve method timing edge cases.
+
+        ### WRITTEN BY AI ###
+        """
+        backend = OpenAIHTTPBackend(target="http://test")
+        await backend.process_startup()
+
+        try:
+            request = GenerationRequest(
+                content="test prompt",
+                request_type="text_completions",
+                constraints={"output_tokens": 50},
+            )
+            request_info = ScheduledRequestInfo(
+                request_id="test-id",
+                status="pending",
+                scheduler_node_id=1,
+                scheduler_process_id=1,
+                scheduler_start_time=123.0,
+                request_timings=GenerationRequestTimings(),
+            )
+
+            # Mock text_completions to test timing edge cases
+            async def mock_text_completions(*args, **kwargs):
+                yield None, None  # Initial yield - tests line 343
+                yield "token1", None  # First token
+                yield "token2", UsageStats(prompt_tokens=10, output_tokens=2)  # Final
+
+            with patch.object(
+                backend, "text_completions", side_effect=mock_text_completions
+            ):
+                responses = []
+                async for response, info in backend.resolve(request, request_info):
+                    responses.append((response, info))
+
+            # Check that timing was properly set
+            final_response, final_info = responses[-1]
+            assert final_info.request_timings.request_start is not None
+            assert final_info.request_timings.first_iteration is not None
+            assert final_info.request_timings.last_iteration is not None
+            assert final_info.request_timings.request_end is not None
+            assert final_response.delta is None  # Tests line 362
+
         finally:
             await backend.process_shutdown()
