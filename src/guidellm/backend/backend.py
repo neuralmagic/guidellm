@@ -11,16 +11,14 @@ Type Aliases:
     BackendType: Literal type defining supported backend implementations.
 """
 
-from abc import abstractmethod
-from collections.abc import AsyncIterator
-from typing import Any, Literal, Optional
+from typing import Literal, Optional
 
 from guidellm.backend.objects import (
     GenerationRequest,
     GenerationRequestTimings,
     GenerationResponse,
 )
-from guidellm.scheduler import BackendInterface, ScheduledRequestInfo
+from guidellm.scheduler import BackendInterface
 from guidellm.utils.registry import RegistryMixin
 
 __all__ = [
@@ -37,7 +35,7 @@ class Backend(
     BackendInterface[GenerationRequest, GenerationRequestTimings, GenerationResponse],
 ):
     """
-    Abstract base class for generative AI backends with registry and lifecycle.
+    Base class for generative AI backends with registry and lifecycle.
 
     Provides a standard interface for backends that communicate with generative AI
     models. Combines the registry pattern for automatic discovery with a defined
@@ -104,84 +102,3 @@ class Backend(
             None if unlimited.
         """
         return None
-
-    @abstractmethod
-    def info(self) -> dict[str, Any]:
-        """
-        :return: Backend metadata including model any initializaiton and
-            configuration information.
-        """
-        ...
-
-    @abstractmethod
-    async def process_startup(self):
-        """
-        Initialize process-specific resources and connections.
-
-        Called when a backend instance is transferred to a worker process.
-        Creates connections, clients, and other resources required for request
-        processing. Resources created here are process-local and need not be
-        pickleable.
-
-        Must be called before validate() or resolve().
-
-        :raises: Exception if startup fails.
-        """
-        ...
-
-    @abstractmethod
-    async def process_shutdown(self):
-        """
-        Clean up process-specific resources and connections.
-
-        Called when the worker process is shutting down. Cleans up resources
-        created during process_startup(). After this method, validate() and
-        resolve() should not be used.
-        """
-        ...
-
-    @abstractmethod
-    async def validate(self):
-        """
-        Validate backend configuration and readiness.
-
-        Verifies the backend is properly configured and can communicate with the
-        target model service. Should be called after process_startup() and before
-        resolve().
-
-        :raises: Exception if backend is not ready or cannot connect.
-        """
-        ...
-
-    @abstractmethod
-    async def resolve(
-        self,
-        request: GenerationRequest,
-        request_info: ScheduledRequestInfo[GenerationRequestTimings],
-        history: Optional[list[tuple[GenerationRequest, GenerationResponse]]] = None,
-    ) -> AsyncIterator[
-        tuple[GenerationResponse, ScheduledRequestInfo[GenerationRequestTimings]]
-    ]:
-        """
-        Process a generation request and yield progressive responses.
-
-        Processes a generation request through the backend's model service,
-        yielding intermediate responses as generation progresses. The final
-        yielded item contains the complete response and timing data.
-
-        :param request: The generation request with content and parameters.
-        :param request_info: Request tracking information updated with timing
-            and progress metadata during processing.
-        :param history: Optional conversation history for multi-turn requests.
-            Each tuple contains a previous request-response pair.
-        :yields: Tuples of (response, updated_request_info) as generation
-            progresses. Final tuple contains the complete response.
-        """
-        ...
-
-    @abstractmethod
-    async def default_model(self) -> str:
-        """
-        :return: The default model name or identifier for generation requests.
-        """
-        ...

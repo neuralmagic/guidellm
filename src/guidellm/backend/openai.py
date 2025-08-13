@@ -139,7 +139,7 @@ class OpenAIHTTPBackend(Backend):
         self._in_process = False
         self._async_client: Optional[httpx.AsyncClient] = None
 
-    async def info(self) -> dict[str, Any]:
+    def info(self) -> dict[str, Any]:
         """
         :return: Dictionary containing backend configuration details.
         """
@@ -190,7 +190,7 @@ class OpenAIHTTPBackend(Backend):
         if not self._in_process:
             raise RuntimeError("Backend not started up for process.")
 
-        await self._async_client.aclose()
+        await self._async_client.aclose()  # type: ignore [union-attr]
         self._async_client = None
         self._in_process = False
 
@@ -210,7 +210,7 @@ class OpenAIHTTPBackend(Backend):
                 # Model is set, use /health endpoint as first check
                 target = f"{self.target}{self.HEALTH_PATH}"
                 headers = self._get_headers()
-                response = await self._async_client.get(target, headers=headers)
+                response = await self._async_client.get(target, headers=headers)  # type: ignore [union-attr]
                 response.raise_for_status()
 
                 return
@@ -258,7 +258,7 @@ class OpenAIHTTPBackend(Backend):
         target = f"{self.target}{self.MODELS_PATH}"
         headers = self._get_headers()
         params = self._get_params(self.MODELS_KEY)
-        response = await self._async_client.get(target, headers=headers, params=params)
+        response = await self._async_client.get(target, headers=headers, params=params)  # type: ignore [union-attr]
         response.raise_for_status()
 
         return [item["id"] for item in response.json()["data"]]
@@ -305,7 +305,7 @@ class OpenAIHTTPBackend(Backend):
             request_id=request.request_id,
             request_args={
                 "request_type": request.request_type,
-                "output_token_count": request.constraints.get("max_output_tokens"),
+                "output_token_count": request.constraints.get("output_tokens"),
                 **request.params,
             },
             value="",
@@ -324,7 +324,7 @@ class OpenAIHTTPBackend(Backend):
             {
                 "prompt": request.content,
                 "request_id": request.request_id,
-                "output_token_count": request.constraints.get("max_output_tokens"),
+                "output_token_count": request.constraints.get("output_tokens"),
                 "stream_response": request.params.get("stream", self.stream_response),
                 **request.params,
             }
@@ -332,7 +332,7 @@ class OpenAIHTTPBackend(Backend):
             else {
                 "content": request.content,
                 "request_id": request.request_id,
-                "output_token_count": request.constraints.get("max_output_tokens"),
+                "output_token_count": request.constraints.get("output_tokens"),
                 "stream_response": request.params.get("stream", self.stream_response),
                 **request.params,
             }
@@ -345,7 +345,7 @@ class OpenAIHTTPBackend(Backend):
             if delta is not None:
                 if request_info.request_timings.first_iteration is None:
                     request_info.request_timings.first_iteration = time.time()
-                response.value += delta
+                response.value += delta  # type: ignore [operator]
                 response.delta = delta
                 request_info.request_timings.last_iteration = time.time()
                 response.iterations += 1
@@ -396,7 +396,7 @@ class OpenAIHTTPBackend(Backend):
         yield None, None  # Initial yield for async iterator to signal start
 
         if not stream_response:
-            response = await self._async_client.post(
+            response = await self._async_client.post(  # type: ignore [union-attr]
                 target,
                 headers=headers,
                 params=params,
@@ -411,7 +411,7 @@ class OpenAIHTTPBackend(Backend):
             return
 
         body.update({"stream": True, "stream_options": {"include_usage": True}})
-        async with self._async_client.stream(
+        async with self._async_client.stream(  # type: ignore [union-attr]
             "POST",
             target,
             headers=headers,
@@ -474,7 +474,7 @@ class OpenAIHTTPBackend(Backend):
         yield None, None  # Initial yield for async iterator to signal start
 
         if not stream_response:
-            response = await self._async_client.post(
+            response = await self._async_client.post(  # type: ignore [union-attr]
                 target, headers=headers, params=params, json=body
             )
             response.raise_for_status()
@@ -486,7 +486,7 @@ class OpenAIHTTPBackend(Backend):
             return
 
         body.update({"stream": True, "stream_options": {"include_usage": True}})
-        async with self._async_client.stream(
+        async with self._async_client.stream(  # type: ignore [union-attr]
             "POST", target, headers=headers, params=params, json=body
         ) as stream:
             stream.raise_for_status()

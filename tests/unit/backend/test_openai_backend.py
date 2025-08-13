@@ -132,7 +132,7 @@ class TestOpenAIHTTPBackend:
             target="http://test", model="test-model", timeout=30.0
         )
 
-        info = await backend.info()
+        info = backend.info()
 
         assert info["target"] == "http://test"
         assert info["model"] == "test-model"

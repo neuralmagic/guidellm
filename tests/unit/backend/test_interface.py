@@ -60,6 +60,9 @@ class TestBackendInterface:
             async def resolve(self, request, request_info, history=None):
                 yield request, request_info
 
+            async def default_model(self) -> str:
+                return "my-model"
+
         # Should be able to instantiate
         backend = MinimalBackend()
         assert backend is not None

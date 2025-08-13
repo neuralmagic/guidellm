@@ -25,11 +25,13 @@ class BackendInterface(ABC, Generic[RequestT, MeasuredRequestTimingsT, ResponseT
     @abstractmethod
     def processes_limit(self) -> Optional[int]:
         """Maximum worker processes supported, or None if unlimited."""
+        ...
 
     @property
     @abstractmethod
     def requests_limit(self) -> Optional[int]:
         """Maximum concurrent requests supported, or None if unlimited."""
+        ...
 
     @abstractmethod
     def info(self) -> dict[str, Any]:
@@ -46,6 +48,7 @@ class BackendInterface(ABC, Generic[RequestT, MeasuredRequestTimingsT, ResponseT
 
         :raises: Implementation-specific exceptions for startup failures.
         """
+        ...
 
     @abstractmethod
     async def validate(self) -> None:
@@ -54,6 +57,7 @@ class BackendInterface(ABC, Generic[RequestT, MeasuredRequestTimingsT, ResponseT
 
         :raises: Implementation-specific exceptions for validation failures.
         """
+        ...
 
     @abstractmethod
     async def process_shutdown(self) -> None:
@@ -62,9 +66,10 @@ class BackendInterface(ABC, Generic[RequestT, MeasuredRequestTimingsT, ResponseT
 
         :raises: Implementation-specific exceptions for shutdown failures.
         """
+        ...
 
     @abstractmethod
-    async def resolve(
+    def resolve(
         self,
         request: RequestT,
         request_info: ScheduledRequestInfo[MeasuredRequestTimingsT],
@@ -79,6 +84,14 @@ class BackendInterface(ABC, Generic[RequestT, MeasuredRequestTimingsT, ResponseT
         :yield: Tuples of (response, updated_request_info) for each response chunk.
         :raises: Implementation-specific exceptions for processing failures.
         """
+        ...
+
+    @abstractmethod
+    async def default_model(self) -> Optional[str]:
+        """
+        :return: The default model name or identifier for generation requests.
+        """
+        ...
 
 
 BackendT = TypeVar("BackendT", bound="BackendInterface")
