@@ -10,12 +10,13 @@ Classes:
     NonDistributedEnvironment: Single-node implementation with minimal overhead.
 """
 
+from __future__ import annotations
+
 import time
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator, Iterable
 from typing import (
     Generic,
-    Optional,
 )
 
 from guidellm.config import settings
@@ -82,7 +83,7 @@ class Environment(ABC, Generic[RequestT, ResponseT]):
     @abstractmethod
     async def update_run_iteration(
         self,
-        response: Optional[ResponseT],
+        response: ResponseT | None,
         request: RequestT,
         request_info: ScheduledRequestInfo[MeasuredRequestTimingsT],
     ):
@@ -177,7 +178,7 @@ class NonDistributedEnvironment(Environment):
 
     async def update_run_iteration(
         self,
-        response: Optional[ResponseT],
+        response: ResponseT | None,
         request: RequestT,
         request_info: ScheduledRequestInfo[MeasuredRequestTimingsT],
     ):

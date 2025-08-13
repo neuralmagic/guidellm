@@ -19,18 +19,20 @@ Type Variables:
     BackendT: Generic backend interface type.
 """
 
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Iterable
 from typing import (
     Any,
     Generic,
     Literal,
-    Optional,
     TypeVar,
+    Union,
 )
 
 from pydantic import Field, computed_field
-from typing_extensions import TypedDict
+from typing_extensions import TypeAliasType, TypedDict
 
 from guidellm.objects import StandardBaseModel
 
@@ -39,6 +41,7 @@ __all__ = [
     "BackendT",
     "MeasuredRequestTimings",
     "MeasuredRequestTimingsT",
+    "MultiTurnRequestT",
     "RequestSchedulerTimings",
     "RequestT",
     "ResponseT",
@@ -49,34 +52,39 @@ __all__ = [
 ]
 
 RequestT = TypeVar("RequestT")
+MultiTurnRequestT = TypeAliasType(
+    "MultiTurnRequestT",
+    Iterable[Union[RequestT, tuple[RequestT, float]]],
+    type_params=(RequestT,),
+)
 ResponseT = TypeVar("ResponseT")
 
 
 class RequestSchedulerTimings(StandardBaseModel):
     """Scheduler-level timing measurements for request lifecycle tracking."""
 
-    targeted_start: Optional[float] = Field(
+    targeted_start: float | None = Field(
         default=None,
         description="When the request was initially targeted for execution",
     )
-    queued: Optional[float] = Field(
+    queued: float | None = Field(
         default=None,
         description="When the request was placed into the processing queue",
     )
-    dequeued: Optional[float] = Field(
+    dequeued: float | None = Field(
         default=None,
         description="When the request was removed from the queue for processing",
     )
-    scheduled_at: Optional[float] = Field(
+    scheduled_at: float | None = Field(
         default=None, description="When the request was scheduled for processing"
     )
-    resolve_start: Optional[float] = Field(
+    resolve_start: float | None = Field(
         default=None, description="When backend resolution of the request began"
     )
-    resolve_end: Optional[float] = Field(
+    resolve_end: float | None = Field(
         default=None, description="When backend resolution of the request completed"
     )
-    finalized: Optional[float] = Field(
+    finalized: float | None = Field(
         default=None,
         description="When the request was processed/acknowledged by the scheduler",
     )
@@ -85,10 +93,10 @@ class RequestSchedulerTimings(StandardBaseModel):
 class MeasuredRequestTimings(StandardBaseModel):
     """Base timing measurements for backend request processing."""
 
-    request_start: Optional[float] = Field(
+    request_start: float | None = Field(
         default=None, description="When the backend began processing the request"
     )
-    request_end: Optional[float] = Field(
+    request_end: float | None = Field(
         default=None, description="When the backend completed processing the request"
     )
 
@@ -105,9 +113,6 @@ class ScheduledRequestInfo(StandardBaseModel, Generic[MeasuredRequestTimingsT]):
     status: Literal[
         "queued", "pending", "in_progress", "completed", "errored", "cancelled"
     ] = Field(description="Current processing status of the request")
-    error: Optional[str] = Field(
-        default=None, description="Error message if the request.status is 'errored'"
-    )
     scheduler_node_id: int = Field(
         description="ID/rank of the scheduler node handling the request"
     )
@@ -118,18 +123,21 @@ class ScheduledRequestInfo(StandardBaseModel, Generic[MeasuredRequestTimingsT]):
         description="Unix timestamp for the local time when scheduler processing began"
     )
 
+    error: str | None = Field(
+        default=None, description="Error message if the request.status is 'errored'"
+    )
     scheduler_timings: RequestSchedulerTimings = Field(
         default_factory=RequestSchedulerTimings,
         description="Scheduler-level timing measurements for request lifecycle",
     )
-    request_timings: Optional[MeasuredRequestTimingsT] = Field(
+    request_timings: MeasuredRequestTimingsT | None = Field(
         default=None,
         description="Backend-specific timing measurements for request processing",
     )
 
     @computed_field
     @property
-    def started_at(self) -> Optional[float]:
+    def started_at(self) -> float | None:
         """
         Get the effective request processing start time.
 
@@ -143,7 +151,7 @@ class ScheduledRequestInfo(StandardBaseModel, Generic[MeasuredRequestTimingsT]):
 
     @computed_field
     @property
-    def completed_at(self) -> Optional[float]:
+    def completed_at(self) -> float | None:
         """
         Get the effective request processing completion time.
 
@@ -162,12 +170,12 @@ class BackendInterface(ABC, Generic[RequestT, MeasuredRequestTimingsT, ResponseT
 
     @property
     @abstractmethod
-    def processes_limit(self) -> Optional[int]:
+    def processes_limit(self) -> int | None:
         """Maximum worker processes supported, or None if unlimited."""
 
     @property
     @abstractmethod
-    def requests_limit(self) -> Optional[int]:
+    def requests_limit(self) -> int | None:
         """Maximum concurrent requests supported, or None if unlimited."""
 
     @abstractmethod
@@ -207,7 +215,7 @@ class BackendInterface(ABC, Generic[RequestT, MeasuredRequestTimingsT, ResponseT
         self,
         request: RequestT,
         request_info: ScheduledRequestInfo[MeasuredRequestTimingsT],
-        history: Optional[list[tuple[RequestT, ResponseT]]] = None,
+        history: list[tuple[RequestT, ResponseT]] | None = None,
     ) -> AsyncIterator[tuple[ResponseT, ScheduledRequestInfo[MeasuredRequestTimingsT]]]:
         """
         Process a request and yield incremental response updates.
@@ -223,6 +231,34 @@ class BackendInterface(ABC, Generic[RequestT, MeasuredRequestTimingsT, ResponseT
 BackendT = TypeVar("BackendT", bound=BackendInterface)
 
 
+class SchedulerUpdateActionProgress(TypedDict, total=False):
+    """Progress information for a scheduler update action."""
+
+    remaining_fraction: float | None = None
+    remaining_requests: float | None = None
+    remaining_duration: float | None = None
+
+
+class SchedulerUpdateAction(StandardBaseModel):
+    """Scheduler behavior control directives and actions."""
+
+    request_queuing: Literal["continue", "stop"] = Field(
+        default="continue", description="Action to take for request queuing operations"
+    )
+    request_processing: Literal["continue", "stop_local", "stop_all"] = Field(
+        default="continue",
+        description="Action to take for request processing operations",
+    )
+    metadata: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Additional context and data for the scheduler action",
+    )
+    progress: SchedulerUpdateActionProgress = Field(
+        default_factory=SchedulerUpdateActionProgress,
+        description="Progress information for the scheduler action",
+    )
+
+
 class SchedulerState(StandardBaseModel):
     """Scheduler operation state tracking and statistics."""
 
@@ -231,37 +267,37 @@ class SchedulerState(StandardBaseModel):
         description="Number of worker processes in this scheduler"
     )
     start_time: float = Field(description="Unix timestamp when the scheduler started")
-    end_time: Optional[float] = Field(
+    end_time: float | None = Field(
         default=None, description="Unix timestamp when the scheduler stopped"
     )
-    end_queuing_time: Optional[float] = Field(
+    end_queuing_time: float | None = Field(
         default=None, description="When request queuing stopped, if applicable"
     )
-    end_queuing_constraints: dict[str, dict[str, Any]] = Field(
+    end_queuing_constraints: dict[str, SchedulerUpdateAction] = Field(
         default_factory=dict,
         description="Constraints that triggered queuing termination",
     )
-    end_processing_time: Optional[float] = Field(
+    end_processing_time: float | None = Field(
         default=None, description="When request processing stopped, if applicable"
     )
-    end_processing_constraints: dict[str, dict[str, Any]] = Field(
+    end_processing_constraints: dict[str, SchedulerUpdateAction] = Field(
         default_factory=dict,
         description="Constraints that triggered processing termination",
     )
-    scheduler_constraints: dict[str, dict[str, Any]] = Field(
+    scheduler_constraints: dict[str, SchedulerUpdateAction] = Field(
         default_factory=dict,
         description="The latest state from all constraints applied during the scheduler run",
     )
 
-    remaining_fraction: Optional[float] = Field(
+    remaining_fraction: float | None = Field(
         default=None,
         description="Estimated fraction for the remaining progress of the scheduler run, if known",
     )
-    remaining_requests: Optional[int] = Field(
+    remaining_requests: int | None = Field(
         default=None,
         description="Estimated number of requests remaining to be processed, if known",
     )
-    remaining_duration: Optional[float] = Field(
+    remaining_duration: float | None = Field(
         default=None,
         description="Estimated time remaining in seconds for the scheduler run, if known",
     )
@@ -289,32 +325,4 @@ class SchedulerState(StandardBaseModel):
     )
     cancelled_requests: int = Field(
         default=0, description="Number of requests that were cancelled"
-    )
-
-
-class SchedulerUpdateActionProgress(TypedDict, total=False):
-    """Progress information for a scheduler update action."""
-
-    remaining_fraction: float
-    remaining_requests: float
-    remaining_duration: float
-
-
-class SchedulerUpdateAction(StandardBaseModel):
-    """Scheduler behavior control directives and actions."""
-
-    request_queuing: Literal["continue", "stop"] = Field(
-        default="continue", description="Action to take for request queuing operations"
-    )
-    request_processing: Literal["continue", "stop_local", "stop_all"] = Field(
-        default="continue",
-        description="Action to take for request processing operations",
-    )
-    metadata: dict[str, Any] = Field(
-        default_factory=dict,
-        description="Additional context and data for the scheduler action",
-    )
-    progress: SchedulerUpdateActionProgress = Field(
-        default_factory=dict,
-        description="Progress information for the scheduler action",
     )

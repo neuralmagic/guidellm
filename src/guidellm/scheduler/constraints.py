@@ -22,8 +22,10 @@ Type Aliases:
     ConstraintInitializer: Function signature for constraint factory.
 """
 
+from __future__ import annotations
+
 import time
-from typing import Any, Optional, Protocol, Union, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from pydantic import Field
 
@@ -32,6 +34,7 @@ from guidellm.scheduler.objects import (
     ScheduledRequestInfo,
     SchedulerState,
     SchedulerUpdateAction,
+    SchedulerUpdateActionProgress,
 )
 from guidellm.utils import RegistryMixin
 
@@ -127,7 +130,7 @@ class ConstraintsInitializerFactory(RegistryMixin[ConstraintInitializer]):
         cls,
         initializers: dict[
             str,
-            Union[Any, dict[str, Any], Constraint, ConstraintInitializer],
+            Any | dict[str, Any] | Constraint | ConstraintInitializer,
         ],
     ) -> dict[str, Constraint]:
         """
@@ -154,7 +157,7 @@ class ConstraintsInitializerFactory(RegistryMixin[ConstraintInitializer]):
     @classmethod
     def resolve_constraints(
         cls,
-        constraints: dict[str, Union[Any, dict[str, Any], Constraint]],
+        constraints: dict[str, Any | dict[str, Any] | Constraint],
     ) -> dict[str, Constraint]:
         """
         Resolve constraints from mixed constraint specifications.
@@ -177,9 +180,7 @@ class ConstraintsInitializerFactory(RegistryMixin[ConstraintInitializer]):
 
 
 class _MaxNumberBase(StandardBaseModel):
-    max_num: Union[int, float] = Field(
-        gt=0, description="Maximum number of requests allowed"
-    )
+    max_num: int | float = Field(gt=0, description="Maximum number of requests allowed")
 
 
 class MaxNumberConstraint(_MaxNumberBase):
@@ -208,12 +209,12 @@ class MaxNumberConstraint(_MaxNumberBase):
                 "created_requests": state.created_requests,
                 "processed_requests": state.processed_requests,
             },
-            progress={
-                "remaining_fraction": max(
+            progress=SchedulerUpdateActionProgress(
+                remaining_fraction=max(
                     0.0, 1.0 - state.processed_requests / float(self.max_num)
                 ),
-                "remaining_requests": max(0, self.max_num - state.processed_requests),
-            },
+                remaining_requests=max(0, self.max_num - state.processed_requests),
+            ),
         )
 
 
@@ -222,9 +223,7 @@ class MaxNumberConstraintInitializer(_MaxNumberBase):
     """Factory for creating MaxNumberConstraint instances."""
 
     @classmethod
-    def from_simple_value(
-        cls, value: Union[int, float]
-    ) -> "MaxNumberConstraintInitializer":
+    def from_simple_value(cls, value: int | float) -> MaxNumberConstraintInitializer:
         """
         Create a MaxNumberConstraintInitializer from a simple scalar value.
 
@@ -246,9 +245,7 @@ class MaxNumberConstraintInitializer(_MaxNumberBase):
 
 
 class _MaxDurationBase(StandardBaseModel):
-    max_duration: Union[int, float] = Field(
-        gt=0, description="Maximum duration in seconds"
-    )
+    max_duration: int | float = Field(gt=0, description="Maximum duration in seconds")
 
 
 class MaxDurationConstraint(_MaxDurationBase):
@@ -278,12 +275,10 @@ class MaxDurationConstraint(_MaxDurationBase):
                 "start_time": state.start_time,
                 "current_time": current_time,
             },
-            progress={
-                "remaining_fraction": max(
-                    0.0, 1.0 - elapsed / float(self.max_duration)
-                ),
-                "remaining_duration": max(0.0, self.max_duration - elapsed),
-            },
+            progress=SchedulerUpdateActionProgress(
+                remaining_fraction=max(0.0, 1.0 - elapsed / float(self.max_duration)),
+                remaining_duration=max(0.0, self.max_duration - elapsed),
+            ),
         )
 
 
@@ -292,9 +287,7 @@ class MaxDurationConstraintInitializer(_MaxDurationBase):
     """Factory for creating MaxDurationConstraint instances."""
 
     @classmethod
-    def from_simple_value(
-        cls, value: Union[int, float]
-    ) -> "MaxDurationConstraintInitializer":
+    def from_simple_value(cls, value: int | float) -> MaxDurationConstraintInitializer:
         """
         Create a MaxDurationConstraintInitializer from a simple scalar value.
 
@@ -316,7 +309,7 @@ class MaxDurationConstraintInitializer(_MaxDurationBase):
 
 
 class _MaxErrorsBase(StandardBaseModel):
-    max_errors: Union[int, float] = Field(
+    max_errors: int | float = Field(
         gt=0, description="Maximum number of errors allowed"
     )
 
@@ -352,9 +345,7 @@ class MaxErrorsConstraintInitializer(_MaxErrorsBase):
     """Factory for creating MaxErrorsConstraint instances."""
 
     @classmethod
-    def from_simple_value(
-        cls, value: Union[int, float]
-    ) -> "MaxErrorsConstraintInitializer":
+    def from_simple_value(cls, value: int | float) -> MaxErrorsConstraintInitializer:
         """
         Create a MaxErrorsConstraintInitializer from a simple scalar value.
 
@@ -376,10 +367,10 @@ class MaxErrorsConstraintInitializer(_MaxErrorsBase):
 
 
 class _MaxErrorRateBase(StandardBaseModel):
-    max_error_rate: Union[int, float] = Field(
+    max_error_rate: int | float = Field(
         gt=0, le=1, description="Maximum error rate allowed (0.0 to 1.0)"
     )
-    window_size: Union[int, float] = Field(
+    window_size: int | float = Field(
         default=50,
         gt=0,
         description="Size of sliding window for calculating error rate",
@@ -444,9 +435,7 @@ class MaxErrorRateConstraintInitializer(_MaxErrorRateBase):
     """Factory for creating MaxErrorRateConstraint instances."""
 
     @classmethod
-    def from_simple_value(
-        cls, value: Union[int, float]
-    ) -> "MaxErrorRateConstraintInitializer":
+    def from_simple_value(cls, value: int | float) -> MaxErrorRateConstraintInitializer:
         """
         Create a MaxErrorRateConstraintInitializer from a simple scalar value.
 
@@ -469,10 +458,10 @@ class MaxErrorRateConstraintInitializer(_MaxErrorRateBase):
 
 
 class _MaxGlobalErrorRateBase(StandardBaseModel):
-    max_error_rate: Union[int, float] = Field(
+    max_error_rate: int | float = Field(
         gt=0, le=1, description="Maximum error rate allowed (0.0 to 1.0)"
     )
-    min_processed: Optional[Union[int, float]] = Field(
+    min_processed: int | float | None = Field(
         default=50,
         gt=30,
         description=(
@@ -524,8 +513,8 @@ class MaxGlobalErrorRateConstraintInitializer(_MaxGlobalErrorRateBase):
 
     @classmethod
     def from_simple_value(
-        cls, value: Union[int, float]
-    ) -> "MaxGlobalErrorRateConstraintInitializer":
+        cls, value: int | float
+    ) -> MaxGlobalErrorRateConstraintInitializer:
         """
         Create a MaxGlobalErrorRateConstraintInitializer from a simple scalar value.
 

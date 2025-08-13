@@ -160,7 +160,12 @@ async def benchmark_generative_text(
         instances=progress or [], enabled=progress is not None
     )
 
-    async for aggregator_update, benchmark, strategy, scheduler_state in progress_group(
+    async for (
+        _aggregator_update,
+        benchmark,
+        _strategy,
+        _scheduler_state,
+    ) in progress_group(
         profile,
         Benchmarker[
             GenerativeBenchmark,

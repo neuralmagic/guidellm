@@ -46,6 +46,7 @@ dependencies = [
     "click>=8.0.0,<8.2.0",
     "culsans~=0.9.0",
     "datasets",
+    "eval_type_backport",
     "ftfy>=6.0.0",
     "httpx[http2]<1.0.0",
     "loguru",

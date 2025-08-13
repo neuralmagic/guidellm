@@ -129,7 +129,7 @@ class TestWorkerProcess:
         )
         assert generic_base is not None
         type_args = getattr(generic_base, "__args__", ())
-        assert len(type_args) == 4  # BackendT, RequestT, RequestTimingsT, ResponseT
+        assert len(type_args) == 3  # RequestT, MeasuredRequestTimingsT, ResponseT
 
         # Function signatures
         run_sig = inspect.signature(WorkerProcess.run)
@@ -179,8 +179,6 @@ class TestWorkerProcess:
     @pytest.mark.sanity
     def test_invalid_initialization(self):
         """Test that invalid initialization raises appropriate errors."""
-        # Note: consider parameterizing this to improve coverage and readability
-
         # Test with missing required parameters
         with pytest.raises(TypeError):
             WorkerProcess()
@@ -206,7 +204,6 @@ class TestWorkerProcess:
             "updates_queue",
             "backend",
             "request_timings",
-            "poll_intervals",
         ]
 
         for param_to_remove in required_params:
@@ -510,13 +507,16 @@ class TestWorkerProcess:
 
         updates = []
         num_failures = 0
-        while True:
+        max_wait_time = 5.0
+        start_time = time.time()
+        while time.time() - start_time < max_wait_time:
             try:
                 update_message = updates_queue.get_nowait()
                 updates.append(MsgpackEncoding.decode(update_message))
+                num_failures = 0
             except Empty:
                 num_failures += 1
-                if num_failures > 50:
+                if len(updates) >= 40:  # We got all expected updates
                     break
                 await asyncio.sleep(0.05)
 
@@ -601,16 +601,15 @@ class TestWorkerProcess:
                 updates.append(MsgpackEncoding.decode(update_message))
             except Empty:
                 num_failures += 1
-                if num_failures > 50:
+                if num_failures > 3:
                     break
-                await asyncio.sleep(0.05)
+                await asyncio.sleep(0.1)
         # Ensure we get all updates we expected (async_limit for pending + 2 for queued)
         assert len(updates) >= 2 * (async_limit + 2)
         # Ensure we didn't process all requests on the queue and shutdown early
         assert len(updates) < 2 * 2 * (async_limit + 2)
 
     @pytest.mark.smoke
-    @pytest.mark.asyncio
     @pytest.mark.parametrize(
         ("request_timings_const", "async_limit", "request_error_rate"),
         [
@@ -669,19 +668,24 @@ class TestWorkerProcess:
                     )
                 )
 
-            time.sleep(1.0)  # delay for processing
+            time.sleep(0.5)  # delay for processing
             shutdown_event.set()
 
         threading.Thread(target=_background_thread).start()
         worker_process.run()
 
         updates = []
-        while True:
+        max_attempts = 50
+        attempts = 0
+        while attempts < max_attempts:
             try:
                 update_message = updates_queue.get_nowait()
                 updates.append(MsgpackEncoding.decode(update_message))
             except Empty:
-                break
+                attempts += 1
+                if len(updates) >= 40:  # We got all expected updates
+                    break
+                time.sleep(0.05)
 
         # Validate updates
         assert len(updates) == 40

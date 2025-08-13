@@ -27,11 +27,13 @@ Classes:
     AsyncPoissonStrategy: Asynchronous request scheduling with Poisson distribution
 """
 
+from __future__ import annotations
+
 import math
 import random
 import time
 from abc import ABC, abstractmethod
-from typing import Literal, Optional, TypeVar
+from typing import Literal, TypeVar
 
 from pydantic import Field, PrivateAttr
 
@@ -205,7 +207,7 @@ class NoDelayRequestTimings(ScheduledRequestTimings):
         default=0.99,
         description=("The target convergence rate during the startup phase."),
     )
-    _start_time: Optional[float] = PrivateAttr(None)
+    _start_time: float | None = PrivateAttr(None)
     _requests_count: int = PrivateAttr(0)
 
     def next_offset(self) -> float:
@@ -306,7 +308,7 @@ class PoissonRateRequestTimings(ScheduledRequestTimings):
         description="The time offset to apply in seconds from scheduler start time.",
     )
     _requests_count: int = PrivateAttr(0)
-    _random: Optional[random.Random] = PrivateAttr(None)
+    _random: random.Random | None = PrivateAttr(None)
 
     def next_offset(self) -> float:
         """
@@ -347,7 +349,7 @@ class SchedulingStrategy(StandardBaseModel):
     )
 
     @property
-    def processes_limit(self) -> Optional[int]:
+    def processes_limit(self) -> int | None:
         """
         :return: The maximum number of worker processes supported by the
             scheduling strategy. None if not limited.
@@ -355,7 +357,7 @@ class SchedulingStrategy(StandardBaseModel):
         return None
 
     @property
-    def requests_limit(self) -> Optional[int]:
+    def requests_limit(self) -> int | None:
         """
         :return: The maximum number of concurrent requests that can be processed
             at once by the scheduling strategy. None if not limited.
@@ -403,7 +405,7 @@ class SynchronousStrategy(SchedulingStrategy):
         return "synchronous"
 
     @property
-    def processes_limit(self) -> Optional[int]:
+    def processes_limit(self) -> int | None:
         """
         Get the maximum number of worker processes for synchronous scheduling.
 
@@ -412,7 +414,7 @@ class SynchronousStrategy(SchedulingStrategy):
         return 1
 
     @property
-    def requests_limit(self) -> Optional[int]:
+    def requests_limit(self) -> int | None:
         """
         Get the maximum number of concurrent requests for synchronous scheduling.
 
@@ -421,17 +423,17 @@ class SynchronousStrategy(SchedulingStrategy):
         return 1
 
     def create_request_timings(
-        self, local_rank: int, local_world_size: int, _local_max_concurrency: int
+        self, local_rank: int, local_world_size: int, local_max_concurrency: int
     ) -> ScheduledRequestTimings:
         """
-        Create timing implementation for synchronous request scheduling.
+            Create timing implementation for synchronous request scheduling.
 
-        :param local_rank: The rank of the worker process. Must be 0.
-        :param local_world_size: Total number of worker processes. Must be 1.
-        :param _local_max_concurrency: The maximum number of concurrent requests
-            for the worker process. Unused in this strategy.
-        :return: LastCompletionRequestTimings instance for sequential processing.
-        :raises ValueError: If multiple workers or non-zero rank is specified.
+            :param local_rank: The rank of the worker process. Must be 0.
+            :param local_world_size: Total number of worker processes. Must be 1.
+        :param local_max_concurrency: The maximum number of concurrent requests
+                for the worker process. Unused in this strategy.
+            :return: LastCompletionRequestTimings instance for sequential processing.
+            :raises ValueError: If multiple workers or non-zero rank is specified.
         """
         if local_world_size > 1 or local_rank != 0:
             raise ValueError(
@@ -496,18 +498,18 @@ class ConcurrentStrategy(SchedulingStrategy):
         return self.streams
 
     def create_request_timings(
-        self, local_rank: int, local_world_size: int, _local_max_concurrency: int
+        self, local_rank: int, local_world_size: int, local_max_concurrency: int
     ) -> LastCompletionRequestTimings:
         """
-        Create timing implementation for concurrent request scheduling.
+            Create timing implementation for concurrent request scheduling.
 
-        :param local_rank: The rank of the worker process. Must be less than streams.
-        :param local_world_size: Total number of worker processes. Must not exceed
-            streams.
-        :param _local_max_concurrency: The maximum number of concurrent requests
-            for the worker process. Unused in this strategy.
-        :return: LastCompletionRequestTimings instance for stream-based processing.
-        :raises ValueError: If worker configuration exceeds stream limits.
+            :param local_rank: The rank of the worker process. Must be less than streams.
+            :param local_world_size: Total number of worker processes. Must not exceed
+                streams.
+        :param local_max_concurrency: The maximum number of concurrent requests
+                for the worker process. Unused in this strategy.
+            :return: LastCompletionRequestTimings instance for stream-based processing.
+            :raises ValueError: If worker configuration exceeds stream limits.
         """
         if local_world_size > self.streams:
             raise ValueError(
@@ -561,7 +563,7 @@ class ThroughputStrategy(SchedulingStrategy):
     """
 
     type_: Literal["throughput"] = "throughput"  # type: ignore[assignment]
-    max_concurrency: Optional[int] = Field(
+    max_concurrency: int | None = Field(
         default=None,
         description=(
             "The maximum number of concurrent requests to schedule. "
@@ -583,7 +585,7 @@ class ThroughputStrategy(SchedulingStrategy):
         return "throughput"
 
     @property
-    def processes_limit(self) -> Optional[int]:
+    def processes_limit(self) -> int | None:
         """
         Get the maximum number of worker processes for throughput scheduling.
 
@@ -593,7 +595,7 @@ class ThroughputStrategy(SchedulingStrategy):
         return self.max_concurrency
 
     @property
-    def requests_limit(self) -> Optional[int]:
+    def requests_limit(self) -> int | None:
         """
         Get the maximum number of concurrent requests for throughput scheduling.
 
@@ -668,19 +670,19 @@ class AsyncConstantStrategy(ThroughputStrategy):
         return f"constant@{self.rate:.2f}"
 
     def create_request_timings(
-        self, _local_rank: int, local_world_size: int, _local_max_concurrency: int
+        self, local_rank: int, local_world_size: int, local_max_concurrency: int
     ) -> ScheduledRequestTimings:
         """
-        Create timing implementation for constant-rate request scheduling.
+            Create timing implementation for constant-rate request scheduling.
 
-        Divides the total rate evenly across all worker processes to maintain
-        the specified aggregate rate.
+            Divides the total rate evenly across all worker processes to maintain
+            the specified aggregate rate.
 
-        :param _local_rank: The rank of the worker process (unused).
-        :param local_world_size: Total number of worker processes for rate division.
-        :param _local_max_concurrency: The maximum number of concurrent requests
-            for the worker process.
-        :return: ConstantRateRequestTimings instance with per-worker rate.
+        :param local_rank: The rank of the worker process (unused).
+            :param local_world_size: Total number of worker processes for rate division.
+        :param local_max_concurrency: The maximum number of concurrent requests
+                for the worker process.
+            :return: ConstantRateRequestTimings instance with per-worker rate.
         """
         # Divide the rate evenly across all worker processes
         worker_rate = self.rate / local_world_size
@@ -731,20 +733,20 @@ class AsyncPoissonStrategy(ThroughputStrategy):
         return f"poisson@{self.rate:.2f}"
 
     def create_request_timings(
-        self, local_rank: int, local_world_size: int, _local_max_concurrency: int
+        self, local_rank: int, local_world_size: int, local_max_concurrency: int
     ) -> ScheduledRequestTimings:
         """
-        Create timing implementation for Poisson-distributed request scheduling.
+            Create timing implementation for Poisson-distributed request scheduling.
 
-        Divides the total rate evenly across all worker processes and assigns
-        unique random seeds to ensure independent but coordinated request streams.
+            Divides the total rate evenly across all worker processes and assigns
+            unique random seeds to ensure independent but coordinated request streams.
 
-        :param local_rank: The rank of the worker process for seed generation.
-        :param local_world_size: Total number of worker processes for rate division.
-        :param _local_max_concurrency: The maximum number of concurrent requests
-            for the worker process.
-        :return: PoissonRateRequestTimings instance with per-worker rate and
-            unique seed.
+            :param local_rank: The rank of the worker process for seed generation.
+            :param local_world_size: Total number of worker processes for rate division.
+        :param local_max_concurrency: The maximum number of concurrent requests
+                for the worker process.
+            :return: PoissonRateRequestTimings instance with per-worker rate and
+                unique seed.
         """
         # Divide the rate evenly across all worker processes
         worker_rate = self.rate / local_world_size

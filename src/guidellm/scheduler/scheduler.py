@@ -11,7 +11,7 @@ Classes:
 from __future__ import annotations
 
 from collections.abc import AsyncIterator, Iterable
-from typing import Any, Generic, Optional, Union
+from typing import Any, Generic
 
 from guidellm.scheduler.constraints import (
     Constraint,
@@ -19,8 +19,9 @@ from guidellm.scheduler.constraints import (
 )
 from guidellm.scheduler.environment import Environment
 from guidellm.scheduler.objects import (
-    BackendT,
+    BackendInterface,
     MeasuredRequestTimingsT,
+    MultiTurnRequestT,
     RequestT,
     ResponseT,
     ScheduledRequestInfo,
@@ -34,7 +35,7 @@ __all__ = ["Scheduler"]
 
 
 class Scheduler(
-    Generic[BackendT, RequestT, MeasuredRequestTimingsT, ResponseT],
+    Generic[RequestT, MeasuredRequestTimingsT, ResponseT],
     ThreadSafeSingletonMixin,
 ):
     """
@@ -73,16 +74,14 @@ class Scheduler(
 
     async def run(
         self,
-        requests: Iterable[
-            Union[RequestT, Iterable[Union[RequestT, tuple[RequestT, float]]]]
-        ],
-        backend: BackendT[RequestT, ResponseT],
+        requests: Iterable[RequestT | MultiTurnRequestT[RequestT]],
+        backend: BackendInterface[RequestT, MeasuredRequestTimingsT, ResponseT],
         strategy: SchedulingStrategy,
         env: Environment,
-        **constraints: dict[str, Union[Any, dict[str, Any], Constraint]],
+        **constraints: dict[str, Any | dict[str, Any] | Constraint],
     ) -> AsyncIterator[
         tuple[
-            Optional[ResponseT],
+            ResponseT | None,
             RequestT,
             ScheduledRequestInfo[MeasuredRequestTimingsT],
             SchedulerState,
@@ -109,11 +108,12 @@ class Scheduler(
             are propagated after cleanup.
         """
         with self.thread_lock:
-            worker_group: Optional[
+            worker_group: (
                 WorkerProcessGroup[
                     BackendT, RequestT, MeasuredRequestTimingsT, ResponseT
                 ]
-            ] = None
+                | None
+            ) = None
 
             # Any issues during the run will raise an error (local or remote),
             # be caught and passed to the environment,

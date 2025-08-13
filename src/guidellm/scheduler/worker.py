@@ -12,19 +12,20 @@ from __future__ import annotations
 
 import asyncio
 import time
-from collections.abc import Generator
+from collections.abc import Generator, Iterable
 from multiprocessing import Queue
 from multiprocessing.synchronize import Barrier as ProcessingBarrier
 from multiprocessing.synchronize import Event as ProcessingEvent
 from queue import Empty as QueueEmpty
 from threading import Event as ThreadingEvent
-from typing import Generic, Optional
+from typing import Generic, Literal
 
 import culsans
 
 from guidellm.scheduler.objects import (
-    BackendT,
+    BackendInterface,
     MeasuredRequestTimingsT,
+    MultiTurnRequestT,
     RequestT,
     ResponseT,
     ScheduledRequestInfo,
@@ -35,7 +36,7 @@ from guidellm.utils import MsgpackEncoding, synchronous_to_exitable_async
 __all__ = ["WorkerProcess"]
 
 
-class WorkerProcess(Generic[BackendT, RequestT, MeasuredRequestTimingsT, ResponseT]):
+class WorkerProcess(Generic[RequestT, MeasuredRequestTimingsT, ResponseT]):
     """
     Individual worker process for request processing and coordination.
 
@@ -53,18 +54,22 @@ class WorkerProcess(Generic[BackendT, RequestT, MeasuredRequestTimingsT, Respons
         shutdown_event: ProcessingEvent,
         error_event: ProcessingEvent,
         requests_queue: Queue[
-            tuple[RequestT, ScheduledRequestInfo[MeasuredRequestTimingsT]]
+            tuple[
+                RequestT | MultiTurnRequestT[RequestT],
+                ScheduledRequestInfo[MeasuredRequestTimingsT],
+            ]
         ],
         updates_queue: Queue[
             tuple[
                 ResponseT | None,
-                RequestT,
+                RequestT | MultiTurnRequestT[RequestT],
                 ScheduledRequestInfo[MeasuredRequestTimingsT],
             ]
         ],
-        backend: BackendT,
+        backend: BackendInterface[RequestT, MeasuredRequestTimingsT, ResponseT],
         request_timings: ScheduledRequestTimings,
-        poll_intervals: float,
+        poll_intervals: float = 0.1,
+        max_requests_queue_buffer: int = 2,
     ):
         """
         Initialize worker process instance.
@@ -95,10 +100,16 @@ class WorkerProcess(Generic[BackendT, RequestT, MeasuredRequestTimingsT, Respons
 
         # Local synchronization (initialized during start up)
         self.pending_requests_queue: culsans.Queue[
-            tuple[RequestT, ScheduledRequestInfo[MeasuredRequestTimingsT]]
+            tuple[
+                RequestT | MultiTurnRequestT[RequestT],
+                ScheduledRequestInfo[MeasuredRequestTimingsT],
+            ]
         ] = None
         self.pending_updates_queue: culsans.Queue[
-            tuple[RequestT, ScheduledRequestInfo[MeasuredRequestTimingsT]]
+            tuple[
+                RequestT | MultiTurnRequestT[RequestT],
+                ScheduledRequestInfo[MeasuredRequestTimingsT],
+            ]
         ] = None
         self.requests_canceled: ThreadingEvent = None
         self.pull_task: asyncio.Task = None
@@ -108,6 +119,7 @@ class WorkerProcess(Generic[BackendT, RequestT, MeasuredRequestTimingsT, Respons
         self.backend = backend
         self.request_timings = request_timings
         self.poll_intervals = poll_intervals
+        self.max_requests_queue_buffer = max_requests_queue_buffer
         self.startup_completed: bool = False
 
     def run(self):
@@ -226,7 +238,9 @@ class WorkerProcess(Generic[BackendT, RequestT, MeasuredRequestTimingsT, Respons
         await self.backend.validate()
 
         # Setup local queues
-        self.pending_requests_queue = culsans.Queue(maxsize=2)
+        self.pending_requests_queue = culsans.Queue(
+            maxsize=self.max_requests_queue_buffer
+        )
         self.pending_updates_queue = culsans.Queue()
         self.requests_canceled = ThreadingEvent()
 
@@ -234,12 +248,13 @@ class WorkerProcess(Generic[BackendT, RequestT, MeasuredRequestTimingsT, Respons
         self.pull_task = asyncio.create_task(
             synchronous_to_exitable_async(
                 self._pull_requests_generator(),
-                poll_interval=self.poll_intervals,
+                poll_interval=0,  # no delays on thread for checking queue
             )
         )
         self.push_task = asyncio.create_task(
             synchronous_to_exitable_async(
-                self._push_updates_generator(), poll_interval=self.poll_intervals
+                self._push_updates_generator(),
+                poll_interval=0,  # no delays on thread for checking queue
             )
         )
 
@@ -320,17 +335,24 @@ class WorkerProcess(Generic[BackendT, RequestT, MeasuredRequestTimingsT, Respons
         self.requests_canceled = None
 
     async def _process_next_request(self):
-        request: Optional[RequestT] = None
-        request_info: Optional[ScheduledRequestInfo[MeasuredRequestTimingsT]] = None
-        response: Optional[ResponseT] = None
+        request: RequestT | MultiTurnRequestT[RequestT] | None = None
+        request_info: ScheduledRequestInfo[MeasuredRequestTimingsT] | None = None
+        response: ResponseT | None = None
 
         try:
             # get next request to send
             request, request_info = await self.pending_requests_queue.async_get()
             current_time = time.time()
             request_info.scheduler_timings.dequeued = current_time
-            request_info.status = "pending"
-            response = None
+            await self._handle_request_update(
+                new_status="pending",
+                response=response,
+                request=request,
+                request_info=request_info,
+            )
+
+            if isinstance(request, Iterable) and not isinstance(request, (str, bytes)):
+                raise NotImplementedError("Multi-turn requests are not yet supported")
 
             # Calculate when to start processing request
             timings_offset = self.request_timings.next_offset()
@@ -343,86 +365,120 @@ class WorkerProcess(Generic[BackendT, RequestT, MeasuredRequestTimingsT, Respons
             else:
                 request_info.scheduler_timings.scheduled_at = current_time
 
-            # Send start processing update
-            request_info.status = "in_progress"
-            request_info.scheduler_timings.resolve_start = time.time()
-            await self.pending_updates_queue.async_put(
-                (response, request, request_info.model_copy())
-            )
-
             # Process the request
-            async for resp in self.backend.resolve(request, request_info, None):
-                response = resp
-
-            # Send completion update
-            request_info.status = "completed"
-            request_info.scheduler_timings.resolve_end = time.time()
-            await self.pending_updates_queue.async_put(
-                (response, request, request_info)
+            request_info.scheduler_timings.resolve_start = time.time()
+            await self._handle_request_update(
+                new_status="in_progress",
+                response=response,
+                request=request,
+                request_info=request_info,
             )
+            async for resp, info in self.backend.resolve(request, request_info, None):
+                response = resp
+                request_info = info
 
-            # Notify instance states
-            self.request_timings.request_completed(request_info)
-            self.pending_requests_queue.task_done()
+            # Complete
+            request_info.scheduler_timings.resolve_end = time.time()
+            await self._handle_request_update(
+                new_status="completed",
+                response=response,
+                request=request,
+                request_info=request_info,
+            )
         except asyncio.CancelledError:
             # Handle cancellation
             if request is not None and request_info is not None:
-                await self._handle_request_cancellation(response, request, request_info)
+                request_info.error = "Request was cancelled"
+                request_info.scheduler_timings.resolve_end = time.time()
+                await self._handle_request_update(
+                    new_status="cancelled",
+                    response=response,
+                    request=request,
+                    request_info=request_info,
+                )
             raise
         except Exception as exc:  # noqa: BLE001
             if request is not None and request_info is not None:
-                await self._handle_request_error(response, request, request_info, exc)
+                request_info.error = str(exc)
+                request_info.scheduler_timings.resolve_end = time.time()
+                await self._handle_request_update(
+                    new_status="errored",
+                    response=response,
+                    request=request,
+                    request_info=request_info,
+                )
 
-    async def _handle_request_cancellation(
+    async def _handle_request_update(
         self,
-        response: Optional[ResponseT],
-        request: RequestT,
+        new_status: Literal[
+            "pending", "in_progress", "completed", "errored", "cancelled"
+        ],
+        response: ResponseT | None,
+        request: RequestT | MultiTurnRequestT[RequestT],
         request_info: ScheduledRequestInfo[MeasuredRequestTimingsT],
     ):
-        request_info.status = "cancelled"
-        request_info.scheduler_timings.resolve_end = time.time()
-        await self.pending_updates_queue.async_put((response, request, request_info))
+        status_orders = {
+            "queued": -2,  # does not send event
+            "pending": -1,  # does not send event
+            "in_progress": 1,
+            "completed": 2,
+            "errored": 2,
+            "cancelled": 2,
+        }
+        prev_status = request_info.status
+        try:
+            if (
+                status_orders[new_status] >= status_orders["in_progress"]
+                and status_orders[prev_status] < status_orders["in_progress"]
+            ):
+                # Haven't sent start update yet
+                request_info.status = "in_progress"
+                await self.pending_updates_queue.async_put(
+                    (None, request, request_info.model_copy())
+                )
+                prev_status = "in_progress"
 
-        # Notify instance states
-        self.request_timings.request_completed(request_info)
-        self.pending_requests_queue.task_done()
+            if (
+                status_orders[new_status] > status_orders["in_progress"]
+                and status_orders[new_status] > status_orders[prev_status]
+            ):
+                # Haven't sent resolved update yet
+                request_info.status = new_status
+                await self.pending_updates_queue.async_put(
+                    (response, request, request_info.model_copy())
+                )
+                prev_status = new_status
 
-    async def _handle_request_error(
-        self,
-        response: Optional[ResponseT],
-        request: RequestT,
-        request_info: ScheduledRequestInfo[MeasuredRequestTimingsT],
-        exc: Exception,
-    ):
-        request_info.status = "errored"
-        request_info.error = str(exc)
-        request_info.scheduler_timings.resolve_end = time.time()
-        await self.pending_updates_queue.async_put((response, request, request_info))
-
-        # Notify instance states
-        self.request_timings.request_completed(request_info)
-        self.pending_requests_queue.task_done()
+                # Notify instance states
+                self.request_timings.request_completed(request_info)
+                self.pending_requests_queue.task_done()
+        except Exception as exc:
+            # Reset status to last one that succeeded or started function with
+            # Calling logic can retry after handling error, if possible
+            request_info.status = prev_status
+            raise exc
 
     async def _cancel_pending_requests(self):
         while True:
+            # All requests will be on the queue by now, loop until we can't get anymore
             try:
                 request, request_info = await asyncio.wait_for(
                     self.pending_requests_queue.async_get(), timeout=self.poll_intervals
                 )
-
-                # Send in_progress update first, every request has same update sequence
-                request_info.status = "in_progress"
-                request_info.scheduler_timings.resolve_start = time.time()
-                await self.pending_updates_queue.async_put(
-                    (None, request, request_info.model_copy())
+                request_info.error = "Request was cancelled"
+                request_info.scheduler_timings.resolve_end = time.time()
+                await self._handle_request_update(
+                    new_status="cancelled",
+                    response=None,
+                    request=request,
+                    request_info=request_info,
                 )
-
-                await self._handle_request_cancellation(None, request, request_info)
-
             except (culsans.QueueEmpty, asyncio.TimeoutError):
                 break
 
     def _pull_requests_generator(self) -> Generator:
+        last_check = time.time()
+
         while True:
             if self.requests_canceled.is_set():
                 break
@@ -435,12 +491,17 @@ class WorkerProcess(Generic[BackendT, RequestT, MeasuredRequestTimingsT, Respons
                 pass  # No update available, continue polling
             except culsans.QueueShutDown:
                 break
-            except Exception as exc:  # noqa: BLE001
-                print(exc)
+            except Exception:  # noqa: BLE001
+                pass
 
-            yield None
+            if time.time() - last_check > self.poll_intervals:
+                # Yield to allow cancel/error/stop checks in wrapper
+                last_check = time.time()
+                yield None
 
     def _push_updates_generator(self) -> Generator:
+        last_check = time.time()
+
         while True:
             try:
                 update_tuple = self.pending_updates_queue.sync_get(
@@ -453,7 +514,10 @@ class WorkerProcess(Generic[BackendT, RequestT, MeasuredRequestTimingsT, Respons
                 pass  # No update available, continue polling
             except culsans.QueueShutDown:
                 break
-            except Exception as exc:  # noqa: BLE001
-                print(exc)
+            except Exception:  # noqa: BLE001
+                pass
 
-            yield None
+            if time.time() - last_check > self.poll_intervals:
+                # Yield to allow cancel/error/stop checks in wrapper
+                last_check = time.time()
+                yield None
