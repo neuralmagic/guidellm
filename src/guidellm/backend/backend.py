@@ -11,7 +11,7 @@ Type Aliases:
     BackendType: Literal type defining supported backend implementations.
 """
 
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from collections.abc import AsyncIterator
 from typing import Any, Literal, Optional
 
@@ -33,7 +33,6 @@ BackendType = Literal["openai_http"]
 
 
 class Backend(
-    ABC,
     RegistryMixin["type[Backend]"],
     BackendInterface[GenerationRequest, GenerationRequestTimings, GenerationResponse],
 ):
