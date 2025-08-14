@@ -1,9 +1,9 @@
 from guidellm.benchmark import (
     BenchmarkArgs,
-    BenchmarkRunStats,
+    BenchmarkSchedulerStats,
     GenerativeBenchmark,
+    GenerativeRequestStats,
     GenerativeTextErrorStats,
-    GenerativeTextResponseStats,
     SynchronousProfile,
 )
 from guidellm.objects import StatusBreakdown
@@ -21,7 +21,7 @@ def mock_generative_benchmark() -> GenerativeBenchmark:
     return GenerativeBenchmark.from_stats(
         run_id="fa4a92c1-9a1d-4c83-b237-83fcc7971bd3",
         successful=[
-            GenerativeTextResponseStats(
+            GenerativeRequestStats(
                 request_id="181a63e2-dc26-4268-9cfc-2ed9279aae63",
                 request_type="text_completions",
                 scheduler_info=SchedulerRequestInfo(
@@ -48,7 +48,7 @@ def mock_generative_benchmark() -> GenerativeBenchmark:
                 first_token_time=1744728125.2473357,
                 last_token_time=1744728126.699908,
             ),
-            GenerativeTextResponseStats(
+            GenerativeRequestStats(
                 request_id="8a7846d5-7624-420d-a269-831e568a848f",
                 request_type="text_completions",
                 scheduler_info=SchedulerRequestInfo(
@@ -75,7 +75,7 @@ def mock_generative_benchmark() -> GenerativeBenchmark:
                 first_token_time=1744728126.7526379,
                 last_token_time=1744728128.1956792,
             ),
-            GenerativeTextResponseStats(
+            GenerativeRequestStats(
                 request_id="4cde0e6c-4531-4e59-aac1-07bc8b6e4139",
                 request_type="text_completions",
                 scheduler_info=SchedulerRequestInfo(
@@ -102,7 +102,7 @@ def mock_generative_benchmark() -> GenerativeBenchmark:
                 first_token_time=1744728128.2481627,
                 last_token_time=1744728129.6914039,
             ),
-            GenerativeTextResponseStats(
+            GenerativeRequestStats(
                 request_id="a95b96be-05d4-4130-b0dd-9528c01c9909",
                 request_type="text_completions",
                 scheduler_info=SchedulerRequestInfo(
@@ -129,7 +129,7 @@ def mock_generative_benchmark() -> GenerativeBenchmark:
                 first_token_time=1744728129.7438853,
                 last_token_time=1744728131.187019,
             ),
-            GenerativeTextResponseStats(
+            GenerativeRequestStats(
                 request_id="714b751c-bbfe-4b2a-a0af-7c1bf2c224ae",
                 request_type="text_completions",
                 scheduler_info=SchedulerRequestInfo(
@@ -156,7 +156,7 @@ def mock_generative_benchmark() -> GenerativeBenchmark:
                 first_token_time=1744728131.2394557,
                 last_token_time=1744728132.6828275,
             ),
-            GenerativeTextResponseStats(
+            GenerativeRequestStats(
                 request_id="ef73ae8a-4c8f-4c88-b303-cfff152ce378",
                 request_type="text_completions",
                 scheduler_info=SchedulerRequestInfo(
@@ -226,7 +226,7 @@ def mock_generative_benchmark() -> GenerativeBenchmark:
             cooldown_number=None,
             cooldown_duration=None,
         ),
-        run_stats=BenchmarkRunStats(
+        run_stats=BenchmarkSchedulerStats(
             start_time=1744728125.0772898,
             end_time=1744728135.8407037,
             requests_made=StatusBreakdown(

@@ -133,17 +133,15 @@ class Settings(BaseSettings):
     max_concurrency: int = 512
     max_worker_processes: int = 10
     max_add_requests_per_loop: int = 20
+    scheduler_start_delay_non_distributed: float = 0.1
+    scheduler_poll_interval: float = 0.05
 
     # Data settings
     dataset: DatasetSettings = DatasetSettings()
 
     # Request/stats settings
-    preferred_prompt_tokens_source: Optional[
-        Literal["request", "response", "local"]
-    ] = "response"
-    preferred_output_tokens_source: Optional[
-        Literal["request", "response", "local"]
-    ] = "response"
+    preferred_prompt_tokens_source: Literal["request", "response"] = "response"
+    preferred_output_tokens_source: Literal["request", "response"] = "response"
     preferred_backend: Literal["openai"] = "openai"
     preferred_route: Literal["text_completions", "chat_completions"] = (
         "text_completions"
