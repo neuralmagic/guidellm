@@ -156,7 +156,7 @@ class MockBackend(BackendInterface):
         pass
 
     async def resolve(self, request, request_info, request_history):
-        yield f"response_for_{request}", request_info
+        yield f"response_for_{request}"
 
 
 class TestWorkerProcessGroup:
@@ -383,7 +383,7 @@ class TestWorkerProcessGroup:
 
         # Setup group and mimic create_processes
         backend = MockBackend()
-        requests = [f"r{i}" for i in range(100)]
+        requests = [f"r{i}" for i in range(5)]  # to few requests, test new iter logic
         group = WorkerProcessGroup(
             backend=backend,
             requests=requests,
@@ -428,7 +428,7 @@ class TestWorkerProcessGroup:
         assert len(sent_requests) == 10
 
         # Enqueue lifecycle updates
-        for req in requests:
+        for req in requests + requests:
             group.updates_queue.put(
                 MsgpackEncoding.encode(
                     (
@@ -465,11 +465,12 @@ class TestWorkerProcessGroup:
         await asyncio.sleep(0.1)
         updates = []
         for _ in range(3 * 10):
-            await asyncio.sleep(0)
             try:
-                update = group.updates_queue.get(timeout=1.0)
+                update = await asyncio.wait_for(
+                    group.pending_updates_queue.async_get(), timeout=1.0
+                )
                 updates.append(update)
-            except Empty:
+            except asyncio.TimeoutError:
                 break
         assert len(updates) == 3 * 10
 
@@ -669,10 +670,3 @@ class TestWorkerProcessGroup:
 
         # Cleanup
         await group.shutdown()
-
-    @pytest.mark.smoke
-    def test_lifecycle(self):
-        """Test placeholder for comprehensive lifecycle testing."""
-        # Implementation deferred: comprehensive test that validates all
-        # worker_group methods work correctly with mock backend across
-        # different strategies and constraints

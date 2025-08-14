@@ -109,10 +109,7 @@ class Scheduler(
         """
         with self.thread_lock:
             worker_group: (
-                WorkerProcessGroup[
-                    BackendT, RequestT, MeasuredRequestTimingsT, ResponseT
-                ]
-                | None
+                WorkerProcessGroup[RequestT, MeasuredRequestTimingsT, ResponseT] | None
             ) = None
 
             # Any issues during the run will raise an error (local or remote),
@@ -131,7 +128,7 @@ class Scheduler(
 
                 # Setup the worker group, sync start with the environment
                 worker_group = WorkerProcessGroup[
-                    BackendT, RequestT, MeasuredRequestTimingsT, ResponseT
+                    RequestT, MeasuredRequestTimingsT, ResponseT
                 ](
                     backend=backend,
                     requests=local_requests,
@@ -154,13 +151,13 @@ class Scheduler(
                     )
                     yield response, request, request_info, state
             except Exception as err:  # noqa: BLE001
-                env.sync_run_error(err)
+                await env.sync_run_error(err)
             finally:
                 # Ensure all worker processes are cleaned up for error or completion
                 if worker_group is not None:
                     err = await worker_group.shutdown()
                     if err is not None:
-                        env.sync_run_error(err)
+                        await env.sync_run_error(err)
 
             # Ensure any errors are raised and all responses
             # are yielded for aggregation on the primary node

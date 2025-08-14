@@ -83,7 +83,7 @@ class MockBackend(BackendInterface):
             raise RuntimeError("Mock resolve failed")
         if self.request_error_rate > 0.0 and random.random() < self.request_error_rate:
             raise RuntimeError("Mock resolve failed")
-        yield f"response_for_{request}", request_info
+        yield f"response_for_{request}"
 
 
 class TestWorkerProcess:

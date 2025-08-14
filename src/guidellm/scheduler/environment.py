@@ -29,11 +29,12 @@ from guidellm.scheduler.objects import (
     SchedulerState,
 )
 from guidellm.scheduler.strategy import SchedulingStrategy
+from guidellm.utils import InfoMixin
 
 __all__ = ["Environment", "NonDistributedEnvironment"]
 
 
-class Environment(ABC, Generic[RequestT, ResponseT]):
+class Environment(ABC, Generic[RequestT, ResponseT], InfoMixin):
     """
     Abstract base for scheduler execution environments.
 
@@ -86,6 +87,7 @@ class Environment(ABC, Generic[RequestT, ResponseT]):
         response: ResponseT | None,
         request: RequestT,
         request_info: ScheduledRequestInfo[MeasuredRequestTimingsT],
+        state: SchedulerState,
     ):
         """
         Update environment state with completed request iteration.
@@ -101,7 +103,7 @@ class Environment(ABC, Generic[RequestT, ResponseT]):
         ...
 
     @abstractmethod
-    async def sync_run_error(self, err: Exception):
+    async def sync_run_error(self, err: list[Exception] | Exception):
         """
         Handle and propagate errors across all nodes.
 
@@ -144,13 +146,11 @@ class NonDistributedEnvironment(Environment):
     distributed coordination. Implements the Environment interface with minimal
     synchronization overhead for local testing, development, and single-machine
     benchmarking.
-
-    :ivar run_err: Exception that occurred during execution, if any.
     """
 
     def __init__(self):
         """Initialize with no stored errors."""
-        self.run_err: Exception = None
+        self.run_errors: list[Exception] = []
 
     async def sync_run_params(
         self,
@@ -181,6 +181,7 @@ class NonDistributedEnvironment(Environment):
         response: ResponseT | None,
         request: RequestT,
         request_info: ScheduledRequestInfo[MeasuredRequestTimingsT],
+        state: SchedulerState,
     ):
         """
         No-op for single-node execution.
@@ -196,7 +197,8 @@ class NonDistributedEnvironment(Environment):
 
         :param err: The exception that occurred during execution.
         """
-        self.run_err = err
+        err = [err] if not isinstance(err, list) else err
+        self.run_errors.extend(err)
 
     async def sync_run_end(
         self,
@@ -214,8 +216,13 @@ class NonDistributedEnvironment(Environment):
         :return: Empty iterator since there are no remote nodes.
         :raises Exception: Any error stored during execution via sync_run_error.
         """
-        if self.run_err:
-            raise self.run_err
-        # Return empty async iterator for non-distributed environment
+        if self.run_errors:
+            if len(self.run_errors) == 1:
+                raise self.run_errors[0]
+            else:
+                raise RuntimeError(
+                    f"Errors occurred during execution: {self.run_errors}"
+                )
+
         return
-        yield
+        yield  # needed to force generator compilation

@@ -367,6 +367,7 @@ class WorkerProcessGroup(Generic[RequestT, MeasuredRequestTimingsT, ResponseT]):
                     "completed, errored, cancelled."
                 )
 
+            state.end_time = time.time()  # Always update for last time update received
             actions = {
                 name: const(state, info) for name, const in self.constraints.items()
             }
@@ -465,11 +466,6 @@ class WorkerProcessGroup(Generic[RequestT, MeasuredRequestTimingsT, ResponseT]):
                 else self.requests
             )
 
-        if self.infinite_requests is not False and isinstance(self.requests, Iterable):
-            # Out of requests and infinite set to True or set to default
-            # Create new iterator out of the Iterable
-            return iter(self.requests)
-
         if self.infinite_requests is True and isinstance(self.requests, Iterator):
             # Out of requests and infinite set to True, but request_iter is Iterator
             # Cannot create new, raise RuntimeError
@@ -477,6 +473,11 @@ class WorkerProcessGroup(Generic[RequestT, MeasuredRequestTimingsT, ResponseT]):
                 f"Requests iterator {self.requests} exhausted and "
                 "infinite_requests is set to True"
             )
+
+        if self.infinite_requests is not False and isinstance(self.requests, Iterable):
+            # Out of requests and infinite set to True or set to default
+            # Create new iterator out of the Iterable
+            return iter(self.requests)
 
         # Either infinite is False for Iterable or Iterator
         # or infinite is None (default) for Iterator

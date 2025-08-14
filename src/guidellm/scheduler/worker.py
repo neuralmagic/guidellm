@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import time
-from collections.abc import Generator, Iterable
+from collections.abc import Generator
 from multiprocessing import Queue
 from multiprocessing.synchronize import Barrier as ProcessingBarrier
 from multiprocessing.synchronize import Event as ProcessingEvent
@@ -112,6 +112,7 @@ class WorkerProcess(Generic[RequestT, MeasuredRequestTimingsT, ResponseT]):
             ]
         ] = None
         self.requests_canceled: ThreadingEvent = None
+        self.pull_requests_stopped: ThreadingEvent = None
         self.pull_task: asyncio.Task = None
         self.push_task: asyncio.Task = None
 
@@ -243,6 +244,7 @@ class WorkerProcess(Generic[RequestT, MeasuredRequestTimingsT, ResponseT]):
         )
         self.pending_updates_queue = culsans.Queue()
         self.requests_canceled = ThreadingEvent()
+        self.pull_requests_stopped = ThreadingEvent()
 
         # Start background tasks for queue management
         self.pull_task = asyncio.create_task(
@@ -351,7 +353,7 @@ class WorkerProcess(Generic[RequestT, MeasuredRequestTimingsT, ResponseT]):
                 request_info=request_info,
             )
 
-            if isinstance(request, Iterable) and not isinstance(request, (str, bytes)):
+            if isinstance(request, (list, tuple)):
                 raise NotImplementedError("Multi-turn requests are not yet supported")
 
             # Calculate when to start processing request
@@ -373,9 +375,8 @@ class WorkerProcess(Generic[RequestT, MeasuredRequestTimingsT, ResponseT]):
                 request=request,
                 request_info=request_info,
             )
-            async for resp, info in self.backend.resolve(request, request_info, None):
+            async for resp in self.backend.resolve(request, request_info, None):
                 response = resp
-                request_info = info
 
             # Complete
             request_info.scheduler_timings.resolve_end = time.time()
@@ -460,7 +461,6 @@ class WorkerProcess(Generic[RequestT, MeasuredRequestTimingsT, ResponseT]):
 
     async def _cancel_pending_requests(self):
         while True:
-            # All requests will be on the queue by now, loop until we can't get anymore
             try:
                 request, request_info = await asyncio.wait_for(
                     self.pending_requests_queue.async_get(), timeout=self.poll_intervals
@@ -474,7 +474,9 @@ class WorkerProcess(Generic[RequestT, MeasuredRequestTimingsT, ResponseT]):
                     request_info=request_info,
                 )
             except (culsans.QueueEmpty, asyncio.TimeoutError):
-                break
+                if self.pull_requests_stopped.is_set():
+                    # No more requests will be put on the Queue
+                    break
 
     def _pull_requests_generator(self) -> Generator:
         last_check = time.time()
@@ -491,13 +493,15 @@ class WorkerProcess(Generic[RequestT, MeasuredRequestTimingsT, ResponseT]):
                 pass  # No update available, continue polling
             except culsans.QueueShutDown:
                 break
-            except Exception:  # noqa: BLE001
+            except Exception:  # noqa: BLE001, S110
                 pass
 
             if time.time() - last_check > self.poll_intervals:
                 # Yield to allow cancel/error/stop checks in wrapper
                 last_check = time.time()
                 yield None
+
+        self.pull_requests_stopped.set()
 
     def _push_updates_generator(self) -> Generator:
         last_check = time.time()
@@ -514,7 +518,7 @@ class WorkerProcess(Generic[RequestT, MeasuredRequestTimingsT, ResponseT]):
                 pass  # No update available, continue polling
             except culsans.QueueShutDown:
                 break
-            except Exception:  # noqa: BLE001
+            except Exception:  # noqa: BLE001, S110
                 pass
 
             if time.time() - last_check > self.poll_intervals:

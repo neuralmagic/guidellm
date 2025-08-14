@@ -13,6 +13,7 @@ from guidellm.scheduler import (
     RequestT,
     ResponseT,
     ScheduledRequestInfo,
+    SchedulerState,
     SynchronousStrategy,
 )
 
@@ -93,10 +94,6 @@ class TestEnvironment:
     @pytest.mark.smoke
     def test_method_signatures(self):
         """Test that method signatures match expected interface."""
-        info_sig = inspect.signature(Environment.info)
-        assert len(info_sig.parameters) == 1
-        assert "self" in info_sig.parameters
-
         params_sig = inspect.signature(Environment.sync_run_params)
         assert len(params_sig.parameters) == 4
         param_names = list(params_sig.parameters.keys())
@@ -107,9 +104,9 @@ class TestEnvironment:
         assert "self" in start_sig.parameters
 
         update_sig = inspect.signature(Environment.update_run_iteration)
-        assert len(update_sig.parameters) == 4
+        assert len(update_sig.parameters) == 5
         param_names = list(update_sig.parameters.keys())
-        assert param_names == ["self", "response", "request", "request_info"]
+        assert param_names == ["self", "response", "request", "request_info", "state"]
 
         error_sig = inspect.signature(Environment.sync_run_error)
         assert len(error_sig.parameters) == 2
@@ -126,7 +123,7 @@ class TestNonDistributedEnvironment:
     def test_initialization(self):
         """Test basic initialization of NonDistributedEnvironment."""
         env = NonDistributedEnvironment()
-        assert env.run_err is None
+        assert env.run_errors == []
         assert isinstance(env, Environment)
 
     @pytest.mark.sanity
@@ -224,14 +221,25 @@ class TestNonDistributedEnvironment:
             scheduler_process_id=0,
             scheduler_start_time=time.time(),
         )
+        mock_state = SchedulerState(
+            node_id=0,
+            num_processes=1,
+            start_time=time.time(),
+        )
 
-        await env.update_run_iteration(mock_response, mock_request, mock_request_info)
-        await env.update_run_iteration(None, mock_request, mock_request_info)
-        await env.update_run_iteration(mock_response, None, mock_request_info)
+        await env.update_run_iteration(
+            mock_response, mock_request, mock_request_info, mock_state
+        )
+        await env.update_run_iteration(
+            None, mock_request, mock_request_info, mock_state
+        )
+        await env.update_run_iteration(
+            mock_response, None, mock_request_info, mock_state
+        )
 
         if error_to_inject:
             await env.sync_run_error(error_to_inject)
-            assert env.run_err is error_to_inject
+            assert error_to_inject in env.run_errors
 
         if error_to_inject:
             with pytest.raises(type(error_to_inject)) as exc_info:

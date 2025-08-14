@@ -96,11 +96,12 @@ class TestScheduledRequestTimings:
         # Check signature parameters using inspect
         next_offset_sig = inspect.signature(next_offset_method)
         assert len(next_offset_sig.parameters) == 1
-        assert next_offset_sig.return_annotation is float
+        assert str(next_offset_sig.return_annotation) == "float"
         request_completed_sig = inspect.signature(request_completed_method)
         assert len(request_completed_sig.parameters) == 2
         params = list(request_completed_sig.parameters.values())
-        assert params[1].annotation == ScheduledRequestInfo
+        param_annotation = params[1].annotation
+        assert param_annotation in {ScheduledRequestInfo, "ScheduledRequestInfo"}
 
     @pytest.mark.sanity
     def test_invalid_implementation(self):

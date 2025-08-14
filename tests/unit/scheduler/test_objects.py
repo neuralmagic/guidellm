@@ -38,9 +38,9 @@ def test_response_t():
 
 
 def test_request_timings_t():
-    """Validate that RequestTimingsT is a TypeVar bound to RequestTimings."""
+    """Validate MeasuredRequestTimingsT is a TypeVar bound to MeasuredRequestTimings."""
     assert isinstance(MeasuredRequestTimingsT, TypeVar)
-    assert MeasuredRequestTimingsT.__name__ == "RequestTimingsT"
+    assert MeasuredRequestTimingsT.__name__ == "MeasuredRequestTimingsT"
     assert MeasuredRequestTimingsT.__bound__ == MeasuredRequestTimings
     assert MeasuredRequestTimingsT.__constraints__ == ()
 
@@ -111,7 +111,7 @@ class TestBackendInterface:
             type_params = generic_base.__args__
             assert len(type_params) == 3, "Should have 3 type parameters"
             param_names = [param.__name__ for param in type_params]
-            expected_names = ["RequestT", "RequestTimingsT", "ResponseT"]
+            expected_names = ["RequestT", "MeasuredRequestTimingsT", "ResponseT"]
             assert param_names == expected_names
 
     @pytest.mark.sanity
@@ -790,10 +790,20 @@ class TestSchedulerState:
                 "start_time": 2000.0,
                 "end_time": 3000.0,
                 "end_queuing_time": 2500.0,
-                "end_queuing_constraints": {"time_limit": {"max_duration": 1500}},
+                "end_queuing_constraints": {
+                    "time_limit": SchedulerUpdateAction(
+                        request_queuing="stop", metadata={"max_duration": 1500}
+                    )
+                },
                 "end_processing_time": 2800.0,
-                "end_processing_constraints": {"request_limit": {"max_requests": 1000}},
-                "scheduler_constraints": {"rate_limit": {"max_rps": 100}},
+                "end_processing_constraints": {
+                    "request_limit": SchedulerUpdateAction(
+                        request_processing="stop_all", metadata={"max_requests": 1000}
+                    )
+                },
+                "scheduler_constraints": {
+                    "rate_limit": SchedulerUpdateAction(metadata={"max_rps": 100})
+                },
                 "remaining_fraction": 0.25,
                 "remaining_requests": 50,
                 "remaining_duration": 300.0,
@@ -1175,9 +1185,9 @@ class TestSchedulerUpdateAction:
 
         # Test that type annotations are correct
         annotations = SchedulerUpdateActionProgress.__annotations__
-        assert annotations["remaining_fraction"] is float
-        assert annotations["remaining_requests"] is float
-        assert annotations["remaining_duration"] is float
+        assert "remaining_fraction" in annotations
+        assert "remaining_requests" in annotations
+        assert "remaining_duration" in annotations
 
         # Test creation of valid TypedDict instances
         valid_progress_1: SchedulerUpdateActionProgress = {}

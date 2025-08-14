@@ -22,7 +22,7 @@ Type Variables:
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import AsyncIterator, Iterable
+from collections.abc import AsyncIterator
 from typing import (
     Any,
     Generic,
@@ -54,7 +54,10 @@ __all__ = [
 RequestT = TypeVar("RequestT")
 MultiTurnRequestT = TypeAliasType(
     "MultiTurnRequestT",
-    Iterable[Union[RequestT, tuple[RequestT, float]]],
+    Union[
+        list[Union[RequestT, tuple[RequestT, float]]],
+        tuple[Union[RequestT, tuple[RequestT, float]]],
+    ],
     type_params=(RequestT,),
 )
 ResponseT = TypeVar("ResponseT")
