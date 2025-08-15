@@ -13,6 +13,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator, Iterable
 from typing import Any, Generic
 
+from guidellm import logger
 from guidellm.scheduler.constraints import (
     Constraint,
     ConstraintsInitializerFactory,
@@ -69,7 +70,7 @@ class Scheduler(
             env=environment,
             max_requests=1000
         ):
-            print(f"Response: {response}")
+            logger.debug(f"Response: {response}")
     """
 
     async def run(
@@ -136,8 +137,15 @@ class Scheduler(
                     constraints=local_constraints,
                 )
                 await worker_group.create_processes()
+                logger.debug("SCHEDULER: worker_group.create_processes() completed")
                 local_start_time = await env.sync_run_start()
+                logger.debug(
+                    f"SCHEDULER: env.sync_run_start() completed, start_time={local_start_time}"
+                )
                 await worker_group.start(local_start_time)
+                logger.debug(
+                    "SCHEDULER: worker_group.start() completed, starting request_updates..."
+                )
 
                 # Yield any updates and sync with the environment for non-local updates
                 async for (

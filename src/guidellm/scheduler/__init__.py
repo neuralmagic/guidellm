@@ -43,6 +43,7 @@ from .strategy import (
     StrategyType,
     SynchronousStrategy,
     ThroughputStrategy,
+    strategy_display_str,
 )
 from .worker import WorkerProcess
 from .worker_group import WorkerProcessGroup
@@ -91,4 +92,5 @@ __all__ = [
     "ThroughputStrategy",
     "WorkerProcess",
     "WorkerProcessGroup",
+    "strategy_display_str",
 ]

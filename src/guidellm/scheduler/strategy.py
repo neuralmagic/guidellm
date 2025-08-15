@@ -54,6 +54,7 @@ __all__ = [
     "StrategyType",
     "SynchronousStrategy",
     "ThroughputStrategy",
+    "strategy_display_str",
 ]
 
 
@@ -383,6 +384,16 @@ class SchedulingStrategy(StandardBaseModel):
 
 
 StrategyT = TypeVar("StrategyT", bound=SchedulingStrategy)
+
+
+def strategy_display_str(strategy: SchedulingStrategy) -> str:
+    """
+    Convert a scheduling strategy to a display string.
+
+    :param strategy: The scheduling strategy to convert.
+    :return: String representation of the strategy.
+    """
+    return str(strategy)
 
 
 class SynchronousStrategy(SchedulingStrategy):

@@ -28,8 +28,26 @@ class InfoMixin:
         :return: Dictionary containing object metadata including type, class,
             module, and public attributes.
         """
-        if hasattr(obj, "info"):
-            return obj.info() if callable(obj.info) else obj.info
+        # Avoid infinite recursion by checking if we're already in a recursive call
+        if not hasattr(cls, "_extracting_objects"):
+            cls._extracting_objects = set()
+
+        obj_id = id(obj)
+        if obj_id in cls._extracting_objects:
+            # Already extracting this object, avoid recursion
+            return {
+                "str": str(obj),
+                "type": type(obj).__name__,
+                "_recursion_avoided": True,
+            }
+
+        cls._extracting_objects.add(obj_id)
+        try:
+            if hasattr(obj, "info"):
+                result = obj.info() if callable(obj.info) else obj.info
+                return result
+        finally:
+            cls._extracting_objects.discard(obj_id)
 
         return {
             "str": str(obj),

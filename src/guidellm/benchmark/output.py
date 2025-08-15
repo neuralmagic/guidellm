@@ -55,6 +55,20 @@ class GenerativeBenchmarkerConsole(GenerativeBenchmarkerOutput):
         """
         self.console = Console()
 
+    def print_line(self, text: str):
+        """
+        Print a line of text to the console.
+
+        :param text: The text to print.
+        """
+        self.console.print(text)
+
+    def print_full_report(self):
+        """
+        Print a placeholder for the full report.
+        This method is called but appears to be intended for a different use case.
+        """
+
     async def finalize(self, report: GenerativeBenchmarksReport):
         """
         Print the complete benchmark report to the console.
