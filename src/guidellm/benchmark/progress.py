@@ -631,7 +631,11 @@ class _GenerativeProgressTaskState:
         if self.start_time < 0.0:
             return "--:--:--"
 
-        return datetime.fromtimestamp(self.start_time).strftime("%H:%M:%S")
+        try:
+            return datetime.fromtimestamp(self.start_time).strftime("%H:%M:%S")
+        except (OverflowError, ValueError, OSError):
+            # Handle timestamp overflow or invalid timestamp
+            return "--:--:--"
 
     @property
     def formatted_progress_status(self) -> str:

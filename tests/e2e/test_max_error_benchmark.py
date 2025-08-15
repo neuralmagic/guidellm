@@ -48,7 +48,7 @@ def test_max_error_benchmark(server: VllmSimServer):
     max_error_rate = 0.1
     guidellm_exe = get_guidellm_executable()
     command = f"""
-GUIDELLM__MAX_CONCURRENCY=1 GUIDELLM__MAX_WORKER_PROCESSES=1 {guidellm_exe} benchmark \
+GUIDELLM__MAX_CONCURRENCY=10 GUIDELLM__MAX_WORKER_PROCESSES=10 {guidellm_exe} benchmark \
   --target "{server.get_url()}" \
   --rate-type constant \
   --rate {rate} \

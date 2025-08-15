@@ -575,7 +575,10 @@ class WorkerProcessGroup(Generic[RequestT, MeasuredRequestTimingsT, ResponseT]):
     ) -> tuple[tuple[bytes, bytes] | None, bool]:
         try:
             request = next(request_iter)
-            request_info = ScheduledRequestInfo[MeasuredRequestTimingsT](
+            # Import GenerationRequestTimings for proper typing
+            from guidellm.backend.objects import GenerationRequestTimings
+
+            request_info = ScheduledRequestInfo[GenerationRequestTimings](
                 request_id=(
                     request
                     if isinstance(request, str)

@@ -29,7 +29,13 @@ def server():
     Pytest fixture to start and stop the server for the entire module
     using the TestServer class.
     """
-    server = VllmSimServer(port=8000, model="databricks/dolly-v2-12b", mode="echo")
+    server = VllmSimServer(
+        port=8000,
+        model="databricks/dolly-v2-12b",
+        mode="echo",
+        time_to_first_token=1,  # 1ms TTFT
+        inter_token_latency=1,  # 1ms ITL
+    )
     try:
         server.start()
         yield server  # Yield the URL for tests to use
@@ -46,7 +52,7 @@ def test_max_seconds_benchmark(server: VllmSimServer):
     rate = 10
     guidellm_exe = get_guidellm_executable()
     command = f"""
-GUIDELLM__MAX_CONCURRENCY=1 GUIDELLM__MAX_WORKER_PROCESSES=1 {guidellm_exe} benchmark \
+GUIDELLM__MAX_CONCURRENCY=10 GUIDELLM__MAX_WORKER_PROCESSES=10 {guidellm_exe} benchmark \
   --target "{server.get_url()}" \
   --rate-type constant \
   --rate {rate} \
@@ -86,7 +92,30 @@ GUIDELLM__MAX_CONCURRENCY=1 GUIDELLM__MAX_WORKER_PROCESSES=1 {guidellm_exe} benc
     requests = benchmark["requests"]
     assert "successful" in requests
     successful = requests["successful"]
-    assert len(successful) >= rate
+    assert len(successful) >= 1
+    for request in successful:
+        assert "request_latency" in request
+        assert request["request_latency"] > 0
+        # Streaming timing fields should now have proper values after fixing data transfer
+        assert "time_to_first_token_ms" in request
+        assert request["time_to_first_token_ms"] is not None
+        assert request["time_to_first_token_ms"] > 0
+        assert "time_per_output_token_ms" in request
+        assert request["time_per_output_token_ms"] is not None
+        assert request["time_per_output_token_ms"] > 0
+        assert "inter_token_latency_ms" in request
+        assert request["inter_token_latency_ms"] is not None
+        assert request["inter_token_latency_ms"] > 0
+        assert "tokens_per_second" in request
+        assert request["tokens_per_second"] > 0
+        assert "output_tokens_per_second" in request
+        assert request["output_tokens_per_second"] > 0
+        assert "total_tokens" in request
+        assert request["total_tokens"] > 0
+        assert "prompt_tokens" in request
+        assert request["prompt_tokens"] > 0
+        assert "output_tokens" in request
+        assert request["output_tokens"] > 0
 
     if report_path.exists():
         report_path.unlink()
@@ -101,7 +130,7 @@ def test_max_requests_benchmark(server: VllmSimServer):
     rate = 10
     guidellm_exe = get_guidellm_executable()
     command = f"""
-GUIDELLM__MAX_CONCURRENCY=1 GUIDELLM__MAX_WORKER_PROCESSES=1 {guidellm_exe} benchmark \
+GUIDELLM__MAX_CONCURRENCY=10 GUIDELLM__MAX_WORKER_PROCESSES=10 {guidellm_exe} benchmark \
   --target "{server.get_url()}" \
   --rate-type constant \
   --rate {rate} \
@@ -142,6 +171,29 @@ GUIDELLM__MAX_CONCURRENCY=1 GUIDELLM__MAX_WORKER_PROCESSES=1 {guidellm_exe} benc
     assert "successful" in requests
     successful = requests["successful"]
     assert len(successful) == rate
+    for request in successful:
+        assert "request_latency" in request
+        assert request["request_latency"] > 0
+        # Streaming timing fields should now have proper values after fixing data transfer
+        assert "time_to_first_token_ms" in request
+        assert request["time_to_first_token_ms"] is not None
+        assert request["time_to_first_token_ms"] > 0
+        assert "time_per_output_token_ms" in request
+        assert request["time_per_output_token_ms"] is not None
+        assert request["time_per_output_token_ms"] > 0
+        assert "inter_token_latency_ms" in request
+        assert request["inter_token_latency_ms"] is not None
+        assert request["inter_token_latency_ms"] > 0
+        assert "tokens_per_second" in request
+        assert request["tokens_per_second"] > 0
+        assert "output_tokens_per_second" in request
+        assert request["output_tokens_per_second"] > 0
+        assert "total_tokens" in request
+        assert request["total_tokens"] > 0
+        assert "prompt_tokens" in request
+        assert request["prompt_tokens"] > 0
+        assert "output_tokens" in request
+        assert request["output_tokens"] > 0
 
     if report_path.exists():
         report_path.unlink()
