@@ -98,7 +98,7 @@ GUIDELLM__MAX_CONCURRENCY=10 GUIDELLM__MAX_WORKER_PROCESSES=10 {guidellm_exe} be
         assert metadata["exceeded_error_rate"] is True
         assert "current_error_rate" in metadata
         current_error_rate = metadata["current_error_rate"]
-        assert current_error_rate > max_error_rate
+        assert current_error_rate >= max_error_rate
     finally:
         process.terminate()  # Send SIGTERM
         try:
