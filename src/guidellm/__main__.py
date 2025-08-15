@@ -201,6 +201,33 @@ def benchmark():
     ),
 )
 @click.option(
+    "--max-errors",
+    type=int,
+    default=GenerativeTextScenario.get_default("max_errors"),
+    help=(
+        "The maximum number of errors allowed before stopping the benchmark. "
+        "Defaults to None."
+    ),
+)
+@click.option(
+    "--max-error-rate",
+    type=float,
+    default=GenerativeTextScenario.get_default("max_error_rate"),
+    help=(
+        "The maximum error rate allowed before stopping the benchmark. "
+        "Should be a value between 0 and 1. Defaults to None."
+    ),
+)
+@click.option(
+    "--max-global-error-rate",
+    type=float,
+    default=GenerativeTextScenario.get_default("max_global_error_rate"),
+    help=(
+        "The maximum global error rate allowed before stopping the benchmark. "
+        "Should be a value between 0 and 1. Defaults to None."
+    ),
+)
+@click.option(
     "--disable-progress",
     is_flag=True,
     help="Set this flag to disable progress updates to the console",
@@ -263,6 +290,9 @@ def run(
     max_requests,
     warmup_percent,
     cooldown_percent,
+    max_errors,
+    max_error_rate,
+    max_global_error_rate,
     disable_progress,
     display_scheduler_stats,
     disable_console_outputs,
@@ -290,6 +320,9 @@ def run(
         max_requests=max_requests,
         warmup_percent=warmup_percent,
         cooldown_percent=cooldown_percent,
+        max_errors=max_errors,
+        max_error_rate=max_error_rate,
+        max_global_error_rate=max_global_error_rate,
         output_sampling=output_sampling,
         random_seed=random_seed,
     )

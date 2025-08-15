@@ -2,6 +2,7 @@
 
 import json
 import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -9,6 +10,18 @@ import pytest
 from loguru import logger
 
 from tests.e2e.vllm_sim_server import VllmSimServer
+
+
+def get_guidellm_executable():
+    """Get the path to the guidellm executable in the current environment."""
+    # Get the directory where the current Python executable is located
+    python_bin_dir = Path(sys.executable).parent
+    guidellm_path = python_bin_dir / "guidellm"
+    if guidellm_path.exists():
+        return str(guidellm_path)
+    else:
+        # Fallback to just "guidellm" if not found
+        return "guidellm"
 
 
 @pytest.fixture(scope="module")
@@ -33,13 +46,16 @@ def test_max_error_benchmark(server: VllmSimServer):
     report_path = Path("tests/e2e/max_error_benchmarks.json")
     rate = 10
     max_error_rate = 0.1
-    command = f"""guidellm benchmark \
+    guidellm_exe = get_guidellm_executable()
+    command = f"""
+GUIDELLM__MAX_CONCURRENCY=1 GUIDELLM__MAX_WORKER_PROCESSES=1 {guidellm_exe} benchmark \
   --target "{server.get_url()}" \
   --rate-type constant \
   --rate {rate} \
   --max-seconds 60 \
-  --max-error {max_error_rate} \
+  --max-error-rate {max_error_rate} \
   --data "prompt_tokens=256,output_tokens=128" \
+  --processor "gpt2" \
   --output-path {report_path}
               """
     logger.info(f"Client command: {command}")
@@ -67,17 +83,22 @@ def test_max_error_benchmark(server: VllmSimServer):
         benchmarks = report["benchmarks"]
         assert len(benchmarks) > 0
         benchmark = benchmarks[0]
-        assert "run_stats" in benchmark
-        run_stats = benchmark["run_stats"]
-        assert "status" in run_stats
-        status = run_stats["status"]
-        assert status == "error"
-        assert "termination_reason" in run_stats
-        termination_reason = run_stats["termination_reason"]
-        assert termination_reason == "max_error_reached"
-        assert "window_error_rate" in run_stats
-        window_error_rate = run_stats["window_error_rate"]
-        assert window_error_rate > max_error_rate
+        # Check that the max error rate constraint was triggered
+        assert "scheduler" in benchmark
+        scheduler = benchmark["scheduler"]
+        assert "state" in scheduler
+        state = scheduler["state"]
+        assert "end_processing_constraints" in state
+        constraints = state["end_processing_constraints"]
+        assert "max_error_rate" in constraints
+        max_error_constraint = constraints["max_error_rate"]
+        assert "metadata" in max_error_constraint
+        metadata = max_error_constraint["metadata"]
+        assert "exceeded_error_rate" in metadata
+        assert metadata["exceeded_error_rate"] is True
+        assert "current_error_rate" in metadata
+        current_error_rate = metadata["current_error_rate"]
+        assert current_error_rate > max_error_rate
     finally:
         process.terminate()  # Send SIGTERM
         try:

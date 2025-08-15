@@ -26,6 +26,7 @@ from typing import (
     Literal,
     Optional,
     Protocol,
+    TypeVar,
     Union,
     runtime_checkable,
 )
@@ -58,6 +59,7 @@ from guidellm.scheduler import (
 
 __all__ = [
     "Aggregator",
+    "AggregatorT",
     "CompilableAggregator",
     "GenerativeRequestsAggregator",
     "GenerativeRequestsStatsProgressAggregator",
@@ -97,14 +99,37 @@ class Aggregator(Protocol[ResponseT, RequestT, MeasuredRequestTimingsT]):
         ...
 
 
+AggregatorT = TypeVar("AggregatorT", bound=Aggregator)
+
+
 @runtime_checkable
-class CompilableAggregator(Aggregator[ResponseT, RequestT, MeasuredRequestTimingsT]):
+class CompilableAggregator(Protocol[ResponseT, RequestT, MeasuredRequestTimingsT]):
     """
     Protocol for aggregators that compile final results from aggregated state.
 
     Extends the Aggregator protocol with the ability to transform accumulated
     state into final benchmark results and metrics after execution completes.
     """
+
+    def __call__(
+        self,
+        agg_state: dict[str, Any],
+        response: Optional[ResponseT],
+        request: RequestT,
+        request_info: ScheduledRequestInfo[MeasuredRequestTimingsT],
+        scheduler_state: SchedulerState,
+    ) -> Optional[dict[str, Any]]:
+        """
+        Process a completed request and update aggregation state.
+
+        :param agg_state: Current aggregation state to update in-place.
+        :param response: Response generated for the request, if successful.
+        :param request: The processed request object.
+        :param request_info: Scheduling metadata and timing information.
+        :param scheduler_state: Current scheduler execution state.
+        :return: Optional intermediate updates for progress reporting.
+        """
+        ...
 
     def compile(
         self, agg_state: dict[str, Any], scheduler_state: SchedulerState
@@ -116,6 +141,7 @@ class CompilableAggregator(Aggregator[ResponseT, RequestT, MeasuredRequestTiming
         :param scheduler_state: Final scheduler execution state.
         :return: Compiled benchmark results and metrics.
         """
+        ...
 
 
 def add_aggregate_metric(
@@ -186,7 +212,7 @@ class SchedulerStatsAggregator(
             "worker_resolve_start_delay",
             agg_state,
             request_info.scheduler_timings.resolve_start,
-            request_info.scheduler_timings.scheduled,
+            request_info.scheduler_timings.scheduled_at,
         )
         add_aggregate_metric(
             "worker_resolve_time",
@@ -251,6 +277,11 @@ class SchedulerStatsAggregator(
                     successful=scheduler_state.successful_requests,
                     incomplete=scheduler_state.cancelled_requests,
                     errored=scheduler_state.errored_requests,
+                    total=(
+                        scheduler_state.successful_requests
+                        + scheduler_state.cancelled_requests
+                        + scheduler_state.errored_requests
+                    ),
                 ),
                 queued_time_avg=(
                     agg_state.get("queued_time_total", 0.0)
@@ -323,6 +354,37 @@ class GenerativeRequestsStatsProgressAggregator(
         if response is None:
             return None
 
+        # COMPREHENSIVE LIST HANDLING for GenerativeRequestsStatsProgressAggregator
+        from guidellm import logger
+
+        if isinstance(response, list) and len(response) > 0:
+            logger.info(
+                f"GenerativeRequestsStatsProgressAggregator: Response is a list with {len(response)} items, extracting GenerationResponse"
+            )
+            extracted_response = None
+
+            for item in response:
+                # Look for the GenerationResponse object in the list
+                if (
+                    hasattr(item, "request_id")
+                    and hasattr(item, "value")
+                    and hasattr(item, "iterations")
+                ):
+                    extracted_response = item
+                    logger.info(
+                        "GenerativeRequestsStatsProgressAggregator: Successfully extracted GenerationResponse from list"
+                    )
+                    break
+
+            if extracted_response is not None:
+                response = extracted_response
+            else:
+                logger.warning(
+                    "GenerativeRequestsStatsProgressAggregator: No valid GenerationResponse found in list, setting to None"
+                )
+                response = None
+                return None
+
         if (
             request_info.status == "completed"
             and request_info.request_timings.request_end is not None
@@ -339,8 +401,12 @@ class GenerativeRequestsStatsProgressAggregator(
 
         if (
             request_info.status == "completed"
+            and hasattr(request_info.request_timings, "first_iteration")
             and request_info.request_timings.first_iteration is not None
+            and hasattr(request_info.request_timings, "last_iteration")
             and request_info.request_timings.last_iteration is not None
+            and response is not None
+            and hasattr(response, "output_tokens")
             and response.output_tokens
         ):
             add_aggregate_metric(
@@ -352,7 +418,8 @@ class GenerativeRequestsStatsProgressAggregator(
             )
 
         if (
-            request_info.request_timings.first_iteration is not None
+            hasattr(request_info.request_timings, "first_iteration")
+            and request_info.request_timings.first_iteration is not None
             and request_info.request_timings.request_start is not None
         ):
             add_aggregate_metric(
@@ -363,8 +430,12 @@ class GenerativeRequestsStatsProgressAggregator(
             )
 
         if (
-            request_info.request_timings.first_iteration is not None
+            hasattr(request_info.request_timings, "first_iteration")
+            and request_info.request_timings.first_iteration is not None
+            and hasattr(request_info.request_timings, "last_iteration")
             and request_info.request_timings.last_iteration is not None
+            and response is not None
+            and hasattr(response, "output_tokens")
             and response.output_tokens is not None
             and response.output_tokens > 1
         ):
@@ -376,7 +447,23 @@ class GenerativeRequestsStatsProgressAggregator(
                 count=response.output_tokens - 1,
             )
 
-        if response.prompt_tokens is not None:
+        # Additional list check right before the error point
+        if isinstance(response, list):
+            logger.info(f"CAUGHT LIST at line 421: {len(response)} items")
+            for item in response:
+                if (
+                    hasattr(item, "request_id")
+                    and hasattr(item, "value")
+                    and hasattr(item, "iterations")
+                ):
+                    response = item
+                    logger.info("Extracted response from list at line 421")
+                    break
+            else:
+                response = None
+                logger.warning("No valid response found in list at line 421")
+
+        if response is not None and response.prompt_tokens is not None:
             add_aggregate_metric(
                 "prompt_tokens",
                 agg_state,
@@ -390,7 +477,7 @@ class GenerativeRequestsStatsProgressAggregator(
                     - scheduler_state.start_time
                 )
 
-        if response.output_tokens is not None:
+        if response is not None and response.output_tokens is not None:
             add_aggregate_metric(
                 "output_tokens",
                 agg_state,
@@ -404,7 +491,7 @@ class GenerativeRequestsStatsProgressAggregator(
                     - scheduler_state.start_time
                 )
 
-        if response.total_tokens is not None:
+        if response is not None and response.total_tokens is not None:
             add_aggregate_metric(
                 "total_tokens",
                 agg_state,
@@ -421,12 +508,7 @@ class GenerativeRequestsStatsProgressAggregator(
         return agg_state
 
 
-class GenerativeRequestsAggregator(
-    StandardBaseModel,
-    CompilableAggregator[
-        GenerationResponse, GenerationRequest, GenerationRequestTimings
-    ],
-):
+class GenerativeRequestsAggregator(StandardBaseModel):
     """
     Compiles complete generative benchmark results with warmup/cooldown filtering.
 
@@ -462,6 +544,34 @@ class GenerativeRequestsAggregator(
         request_info: ScheduledRequestInfo[GenerationRequestTimings],
         scheduler_state: SchedulerState,
     ) -> Optional[dict[str, Any]]:
+        from guidellm import logger
+
+        # COMPREHENSIVE LIST HANDLING: Handle when response is a list containing valid data
+        if isinstance(response, list) and len(response) > 0:
+            logger.info(
+                f"Response is a list with {len(response)} items, extracting GenerationResponse"
+            )
+            extracted_response = None
+
+            for item in response:
+                # Look for the GenerationResponse object in the list
+                if (
+                    hasattr(item, "request_id")
+                    and hasattr(item, "value")
+                    and hasattr(item, "iterations")
+                ):
+                    extracted_response = item
+                    logger.info("Successfully extracted GenerationResponse from list")
+                    break
+
+            if extracted_response is not None:
+                response = extracted_response
+            else:
+                logger.warning(
+                    "No valid GenerationResponse found in list, setting to None"
+                )
+                response = None
+
         """
         Collect completed requests for final compilation.
 
@@ -555,7 +665,7 @@ class GenerativeRequestsAggregator(
             for (response, request, request_info) in agg_state.get("errored", [])
         ]
         total: list[GenerativeRequestStats] = successful + incomplete + errored
-        total_types = list[Literal["successful", "incomplete", "error"]] = [
+        total_types: list[Literal["successful", "incomplete", "error"]] = [
             *["successful"] * len(successful),
             *["incomplete"] * len(incomplete),
             *["error"] * len(errored),
@@ -594,7 +704,16 @@ class GenerativeRequestsAggregator(
             "metrics": GenerativeMetrics(
                 requests_per_second=(
                     StatusDistributionSummary.from_request_times(
-                        request_types=total_types,
+                        request_types=[
+                            req_type
+                            for req_type, req in zip(total_types, total)
+                            if (
+                                req.scheduler_info.request_timings.request_start
+                                is not None
+                                and req.scheduler_info.request_timings.request_end
+                                is not None
+                            )
+                        ],
                         requests=[
                             (
                                 req.scheduler_info.request_timings.request_start,
@@ -613,7 +732,16 @@ class GenerativeRequestsAggregator(
                 ),
                 request_concurrency=(
                     StatusDistributionSummary.from_request_times(
-                        request_types=total_types,
+                        request_types=[
+                            req_type
+                            for req_type, req in zip(total_types, total)
+                            if (
+                                req.scheduler_info.request_timings.request_start
+                                is not None
+                                and req.scheduler_info.request_timings.request_end
+                                is not None
+                            )
+                        ],
                         requests=[
                             (
                                 req.scheduler_info.request_timings.request_start,
@@ -632,7 +760,11 @@ class GenerativeRequestsAggregator(
                 ),
                 request_latency=(
                     StatusDistributionSummary.from_values(
-                        value_types=total_types,
+                        value_types=[
+                            type_
+                            for type_, req in zip(total_types, total)
+                            if req.request_latency is not None
+                        ],
                         values=[
                             req.request_latency
                             for req in total
@@ -676,12 +808,12 @@ class GenerativeRequestsAggregator(
                             if req.prompt_tokens is not None
                             or req.output_tokens is not None
                         ],
-                        values=(
+                        values=[
                             (req.prompt_tokens or 0) + (req.output_tokens or 0)
                             for req in total
                             if req.prompt_tokens is not None
                             or req.output_tokens is not None
-                        ),
+                        ],
                     )
                 ),
                 time_to_first_token_ms=(
@@ -742,6 +874,12 @@ class GenerativeRequestsAggregator(
                             type_
                             for type_, req in zip(total_types, total)
                             if req.output_tokens_per_second is not None
+                            and req.output_tokens is not None
+                            and hasattr(
+                                req.scheduler_info.request_timings, "first_iteration"
+                            )
+                            and req.scheduler_info.request_timings.first_iteration
+                            is not None
                         ],
                         requests=[
                             (
@@ -750,11 +888,21 @@ class GenerativeRequestsAggregator(
                             )
                             for req in total
                             if req.output_tokens_per_second is not None
+                            and req.output_tokens is not None
+                            and hasattr(
+                                req.scheduler_info.request_timings, "first_iteration"
+                            )
+                            and req.scheduler_info.request_timings.first_iteration
+                            is not None
                         ],
                         first_iter_times=[
                             req.scheduler_info.request_timings.first_iteration
                             for req in total
                             if req.output_tokens_per_second is not None
+                            and req.output_tokens is not None
+                            and hasattr(
+                                req.scheduler_info.request_timings, "first_iteration"
+                            )
                             and req.scheduler_info.request_timings.first_iteration
                             is not None
                         ],
@@ -763,6 +911,22 @@ class GenerativeRequestsAggregator(
                             for req in total
                             if req.output_tokens_per_second is not None
                             and req.output_tokens is not None
+                            and hasattr(
+                                req.scheduler_info.request_timings, "first_iteration"
+                            )
+                            and req.scheduler_info.request_timings.first_iteration
+                            is not None
+                        ],
+                        first_iter_counts=[
+                            1  # Each request has 1 first iteration count
+                            for req in total
+                            if req.output_tokens_per_second is not None
+                            and req.output_tokens is not None
+                            and hasattr(
+                                req.scheduler_info.request_timings, "first_iteration"
+                            )
+                            and req.scheduler_info.request_timings.first_iteration
+                            is not None
                         ],
                     )
                 ),
@@ -772,6 +936,11 @@ class GenerativeRequestsAggregator(
                             type_
                             for type_, req in zip(total_types, total)
                             if req.tokens_per_second is not None
+                            and hasattr(
+                                req.scheduler_info.request_timings, "first_iteration"
+                            )
+                            and req.scheduler_info.request_timings.first_iteration
+                            is not None
                         ],
                         requests=[
                             (
@@ -780,21 +949,41 @@ class GenerativeRequestsAggregator(
                             )
                             for req in total
                             if req.tokens_per_second is not None
+                            and hasattr(
+                                req.scheduler_info.request_timings, "first_iteration"
+                            )
+                            and req.scheduler_info.request_timings.first_iteration
+                            is not None
                         ],
                         first_iter_times=[
                             req.scheduler_info.request_timings.first_iteration
                             for req in total
                             if req.tokens_per_second is not None
+                            and hasattr(
+                                req.scheduler_info.request_timings, "first_iteration"
+                            )
+                            and req.scheduler_info.request_timings.first_iteration
+                            is not None
                         ],
                         iter_counts=[
                             req.output_tokens
                             for req in total
                             if req.tokens_per_second is not None
+                            and hasattr(
+                                req.scheduler_info.request_timings, "first_iteration"
+                            )
+                            and req.scheduler_info.request_timings.first_iteration
+                            is not None
                         ],
                         first_iter_counts=[
                             req.prompt_tokens
                             for req in total
                             if req.tokens_per_second is not None
+                            and hasattr(
+                                req.scheduler_info.request_timings, "first_iteration"
+                            )
+                            and req.scheduler_info.request_timings.first_iteration
+                            is not None
                         ],
                     )
                 ),
@@ -808,6 +997,32 @@ class GenerativeRequestsAggregator(
         request: GenerationRequest,
         request_info: ScheduledRequestInfo[GenerationRequestTimings],
     ) -> GenerativeRequestStats:
+        # Handle case where response might be a list containing the actual response
+        if isinstance(response, list) and len(response) > 0:
+            from guidellm import logger
+
+            logger.debug(
+                "_create_generate_stats: Response is a list, extracting GenerationResponse"
+            )
+
+            # Find the actual GenerationResponse in the list
+            for item in response:
+                if hasattr(item, "preferred_prompt_tokens") and hasattr(
+                    item, "preferred_output_tokens"
+                ):
+                    response = item
+                    logger.debug(
+                        "_create_generate_stats: Found GenerationResponse in list"
+                    )
+                    break
+            else:
+                logger.error(
+                    f"_create_generate_stats: No valid GenerationResponse found in list: {[type(item) for item in response]}"
+                )
+                raise ValueError(
+                    f"Invalid response list structure: {[type(item) for item in response]}"
+                )
+
         prompt_tokens = response.preferred_prompt_tokens(
             settings.preferred_prompt_tokens_source
         )

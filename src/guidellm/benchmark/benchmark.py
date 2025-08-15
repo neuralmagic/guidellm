@@ -24,7 +24,16 @@ Type Variables:
 import json
 import uuid
 from pathlib import Path
-from typing import Any, ClassVar, Generic, Literal, Optional, TypedDict, TypeVar, Union
+from typing import (
+    Annotated,
+    Any,
+    ClassVar,
+    Generic,
+    Literal,
+    Optional,
+    TypeVar,
+    Union,
+)
 
 import yaml
 from pydantic import Field, computed_field
@@ -33,7 +42,6 @@ from guidellm.backend import GenerationRequestTimings
 from guidellm.benchmark.profile import (
     AsyncProfile,
     ConcurrentProfile,
-    Profile,
     SweepProfile,
     SynchronousProfile,
     ThroughputProfile,
@@ -49,7 +57,6 @@ from guidellm.scheduler import (
     ConcurrentStrategy,
     ScheduledRequestInfo,
     SchedulerState,
-    SchedulingStrategy,
     SynchronousStrategy,
     ThroughputStrategy,
 )
@@ -103,36 +110,50 @@ class BenchmarkSchedulerStats(StandardBaseModel):
     )
 
 
-class SchedulerDict(TypedDict, total=False):
+class SchedulerDict(StandardBaseModel):
     """Scheduler configuration and execution state dictionary."""
 
-    strategy: Union[
-        AsyncConstantStrategy,
-        AsyncPoissonStrategy,
-        ConcurrentStrategy,
-        SynchronousStrategy,
-        ThroughputStrategy,
-        SchedulingStrategy,
-    ]
-    constraints: dict[str, dict[str, Any]]
-    state: SchedulerState
+    strategy: Annotated[
+        Union[
+            AsyncConstantStrategy,
+            AsyncPoissonStrategy,
+            ConcurrentStrategy,
+            SynchronousStrategy,
+            ThroughputStrategy,
+        ],
+        Field(discriminator="type_"),
+    ] = Field(description="Scheduling strategy configuration")
+    constraints: dict[str, dict[str, Any]] = Field(
+        default_factory=dict, description="Strategy execution constraints"
+    )
+    state: SchedulerState = Field(description="Scheduler execution state")
 
 
-class BenchmarkerDict(TypedDict, total=False):
+class BenchmarkerDict(StandardBaseModel):
     """Benchmarker configuration and component settings dictionary."""
 
-    profile: Union[
-        AsyncProfile,
-        ConcurrentProfile,
-        SynchronousProfile,
-        ThroughputProfile,
-        SweepProfile,
-        Profile,
-    ]
-    requests: dict[str, Any]
-    backend: dict[str, Any]
-    environment: dict[str, Any]
-    aggregators: dict[str, dict[str, Any]]
+    profile: Annotated[
+        Union[
+            AsyncProfile,
+            ConcurrentProfile,
+            SynchronousProfile,
+            ThroughputProfile,
+            SweepProfile,
+        ],
+        Field(discriminator="type_"),
+    ] = Field(description="Benchmarking profile configuration")
+    requests: dict[str, Any] = Field(
+        default_factory=dict, description="Request loader configuration"
+    )
+    backend: dict[str, Any] = Field(
+        default_factory=dict, description="Backend configuration"
+    )
+    environment: dict[str, Any] = Field(
+        default_factory=dict, description="Environment configuration"
+    )
+    aggregators: dict[str, dict[str, Any]] = Field(
+        default_factory=dict, description="Aggregator configurations"
+    )
 
 
 class BenchmarkMetrics(StandardBaseModel):

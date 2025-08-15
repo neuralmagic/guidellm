@@ -29,7 +29,7 @@ from guidellm.benchmark.aggregator import Aggregator, CompilableAggregator
 from guidellm.benchmark.benchmark import BenchmarkT
 from guidellm.benchmark.profile import Profile
 from guidellm.scheduler import (
-    BackendT,
+    BackendInterface,
     Constraint,
     Environment,
     MeasuredRequestTimingsT,
@@ -65,7 +65,7 @@ class Benchmarker(
         requests: Iterable[
             Union[RequestT, Iterable[Union[RequestT, tuple[RequestT, float]]]]
         ],
-        backend: BackendT[RequestT, MeasuredRequestTimingsT, ResponseT],
+        backend: BackendInterface[RequestT, MeasuredRequestTimingsT, ResponseT],
         profile: Profile,
         environment: Environment,
         benchmark_aggregators: dict[
@@ -114,9 +114,7 @@ class Benchmarker(
                     request,
                     request_info,
                     scheduler_state,
-                ) in Scheduler[
-                    BackendT, RequestT, MeasuredRequestTimingsT, ResponseT
-                ].run(
+                ) in Scheduler().run(
                     requests=requests,
                     backend=backend,
                     strategy=strategy,
@@ -152,7 +150,11 @@ class Benchmarker(
                 benchmark = benchmark_class(**benchmark_kwargs)
                 yield {}, benchmark, strategy, None
 
-                strategy, constraints = strategies_generator.send(benchmark)
+                try:
+                    strategy, constraints = strategies_generator.send(benchmark)
+                except StopIteration:
+                    # No more strategies, exit the loop
+                    strategy = None
 
     @classmethod
     def _compile_benchmark_kwargs(
@@ -163,7 +165,7 @@ class Benchmarker(
         requests: Iterable[
             Union[RequestT, Iterable[Union[RequestT, tuple[RequestT, float]]]]
         ],
-        backend: BackendT[RequestT, MeasuredRequestTimingsT, ResponseT],
+        backend: BackendInterface[RequestT, MeasuredRequestTimingsT, ResponseT],
         environment: Environment,
         aggregators: dict[
             str,
@@ -197,13 +199,36 @@ class Benchmarker(
         :return: Dictionary of parameters for benchmark object construction.
         :raises ValueError: If aggregator output conflicts with existing keys.
         """
+        from guidellm import logger
+
+        logger.debug(
+            f"_compile_benchmark_kwargs called with constraints type: {type(constraints)}"
+        )
+        logger.debug(f"constraints content: {constraints}")
+        logger.debug(f"constraints has items method: {hasattr(constraints, 'items')}")
+
+        constraints_items = (
+            constraints.items() if hasattr(constraints, "items") else constraints
+        )
+        logger.debug(f"constraints_items type: {type(constraints_items)}")
+
+        try:
+            constraints_list = list(constraints_items)
+            logger.debug(f"constraints_list: {constraints_list}")
+            logger.debug(
+                f"Sample constraint item: {constraints_list[0] if constraints_list else 'No items'}"
+            )
+        except Exception as e:
+            logger.error(f"Error converting constraints to list: {e}")
+
         benchmark_kwargs = {
             "run_id": run_id,
             "run_index": run_index,
             "scheduler": {
                 "strategy": strategy,
                 "constraints": {
-                    key: InfoMixin.extract_from_obj(val) for key, val in constraints
+                    key: InfoMixin.extract_from_obj(val)
+                    for key, val in constraints_items
                 },
                 "state": scheduler_state,
             },
@@ -217,26 +242,23 @@ class Benchmarker(
                     for key, aggregator in aggregators.items()
                 },
             },
+            "env_args": {},  # Environment arguments - empty for now
             "system": {},
             "extras": {},
         }
+
         for key, aggregator in aggregators.items():
             if not isinstance(aggregator, CompilableAggregator):
                 continue
 
-            compiled = aggregator.compile(aggregators_state[key])
+            compiled = aggregator.compile(aggregators_state[key], scheduler_state)
 
-            if key not in benchmark_kwargs:
-                benchmark_kwargs[key] = compiled
-                continue
+            # Handle key mapping for scheduler_stats -> run_stats
+            if key == "scheduler_stats" and "scheduler_stats" in compiled:
+                compiled["run_stats"] = compiled.pop("scheduler_stats")
 
-            existing_val = benchmark_kwargs[key]
-            if not (isinstance(existing_val, dict) and isinstance(compiled, dict)):
-                raise ValueError(
-                    f"Key '{key}' already exists with value {existing_val} "
-                    f"(type: {type(existing_val).__name__}) and cannot be "
-                    f"overwritten with {compiled} (type: {type(compiled).__name__})"
-                )
-            existing_val.update(compiled)
+            # Flatten aggregator results into top-level benchmark_kwargs
+            for field_key, field_value in compiled.items():
+                benchmark_kwargs[field_key] = field_value
 
         return benchmark_kwargs

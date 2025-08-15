@@ -11,20 +11,16 @@ from transformers import (  # type: ignore[import]
 from guidellm.backend import (
     Backend,
     BackendType,
-    GenerationRequest,
-    GenerationRequestTimings,
-    GenerationResponse,
 )
 from guidellm.benchmark.aggregator import (
     GenerativeRequestsAggregator,
     GenerativeRequestsStatsProgressAggregator,
     SchedulerStatsAggregator,
 )
-from guidellm.benchmark.benchmark import GenerativeBenchmark
+from guidellm.benchmark.benchmark import GenerativeBenchmark, GenerativeBenchmarksReport
 from guidellm.benchmark.benchmarker import Benchmarker
 from guidellm.benchmark.output import (
-    GenerativeBenchmarksConsole,
-    GenerativeBenchmarksReport,
+    GenerativeBenchmarkerConsole,
 )
 from guidellm.benchmark.profile import Profile, ProfileType
 from guidellm.benchmark.progress import (
@@ -50,12 +46,30 @@ async def benchmark_with_scenario(scenario: Scenario, **kwargs):
     """
 
     if isinstance(scenario, GenerativeTextScenario):
-        return await benchmark_generative_text(**vars(scenario), **kwargs)
+        # Extract and handle special kwargs that need to be translated
+        show_progress = kwargs.pop("show_progress", True)
+        show_progress_scheduler_stats = kwargs.pop(
+            "show_progress_scheduler_stats", False
+        )
+
+        # Convert show_progress to the progress parameter
+        if show_progress:
+            progress = [
+                GenerativeConsoleBenchmarkerProgress(
+                    enabled=True, display_scheduler_stats=show_progress_scheduler_stats
+                )
+            ]
+        else:
+            progress = None
+
+        return await benchmark_generative_text(
+            **vars(scenario), progress=progress, **kwargs
+        )
     else:
         raise ValueError(f"Unsupported Scenario type {type(scenario)}")
 
 
-@validate_call
+@validate_call(config={"arbitrary_types_allowed": True})
 async def benchmark_generative_text(
     target: str,
     backend_type: BackendType,
@@ -92,7 +106,7 @@ async def benchmark_generative_text(
     ),
     output_console: bool = True,
 ) -> tuple[GenerativeBenchmarksReport, Optional[Path]]:
-    console = GenerativeBenchmarksConsole(enabled=progress is not None)
+    console = GenerativeBenchmarkerConsole()
     backend = Backend.create(
         backend_type, target=target, model=model, **(backend_args or {})
     )
@@ -122,8 +136,8 @@ async def benchmark_generative_text(
         constraints={
             key: val
             for key, val in {
-                "max_requests": max_requests,
-                "max_seconds": max_seconds,
+                "max_number": max_requests,
+                "max_duration": max_seconds,
                 "max_errors": max_errors,
                 "max_error_rate": max_error_rate,
                 "max_global_error_rate": max_global_error_rate,
@@ -167,12 +181,7 @@ async def benchmark_generative_text(
         _scheduler_state,
     ) in progress_group(
         profile,
-        Benchmarker[
-            GenerativeBenchmark,
-            GenerationRequest,
-            GenerationRequestTimings,
-            GenerationResponse,
-        ].run(
+        Benchmarker().run(
             requests=request_loader,
             backend=backend,
             profile=profile,
@@ -206,7 +215,7 @@ def reimport_benchmarks_report(file: Path, output_path: Optional[Path]) -> None:
     existing benchmarks report. Can also specify
     Assumes the file provided exists.
     """
-    console = GenerativeBenchmarksConsole(enabled=True)
+    console = GenerativeBenchmarkerConsole()
     report = GenerativeBenchmarksReport.load_file(file)
     console.benchmarks = report.benchmarks
     console.print_full_report()

@@ -17,14 +17,29 @@ Type Aliases:
     ProfileType: Literal type for supported profile configurations.
 """
 
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from collections.abc import Generator
-from typing import Any, Generic, Literal, Optional, Union
+from typing import (
+    TYPE_CHECKING,
+    Annotated,
+    Any,
+    Generic,
+    Literal,
+    Optional,
+    TypeVar,
+    Union,
+)
 
 import numpy as np
-from pydantic import Field, computed_field
+from pydantic import ConfigDict, Field, computed_field, field_validator
 
-from guidellm.benchmark.benchmark import BenchmarkT
+if TYPE_CHECKING:
+    from guidellm.benchmark.benchmark import Benchmark
+
+# Create a TypeVar for the benchmark type to avoid circular imports
+BenchmarkT = TypeVar("BenchmarkT", bound="Benchmark")
 from guidellm.objects import StandardBaseModel
 from guidellm.scheduler import (
     AsyncConstantStrategy,
@@ -33,7 +48,6 @@ from guidellm.scheduler import (
     Constraint,
     ConstraintInitializer,
     ConstraintsInitializerFactory,
-    SchedulingStrategy,
     StrategyT,
     StrategyType,
     SynchronousStrategy,
@@ -56,9 +70,9 @@ ProfileType = Literal["synchronous", "concurrent", "throughput", "async", "sweep
 
 class Profile(
     StandardBaseModel,
-    ABC,
     Generic[StrategyT, BenchmarkT],
-    RegistryMixin,
+    RegistryMixin["type[Profile]"],
+    ABC,
 ):
     """
     Abstract base for multi-strategy benchmarking execution profiles.
@@ -68,6 +82,8 @@ class Profile(
     comprehensive benchmarking workflows.
     """
 
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     @classmethod
     def create(
         cls,
@@ -75,7 +91,7 @@ class Profile(
         rate: Optional[Union[float, int, list[float, int]]],
         random_seed: int,
         **kwargs: Any,
-    ) -> "Profile":
+    ) -> Profile:
         """
         Create a profile instance based on the specified type.
 
@@ -116,7 +132,18 @@ class Profile(
     type_: Literal["profile"] = Field(
         description="The type of benchmarking profile to use",
     )
-    completed_strategies: list[SchedulingStrategy] = Field(
+    completed_strategies: list[
+        Annotated[
+            Union[
+                AsyncConstantStrategy,
+                AsyncPoissonStrategy,
+                ConcurrentStrategy,
+                SynchronousStrategy,
+                ThroughputStrategy,
+            ],
+            Field(discriminator="type_"),
+        ]
+    ] = Field(
         default_factory=list,
         description="The strategies that have completed execution",
     )
@@ -262,7 +289,6 @@ class ConcurrentProfile(Profile[StrategyT, BenchmarkT]):
     type_: Literal["concurrent"] = "concurrent"  # type: ignore[assignment]
     streams: Union[int, list[int]] = Field(
         description="Number of concurrent streams for request scheduling",
-        gt=0,
     )
     startup_duration: float = Field(
         default=0.0,
@@ -272,6 +298,18 @@ class ConcurrentProfile(Profile[StrategyT, BenchmarkT]):
         ),
         ge=0,
     )
+
+    @field_validator("streams")
+    @classmethod
+    def validate_streams(cls, v):
+        """Validate that all stream values are positive."""
+        if isinstance(v, list):
+            for stream in v:
+                if stream <= 0:
+                    raise ValueError("All stream values must be greater than 0")
+        elif v <= 0:
+            raise ValueError("Stream value must be greater than 0")
+        return v
 
     @classmethod
     def resolve_args(
@@ -393,19 +431,17 @@ class ThroughputProfile(Profile[StrategyT, BenchmarkT]):
         )
 
 
-@Profile.register(["async", "constant", "poisson"])
 class AsyncProfile(Profile[StrategyT, BenchmarkT]):
     """
     Rate-based asynchronous strategy execution profile with configurable patterns.
     """
 
-    type_: Literal["async"] = "async"  # type: ignore[assignment]
+    type_: Literal["async", "constant", "poisson"] = "async"  # type: ignore[assignment]
     strategy_type: Literal["constant", "poisson"] = Field(
         description="Type of asynchronous strategy pattern to use",
     )
     rate: Union[float, list[float]] = Field(
         description="Request scheduling rate in requests per second",
-        gt=0,
     )
     startup_duration: float = Field(
         default=0.0,
@@ -415,6 +451,19 @@ class AsyncProfile(Profile[StrategyT, BenchmarkT]):
         ),
         ge=0,
     )
+
+    @field_validator("rate")
+    @classmethod
+    def validate_rate(cls, v):
+        """Validate that all rate values are positive."""
+        if isinstance(v, list):
+            for rate in v:
+                if rate <= 0:
+                    raise ValueError("All rate values must be greater than 0")
+        elif v <= 0:
+            raise ValueError("Rate value must be greater than 0")
+        return v
+
     max_concurrency: Optional[int] = Field(
         default=None,
         description="Maximum number of concurrent requests to schedule",
@@ -450,6 +499,10 @@ class AsyncProfile(Profile[StrategyT, BenchmarkT]):
             rate_type
             if rate_type in ["constant", "poisson"]
             else kwargs.get("strategy_type", "constant")
+        )
+        # Set the type_ field to match the rate_type for proper serialization
+        kwargs["type_"] = (
+            rate_type if rate_type in ["constant", "poisson", "async"] else "async"
         )
         kwargs["rate"] = rate
         kwargs["random_seed"] = random_seed
@@ -497,6 +550,12 @@ class AsyncProfile(Profile[StrategyT, BenchmarkT]):
             )
         else:
             raise ValueError(f"Invalid strategy type: {self.strategy_type}")
+
+
+# Register AsyncProfile with multiple names
+Profile.register("async")(AsyncProfile)
+Profile.register("constant")(AsyncProfile)
+Profile.register("poisson")(AsyncProfile)
 
 
 @Profile.register("sweep")

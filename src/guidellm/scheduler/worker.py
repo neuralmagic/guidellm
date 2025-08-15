@@ -22,6 +22,7 @@ from typing import Generic, Literal
 
 import culsans
 
+from guidellm import logger
 from guidellm.scheduler.objects import (
     BackendInterface,
     MeasuredRequestTimingsT,
@@ -135,6 +136,16 @@ class WorkerProcess(Generic[RequestT, MeasuredRequestTimingsT, ResponseT]):
             asyncio.run(self.run_async())
         except Exception as exc:
             self.error_event.set()
+            # Print detailed error information to help with debugging
+            import traceback
+
+            logger.error(
+                f"WORKER ERROR: Worker process {self.local_rank} error details:"
+            )
+            logger.error(f"Exception type: {type(exc).__name__}")
+            logger.error(f"Exception message: {str(exc)}")
+            logger.error("Full traceback:")
+            traceback.print_exc()
             raise RuntimeError(
                 f"Worker process {self.local_rank} encountered an error: {exc}"
             ) from exc
@@ -235,16 +246,37 @@ class WorkerProcess(Generic[RequestT, MeasuredRequestTimingsT, ResponseT]):
 
     async def _initialize_requests_processing(self):
         # Ensure backend is ready on this worker
-        await self.backend.process_startup()
-        await self.backend.validate()
+        try:
+            logger.debug(
+                f"WORKER {self.local_rank}: Starting backend process_startup..."
+            )
+            await self.backend.process_startup()
+            logger.debug(
+                f"WORKER {self.local_rank}: process_startup completed, starting validate..."
+            )
+            await self.backend.validate()
+            logger.debug(
+                f"WORKER {self.local_rank}: Backend validation completed successfully"
+            )
+        except Exception as e:
+            logger.error(f"WORKER {self.local_rank}: Backend initialization failed!")
+            logger.error(f"Error type: {type(e).__name__}")
+            logger.error(f"Error message: {str(e)}")
+            import traceback
+
+            traceback.print_exc()
+            self.error_event.set()
+            raise
 
         # Setup local queues
+        logger.debug(f"WORKER {self.local_rank}: Setting up local queues...")
         self.pending_requests_queue = culsans.Queue(
             maxsize=self.max_requests_queue_buffer
         )
         self.pending_updates_queue = culsans.Queue()
         self.requests_canceled = ThreadingEvent()
         self.pull_requests_stopped = ThreadingEvent()
+        logger.debug(f"WORKER {self.local_rank}: Local queues setup completed")
 
         # Start background tasks for queue management
         self.pull_task = asyncio.create_task(
@@ -262,10 +294,14 @@ class WorkerProcess(Generic[RequestT, MeasuredRequestTimingsT, ResponseT]):
 
     async def _start_ready_requests_processing(self):
         # Wait for all processes to be ready
+        logger.debug(f"WORKER {self.local_rank}: Waiting at startup barrier...")
         barrier_exit_reason, _ = await synchronous_to_exitable_async(
             synchronous=None,
             exit_barrier=self.startup_barrier,
             poll_interval=self.poll_intervals,
+        )
+        logger.debug(
+            f"WORKER {self.local_rank}: Startup barrier result: {barrier_exit_reason}"
         )
 
         if barrier_exit_reason not in ["barrier", "canceled"]:
@@ -277,6 +313,7 @@ class WorkerProcess(Generic[RequestT, MeasuredRequestTimingsT, ResponseT]):
         self.startup_completed = True
 
     async def _loop_requests_processing(self):
+        logger.debug(f"WORKER {self.local_rank}: Starting request processing loop...")
         async_semaphore = asyncio.Semaphore(self.async_limit)
         pending_tasks = set()
 
@@ -289,8 +326,13 @@ class WorkerProcess(Generic[RequestT, MeasuredRequestTimingsT, ResponseT]):
 
         try:
             # Main loop; loop until canceled
+            logger.debug(f"WORKER {self.local_rank}: Entering main processing loop...")
             while True:
+                logger.debug(f"WORKER {self.local_rank}: Waiting for semaphore...")
                 await async_semaphore.acquire()
+                logger.debug(
+                    f"WORKER {self.local_rank}: Acquired semaphore, processing request..."
+                )
                 request_task = asyncio.create_task(self._process_next_request())
                 pending_tasks.add(request_task)
                 request_task.add_done_callback(_task_done)
@@ -337,13 +379,18 @@ class WorkerProcess(Generic[RequestT, MeasuredRequestTimingsT, ResponseT]):
         self.requests_canceled = None
 
     async def _process_next_request(self):
+        logger.debug(f"WORKER {self.local_rank}: _process_next_request starting...")
         request: RequestT | MultiTurnRequestT[RequestT] | None = None
         request_info: ScheduledRequestInfo[MeasuredRequestTimingsT] | None = None
         response: ResponseT | None = None
 
         try:
             # get next request to send
+            logger.debug(
+                f"WORKER {self.local_rank}: Getting next request from queue..."
+            )
             request, request_info = await self.pending_requests_queue.async_get()
+            logger.debug(f"WORKER {self.local_rank}: Got request, processing...")
             current_time = time.time()
             request_info.scheduler_timings.dequeued = current_time
             await self._handle_request_update(

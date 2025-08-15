@@ -68,9 +68,9 @@ class BenchmarkerProgress(Generic[BenchmarkT], ABC):
 
         :param enabled: Whether to enable progress tracking and display.
         """
-        self.enabled = enabled
         self.profile: Profile = None
         self.current_strategy: SchedulingStrategy = None
+        self.enabled = enabled
 
     @property
     def enabled(self) -> bool:
@@ -367,8 +367,9 @@ class GenerativeConsoleBenchmarkerProgress(
         :param enabled: Whether to enable progress tracking and display.
         :param display_scheduler_stats: Whether to display scheduler statistics.
         """
-        super(BenchmarkerProgress, self).__init__(enabled=enabled)
-        super(Live, self).__init__(
+        BenchmarkerProgress.__init__(self, enabled=enabled)
+        Live.__init__(
+            self,
             refresh_per_second=4,
             auto_refresh=True,
             redirect_stdout=True,
@@ -524,6 +525,10 @@ class _GenerativeProgressTasks(Progress):
         )
         progress_total = self.current_index + (progress_current_task or 0)
 
+        # Ensure progress_total is never None to prevent multiplication errors
+        if progress_total is None:
+            progress_total = 0
+
         return progress_total * _PROGRESS_SCALE
 
     def start_benchmark(self, strategy: SchedulingStrategy):
@@ -566,8 +571,8 @@ class _GenerativeProgressTasks(Progress):
 
 @dataclass
 class _GenerativeProgressTaskState:
-    task_id: TaskID = None
     strategy_type: StrategyType
+    task_id: TaskID = None
     strategy: SchedulingStrategy | None = None
     benchmark_status: Literal[
         "pending", "in_warmup", "in_progress", "in_cooldown", "completed"
@@ -599,23 +604,27 @@ class _GenerativeProgressTaskState:
             "requests_summary": self.formatted_requests_summary,
             "tokens_summary": self.formatted_tokens_summary,
             "scheduler_stats": self.formatted_scheduler_stats,
-            "completed": None,
-            "total": None,
+            "completed": self.completed,
+            "total": self.total,
         }
 
     @property
-    def completed(self) -> float | None:
+    def completed(self) -> float:
         if self.benchmark_status == "pending":
-            return None
+            return 0.0
 
         if self.benchmark_status == "completed":
             return _PROGRESS_SCALE
 
-        return self.progress * _PROGRESS_SCALE if self.progress is not None else None
+        # Extra safety: ensure we never multiply None
+        if self.progress is not None:
+            return self.progress * _PROGRESS_SCALE
+        else:
+            return 0.0
 
     @property
-    def total(self) -> float | None:
-        return _PROGRESS_SCALE if self.benchmark_status != "pending" else None
+    def total(self) -> float:
+        return _PROGRESS_SCALE
 
     @property
     def formatted_start_time(self) -> str:
@@ -823,9 +832,10 @@ class _GenerativeProgressTaskState:
             output_tokens_rate=aggregator_update.get("output_tokens_rate"),
             prompt_tokens=aggregator_update.get("prompt_tokens"),
             total_tokens_rate=aggregator_update.get("total_tokens_rate"),
-            time_to_first_token=aggregator_update.get("time_to_first_token")
+            time_to_first_token=(aggregator_update.get("time_to_first_token") or 0)
             * 1000,  # ms
-            inter_token_latency=aggregator_update.get("inter_token_latency") * 1000,
+            inter_token_latency=(aggregator_update.get("inter_token_latency") or 0)
+            * 1000,
         )
         self._update_system_stats(
             request_targeted_start_delay=aggregator_update.get(
