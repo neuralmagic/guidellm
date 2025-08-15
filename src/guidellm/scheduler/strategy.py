@@ -389,8 +389,12 @@ class AsyncConstantStrategy(ThroughputStrategy):
 
         :return: A generator that yields timestamps for request scheduling.
         """
+        incremental_mode = "linear"  # constant, linear, exponential
+        linear_increment = 0.1
+        exponential_base = 1.1
+
         start_time = time.time()
-        constant_increment = 1.0 / self.rate
+        base_increment = 1.0 / self.rate
 
         # handle bursts first to get to the desired rate
         if self.initial_burst is not None:
@@ -400,14 +404,30 @@ class AsyncConstantStrategy(ThroughputStrategy):
             for _ in range(burst_count):
                 yield start_time
 
-            start_time += constant_increment
+            start_time += base_increment
 
         counter = 0
+        current_time = start_time
 
-        # continue with constant rate after bursting
+        # continue with the given rate after bursting
         while True:
-            yield start_time + constant_increment * counter
+            yield current_time
             counter += 1
+
+            if incremental_mode == "constant":
+                current_time = start_time + base_increment * counter
+
+            elif incremental_mode == "linear":
+                elapsed_time = current_time - start_time
+                current_rate = self.rate + (linear_increment * elapsed_time)
+                increment = 1.0 / current_rate
+                current_time += increment
+
+            elif incremental_mode == "exponential":
+                elapsed_time = current_time - start_time
+                current_rate = self.rate * (exponential_base ** elapsed_time)
+                increment = 1.0 / current_rate
+                current_time += increment
 
 
 class AsyncPoissonStrategy(ThroughputStrategy):
