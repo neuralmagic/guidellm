@@ -390,7 +390,7 @@ class AsyncConstantStrategy(ThroughputStrategy):
         :return: A generator that yields timestamps for request scheduling.
         """
         incremental_mode = "linear"  # constant, linear, exponential
-        linear_increment = 0.1
+        linear_increment = 0.05
         exponential_base = 1.1
 
         start_time = time.time()
