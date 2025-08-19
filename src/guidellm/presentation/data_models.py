@@ -6,9 +6,9 @@ from typing import TYPE_CHECKING, Optional, Union
 from pydantic import BaseModel, computed_field
 
 if TYPE_CHECKING:
-    from guidellm.benchmark.benchmark import GenerativeBenchmark
+    from guidellm.benchmark.objects import GenerativeBenchmark
 
-from guidellm.objects.statistics import DistributionSummary
+from guidellm.utils.statistics import DistributionSummary
 
 
 class Bucket(BaseModel):

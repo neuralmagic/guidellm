@@ -1,7 +1,7 @@
 import pytest
 from pydantic import computed_field
 
-from guidellm.objects.pydantic import StandardBaseModel
+from guidellm.utils.pydantic_utils import StandardBaseModel
 
 
 class ExampleModel(StandardBaseModel):

@@ -1,760 +1,1288 @@
-import time
+"""
+Benchmark result aggregation and compilation interfaces.
+
+Provides protocols and implementations for collecting, processing, and compiling
+benchmark data from scheduler executions into final metrics and statistics.
+
+Classes:
+    Aggregator: Protocol for processing benchmark data updates.
+    CompilableAggregator: Protocol for aggregators that can compile final results.
+    SchedulerStatsAggregator: Aggregates scheduler timing and performance metrics.
+    GenerativeRequestsStatsProgressAggregator: Tracks generation metrics during run.
+    GenerativeRequestsAggregator: Compiles complete generative benchmark results.
+
+Functions:
+    add_aggregate_metric: Helper for accumulating timing and count metrics.
+
+Type Variables:
+    RequestT: Generic request object type.
+    ResponseT: Generic response object type.
+    RequestTimingsT: Generic request timing object type.
+"""
+
+from __future__ import annotations
+
+import math
 from abc import ABC, abstractmethod
-from pathlib import Path
 from typing import (
     Any,
+    ClassVar,
     Generic,
     Literal,
-    Optional,
-    TypeVar,
-    Union,
+    Protocol,
+    runtime_checkable,
 )
 
-from pydantic import Field
+import numpy
+from pydantic import Field, PrivateAttr
 
-from guidellm.backend import ResponseSummary
-from guidellm.benchmark.benchmark import (
-    BenchmarkArgs,
-    BenchmarkRunStats,
-    BenchmarkT,
-    GenerativeBenchmark,
-    GenerativeTextErrorStats,
-    GenerativeTextResponseStats,
+from guidellm.backend import (
+    GenerationRequest,
+    GenerationRequestTimings,
+    GenerationResponse,
+)
+from guidellm.benchmark.objects import (
+    BenchmarkSchedulerStats,
+    GenerativeMetrics,
+    GenerativeRequestStats,
 )
 from guidellm.config import settings
-from guidellm.objects import (
-    RunningStats,
-    StandardBaseModel,
-    StatusBreakdown,
-    TimeRunningStats,
-)
-from guidellm.request import (
-    GenerationRequest,
-    GenerativeRequestLoaderDescription,
-    RequestLoaderDescription,
-)
 from guidellm.scheduler import (
-    GenerativeRequestsWorkerDescription,
+    MeasuredRequestTimingsT,
     RequestT,
     ResponseT,
-    SchedulerRequestResult,
-    WorkerDescription,
+    ScheduledRequestInfo,
+    SchedulerState,
 )
-from guidellm.utils import check_load_processor
+from guidellm.utils import (
+    InfoMixin,
+    PydanticClassRegistryMixin,
+    StatusBreakdown,
+    StatusDistributionSummary,
+    all_defined,
+    safe_divide,
+    safe_getattr,
+    safe_subtract,
+)
 
 __all__ = [
-    "AggregatorT",
-    "BenchmarkAggregator",
-    "GenerativeBenchmarkAggregator",
+    "Aggregator",
+    "CompilableAggregator",
+    "GenerativeRequestsAggregator",
+    "GenerativeStatsProgressAggregator",
+    "SchedulerStatsAggregator",
+    "SerializableAggregator",
 ]
 
 
-class SchedulerRunningStats(StandardBaseModel):
+@runtime_checkable
+class Aggregator(Protocol[ResponseT, RequestT, MeasuredRequestTimingsT]):
     """
-    The metrics for the scheduler stored as running statistics for easy calculations
-    of rates, averages, totals, etc.
-    """
+    Protocol for processing benchmark data updates during execution.
 
-    created_requests: RunningStats = Field(
-        description=(
-            "The running statistics for the number of requests created for this "
-            "benchmark run. This includes all requests created, regardless of "
-            "their status."
-        ),
-        default_factory=RunningStats,
-    )
-    queued_requests: RunningStats = Field(
-        description=(
-            "The running statistics for the number of requests pending in queue "
-            "for this benchmark run. This includes requests that are waiting to "
-            "be scheduled."
-        ),
-        default_factory=RunningStats,
-    )
-    scheduled_requests: RunningStats = Field(
-        description=(
-            "The running statistics for the number of requests scheduled (actively "
-            "running but waiting for the desired start time) for this benchmark run."
-        ),
-        default_factory=RunningStats,
-    )
-    processing_requests: RunningStats = Field(
-        description=(
-            "The running statistics for the number of requests actively being "
-            "processed by the worker for this benchmark run."
-        ),
-        default_factory=RunningStats,
-    )
-    completed_requests: RunningStats = Field(
-        description=(
-            "The running statistics for the number of requests completed for this "
-            "benchmark run. This includes requests within the warmup and cooldown "
-            "period, if any, along with the final results."
-        ),
-        default_factory=RunningStats,
-    )
-
-
-class RequestsRunningStats(StandardBaseModel):
-    """
-    The metrics for requests that have succeeded, been canceled, or errored stored
-    as running statistics for easy calculations of rates, averages, totals, etc.
+    Defines the interface for aggregators that collect and process request/response
+    data from scheduler executions. Implementations update aggregation state with
+    each completed request for eventual compilation into final metrics.
     """
 
-    totals: StatusBreakdown[RunningStats, RunningStats, RunningStats, RunningStats] = (
-        Field(
-            description=(
-                "The running statistics for the total number of requests that "
-                "completed within the benchmark run."
-            ),
-            default_factory=lambda: StatusBreakdown(
-                successful=RunningStats(),
-                errored=RunningStats(),
-                incomplete=RunningStats(),
-                total=RunningStats(),
-            ),
-        )
-    )
-    queued_time: TimeRunningStats = Field(
-        description=(
-            "The running statistics for the time spent in queue for all requests that "
-            "completed within the benchmark run. This is the time from when the "
-            "request was created to when it was dequeued by the worker."
-        ),
-        default_factory=TimeRunningStats,
-    )
-    scheduled_time_delay: TimeRunningStats = Field(
-        description=(
-            "The running statistics for the time spent from when a request was "
-            "dequeued by the worker to when it was actually scheduled by the worker"
-            "for all requests that completed within the benchmark run. "
-            "This should be as close to 0 as possible, any additional time is "
-            "overheads from the system or the worker."
-        ),
-        default_factory=TimeRunningStats,
-    )
-    scheduled_time_sleep: TimeRunningStats = Field(
-        description=(
-            "The running statistics for the time for each request spent sleeping til "
-            "the desired start time was reached for all requests that completed within "
-            "the benchmark run. This is the time from when the request was scheduled "
-            "to when the desired start time was reached. "
-        ),
-        default_factory=TimeRunningStats,
-    )
-    worker_start_delay: TimeRunningStats = Field(
-        description=(
-            "The running statistics for the time delay between when the request was "
-            "scheduled and when the worker actually started processing subtracting any "
-            "sleep time for all requests that completed within the benchmark run. "
-            "This should be as close to 0 as possible, any additional time is "
-            "overheads from the system or the worker."
-        ),
-        default_factory=TimeRunningStats,
-    )
-    worker_time: TimeRunningStats = Field(
-        description=(
-            "The running statistics for the time spent processing all requests that "
-            "completed within the benchmark run. This is the time from when the "
-            "request was started to when it was completed."
-        ),
-        default_factory=TimeRunningStats,
-    )
-    worker_start_time_targeted_delay: TimeRunningStats = Field(
-        description=(
-            "The running statistics for the delay between the targeted start time and "
-            "the actual start time for requests that completed within the benchmark "
-            "run. This represents delays from the best case desired start time. "
-            "For async strategies, this represents delays from the ideal system. "
-            "For sync strategies, since those are doubled in queue, this should be "
-            "as close to the time for a request to be processed as possible."
-        ),
-        default_factory=TimeRunningStats,
-    )
-    request_start_time_delay: TimeRunningStats = Field(
-        description=(
-            "The running statistics for the delay between the actual request being "
-            "made and the time the worker started on the request for all requests "
-            "that completed within the benchmark run. This time should be as close to "
-            "0 as possible, any additional time is overhead from the system or "
-            "the worker."
-        ),
-        default_factory=TimeRunningStats,
-    )
-    request_start_time_targeted_delay: TimeRunningStats = Field(
-        description=(
-            "The running statistics for the delay between the targeted start time and "
-            "the actual start time for all requests that completed within the "
-            "benchmark run. This represents delays from the best case desired start "
-            "time. For async strategies, this represents delays from the ideal system. "
-            "For sync strategies, since those are duplicated in queue, this should be "
-            "as close to the time for a request to be processed."
-        ),
-        default_factory=TimeRunningStats,
-    )
-    request_time_delay: TimeRunningStats = Field(
-        description=(
-            "The running statistics for the delay in time between the total request "
-            "time and the worker time. This should be as close to 0 as possible, any "
-            "additional time is overhead from the system or the worker. "
-        ),
-        default_factory=TimeRunningStats,
-    )
-    request_time: TimeRunningStats = Field(
-        description=(
-            "The running statistics for the time spent processing all requests that "
-            "completed within the benchmark run. This is the time from when the "
-            "request was created to when it was completed."
-        ),
-        default_factory=TimeRunningStats,
-    )
-
-
-class BenchmarkAggregator(
-    ABC, StandardBaseModel, Generic[BenchmarkT, RequestT, ResponseT]
-):
-    """
-    A pydantic base class representing the base class for aggregating benchmark results.
-    The purpose is to receive and process results from a Benchmarker as it iterates
-    through a Scheduler for an individual benchmark run.
-    As results are added, lightweight statistics are updated and stored for immediate
-    progress and informational updates to the caller.
-    Once the benchmark run is complete, the `compile` method is called to finalize
-    the benchmark and return a Benchmark object with all the results and statistics
-    fully calculated.
-    """
-
-    type_: Literal["benchmark_aggregator"] = "benchmark_aggregator"
-    run_id: str = Field(
-        description=(
-            "The unique identifier for the encompasing benchmark run that this "
-            "benchmark was a part of."
-        )
-    )
-    args: BenchmarkArgs = Field(
-        description=(
-            "The arguments used to create the benchmark run that this benchmark was "
-            "a part of."
-        )
-    )
-    worker_description: Union[
-        GenerativeRequestsWorkerDescription, WorkerDescription
-    ] = Field(
-        description=(
-            "The description and specifics for the worker used to resolve requests "
-            "for this benchmark."
-        ),
-        discriminator="type_",
-    )
-    request_loader_description: Union[
-        GenerativeRequestLoaderDescription, RequestLoaderDescription
-    ] = Field(
-        description=(
-            "The description and specifics for the request loader used to create "
-            "requests for this benchmark."
-        ),
-        discriminator="type_",
-    )
-    extras: dict[str, Any] = Field(
-        description=(
-            "Any additional information or metadata that was passed for this benchmark."
-        )
-    )
-    in_warmup: bool = Field(
-        description=(
-            "A flag to indicate if the benchmark is currently in the warmup phase."
-        ),
-        default=False,
-        exclude=True,
-    )
-    in_cooldown: bool = Field(
-        description=(
-            "A flag to indicate if the benchmark is currently in the cooldown phase."
-        ),
-        default=False,
-        exclude=True,
-    )
-    scheduler_stats: SchedulerRunningStats = Field(
-        description=(
-            "The running statistics for the scheduler for this benchmark run. "
-            "This includes all requests created, regardless of their status."
-        ),
-        default_factory=SchedulerRunningStats,
-    )
-    requests_stats: RequestsRunningStats = Field(
-        description=(
-            "The running statistics for the requests for this benchmark run. "
-            "This includes all requests created, regardless of their status."
-        ),
-        default_factory=RequestsRunningStats,
-    )
-    results: StatusBreakdown[
-        list[SchedulerRequestResult[RequestT, ResponseT]],
-        list[SchedulerRequestResult[RequestT, ResponseT]],
-        list[SchedulerRequestResult[RequestT, ResponseT]],
-        None,
-    ] = Field(
-        description=(
-            "The completed requests for this benchmark run broken down by status"
-            "and excluding warmup and cooldown requests."
-        ),
-        default_factory=lambda: StatusBreakdown(  # type: ignore[arg-type]
-            successful=[],
-            errored=[],
-            incomplete=[],
-            total=None,
-        ),
-    )
-
-    def add_result(
+    def __call__(
         self,
-        result: SchedulerRequestResult[RequestT, ResponseT],
-    ) -> bool:
+        agg_state: dict[str, Any],
+        response: ResponseT | None,
+        request: RequestT,
+        request_info: ScheduledRequestInfo[MeasuredRequestTimingsT],
+        scheduler_state: SchedulerState,
+    ) -> dict[str, Any] | None:
         """
-        Add a result to the aggregator. This will update the internal statistics
-        and add the result to the list of results if it is not within the warmup or
-        cooldown period.
+        Process a completed request and update aggregation state.
 
-        :param result: The result to add to the aggregator.
-        :return: True if the result was added, False if it was added because it
-            did not fit within the warmup or cooldown period, was not requested,
-            or is not finished
+        :param agg_state: Current aggregation state to update in-place.
+        :param response: Response generated for the request, if successful.
+        :param request: The processed request object.
+        :param request_info: Scheduling metadata and timing information.
+        :param scheduler_state: Current scheduler execution state.
+        :return: Optional intermediate updates for progress reporting.
         """
-        # Add scheduler statistics
-        self.scheduler_stats.created_requests += max(
-            0, result.run_info.created_requests
+
+
+@runtime_checkable
+class CompilableAggregator(Protocol[ResponseT, RequestT, MeasuredRequestTimingsT]):
+    """
+    Protocol for aggregators that compile final results from aggregated state.
+
+    Extends the Aggregator protocol with the ability to transform accumulated
+    state into final benchmark results and metrics after execution completes.
+    """
+
+    def __call__(
+        self,
+        agg_state: dict[str, Any],
+        response: ResponseT | None,
+        request: RequestT,
+        request_info: ScheduledRequestInfo[MeasuredRequestTimingsT],
+        scheduler_state: SchedulerState,
+    ) -> dict[str, Any] | None:
+        """
+        Process a completed request and update aggregation state.
+
+        :param agg_state: Current aggregation state to update in-place.
+        :param response: Response generated for the request, if successful.
+        :param request: The processed request object.
+        :param request_info: Scheduling metadata and timing information.
+        :param scheduler_state: Current scheduler execution state.
+        :return: Optional intermediate updates for progress reporting.
+        """
+
+    def compile(
+        self, agg_state: dict[str, Any], scheduler_state: SchedulerState
+    ) -> dict[str, Any]:
+        """
+        Compile aggregated state into final benchmark results.
+
+        :param agg_state: The accumulated aggregation state.
+        :param scheduler_state: Final scheduler execution state.
+        :return: Compiled benchmark results and metrics.
+        """
+
+
+class SerializableAggregator(
+    PydanticClassRegistryMixin[type["SerializableAggregator"]],
+    ABC,
+    Generic[ResponseT, RequestT, MeasuredRequestTimingsT],
+):
+    schema_discriminator: ClassVar[str] = "type_"
+
+    @classmethod
+    def __pydantic_schema_base_type__(cls) -> type[SerializableAggregator]:
+        if cls.__name__ == "SerializableAggregator":
+            return cls
+
+        return SerializableAggregator
+
+    @classmethod
+    def add_aggregate_metric(
+        cls,
+        base_key: str,
+        agg_state: dict[str, Any],
+        end_val: int | float | None,
+        start_val: int | float | None = 0.0,
+        count: int = 1,
+    ) -> int | float | None:
+        """
+        Add timing or count metrics to aggregation state.
+
+        Accumulates delta values and counts for computing averages and totals.
+        Creates entries for "{base_key}_total" and "{base_key}_count" in agg_state.
+
+        :param base_key: Base key name for the metric.
+        :param agg_state: Aggregation state dictionary to update.
+        :param end_val: End value for calculating delta, or None to skip.
+        :param start_val: Start value for calculating delta, defaults to 0.0.
+        :param count: Number of occurrences to count, defaults to 1.
+        """
+        if not all_defined(end_val, start_val):
+            return None
+
+        delta_val = end_val - start_val
+        agg_state[f"{base_key}_total"] = (
+            agg_state.get(f"{base_key}_total", 0) + delta_val
         )
-        self.scheduler_stats.queued_requests += max(0, result.run_info.queued_requests)
-        self.scheduler_stats.scheduled_requests += max(
-            0, result.run_info.scheduled_requests
-        )
-        self.scheduler_stats.processing_requests += max(
-            0, result.run_info.processing_requests
-        )
-        self.scheduler_stats.completed_requests += max(
-            0, result.run_info.completed_requests
+        agg_state[f"{base_key}_count"] = agg_state.get(f"{base_key}_count", 0) + count
+
+        return agg_state[f"{base_key}_total"]
+
+    @classmethod
+    def add_aggregate_metric_rate(
+        cls, base_key: str, agg_state: dict[str, Any]
+    ) -> float:
+        """
+        Calculate the rate of a metric by dividing the total by the count.
+
+        :param base_key: Base key name for the metric.
+        :param agg_state: Aggregation state dictionary to update.
+        """
+        agg_state[f"{base_key}_rate"] = safe_divide(
+            agg_state.get(f"{base_key}_total"), agg_state.get(f"{base_key}_count")
         )
 
-        if result.type_ != "request_complete" or (
-            result.request_info.canceled and not result.request_info.requested
-        ):
-            # If the result is not completed yet, don't add to the results
-            # If the result was canceled and not started, ignore it
-            return False
+        return agg_state[f"{base_key}_rate"]
 
-        # Add request statistics
-        self.requests_stats.totals.total += 1
-        if result.request_info.canceled:
-            self.requests_stats.totals.incomplete += 1
-        elif result.request_info.errored:
-            self.requests_stats.totals.errored += 1
-        elif result.request_info.completed:
-            self.requests_stats.totals.successful += 1
-        else:
-            raise ValueError(
-                "Unexpected state: request_info must be either "
-                "completed, canceled, or errored. "
-                f"Got {result.request_info}"
-            )
-
-        self.requests_stats.queued_time.update(
-            result.request_info.dequeued_time - result.request_info.queued_time
-        )
-        self.requests_stats.scheduled_time_delay.update(
-            result.request_info.scheduled_time - result.request_info.dequeued_time
-        )
-        sleep_time = max(
-            0.0,
-            result.request_info.targeted_start_time
-            - result.request_info.scheduled_time,
-        )
-        self.requests_stats.scheduled_time_sleep.update(sleep_time)
-        time_to_worker_start = (
-            result.request_info.worker_start - result.request_info.scheduled_time
-        )
-        self.requests_stats.worker_start_delay.update(time_to_worker_start - sleep_time)
-        self.requests_stats.worker_time.update(
-            result.request_info.worker_end - result.request_info.worker_start
-        )
-        self.requests_stats.worker_start_time_targeted_delay.update(
-            result.request_info.worker_start - result.request_info.targeted_start_time
-        )
-        self.requests_stats.request_start_time_delay.update(
-            result.request_info.worker_start - result.request_info.targeted_start_time
-        )
-        self.requests_stats.request_start_time_targeted_delay.update(
-            result.request_info.worker_start - result.request_info.targeted_start_time
-        )
-        self.requests_stats.request_time_delay.update(
-            (result.request_info.worker_end - result.request_info.worker_start)
-            - (result.request_info.worker_end - result.request_info.worker_start)
-        )
-        self.requests_stats.request_time.update(
-            result.request_info.worker_end - result.request_info.worker_start
-        )
-
-        # Add result to the list of results provided we are not in warmup or cooldown
-        total_completed = self.requests_stats.totals.total.total
-        global_start_time = self.requests_stats.totals.total.start_time
-
-        in_warmup_number = (
-            self.args.warmup_number and total_completed <= self.args.warmup_number
-        )
-        in_warmup_duration = (
-            self.args.warmup_duration
-            and result.request_info.worker_start
-            <= (global_start_time + self.args.warmup_duration)
-        )
-
-        if in_warmup_number or in_warmup_duration:
-            self.in_warmup = True
-            return True
-
-        self.in_warmup = False
-        in_cooldown_number = (
-            self.args.cooldown_number
-            and self.args.max_number
-            and total_completed > self.args.max_number - self.args.cooldown_number
-        )
-        in_cooldown_duration = (
-            self.args.cooldown_duration
-            and self.args.max_duration
-            and result.request_info.worker_start
-            > global_start_time + self.args.max_duration - self.args.cooldown_duration
-        )
-
-        if in_cooldown_number or in_cooldown_duration:
-            self.in_cooldown = True
-            return True
-
-        self.in_cooldown = False
-
-        if result.request_info.canceled:
-            self.results.incomplete.append(result)
-        elif result.request_info.errored:
-            self.results.errored.append(result)
-        elif result.request_info.completed:
-            self.results.successful.append(result)
-        else:
-            raise ValueError(
-                "Unexpected state: request_info must be either "
-                "completed, canceled, or errored. "
-                f"Got {result.request_info}"
-            )
-
-        return True
-
+    @classmethod
     @abstractmethod
-    def compile(self) -> BenchmarkT:
+    def validated_kwargs(cls, *args, **kwargs) -> dict[str, Any]:
         """
-        Compile the benchmark results and statistics into a Benchmark object.
-        This is required to be implemented by subclasses to finalize the benchmark
-        and return the compiled object.
+        Validate and process arguments for constraint creation.
+
+        Must be implemented by subclasses to handle their specific parameter patterns.
+
+        :param args: Positional arguments passed to the constraint
+        :param kwargs: Keyword arguments passed to the constraint
+        :return: Validated dictionary of parameters for constraint creation
+        :raises NotImplementedError: Must be implemented by subclasses
         """
         ...
 
+    @classmethod
+    def resolve(
+        cls,
+        aggregators: dict[
+            str,
+            Any | dict[str, Any] | Aggregator | CompilableAggregator,
+        ],
+    ) -> dict[str, Aggregator | CompilableAggregator]:
+        """
+        Resolve mixed aggregator specifications to callable aggregators.
 
-AggregatorT = TypeVar("AggregatorT", bound=BenchmarkAggregator)
+        :param aggregators: Dictionary mapping aggregator keys to specifications
+        :return: Dictionary mapping aggregator keys to callable functions
+        :raises ValueError: If any key is not registered in the factory
+        """
+        resolved = {}
+
+        for key, val in aggregators.items():
+            if isinstance(val, (Aggregator, CompilableAggregator)):
+                resolved[key] = val
+            else:
+                aggregator_class = cls.get_registered_object(key)
+                kwargs = aggregator_class.validated_kwargs(**val)
+                resolved[key] = aggregator_class(**kwargs)
+
+        return resolved
+
+    type_: Literal["aggregator"] = Field(default="aggregator", description="")
+
+    @abstractmethod
+    def __call__(
+        self,
+        agg_state: dict[str, Any],
+        response: ResponseT | None,
+        request: RequestT,
+        request_info: ScheduledRequestInfo[MeasuredRequestTimingsT],
+        scheduler_state: SchedulerState,
+    ) -> dict[str, Any] | None:
+        """
+        Process a completed request and update aggregation state.
+
+        :param agg_state: Current aggregation state to update in-place.
+        :param response: Response generated for the request, if successful.
+        :param request: The processed request object.
+        :param request_info: Scheduling metadata and timing information.
+        :param scheduler_state: Current scheduler execution state.
+        :return: Optional intermediate updates for progress reporting.
+        """
+
+    @abstractmethod
+    def compile(
+        self, agg_state: dict[str, Any], scheduler_state: SchedulerState
+    ) -> dict[str, Any]:
+        """
+        Compile aggregated state into final benchmark results.
+
+        :param agg_state: The accumulated aggregation state.
+        :param scheduler_state: Final scheduler execution state.
+        :return: Compiled benchmark results and metrics.
+        """
 
 
-class GenerativeRequestsRunningStats(RequestsRunningStats):
-    """
-    The metrics for generative requests that have succeeded, been canceled, or errored
-    stored as running statistics for easy calculations of rates, averages, totals, etc.
-    """
-
-    time_to_first_token: TimeRunningStats = Field(
-        description=(
-            "The running statistics for the time from the start of the request to the "
-            "first token being generated for all requests that completed within the "
-            "benchmark run."
-        ),
-        default_factory=TimeRunningStats,
-    )
-    inter_token_latency: TimeRunningStats = Field(
-        description=(
-            "The running statistics for the time between each token being generated "
-            "for all requests that completed within the benchmark run."
-        ),
-        default_factory=TimeRunningStats,
-    )
-    prompt_tokens: RunningStats = Field(
-        description=(
-            "The running statistics for the token count for the prompt for all "
-            "requests that completed, if available in the response."
-        ),
-        default_factory=RunningStats,
-    )
-    output_tokens: RunningStats = Field(
-        description=(
-            "The running statistics for the token count for the output for all "
-            "requests that completed, if available in the response."
-        ),
-        default_factory=RunningStats,
-    )
-    total_tokens: RunningStats = Field(
-        description=(
-            "The running statistics for the total token count for all requests that "
-            "completed, if available in the response."
-        ),
-        default_factory=RunningStats,
-    )
-
-
-class GenerativeBenchmarkAggregator(
-    BenchmarkAggregator[GenerativeBenchmark, GenerationRequest, ResponseSummary]
+@SerializableAggregator.register("scheduler_stats")
+class SchedulerStatsAggregator(
+    SerializableAggregator[ResponseT, RequestT, MeasuredRequestTimingsT], InfoMixin
 ):
-    type_: Literal["generative_benchmark_aggregator"] = (
-        "generative_benchmark_aggregator"  # type: ignore[assignment]
-    )
-    processor: Optional[Union[str, Path, Any]] = Field(
-        description=(
-            "The tokenizer to use for calculating token counts when none are "
-            "avaiable that match the preferred source."
+    """
+    Aggregates scheduler timing and performance metrics.
+
+    Collects timing data for various scheduler phases including queuing,
+    resolution, and processing delays to generate performance statistics.
+    """
+
+    @classmethod
+    def validated_kwargs(cls, *args, **kwargs) -> dict[str, Any]:
+        return {}
+
+    type_: Literal["scheduler_stats"] = Field(default="scheduler_stats")
+
+    def __call__(
+        self,
+        agg_state: dict[str, Any],
+        response: ResponseT | None,
+        request: RequestT,
+        request_info: ScheduledRequestInfo[MeasuredRequestTimingsT],
+        scheduler_state: SchedulerState,
+    ) -> dict[str, Any] | None:
+        """
+        Aggregate scheduler timing metrics for a completed request.
+
+        :param agg_state: Current aggregation state to update.
+        :param response: Response generated for the request, if successful.
+        :param request: The processed request object.
+        :param request_info: Scheduling metadata and timing information.
+        :param scheduler_state: Current scheduler execution state.
+        :return: Updated aggregation state for intermediate reporting.
+        """
+        if request_info.status not in ("completed", "errored", "cancelled"):
+            # Only compile scheduler stats for processed requests
+            return None
+
+        self.add_aggregate_metric(
+            "queued_time",
+            agg_state,
+            request_info.scheduler_timings.dequeued,
+            request_info.scheduler_timings.queued,
         )
-    )
-    processor_args: Optional[dict[str, Any]] = Field(
-        description=(
-            "Additional arguments to pass to the tokenizer if it requires "
-            "any specific configuration for loading or processing."
-        ),
-    )
-    worker_description: GenerativeRequestsWorkerDescription = Field(
-        description=(
-            "The description and specifics for the worker used to resolve requests "
-            "for this benchmark."
-        ),
-        discriminator="type_",
-    )
-    request_loader_description: GenerativeRequestLoaderDescription = Field(
-        description=(
-            "The description and specifics for the request loader used to create "
-            "requests for this benchmark."
-        ),
-        discriminator="type_",
-    )
-    requests_stats: GenerativeRequestsRunningStats = Field(
-        description=(
-            "The running statistics for the requests for this benchmark run. "
-            "This includes all requests created, regardless of their status."
-        ),
-        default_factory=GenerativeRequestsRunningStats,
+        self.add_aggregate_metric(
+            "worker_resolve_start_delay",
+            agg_state,
+            request_info.scheduler_timings.resolve_start,
+            request_info.scheduler_timings.scheduled_at,
+        )
+        self.add_aggregate_metric(
+            "worker_resolve_time",
+            agg_state,
+            request_info.scheduler_timings.resolve_end,
+            request_info.scheduler_timings.resolve_start,
+        )
+        self.add_aggregate_metric(
+            "worker_resolve_end_delay",
+            agg_state,
+            request_info.scheduler_timings.resolve_end,
+            safe_getattr(request_info.request_timings, "request_end"),
+        )
+        self.add_aggregate_metric(
+            "finalized_delay",
+            agg_state,
+            request_info.scheduler_timings.finalized,
+            request_info.scheduler_timings.resolve_end,
+        )
+        self.add_aggregate_metric(
+            "worker_targeted_start_delay",
+            agg_state,
+            request_info.scheduler_timings.resolve_start,
+            request_info.scheduler_timings.targeted_start,
+        )
+        self.add_aggregate_metric(
+            "request_start_delay",
+            agg_state,
+            request_info.scheduler_timings.resolve_start,
+            safe_getattr(request_info.request_timings, "request_start"),
+        )
+        self.add_aggregate_metric(
+            "request_time",
+            agg_state,
+            safe_getattr(request_info.request_timings, "request_end"),
+            safe_getattr(request_info.request_timings, "request_start"),
+        )
+        self.add_aggregate_metric(
+            "request_targeted_start_delay",
+            agg_state,
+            safe_getattr(request_info.request_timings, "request_start"),
+            request_info.scheduler_timings.targeted_start,
+        )
+
+        return agg_state
+
+    def compile(
+        self, agg_state: dict[str, Any], scheduler_state: SchedulerState
+    ) -> dict[Literal["scheduler_stats"], BenchmarkSchedulerStats]:
+        """
+        Compile scheduler timing metrics into benchmark statistics.
+
+        :param agg_state: Accumulated timing data and counts.
+        :param scheduler_state: Final scheduler execution state.
+        :return: Dictionary containing compiled scheduler statistics.
+        """
+        return {
+            "run_stats": BenchmarkSchedulerStats(
+                start_time=scheduler_state.start_time,
+                end_time=scheduler_state.end_time,
+                requests_made=StatusBreakdown[int, int, int, int](
+                    successful=scheduler_state.successful_requests,
+                    incomplete=scheduler_state.cancelled_requests,
+                    errored=scheduler_state.errored_requests,
+                    total=(
+                        scheduler_state.successful_requests
+                        + scheduler_state.cancelled_requests
+                        + scheduler_state.errored_requests
+                    ),
+                ),
+                queued_time_avg=self.add_aggregate_metric_rate(
+                    "queued_time", agg_state
+                ),
+                worker_resolve_start_delay_avg=self.add_aggregate_metric_rate(
+                    "worker_resolve_start_delay", agg_state
+                ),
+                worker_resolve_time_avg=self.add_aggregate_metric_rate(
+                    "worker_resolve_time", agg_state
+                ),
+                worker_resolve_end_delay_avg=self.add_aggregate_metric_rate(
+                    "worker_resolve_end_delay", agg_state
+                ),
+                finalized_delay_avg=self.add_aggregate_metric_rate(
+                    "finalized_delay", agg_state
+                ),
+                worker_targeted_start_delay_avg=self.add_aggregate_metric_rate(
+                    "worker_targeted_start_delay", agg_state
+                ),
+                request_start_delay_avg=self.add_aggregate_metric_rate(
+                    "request_start_delay", agg_state
+                ),
+                request_time_avg=self.add_aggregate_metric_rate(
+                    "request_time", agg_state
+                ),
+                request_targeted_delay_avg=self.add_aggregate_metric_rate(
+                    "request_targeted_delay", agg_state
+                ),
+            ),
+        }
+
+
+@SerializableAggregator.register("generative_stats_progress")
+class GenerativeStatsProgressAggregator(
+    SerializableAggregator[
+        GenerationResponse, GenerationRequest, GenerationRequestTimings
+    ]
+):
+    """
+    Tracks generative model metrics during benchmark execution.
+
+    Aggregates token-level metrics including time to first token, inter-token
+    latency, and token counts for real-time progress monitoring.
+    """
+
+    @classmethod
+    def validated_kwargs(cls, *args, **kwargs) -> dict[str, Any]:
+        return {}
+
+    type_: Literal["generative_stats_progress"] = Field(
+        default="generative_stats_progress"
     )
 
-    def add_result(
-        self, result: SchedulerRequestResult[GenerationRequest, ResponseSummary]
+    def __call__(
+        self,
+        agg_state: dict[str, Any],
+        response: GenerationResponse | None,
+        request: GenerationRequest,
+        request_info: ScheduledRequestInfo[GenerationRequestTimings],
+        scheduler_state: SchedulerState,
+    ) -> dict[str, Any] | None:
+        """
+        Aggregate generative model metrics for a completed request.
+
+        :param agg_state: Current aggregation state to update.
+        :param response: Generation response with token and timing data.
+        :param request: The processed generation request.
+        :param request_info: Scheduling metadata and timing information.
+        :param scheduler_state: Current scheduler execution state.
+        :return: Updated aggregation state for progress reporting.
+        """
+        if request_info.status == "completed":
+            prefix = "completed_"
+        elif request_info.status == "errored":
+            prefix = "errored_"
+        elif request_info.status == "cancelled":
+            prefix = "cancelled_"
+        else:
+            # Only compile progress stats for processed requests
+            return None
+
+        start_time = scheduler_state.start_time
+        end_time = (
+            safe_getattr(request_info.request_timings, "request_end")
+            or request_info.scheduler_timings.resolve_end
+        )
+        duration = safe_subtract(end_time, start_time)
+
+        if all_defined(end_time):
+            # request rate
+            requests = (
+                scheduler_state.successful_requests
+                if request_info.status == "completed"
+                else scheduler_state.cancelled_requests
+                if request_info.status == "cancelled"
+                else scheduler_state.errored_requests
+            )
+            agg_state[f"{prefix}requests_per_second"] = safe_divide(requests, duration)
+            agg_state["requests_per_second"] = safe_divide(
+                scheduler_state.processed_requests, duration
+            )
+
+        if all_defined(
+            safe_getattr(request_info.request_timings, "request_end"),
+            safe_getattr(request_info.request_timings, "request_start"),
+        ):
+            # request latency
+            self.add_aggregate_metric(
+                f"{prefix}request_latency",
+                agg_state,
+                request_info.request_timings.request_end,
+                request_info.request_timings.request_start,
+            )
+            self.add_aggregate_metric_rate(f"{prefix}request_latency", agg_state)
+            self.add_aggregate_metric(
+                "request_latency",
+                agg_state,
+                request_info.request_timings.request_end,
+                request_info.request_timings.request_start,
+            )
+            self.add_aggregate_metric_rate("request_latency", agg_state)
+
+        if all_defined(
+            safe_getattr(request_info.request_timings, "last_iteration"),
+            safe_getattr(request_info.request_timings, "request_start"),
+        ):
+            # TPOT
+            self.add_aggregate_metric(
+                f"{prefix}time_per_output_token",
+                agg_state,
+                request_info.request_timings.last_iteration,
+                request_info.request_timings.request_start,
+            )
+            self.add_aggregate_metric_rate(f"{prefix}time_per_output_token", agg_state)
+            self.add_aggregate_metric(
+                "time_per_output_token",
+                agg_state,
+                request_info.request_timings.last_iteration,
+                request_info.request_timings.request_start,
+            )
+            self.add_aggregate_metric_rate("time_per_output_token", agg_state)
+
+        if all_defined(
+            safe_getattr(request_info.request_timings, "first_iteration"),
+            safe_getattr(request_info.request_timings, "request_start"),
+        ):
+            # TTFT
+            self.add_aggregate_metric(
+                f"{prefix}time_to_first_token",
+                agg_state,
+                request_info.request_timings.first_iteration,
+                request_info.request_timings.request_start,
+            )
+            self.add_aggregate_metric_rate(f"{prefix}time_to_first_token", agg_state)
+            self.add_aggregate_metric(
+                "time_to_first_token",
+                agg_state,
+                request_info.request_timings.first_iteration,
+                request_info.request_timings.request_start,
+            )
+            self.add_aggregate_metric_rate("time_to_first_token", agg_state)
+
+        if (
+            all_defined(
+                safe_getattr(request_info.request_timings, "first_iteration"),
+                safe_getattr(request_info.request_timings, "last_iteration"),
+                safe_getattr(response, "output_tokens"),
+            )
+            and response.output_tokens > 1
+        ):
+            # ITL
+            self.add_aggregate_metric(
+                f"{prefix}inter_token_latency",
+                agg_state,
+                request_info.request_timings.last_iteration,
+                request_info.request_timings.first_iteration,
+                count=response.output_tokens - 1,
+            )
+            self.add_aggregate_metric_rate(f"{prefix}inter_token_latency", agg_state)
+            self.add_aggregate_metric(
+                "inter_token_latency",
+                agg_state,
+                request_info.request_timings.last_iteration,
+                request_info.request_timings.first_iteration,
+                count=response.output_tokens - 1,
+            )
+            self.add_aggregate_metric_rate("inter_token_latency", agg_state)
+
+        if all_defined(safe_getattr(response, "prompt_tokens")):
+            # Prompt tokens totals
+            self.add_aggregate_metric(
+                f"{prefix}prompt_tokens", agg_state, response.prompt_tokens
+            )
+            agg_state[f"{prefix}prompt_tokens_per_request"] = (
+                self.add_aggregate_metric_rate(f"{prefix}prompt_tokens", agg_state)
+            )
+            self.add_aggregate_metric(
+                f"{prefix}prompt_tokens", agg_state, response.prompt_tokens
+            )
+            agg_state["prompt_tokens_per_request"] = self.add_aggregate_metric_rate(
+                "prompt_tokens", agg_state
+            )
+
+            if all_defined(end_time):
+                # Prompt tokens rate
+                agg_state[f"{prefix}prompt_tokens_rate"] = safe_divide(
+                    agg_state[f"{prefix}prompt_tokens_total"], duration
+                )
+                agg_state["prompt_tokens_rate"] = safe_divide(
+                    agg_state["prompt_tokens_total"], duration
+                )
+
+        if all_defined(safe_getattr(response, "output_tokens")):
+            # Output tokens totals
+            self.add_aggregate_metric(
+                f"{prefix}output_tokens", agg_state, response.output_tokens
+            )
+            agg_state[f"{prefix}output_tokens_per_request"] = (
+                self.add_aggregate_metric_rate(f"{prefix}output_tokens", agg_state)
+            )
+            self.add_aggregate_metric(
+                "output_tokens", agg_state, response.output_tokens
+            )
+            agg_state["output_tokens_per_request"] = self.add_aggregate_metric_rate(
+                "output_tokens", agg_state
+            )
+
+            if all_defined(end_time):
+                # Output tokens rate
+                agg_state[f"{prefix}output_tokens_rate"] = safe_divide(
+                    agg_state[f"{prefix}output_tokens_total"], duration
+                )
+                agg_state["output_tokens_rate"] = safe_divide(
+                    agg_state["output_tokens_total"], duration
+                )
+
+        if all_defined(safe_getattr(response, "total_tokens")):
+            # Total tokens totals
+            self.add_aggregate_metric(
+                f"{prefix}total_tokens", agg_state, response.total_tokens
+            )
+            agg_state[f"{prefix}total_tokens_per_request"] = (
+                self.add_aggregate_metric_rate(f"{prefix}total_tokens", agg_state)
+            )
+            self.add_aggregate_metric("total_tokens", agg_state, response.total_tokens)
+            agg_state["total_tokens_per_request"] = self.add_aggregate_metric_rate(
+                "total_tokens", agg_state
+            )
+
+            if all_defined(end_time):
+                # Total tokens rate
+                agg_state[f"{prefix}total_tokens_rate"] = safe_divide(
+                    agg_state[f"{prefix}total_tokens_total"], duration
+                )
+                agg_state["total_tokens_rate"] = safe_divide(
+                    agg_state["total_tokens_total"], duration
+                )
+
+        return agg_state
+
+    def compile(
+        self, agg_state: dict[str, Any], scheduler_state: SchedulerState
+    ) -> dict[str, Any]:
+        """
+        Compile progress metrics into final results.
+
+        GenerativeStatsProgressAggregator is primarily for progress tracking,
+        so compilation returns the aggregated state as-is.
+
+        :param agg_state: The accumulated aggregation state.
+        :param scheduler_state: Final scheduler execution state.
+        :return: The aggregated state as final results.
+        """
+        return {}
+
+
+@SerializableAggregator.register("generative_requests")
+class GenerativeRequestsAggregator(
+    SerializableAggregator[
+        GenerationResponse, GenerationRequest, GenerationRequestTimings
+    ],
+):
+    """
+    Compiles complete generative benchmark results with warmup/cooldown filtering.
+
+    Aggregates request data during execution and compiles comprehensive metrics
+    including timing distributions, token statistics, and throughput measurements.
+    Supports filtering warmup and cooldown periods from final results.
+    """
+
+    @classmethod
+    def validated_kwargs(
+        cls,
+        request_samples: int | None = 20,
+        warmup: int | float | None = None,
+        cooldown: int | float | None = None,
+        **kwargs,
+    ) -> dict[str, Any]:
+        return {
+            "request_samples": request_samples,
+            "warmup": warmup,
+            "cooldown": cooldown,
+        }
+
+    type_: Literal["generative_requests"] = Field(default="generative_requests")
+
+    request_samples: int | None = Field(default=20, description="")
+    warmup: int | float | None = Field(
+        default=None,
+        description="Number of warmup requests to ignore at benchmark start",
+    )
+    cooldown: int | float | None = Field(
+        default=None,
+        description="Number of cooldown requests to ignore at benchmark end",
+    )
+    _in_cooldown: bool = PrivateAttr(False)
+    _in_warmup: bool = PrivateAttr(False)
+
+    def __call__(
+        self,
+        agg_state: dict[str, Any],
+        response: GenerationResponse | None,
+        request: GenerationRequest,
+        request_info: ScheduledRequestInfo[GenerationRequestTimings],
+        scheduler_state: SchedulerState,
+    ) -> dict[str, Any] | None:
+        """
+        Collect completed requests for final compilation.
+
+        Filters requests based on warmup/cooldown settings and categorizes by
+        completion status for comprehensive benchmark analysis.
+
+        :param agg_state: Current aggregation state to update.
+        :param response: Generation response data.
+        :param request: The processed generation request.
+        :param request_info: Scheduling metadata and timing information.
+        :param scheduler_state: Current scheduler execution state.
+        :return: None, as this aggregator only collects for final compilation.
+        """
+        status = {
+            "requests_in_warmup": False,
+            "requests_in_cooldown": False,
+        }
+
+        # Skip invalid requests
+        if request_info.status not in {"completed", "canceled", "errored"} or (
+            request_info.status == "canceled"
+            and safe_getattr(request_info.scheduler_timings, "resolve_start") is None
+            # Canceled requests that never started should not be kept
+        ):
+            return status
+
+        if self._is_in_warmup(request_info, scheduler_state):
+            status["requests_in_warmup"] = True
+            return status
+
+        if self._is_in_cooldown(request_info, scheduler_state):
+            status["requests_in_cooldown"] = True
+            return status
+
+        if "completed" not in agg_state:
+            agg_state["completed"] = []
+            agg_state["errored"] = []
+            agg_state["incomplete"] = []
+
+        # Categorize request by status
+        if request_info.status == "completed":
+            agg_state["completed"].append((response, request, request_info))
+        elif request_info.status == "canceled":
+            agg_state["incomplete"].append((response, request, request_info))
+        else:
+            agg_state["errored"].append((response, request, request_info))
+
+        return status
+
+    def compile(
+        self,
+        agg_state: dict[str, Any],
+        scheduler_state: SchedulerState,  # noqa: ARG002
+    ) -> dict[str, Any]:
+        """
+        Compile aggregated requests into comprehensive benchmark results.
+
+        Transforms collected request data into detailed metrics including timing
+        distributions, token statistics, throughput measurements, and status breakdowns.
+
+        :param agg_state: Accumulated request data categorized by completion status.
+        :param scheduler_state: Final scheduler execution state.
+        :return: Complete benchmark results with metrics and request statistics.
+        """
+        successful: list[GenerativeRequestStats] = [
+            self._create_generate_stats(response, request, request_info)
+            for (response, request, request_info) in agg_state.get("completed", [])
+        ]
+        incomplete: list[GenerativeRequestStats] = [
+            self._create_generate_stats(response, request, request_info)
+            for (response, request, request_info) in agg_state.get("incomplete", [])
+        ]
+        errored: list[GenerativeRequestStats] = [
+            self._create_generate_stats(response, request, request_info)
+            for (response, request, request_info) in agg_state.get("errored", [])
+        ]
+
+        # Use all requests for metrics calculations (not sampled)
+        total: list[GenerativeRequestStats] = successful + incomplete + errored
+        total_types: list[Literal["successful", "incomplete", "error"]] = [
+            *["successful"] * len(successful),
+            *["incomplete"] * len(incomplete),
+            *["error"] * len(errored),
+        ]
+        start_time = min(
+            [math.inf]
+            + [
+                req.scheduler_info.request_timings.request_start
+                for req in total
+                if req.scheduler_info.request_timings.request_start is not None
+            ]
+        )
+        end_time = max(
+            [-1 * math.inf]
+            + [
+                req.scheduler_info.request_timings.request_end
+                for req in total
+                if req.scheduler_info.request_timings.request_end is not None
+            ]
+        )
+
+        return {
+            "start_time": start_time,
+            "end_time": end_time,
+            "request_totals": StatusBreakdown(
+                successful=len(successful),
+                incomplete=len(incomplete),
+                errored=len(errored),
+                total=len(total),
+            ),
+            "requests": StatusBreakdown(
+                successful=(
+                    list(
+                        numpy.random.choice(
+                            successful, size=self.request_samples, replace=False
+                        )
+                    )
+                    if self.request_samples
+                    else successful
+                ),
+                incomplete=(
+                    list(
+                        numpy.random.choice(
+                            incomplete, size=self.request_samples, replace=False
+                        )
+                    )
+                    if self.request_samples
+                    else incomplete
+                ),
+                errored=(
+                    list(
+                        numpy.random.choice(
+                            errored, size=self.request_samples, replace=False
+                        )
+                    )
+                    if self.request_samples
+                    else errored
+                ),
+            ),
+            "metrics": GenerativeMetrics(
+                requests_per_second=self._calculate_requests_per_second(
+                    statuses=total_types, requests=total
+                ),
+                request_concurrency=self._calculate_request_concurrency(
+                    statuses=total_types, requests=total
+                ),
+                request_latency=self._calculate_request_latency(
+                    statuses=total_types, requests=total
+                ),
+                prompt_token_count=self._calculate_prompt_token_count(
+                    statuses=total_types, requests=total
+                ),
+                output_token_count=self._calculate_output_token_count(
+                    statuses=total_types, requests=total
+                ),
+                total_token_count=self._calculate_total_token_count(
+                    statuses=total_types, requests=total
+                ),
+                time_to_first_token_ms=self._calculate_time_to_first_token_ms(
+                    statuses=total_types, requests=total
+                ),
+                time_per_output_token_ms=self._calculate_time_per_output_token_ms(
+                    statuses=total_types, requests=total
+                ),
+                inter_token_latency_ms=self._calculate_inter_token_latency_ms(
+                    statuses=total_types, requests=total
+                ),
+                output_tokens_per_second=self._calculate_output_tokens_per_second(
+                    statuses=total_types, requests=total
+                ),
+                tokens_per_second=self._calculate_tokens_per_second(
+                    statuses=total_types, requests=total
+                ),
+            ),
+        }
+
+    def _is_in_warmup(
+        self,
+        request_info: ScheduledRequestInfo[GenerationRequestTimings],
+        scheduler_state: SchedulerState,
     ) -> bool:
-        """
-        Add a result to the aggregator. This will update the internal statistics
-        and add the result to the list of results if it is not within the warmup or
-        cooldown period.
-
-        :param result: The result to add to the aggregator.
-        """
-        if not super().add_result(result):
+        """Check if the current request is within the warmup period."""
+        if self.warmup is None:
             return False
 
-        if result.request is None:
-            raise ValueError("Request is None, cannot add result.")
-
-        if result.response is None:
-            raise ValueError("Response is None, cannot add result.")
-
-        self.requests_stats.request_start_time_delay.update(
-            result.response.start_time - result.request_info.worker_start
-        )
-        self.requests_stats.request_start_time_targeted_delay.update(
-            result.response.start_time - result.request_info.targeted_start_time
-        )
-        self.requests_stats.request_time_delay.update(
-            (result.response.start_time - result.request_info.worker_start)
-            + result.request_info.worker_end
-            - result.response.end_time
-        )
-        self.requests_stats.request_time.update(
-            result.response.end_time - result.response.start_time
-        )
-        if result.response.first_iter_time:
-            self.requests_stats.time_to_first_token.update(
-                result.response.first_iter_time - result.response.start_time
+        if 0 < self.warmup < 1:  # Percentage-based warmup
+            return (
+                scheduler_state.remaining_fraction is not None
+                and scheduler_state.remaining_fraction > (1 - self.warmup)
             )
-        if result.response.last_iter_time and result.response.first_iter_time:
-            self.requests_stats.inter_token_latency.update(
-                result.response.last_iter_time - result.response.first_iter_time,
-                count=(result.response.output_tokens or 1) - 1,
+
+        if self.warmup >= 1:  # Count/time-based warmup
+            if scheduler_state.processed_requests < self.warmup:
+                return True
+
+            current_time = request_info.scheduler_timings.targeted_start
+            return (
+                current_time is not None
+                and (current_time - scheduler_state.start_time) < self.warmup
             )
-        self.requests_stats.prompt_tokens += result.response.request_prompt_tokens or 0
-        self.requests_stats.output_tokens += result.response.request_output_tokens or 0
-        total_tokens = (result.response.request_prompt_tokens or 0) + (
-            result.response.request_output_tokens or 0
+
+        return False
+
+    def _is_in_cooldown(
+        self,
+        request_info: ScheduledRequestInfo[GenerationRequestTimings],
+        scheduler_state: SchedulerState,
+    ) -> bool:
+        """Check if the current request is within the cooldown period."""
+        if self.cooldown is None:
+            return False
+
+        if 0 < self.cooldown < 1:  # Percentage-based cooldown
+            return (
+                scheduler_state.remaining_fraction is not None
+                and scheduler_state.remaining_fraction < self.cooldown
+            )
+
+        if self.cooldown >= 1:  # Count/time-based cooldown
+            if scheduler_state.remaining_requests < self.cooldown:
+                return True
+
+            current_time = (
+                request_info.scheduler_timings.resolve_end
+                or request_info.scheduler_timings.targeted_start
+            )
+            return (
+                current_time is not None
+                and scheduler_state.remaining_duration is not None
+                and scheduler_state.remaining_duration < self.cooldown
+            )
+
+        return False
+
+    @classmethod
+    def _create_generate_stats(
+        cls,
+        response: GenerationResponse,
+        request: GenerationRequest,
+        request_info: ScheduledRequestInfo[GenerationRequestTimings],
+    ) -> GenerativeRequestStats:
+        prompt_tokens = response.preferred_prompt_tokens(
+            settings.preferred_prompt_tokens_source
         )
-        self.requests_stats.total_tokens += total_tokens
+        output_tokens = response.preferred_output_tokens(
+            settings.preferred_output_tokens_source
+        )
 
-        return True
-
-    def compile(self) -> GenerativeBenchmark:
-        """
-        Compile the benchmark results and statistics into a GenerativeBenchmark object.
-        This is required to be implemented by subclasses to finalize the benchmark
-        and return the compiled object.
-        """
-        successful, incomplete, errored = self._compile_results()
-
-        return GenerativeBenchmark.from_stats(
-            run_id=self.run_id,
-            successful=successful,
-            incomplete=incomplete,
-            errored=errored,
-            args=self.args,
-            run_stats=BenchmarkRunStats(
-                start_time=self.requests_stats.totals.total.start_time,
-                end_time=time.time(),
-                requests_made=StatusBreakdown(
-                    successful=int(self.requests_stats.totals.successful.total),
-                    errored=int(self.requests_stats.totals.errored.total),
-                    incomplete=int(self.requests_stats.totals.incomplete.total),
-                    total=int(self.requests_stats.totals.total.total),
-                ),
-                queued_time_avg=self.requests_stats.queued_time.mean,
-                scheduled_time_delay_avg=self.requests_stats.scheduled_time_delay.mean,
-                scheduled_time_sleep_avg=self.requests_stats.scheduled_time_sleep.mean,
-                worker_start_delay_avg=self.requests_stats.worker_start_delay.mean,
-                worker_time_avg=self.requests_stats.worker_time.mean,
-                worker_start_time_targeted_delay_avg=self.requests_stats.worker_start_time_targeted_delay.mean,
-                request_start_time_delay_avg=self.requests_stats.request_start_time_delay.mean,
-                request_start_time_targeted_delay_avg=self.requests_stats.request_start_time_targeted_delay.mean,
-                request_time_delay_avg=self.requests_stats.request_time_delay.mean,
-                request_time_avg=self.requests_stats.request_time.mean,
+        return GenerativeRequestStats(
+            request_id=request.request_id,
+            request_type=request.request_type,
+            prompt=str(request.content),
+            request_args=response.request_args,
+            output=response.value,
+            iterations=response.iterations,
+            prompt_tokens=prompt_tokens,
+            output_tokens=output_tokens,
+            total_tokens=(
+                prompt_tokens + output_tokens
+                if prompt_tokens is not None and output_tokens is not None
+                else None
             ),
-            worker=self.worker_description,
-            requests_loader=self.request_loader_description,
-            extras=self.extras,
+            scheduler_info=request_info,
         )
 
-    def _compile_results(
-        self,
-    ) -> tuple[
-        list[GenerativeTextResponseStats],
-        list[GenerativeTextErrorStats],
-        list[GenerativeTextErrorStats],
-    ]:
-        successful: list[GenerativeTextResponseStats] = [
-            GenerativeTextResponseStats(
-                request_id=result.request.request_id,
-                request_type=result.request.request_type,
-                scheduler_info=result.request_info,
-                prompt=str(result.request.content),
-                prompt_tokens=self._compile_tokens_count(
-                    value=str(result.request.content),
-                    requests_tokens=result.response.request_prompt_tokens,
-                    response_tokens=result.response.response_prompt_tokens,
-                    preferred_tokens_source=settings.preferred_prompt_tokens_source,
-                    errored=False,
-                ),
-                output=result.response.value,
-                output_tokens=self._compile_tokens_count(
-                    value=result.response.value,
-                    requests_tokens=result.response.request_output_tokens,
-                    response_tokens=result.response.response_output_tokens,
-                    preferred_tokens_source=settings.preferred_output_tokens_source,
-                    errored=False,
-                ),
-                start_time=result.response.start_time,
-                end_time=result.response.end_time,
-                first_token_time=result.response.first_iter_time or -1.0,
-                last_token_time=result.response.last_iter_time or -1.0,
+    @classmethod
+    def _calculate_requests_per_second(
+        cls,
+        statuses: list[Literal["successful", "incomplete", "error"]],
+        requests: list[GenerativeRequestStats],
+    ) -> StatusDistributionSummary:
+        filtered_statuses = []
+        filtered_times = []
+
+        for status, request in zip(statuses, requests):
+            if not all_defined(
+                safe_getattr(request.scheduler_info.request_timings, "request_start"),
+                safe_getattr(request.scheduler_info.request_timings, "request_end"),
+            ):
+                continue
+
+            filtered_statuses.append(status)
+            filtered_times.append(
+                (
+                    request.scheduler_info.request_timings.request_start,
+                    request.scheduler_info.request_timings.request_end,
+                )
             )
-            for result in self.results.successful
-            if result.request and result.response
-        ]
-        incomplete: list[GenerativeTextErrorStats] = [
-            GenerativeTextErrorStats(
-                error=result.response.error or "",
-                request_id=result.request.request_id,
-                request_type=result.request.request_type,
-                scheduler_info=result.request_info,
-                prompt=str(result.request.content),
-                prompt_tokens=self._compile_tokens_count(
-                    value=str(result.request.content),
-                    requests_tokens=result.response.request_prompt_tokens,
-                    response_tokens=result.response.response_prompt_tokens,
-                    preferred_tokens_source=settings.preferred_prompt_tokens_source,
-                    errored=True,
-                ),
-                output=result.response.value,
-                output_tokens=self._compile_tokens_count(
-                    value=result.response.value,
-                    requests_tokens=result.response.request_output_tokens,
-                    response_tokens=result.response.response_output_tokens,
-                    preferred_tokens_source=settings.preferred_output_tokens_source,
-                    errored=True,
-                ),
-                start_time=result.response.start_time,
-                end_time=result.response.end_time,
-                first_token_time=result.response.first_iter_time,
-                last_token_time=result.response.last_iter_time,
-            )
-            for result in self.results.incomplete
-            if result.request and result.response
-        ]
-        error: list[GenerativeTextErrorStats] = [
-            GenerativeTextErrorStats(
-                error=result.response.error or "",
-                request_id=result.request.request_id,
-                request_type=result.request.request_type,
-                scheduler_info=result.request_info,
-                prompt=str(result.request.content),
-                prompt_tokens=self._compile_tokens_count(
-                    value=str(result.request.content),
-                    requests_tokens=result.response.request_prompt_tokens,
-                    response_tokens=result.response.response_prompt_tokens,
-                    preferred_tokens_source=settings.preferred_prompt_tokens_source,
-                    errored=True,
-                ),
-                output=result.response.value,
-                output_tokens=self._compile_tokens_count(
-                    value=result.response.value,
-                    requests_tokens=result.response.request_output_tokens,
-                    response_tokens=result.response.response_output_tokens,
-                    preferred_tokens_source=settings.preferred_output_tokens_source,
-                    errored=True,
-                ),
-                start_time=result.response.start_time,
-                end_time=result.response.end_time,
-                first_token_time=result.response.first_iter_time,
-                last_token_time=result.response.last_iter_time,
-            )
-            for result in self.results.errored
-            if result.request and result.response
-        ]
 
-        return successful, incomplete, error
-
-    def _compile_tokens_count(
-        self,
-        value: str,
-        requests_tokens: Optional[int],
-        response_tokens: Optional[int],
-        preferred_tokens_source: Optional[Literal["request", "response", "local"]],
-        errored: bool,
-    ) -> int:
-        if not errored and preferred_tokens_source == "response" and response_tokens:
-            return response_tokens or 0
-
-        if not errored and preferred_tokens_source == "request" and requests_tokens:
-            return requests_tokens or 0
-
-        if preferred_tokens_source in {"response", "request"} and (
-            self.processor is None or errored or response_tokens or requests_tokens
-        ):
-            # we had a preferred tokens source that isn't local and we either
-            # have the data to return something or we don't have the ability
-            # to calculate locally
-            return response_tokens or requests_tokens or 0
-
-        self.processor = check_load_processor(
-            self.processor,
-            processor_args=self.processor_args,
-            error_msg="Processor/Tokenizer is required for calculating token counts.",
+        return StatusDistributionSummary.from_request_times(
+            request_types=filtered_statuses,
+            requests=filtered_times,
+            distribution_type="rate",
         )
-        return len(self.processor.tokenize(value))
+
+    @classmethod
+    def _calculate_request_concurrency(
+        cls,
+        statuses: list[Literal["successful", "incomplete", "error"]],
+        requests: list[GenerativeRequestStats],
+    ) -> StatusDistributionSummary:
+        filtered_statuses = []
+        filtered_times = []
+
+        for status, request in zip(statuses, requests):
+            if not all_defined(
+                safe_getattr(request.scheduler_info.request_timings, "request_start"),
+                safe_getattr(request.scheduler_info.request_timings, "request_end"),
+            ):
+                continue
+
+            filtered_statuses.append(status)
+            filtered_times.append(
+                (
+                    request.scheduler_info.request_timings.request_start,
+                    request.scheduler_info.request_timings.request_end,
+                )
+            )
+
+        return StatusDistributionSummary.from_request_times(
+            request_types=filtered_statuses,
+            requests=filtered_times,
+            distribution_type="concurrency",
+        )
+
+    @classmethod
+    def _calculate_request_latency(
+        cls,
+        statuses: list[Literal["successful", "incomplete", "error"]],
+        requests: list[GenerativeRequestStats],
+    ) -> StatusDistributionSummary:
+        filtered_statuses = []
+        filtered_values = []
+
+        for status, request in zip(statuses, requests):
+            if not all_defined(request.request_latency):
+                continue
+
+            filtered_statuses.append(status)
+            filtered_values.append(request.request_latency)
+
+        return StatusDistributionSummary.from_values(
+            value_types=filtered_statuses,
+            values=filtered_values,
+        )
+
+    @classmethod
+    def _calculate_prompt_token_count(
+        cls,
+        statuses: list[Literal["successful", "incomplete", "error"]],
+        requests: list[GenerativeRequestStats],
+    ) -> StatusDistributionSummary:
+        filtered_statuses = []
+        filtered_values = []
+
+        for status, request in zip(statuses, requests):
+            if not all_defined(request.prompt_tokens):
+                continue
+
+            filtered_statuses.append(status)
+            filtered_values.append(request.prompt_tokens)
+
+        return StatusDistributionSummary.from_values(
+            value_types=filtered_statuses,
+            values=filtered_values,
+        )
+
+    @classmethod
+    def _calculate_output_token_count(
+        cls,
+        statuses: list[Literal["successful", "incomplete", "error"]],
+        requests: list[GenerativeRequestStats],
+    ) -> StatusDistributionSummary:
+        filtered_statuses = []
+        filtered_values = []
+
+        for status, request in zip(statuses, requests):
+            if not all_defined(request.output_tokens):
+                continue
+
+            filtered_statuses.append(status)
+            filtered_values.append(request.output_tokens)
+
+        return StatusDistributionSummary.from_values(
+            value_types=filtered_statuses,
+            values=filtered_values,
+        )
+
+    @classmethod
+    def _calculate_total_token_count(
+        cls,
+        statuses: list[Literal["successful", "incomplete", "error"]],
+        requests: list[GenerativeRequestStats],
+    ) -> StatusDistributionSummary:
+        filtered_statuses = []
+        filtered_values = []
+
+        for status, request in zip(statuses, requests):
+            if not all_defined(request.total_tokens):
+                continue
+
+            filtered_statuses.append(status)
+            filtered_values.append(request.total_tokens)
+
+        return StatusDistributionSummary.from_values(
+            value_types=filtered_statuses,
+            values=filtered_values,
+        )
+
+    @classmethod
+    def _calculate_time_to_first_token_ms(
+        cls,
+        statuses: list[Literal["successful", "incomplete", "error"]],
+        requests: list[GenerativeRequestStats],
+    ) -> StatusDistributionSummary:
+        filtered_statuses = []
+        filtered_values = []
+
+        for status, request in zip(statuses, requests):
+            if not all_defined(request.time_to_first_token_ms):
+                continue
+
+            filtered_statuses.append(status)
+            filtered_values.append(request.time_to_first_token_ms)
+
+        return StatusDistributionSummary.from_values(
+            value_types=filtered_statuses,
+            values=filtered_values,
+        )
+
+    @classmethod
+    def _calculate_time_per_output_token_ms(
+        cls,
+        statuses: list[Literal["successful", "incomplete", "error"]],
+        requests: list[GenerativeRequestStats],
+    ) -> StatusDistributionSummary:
+        filtered_statuses = []
+        filtered_values = []
+        filtered_weights = []
+
+        for status, request in zip(statuses, requests):
+            if not all_defined(request.time_to_first_token_ms):
+                continue
+
+            # Add time to first token separately to better reflect in distribution
+            filtered_statuses.append(status)
+            filtered_values.append(request.time_to_first_token_ms)
+            filtered_weights.append(1)
+
+            if not all_defined(request.inter_token_latency_ms):
+                continue
+
+            # Add tokens after the first token to get the full distribution
+            filtered_statuses.append(status)
+            filtered_values.append(request.inter_token_latency_ms)
+            filtered_weights.append(request.output_tokens - 1)
+
+        return StatusDistributionSummary.from_values(
+            value_types=filtered_statuses,
+            values=filtered_values,
+            weights=filtered_weights,
+        )
+
+    @classmethod
+    def _calculate_inter_token_latency_ms(
+        cls,
+        statuses: list[Literal["successful", "incomplete", "error"]],
+        requests: list[GenerativeRequestStats],
+    ) -> StatusDistributionSummary:
+        filtered_statuses = []
+        filtered_values = []
+        filtered_weights = []
+
+        for status, request in zip(statuses, requests):
+            if not all_defined(request.inter_token_latency_ms):
+                continue
+
+            filtered_statuses.append(status)
+            filtered_values.append(request.inter_token_latency_ms)
+            filtered_weights.append(request.output_tokens - 1)
+
+        return StatusDistributionSummary.from_values(
+            value_types=filtered_statuses,
+            values=filtered_values,
+            weights=filtered_weights,
+        )
+
+    @classmethod
+    def _calculate_output_tokens_per_second(
+        cls,
+        statuses: list[Literal["successful", "incomplete", "error"]],
+        requests: list[GenerativeRequestStats],
+    ) -> StatusDistributionSummary:
+        filtered_statuses = []
+        filtered_request_times = []
+        filtered_first_iter_times = []
+        filtered_iter_counts = []
+
+        for status, request in zip(statuses, requests):
+            if not all_defined(request.output_tokens_per_second):
+                continue
+
+            filtered_statuses.append(status)
+            filtered_request_times.append(
+                (
+                    request.scheduler_info.request_timings.request_start,
+                    request.scheduler_info.request_timings.request_end,
+                )
+            )
+            filtered_first_iter_times.append(
+                request.scheduler_info.request_timings.first_iteration
+            )
+            filtered_iter_counts.append(request.output_tokens)
+
+        return StatusDistributionSummary.from_iterable_request_times(
+            request_types=filtered_statuses,
+            requests=filtered_request_times,
+            first_iter_times=filtered_first_iter_times,
+            iter_counts=filtered_iter_counts,
+        )
+
+    @classmethod
+    def _calculate_tokens_per_second(
+        cls,
+        statuses: list[Literal["successful", "incomplete", "error"]],
+        requests: list[GenerativeRequestStats],
+    ) -> StatusDistributionSummary:
+        filtered_statuses = []
+        filtered_request_times = []
+        filtered_first_iter_times = []
+        filtered_iter_counts = []
+        filtered_first_iter_counts = []
+
+        for status, request in zip(statuses, requests):
+            if not all_defined(request.tokens_per_second):
+                continue
+
+            filtered_statuses.append(status)
+            filtered_request_times.append(
+                (
+                    request.scheduler_info.request_timings.request_start,
+                    request.scheduler_info.request_timings.request_end,
+                )
+            )
+            filtered_first_iter_times.append(
+                request.scheduler_info.request_timings.first_iteration
+            )
+            filtered_iter_counts.append(request.output_tokens - 1)
+            filtered_first_iter_counts.append(request.prompt_tokens + 1)
+
+        return StatusDistributionSummary.from_iterable_request_times(
+            request_types=filtered_statuses,
+            requests=filtered_request_times,
+            first_iter_times=filtered_first_iter_times,
+            iter_counts=filtered_iter_counts,
+            first_iter_counts=filtered_first_iter_counts,
+        )

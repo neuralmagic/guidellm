@@ -11,11 +11,13 @@ from loguru import logger
 
 from guidellm import data as package_data
 from guidellm.config import settings
+from guidellm.utils.colors import Colors
 
 __all__ = [
     "EndlessTextCreator",
     "clean_text",
     "filter_text",
+    "format_value_display",
     "is_puncutation",
     "load_text",
     "split_text",
@@ -23,6 +25,34 @@ __all__ = [
 ]
 
 MAX_PATH_LENGTH = 4096
+
+
+def format_value_display(
+    value: float,
+    label: str,
+    units: str = "",
+    total_characters: Optional[int] = None,
+    digits_places: Optional[int] = None,
+    decimal_places: Optional[int] = None,
+) -> str:
+    if decimal_places is None and digits_places is None:
+        formatted_number = f"{value}:.0f"
+    elif digits_places is None:
+        formatted_number = f"{value:.{decimal_places}f}"
+    elif decimal_places is None:
+        formatted_number = f"{value:>{digits_places}f}"
+    else:
+        formatted_number = f"{value:>{digits_places}.{decimal_places}f}"
+
+    result = f"{formatted_number}{units} [{Colors.INFO}]{label}[/{Colors.INFO}]"
+
+    if total_characters is not None:
+        total_characters += len(Colors.INFO) * 2 + 5
+
+        if len(result) < total_characters:
+            result = result.rjust(total_characters)
+
+    return result
 
 
 def split_text_list_by_length(

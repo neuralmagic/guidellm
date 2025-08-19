@@ -1,10 +1,11 @@
+from guidellm.backend import GenerationRequest
+
 from .loader import (
     GenerativeRequestLoader,
     GenerativeRequestLoaderDescription,
     RequestLoader,
     RequestLoaderDescription,
 )
-from .request import GenerationRequest
 
 __all__ = [
     "GenerationRequest",
