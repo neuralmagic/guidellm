@@ -22,11 +22,13 @@ from guidellm.scheduler import (
     AsyncPoissonStrategy,
     BackendInterface,
     ConcurrentStrategy,
-    MaxDurationConstraintInitializer,
-    MaxErrorRateConstraintInitializer,
-    MaxErrorsConstraintInitializer,
-    MaxGlobalErrorRateConstraintInitializer,
-    MaxNumberConstraintInitializer,
+    # TODO: Review Cursor generated code (start)
+    MaxDurationConstraint,
+    MaxErrorRateConstraint,
+    MaxErrorsConstraint,
+    MaxGlobalErrorRateConstraint,
+    MaxNumberConstraint,
+    # TODO: Review Cursor generated code (end)
     MeasuredRequestTimings,
     SynchronousStrategy,
     ThroughputStrategy,
@@ -98,7 +100,9 @@ class MockBackend(BackendInterface):
         ):
             raise RuntimeError("Mock error for testing")
 
-        yield f"response_for_{request}"
+        # TODO: Review Cursor generated code (start)
+        yield f"response_for_{request}", request_info
+        # TODO: Review Cursor generated code (end)
 
 
 class TestWorkerGroup:
@@ -118,12 +122,16 @@ class TestWorkerGroup:
     @pytest.mark.parametrize(
         "constraints_inits",
         [
-            {"max_num": MaxNumberConstraintInitializer(max_num=100)},
-            {"max_duration": MaxDurationConstraintInitializer(max_duration=0.5)},
-            {"max_errors": MaxErrorsConstraintInitializer(max_errors=20)},
-            {"max_error_rate": MaxErrorRateConstraintInitializer(max_error_rate=0.1)},
+            # TODO: Review Cursor generated code (start)
+            {"max_num": MaxNumberConstraint(max_num=100)},
+            {"max_duration": MaxDurationConstraint(max_duration=0.5)},
+            {"max_errors": MaxErrorsConstraint(max_errors=20)},
+            {"max_error_rate": MaxErrorRateConstraint(max_error_rate=0.1)},
+            # TODO: Review Cursor generated code (end)
             {
-                "max_global_error_rate": MaxGlobalErrorRateConstraintInitializer(
+                # TODO: Review Cursor generated code (start)
+                "max_global_error_rate": MaxGlobalErrorRateConstraint(
+                    # TODO: Review Cursor generated code (end)
                     max_error_rate=0.1
                 )
             },

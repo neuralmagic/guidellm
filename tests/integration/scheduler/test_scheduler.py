@@ -88,7 +88,9 @@ class MockBackend(BackendInterface):
         ):
             raise RuntimeError(f"mock_error_for_{request.payload}")
 
-        yield f"response_for_{request.payload}"
+        # TODO: Review Cursor generated code (start)
+        yield f"response_for_{request.payload}", request_info
+        # TODO: Review Cursor generated code (end)
 
 
 @pytest.mark.smoke

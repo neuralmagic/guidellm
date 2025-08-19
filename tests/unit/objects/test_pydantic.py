@@ -1,7 +1,10 @@
 import pytest
 from pydantic import computed_field
 
-from guidellm.utils.pydantic import StandardBaseModel
+# TODO: Review Cursor generated code (start)
+from guidellm.utils.pydantic_utils import StandardBaseModel
+
+# TODO: Review Cursor generated code (end)
 
 
 class ExampleModel(StandardBaseModel):

@@ -5,7 +5,9 @@ from typing import Literal
 import numpy as np
 import pytest
 
-from guidellm.objects import (
+# TODO: Review Cursor generated code (start)
+from guidellm.utils import (
+    # TODO: Review Cursor generated code (end)
     DistributionSummary,
     Percentiles,
     RunningStats,
