@@ -354,12 +354,53 @@ class OpenAIHTTPBackend(Backend):
                 request_info.request_timings.request_end = time.time()
                 response.request_output_tokens = usage_stats.output_tokens
                 response.request_prompt_tokens = usage_stats.prompt_tokens
+                # TODO: Review Cursor generated code (start)
+                logger.debug(
+                    f"OpenAI Backend: Got usage_stats - prompt_tokens={usage_stats.prompt_tokens}, output_tokens={usage_stats.output_tokens}"
+                )
+                # TODO: Review Cursor generated code (end)
+
+            # TODO: Review Cursor generated code (start)
+            # Debug what we're actually yielding
+            from loguru import logger
+            # TODO: Review Cursor generated code (end)
+
+            # TODO: Review Cursor generated code (start)
+            logger.debug("OpenAI Backend: About to yield response, request_info")
+            logger.debug(
+                f"OpenAI Backend: request_info.request_timings id: {id(request_info.request_timings)}"
+            )
+            if request_info.request_timings:
+                logger.debug(
+                    f"OpenAI Backend: Yielding with first_iteration={request_info.request_timings.first_iteration}, last_iteration={request_info.request_timings.last_iteration}"
+                )
+            else:
+                logger.debug("OpenAI Backend: Yielding with request_timings=None")
+            # TODO: Review Cursor generated code (end)
 
             yield response, request_info
 
         if request_info.request_timings.request_end is None:
             request_info.request_timings.request_end = time.time()
         response.delta = None
+
+        # TODO: Review Cursor generated code (start)
+        # Debug final yield
+        from loguru import logger
+        # TODO: Review Cursor generated code (end)
+
+        # TODO: Review Cursor generated code (start)
+        logger.debug(
+            f"OpenAI Backend: Final yield - request_info.request_timings id: {id(request_info.request_timings)}"
+        )
+        if request_info.request_timings:
+            logger.debug(
+                f"OpenAI Backend: Final yield with first_iteration={request_info.request_timings.first_iteration}, last_iteration={request_info.request_timings.last_iteration}"
+            )
+        else:
+            logger.debug("OpenAI Backend: Final yield with request_timings=None")
+        # TODO: Review Cursor generated code (end)
+
         yield response, request_info
 
     async def text_completions(

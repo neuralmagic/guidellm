@@ -76,7 +76,9 @@ class MsgpackEncoding:
 
             encoded = {
                 cls.PYDANTIC_TAG: f"{origin.__module__}.{origin.__name__}",
-                cls.PYDANTIC_DATA: obj.model_dump(),
+                # TODO: Review Cursor generated code (start)
+                cls.PYDANTIC_DATA: obj.model_dump(exclude_none=False),
+                # TODO: Review Cursor generated code (end)
             }
 
             if args:

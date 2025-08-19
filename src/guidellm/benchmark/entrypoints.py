@@ -6,6 +6,11 @@ from pathlib import Path
 from typing import Any, Literal
 
 from datasets import Dataset, DatasetDict, IterableDataset, IterableDatasetDict
+
+# TODO: Review Cursor generated code (start)
+from loguru import logger
+
+# TODO: Review Cursor generated code (end)
 from pydantic import validate_call
 from rich.console import Console
 from transformers import (  # type: ignore[import]
@@ -60,7 +65,147 @@ async def benchmark_with_scenario(scenario: Scenario, **kwargs):
     """
 
     if isinstance(scenario, GenerativeTextScenario):
-        return await benchmark_generative_text(**vars(scenario), **kwargs)
+        # TODO: Review Cursor generated code (start)
+        # Map scenario fields to function parameters
+        # Use model_dump() to get values, but handle special cases for problematic fields
+        scenario_vars = scenario.model_dump()
+        # TODO: Review Cursor generated code (end)
+
+        # TODO: Review Cursor generated code (start)
+        # Debug logging to understand the data field issue
+        logger.debug(f"DEBUG: scenario.data type: {type(scenario.data)}")
+        logger.debug(f"DEBUG: scenario.data value: {scenario.data}")
+        logger.debug(
+            f"DEBUG: scenario_vars['data'] type: {type(scenario_vars.get('data'))}"
+        )
+        logger.debug(f"DEBUG: scenario_vars['data'] value: {scenario_vars.get('data')}")
+        # TODO: Review Cursor generated code (end)
+
+        # TODO: Review Cursor generated code (start)
+        # Handle the data field specially if it's a ValidatorIterator
+        # This happens when Pydantic converts string data to an iterable during validation
+        if "data" in scenario_vars and "ValidatorIterator" in str(
+            type(scenario_vars["data"])
+        ):
+            logger.debug("DEBUG: Detected ValidatorIterator for data field")
+            # Try to get the original string value
+            # For CLI usage, the data should be a string like "prompt_tokens=256,output_tokens=128"
+            try:
+                # Access the actual scenario field to get the real string value
+                actual_data = getattr(scenario, "data", None)
+                logger.debug(
+                    f"DEBUG: actual_data from scenario.data: {actual_data}, type: {type(actual_data)}"
+                )
+                if isinstance(actual_data, str):
+                    scenario_vars["data"] = actual_data
+                    logger.debug(
+                        f"DEBUG: Updated scenario_vars['data'] to string: {actual_data}"
+                    )
+                elif hasattr(actual_data, "__iter__") and not isinstance(
+                    actual_data, (dict, str)
+                ):
+                    # If it's an iterable, try to extract the string representation
+                    # For now, we'll just keep the original value and let the function handle it
+                    logger.debug(
+                        "DEBUG: data is iterable but not string/dict, keeping original"
+                    )
+            except Exception as e:
+                logger.debug(f"DEBUG: Exception handling ValidatorIterator: {e}")
+        # TODO: Review Cursor generated code (end)
+
+        # TODO: Review Cursor generated code (start)
+        function_params = {}
+        # TODO: Review Cursor generated code (end)
+
+        # TODO: Review Cursor generated code (start)
+        # Direct mappings (same name)
+        direct_mapping_fields = [
+            "target",
+            "data",
+            "random_seed",
+            "model",
+            "processor",
+            "processor_args",
+            "data_args",
+            "data_sampler",
+            "max_seconds",
+            "max_requests",
+            "max_error_rate",
+            "backend_args",
+        ]
+        for field in direct_mapping_fields:
+            if field in scenario_vars:
+                function_params[field] = scenario_vars[field]
+        # TODO: Review Cursor generated code (end)
+
+        # TODO: Review Cursor generated code (start)
+        # Handle rate specially - only include if not None
+        if "rate" in scenario_vars and scenario_vars["rate"] is not None:
+            function_params["rate"] = scenario_vars["rate"]
+        # TODO: Review Cursor generated code (end)
+
+        # TODO: Review Cursor generated code (start)
+        # Field name mappings (different names)
+        field_mappings = {
+            "backend_type": "backend",
+            "rate_type": "profile",
+            "warmup_percent": "warmup",
+            "cooldown_percent": "cooldown",
+            "output_sampling": "request_samples",
+        }
+        for scenario_field, function_param in field_mappings.items():
+            if scenario_field in scenario_vars:
+                function_params[function_param] = scenario_vars[scenario_field]
+        # TODO: Review Cursor generated code (end)
+
+        # TODO: Review Cursor generated code (start)
+        # Handle kwargs mappings (CLI parameters to function parameters)
+        final_kwargs = {}
+        kwargs_mappings = {
+            "output_path": "save_path",
+        }
+        # TODO: Review Cursor generated code (end)
+
+        # TODO: Review Cursor generated code (start)
+        for cli_param, function_param in kwargs_mappings.items():
+            if cli_param in kwargs:
+                final_kwargs[function_param] = kwargs[cli_param]
+        # TODO: Review Cursor generated code (end)
+
+        # TODO: Review Cursor generated code (start)
+        # Handle special kwargs that need transformation
+        if "show_progress" in kwargs:
+            # Direct mapping: show_progress=True means print_updates=True
+            final_kwargs["print_updates"] = kwargs.get("show_progress", True)
+        # TODO: Review Cursor generated code (end)
+
+        # TODO: Review Cursor generated code (start)
+        # Filter out CLI-specific parameters that don't map to function parameters
+        # These will be handled differently by the function's internal logic
+        filtered_kwargs = [
+            "show_progress_scheduler_stats",
+            "output_console",
+            "output_extras",
+        ]
+        for kwarg in filtered_kwargs:
+            # These parameters don't directly map to function parameters, so we skip them
+            pass
+        # TODO: Review Cursor generated code (end)
+
+        # TODO: Review Cursor generated code (start)
+        # Debug logging for function parameters
+        logger.debug(
+            f"DEBUG: Final function_params keys: {list(function_params.keys())}"
+        )
+        logger.debug(
+            f"DEBUG: Final function_params['data']: {function_params.get('data')}, type: {type(function_params.get('data'))}"
+        )
+        logger.debug(f"DEBUG: Final final_kwargs: {final_kwargs}")
+        # TODO: Review Cursor generated code (end)
+
+        # TODO: Review Cursor generated code (start)
+        return await benchmark_generative_text(**function_params, **final_kwargs)
+        # TODO: Review Cursor generated code (end)
     else:
         raise ValueError(f"Unsupported Scenario type {type(scenario)}")
 
@@ -115,6 +260,26 @@ async def benchmark_generative_text(
 ) -> tuple[GenerativeBenchmarksReport, dict[str, Any]]:
     console = Console(quiet=not print_updates)
 
+    # TODO: Review Cursor generated code (start)
+    # Fix ValidatorIterator issue: convert it back to string if needed
+    if "ValidatorIterator" in str(type(data)):
+        try:
+            # Try to extract the original string from the ValidatorIterator
+            # For CLI synthetic data like "prompt_tokens=256,output_tokens=128"
+            if hasattr(data, "__iter__"):
+                # Convert iterator to list and reconstruct the string
+                data_list = list(data)
+                if len(data_list) > 0 and all(
+                    isinstance(item, str) for item in data_list
+                ):
+                    # If all items are strings (characters), join them back into the original string
+                    data = "".join(data_list)
+                elif len(data_list) == 1 and isinstance(data_list[0], str):
+                    data = data_list[0]
+        except Exception:
+            pass
+    # TODO: Review Cursor generated code (end)
+
     backend = (
         Backend.create(backend, target=target, model=model, **(backend_args or {}))
         if not isinstance(backend, Backend)
@@ -160,9 +325,23 @@ async def benchmark_generative_text(
         random_seed=random_seed,
     )
     unique_requests = request_loader.num_unique_items(raise_err=False)
+
+    # TODO: Review Cursor generated code (start)
+    # Try to get info or description, with fallback
+    info_str = "GenerativeRequestLoader"
+    if hasattr(request_loader, "info"):
+        info_str = request_loader.info
+    elif hasattr(request_loader, "description"):
+        info_str = str(request_loader.description)
+    elif hasattr(request_loader, "data"):
+        info_str = f"data={request_loader.data}"
+    # TODO: Review Cursor generated code (end)
+
     console.print(
         f"[{Colors.SUCCESS}]Request loader created:[/{Colors.SUCCESS}] "
-        f"with {unique_requests} unique requests, {request_loader.info}"
+        # TODO: Review Cursor generated code (start)
+        f"with {unique_requests} unique requests, {info_str}"
+        # TODO: Review Cursor generated code (end)
     )
 
     for key, val in {
@@ -175,20 +354,54 @@ async def benchmark_generative_text(
         if val is not None:
             constraints[key] = val
     if not isinstance(profile, Profile):
-        profile = Profile.create(
-            rate_type=profile,
-            rate=rate,
-            random_seed=random_seed,
-            constraints={**constraints},
-        )
+        # TODO: Review Cursor generated code (start)
+        # Fix rate parameter if it's a list with single value
+        rate_param = rate
+        if isinstance(rate, list) and len(rate) == 1:
+            rate_param = rate[0]
+        # TODO: Review Cursor generated code (end)
+
+        # TODO: Review Cursor generated code (start)
+        # Handle rate parameter for different profile types
+        profile_kwargs = {
+            "rate_type": profile,
+            "random_seed": random_seed,
+            "constraints": {**constraints},
+        }
+        # TODO: Review Cursor generated code (end)
+
+        # TODO: Review Cursor generated code (start)
+        # For synchronous profiles, rate must be None
+        if profile == "synchronous":
+            profile_kwargs["rate"] = None
+        elif rate_param is not UNSET:
+            profile_kwargs["rate"] = rate_param
+        # TODO: Review Cursor generated code (end)
+
+        # TODO: Review Cursor generated code (start)
+        profile = Profile.create(**profile_kwargs)
+        # TODO: Review Cursor generated code (end)
     elif constraints:
         raise ValueError(
             "Constraints must be empty or unset when providing a Profile instance. "
             f"Provided constraints: {constraints} ; provided profile: {profile}"
         )
+    # TODO: Review Cursor generated code (start)
+    # Try to get profile info with fallback
+    profile_info = ""
+    if hasattr(profile, "info"):
+        profile_info = profile.info
+    elif hasattr(profile, "type_"):
+        profile_info = f"type={profile.type_}"
+    else:
+        profile_info = str(profile)
+    # TODO: Review Cursor generated code (end)
+
     console.print(
         f"[{Colors.SUCCESS}]Profile created:[/{Colors.SUCCESS}] "
-        f"{profile.__class__.__name__} {profile.info}"
+        # TODO: Review Cursor generated code (start)
+        f"{profile.__class__.__name__} {profile_info}"
+        # TODO: Review Cursor generated code (end)
     )
 
     aggregators = (
@@ -209,8 +422,17 @@ async def benchmark_generative_text(
         f"{len(aggregators)} aggregators: {', '.join(aggregators.keys())}"
     )
 
+    # TODO: Review Cursor generated code (start)
+    # Handle UNSET parameter for progress
+    progress_instances = [] if progress is UNSET or progress is None else progress
+    progress_enabled = progress is not UNSET and progress is not None
+    # TODO: Review Cursor generated code (end)
+
     progress_group = BenchmarkerProgressGroup(
-        instances=progress or [], enabled=progress is not None
+        # TODO: Review Cursor generated code (start)
+        instances=progress_instances,
+        enabled=progress_enabled,
+        # TODO: Review Cursor generated code (end)
     )
     report = GenerativeBenchmarksReport()
     console.print(f"[{Colors.INFO}]Starting benchmark run...[/{Colors.INFO}]\n\n\n")
@@ -227,7 +449,9 @@ async def benchmark_generative_text(
             GenerationRequest,
             GenerationRequestTimings,
             GenerationResponse,
-        ].run(
+            # TODO: Review Cursor generated code (start)
+        ]().run(
+            # TODO: Review Cursor generated code (end)
             requests=request_loader,
             backend=backend,
             profile=profile,
@@ -249,11 +473,39 @@ async def benchmark_generative_text(
         )
 
     if outputs == UNSET:
-        outputs = {
-            "console": {"save_path": save_path},
-            "csv": {"save_path": save_path},
-            "html": {"save_path": save_path},
-        }
+        # TODO: Review Cursor generated code (start)
+        outputs = {"console": {"save_path": save_path}}
+        # TODO: Review Cursor generated code (end)
+
+        # TODO: Review Cursor generated code (start)
+        # Infer output format from file extension if save_path is provided
+        if save_path is not None and save_path is not UNSET:
+            save_path_obj = (
+                Path(save_path) if not isinstance(save_path, Path) else save_path
+            )
+            # TODO: Review Cursor generated code (end)
+
+            # TODO: Review Cursor generated code (start)
+            # If it's a directory, use default JSON
+            if save_path_obj.is_dir():
+                outputs["json"] = {"save_path": save_path}
+            else:
+                # Infer format from file extension
+                extension = save_path_obj.suffix.lower()
+                if extension == ".json":
+                    # JSON output is handled by report.save_file(), don't add duplicate
+                    pass
+                elif extension == ".yaml" or extension == ".yml":
+                    # YAML output is handled by report.save_file(), don't add duplicate
+                    pass
+                elif extension == ".csv":
+                    outputs["csv"] = {"save_path": save_path}
+                elif extension == ".html" or extension == ".htm":
+                    outputs["html"] = {"save_path": save_path}
+                else:
+                    # Unknown extension, default to JSON via report.save_file()
+                    pass
+            # TODO: Review Cursor generated code (end)
     for key, output in GenerativeBenchmarkerOutput.resolve(outputs or {}).items():
         finalized_outputs[key] = await output.finalize(report)
         console.print(

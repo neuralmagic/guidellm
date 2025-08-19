@@ -134,6 +134,20 @@ class WorkerProcess(Generic[RequestT, MeasuredRequestTimingsT, ResponseT]):
         try:
             asyncio.run(self.run_async())
         except Exception as exc:
+            # TODO: Review Cursor generated code (start)
+            # Add detailed logging for debugging worker failures
+            from loguru import logger
+            # TODO: Review Cursor generated code (end)
+
+            # TODO: Review Cursor generated code (start)
+            logger.error(
+                f"Worker process {self.local_rank} detailed error: {type(exc).__name__}: {exc}"
+            )
+            logger.error(
+                f"Worker process {self.local_rank} error traceback:", exc_info=True
+            )
+            # TODO: Review Cursor generated code (end)
+
             self.error_event.set()
             raise RuntimeError(
                 f"Worker process {self.local_rank} encountered an error: {exc}"
@@ -383,6 +397,52 @@ class WorkerProcess(Generic[RequestT, MeasuredRequestTimingsT, ResponseT]):
 
             # Complete
             request_info.scheduler_timings.resolve_end = time.time()
+
+            # TODO: Review Cursor generated code (start)
+            # Debug timing data before final update
+            from loguru import logger
+            # TODO: Review Cursor generated code (end)
+
+            # TODO: Review Cursor generated code (start)
+            if (
+                hasattr(request_info, "request_timings")
+                and request_info.request_timings
+            ):
+                logger.debug(
+                    f"Worker: Final timing data before completed update: "
+                    f"first_iteration={getattr(request_info.request_timings, 'first_iteration', None)}, "
+                    f"last_iteration={getattr(request_info.request_timings, 'last_iteration', None)}"
+                )
+            # TODO: Review Cursor generated code (end)
+
+            # TODO: Review Cursor generated code (start)
+            # Debug timing data before final update
+            from loguru import logger
+            # TODO: Review Cursor generated code (end)
+
+            # TODO: Review Cursor generated code (start)
+            if (
+                hasattr(request_info, "request_timings")
+                and request_info.request_timings
+            ):
+                logger.debug(
+                    f"Worker: Before final update - timing type: {type(request_info.request_timings)}"
+                )
+                if hasattr(request_info.request_timings, "first_iteration"):
+                    logger.debug(
+                        f"Worker: Before final update - first_iteration: {getattr(request_info.request_timings, 'first_iteration', 'N/A')}"
+                    )
+                    logger.debug(
+                        f"Worker: Before final update - last_iteration: {getattr(request_info.request_timings, 'last_iteration', 'N/A')}"
+                    )
+                else:
+                    logger.debug(
+                        "Worker: Before final update - NO first_iteration attribute"
+                    )
+            else:
+                logger.debug("Worker: Before final update - NO request_timings")
+            # TODO: Review Cursor generated code (end)
+
             await self._handle_request_update(
                 new_status="completed",
                 response=response,
@@ -448,8 +508,55 @@ class WorkerProcess(Generic[RequestT, MeasuredRequestTimingsT, ResponseT]):
             ):
                 # Haven't sent resolved update yet
                 request_info.status = new_status
+
+                # TODO: Review Cursor generated code (start)
+                # Debug before model_copy
+                from loguru import logger
+                # TODO: Review Cursor generated code (end)
+
+                # TODO: Review Cursor generated code (start)
+                if (
+                    hasattr(request_info, "request_timings")
+                    and request_info.request_timings
+                ):
+                    logger.debug(
+                        f"Worker: Before model_copy - timing type: {type(request_info.request_timings)}"
+                    )
+                    if hasattr(request_info.request_timings, "first_iteration"):
+                        logger.debug(
+                            f"Worker: Before model_copy - first_iteration: {getattr(request_info.request_timings, 'first_iteration', 'N/A')}"
+                        )
+                # TODO: Review Cursor generated code (end)
+
+                # TODO: Review Cursor generated code (start)
+                copied_info = request_info.model_copy(deep=True)
+                # TODO: Review Cursor generated code (end)
+
+                # TODO: Review Cursor generated code (start)
+                # Debug after model_copy
+                if (
+                    hasattr(copied_info, "request_timings")
+                    and copied_info.request_timings
+                ):
+                    logger.debug(
+                        f"Worker: After model_copy - timing type: {type(copied_info.request_timings)}"
+                    )
+                    if hasattr(copied_info.request_timings, "first_iteration"):
+                        logger.debug(
+                            f"Worker: After model_copy - first_iteration: {getattr(copied_info.request_timings, 'first_iteration', 'N/A')}"
+                        )
+                    else:
+                        logger.debug(
+                            "Worker: After model_copy - NO first_iteration attribute"
+                        )
+                else:
+                    logger.debug("Worker: After model_copy - NO request_timings")
+                # TODO: Review Cursor generated code (end)
+
                 await self.pending_updates_queue.async_put(
-                    (response, request, request_info.model_copy())
+                    # TODO: Review Cursor generated code (start)
+                    (response, request, copied_info)
+                    # TODO: Review Cursor generated code (end)
                 )
                 prev_status = new_status
 

@@ -180,6 +180,17 @@ def benchmark():
         "If None, will run until max_seconds or the data is exhausted."
     ),
 )
+# TODO: Review Cursor generated code (start)
+@click.option(
+    "--max-error-rate",
+    type=float,
+    default=None,
+    help=(
+        "The maximum error rate allowed (0.0 to 1.0) before stopping the benchmark. "
+        "If None, no error rate constraint will be applied."
+    ),
+)
+# TODO: Review Cursor generated code (end)
 @click.option(
     "--warmup-percent",
     type=float,
@@ -261,6 +272,9 @@ def run(
     rate,
     max_seconds,
     max_requests,
+    # TODO: Review Cursor generated code (start)
+    max_error_rate,
+    # TODO: Review Cursor generated code (end)
     warmup_percent,
     cooldown_percent,
     disable_progress,
@@ -288,6 +302,9 @@ def run(
         rate=rate,
         max_seconds=max_seconds,
         max_requests=max_requests,
+        # TODO: Review Cursor generated code (start)
+        max_error_rate=max_error_rate,
+        # TODO: Review Cursor generated code (end)
         warmup_percent=warmup_percent,
         cooldown_percent=cooldown_percent,
         output_sampling=output_sampling,
