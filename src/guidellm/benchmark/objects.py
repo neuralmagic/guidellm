@@ -240,10 +240,10 @@ class GenerativeRequestStats(BenchmarkRequestStats):
 
         :return: Sum of prompt and output tokens, or None if either is unavailable.
         """
-        if self.prompt_tokens is None or self.output_tokens is None:
+        if self.prompt_tokens is None and self.output_tokens is None:
             return None
 
-        return self.prompt_tokens + self.output_tokens
+        return (self.prompt_tokens or 0) + (self.output_tokens or 0)
 
     @computed_field  # type: ignore[misc]
     @property

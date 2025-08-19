@@ -139,6 +139,7 @@ class OpenAIHTTPBackend(Backend):
         self._in_process = False
         self._async_client: Optional[httpx.AsyncClient] = None
 
+    @property
     def info(self) -> dict[str, Any]:
         """
         :return: Dictionary containing backend configuration details.

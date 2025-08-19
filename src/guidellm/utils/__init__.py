@@ -2,7 +2,16 @@ from .auto_importer import AutoImporterMixin
 from .colors import Colors
 from .default_group import DefaultGroupHandler
 from .encoding import MsgpackEncoding
-from .general import UNSET, UnsetType
+from .general import (
+    UNSET,
+    UnsetType,
+    all_defined,
+    safe_add,
+    safe_divide,
+    safe_getattr,
+    safe_multiply,
+    safe_subtract,
+)
 from .hf_datasets import (
     SUPPORTED_TYPES,
     save_dataset_to_file,
@@ -64,12 +73,18 @@ __all__ = [
     "ThreadSafeSingletonMixin",
     "TimeRunningStats",
     "UnsetType",
+    "all_defined",
     "check_load_processor",
     "clean_text",
     "filter_text",
     "format_value_display",
     "is_puncutation",
     "load_text",
+    "safe_add",
+    "safe_divide",
+    "safe_getattr",
+    "safe_multiply",
+    "safe_subtract",
     "save_dataset_to_file",
     "split_text",
     "split_text_list_by_length",

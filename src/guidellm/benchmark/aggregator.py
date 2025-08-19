@@ -59,6 +59,10 @@ from guidellm.utils import (
     PydanticClassRegistryMixin,
     StatusBreakdown,
     StatusDistributionSummary,
+    all_defined,
+    safe_divide,
+    safe_getattr,
+    safe_subtract,
 )
 
 __all__ = [
@@ -161,9 +165,9 @@ class SerializableAggregator(
         base_key: str,
         agg_state: dict[str, Any],
         end_val: int | float | None,
-        start_val: int | float | None,
+        start_val: int | float | None = 0.0,
         count: int = 1,
-    ):
+    ) -> int | float | None:
         """
         Add timing or count metrics to aggregation state.
 
@@ -176,14 +180,32 @@ class SerializableAggregator(
         :param start_val: Start value for calculating delta, defaults to 0.0.
         :param count: Number of occurrences to count, defaults to 1.
         """
-        if start_val is None or end_val is None:
-            return
+        if not all_defined(end_val, start_val):
+            return None
 
         delta_val = end_val - start_val
         agg_state[f"{base_key}_total"] = (
             agg_state.get(f"{base_key}_total", 0) + delta_val
         )
         agg_state[f"{base_key}_count"] = agg_state.get(f"{base_key}_count", 0) + count
+
+        return agg_state[f"{base_key}_total"]
+
+    @classmethod
+    def add_aggregate_metric_rate(
+        cls, base_key: str, agg_state: dict[str, Any]
+    ) -> float:
+        """
+        Calculate the rate of a metric by dividing the total by the count.
+
+        :param base_key: Base key name for the metric.
+        :param agg_state: Aggregation state dictionary to update.
+        """
+        agg_state[f"{base_key}_rate"] = safe_divide(
+            agg_state.get(f"{base_key}_total"), agg_state.get(f"{base_key}_count")
+        )
+
+        return agg_state[f"{base_key}_rate"]
 
     @classmethod
     @abstractmethod
@@ -297,7 +319,8 @@ class SchedulerStatsAggregator(
         :param scheduler_state: Current scheduler execution state.
         :return: Updated aggregation state for intermediate reporting.
         """
-        if response is None:
+        if request_info.status not in ("completed", "errored", "cancelled"):
+            # Only compile scheduler stats for processed requests
             return None
 
         self.add_aggregate_metric(
@@ -310,7 +333,7 @@ class SchedulerStatsAggregator(
             "worker_resolve_start_delay",
             agg_state,
             request_info.scheduler_timings.resolve_start,
-            request_info.scheduler_timings.scheduled,
+            request_info.scheduler_timings.scheduled_at,
         )
         self.add_aggregate_metric(
             "worker_resolve_time",
@@ -322,7 +345,7 @@ class SchedulerStatsAggregator(
             "worker_resolve_end_delay",
             agg_state,
             request_info.scheduler_timings.resolve_end,
-            request_info.request_timings.request_end,
+            safe_getattr(request_info.request_timings, "request_end"),
         )
         self.add_aggregate_metric(
             "finalized_delay",
@@ -340,18 +363,18 @@ class SchedulerStatsAggregator(
             "request_start_delay",
             agg_state,
             request_info.scheduler_timings.resolve_start,
-            request_info.request_timings.request_start,
+            safe_getattr(request_info.request_timings, "request_start"),
         )
         self.add_aggregate_metric(
             "request_time",
             agg_state,
-            request_info.request_timings.request_end,
-            request_info.request_timings.request_start,
+            safe_getattr(request_info.request_timings, "request_end"),
+            safe_getattr(request_info.request_timings, "request_start"),
         )
         self.add_aggregate_metric(
             "request_targeted_start_delay",
             agg_state,
-            request_info.request_timings.request_start,
+            safe_getattr(request_info.request_timings, "request_start"),
             request_info.scheduler_timings.targeted_start,
         )
 
@@ -368,10 +391,10 @@ class SchedulerStatsAggregator(
         :return: Dictionary containing compiled scheduler statistics.
         """
         return {
-            "scheduler_stats": BenchmarkSchedulerStats(
+            "run_stats": BenchmarkSchedulerStats(
                 start_time=scheduler_state.start_time,
                 end_time=scheduler_state.end_time,
-                requests_made=StatusBreakdown(
+                requests_made=StatusBreakdown[int, int, int, int](
                     successful=scheduler_state.successful_requests,
                     incomplete=scheduler_state.cancelled_requests,
                     errored=scheduler_state.errored_requests,
@@ -381,41 +404,32 @@ class SchedulerStatsAggregator(
                         + scheduler_state.errored_requests
                     ),
                 ),
-                queued_time_avg=(
-                    agg_state.get("queued_time_total", 0.0)
-                    / agg_state.get("queued_time_count", 1)
+                queued_time_avg=self.add_aggregate_metric_rate(
+                    "queued_time", agg_state
                 ),
-                worker_resolve_start_delay_avg=(
-                    agg_state.get("worker_resolve_start_delay_total", 0.0)
-                    / agg_state.get("worker_resolve_start_delay_count", 1)
+                worker_resolve_start_delay_avg=self.add_aggregate_metric_rate(
+                    "worker_resolve_start_delay", agg_state
                 ),
-                worker_resolve_time_avg=(
-                    agg_state.get("worker_resolve_time_total", 0.0)
-                    / agg_state.get("worker_resolve_time_count", 1)
+                worker_resolve_time_avg=self.add_aggregate_metric_rate(
+                    "worker_resolve_time", agg_state
                 ),
-                worker_resolve_end_delay_avg=(
-                    agg_state.get("worker_resolve_end_delay_total", 0.0)
-                    / agg_state.get("worker_resolve_end_delay_count", 1)
+                worker_resolve_end_delay_avg=self.add_aggregate_metric_rate(
+                    "worker_resolve_end_delay", agg_state
                 ),
-                finalized_delay_avg=(
-                    agg_state.get("finalized_delay_total", 0.0)
-                    / agg_state.get("finalized_delay_count", 1)
+                finalized_delay_avg=self.add_aggregate_metric_rate(
+                    "finalized_delay", agg_state
                 ),
-                worker_targeted_start_delay_avg=(
-                    agg_state.get("worker_targeted_start_delay_total", 0.0)
-                    / agg_state.get("worker_targeted_start_delay_count", 1)
+                worker_targeted_start_delay_avg=self.add_aggregate_metric_rate(
+                    "worker_targeted_start_delay", agg_state
                 ),
-                request_start_delay_avg=(
-                    agg_state.get("request_start_delay_total", 0.0)
-                    / agg_state.get("request_start_delay_count", 1)
+                request_start_delay_avg=self.add_aggregate_metric_rate(
+                    "request_start_delay", agg_state
                 ),
-                request_time_avg=(
-                    agg_state.get("request_time_total", 0.0)
-                    / agg_state.get("request_time_count", 1)
+                request_time_avg=self.add_aggregate_metric_rate(
+                    "request_time", agg_state
                 ),
-                request_targeted_delay_avg=(
-                    agg_state.get("request_targeted_delay_total", 0.0)
-                    / agg_state.get("request_targeted_delay_count", 1)
+                request_targeted_delay_avg=self.add_aggregate_metric_rate(
+                    "request_targeted_delay", agg_state
                 ),
             ),
         }
@@ -460,54 +474,114 @@ class GenerativeStatsProgressAggregator(
         :param scheduler_state: Current scheduler execution state.
         :return: Updated aggregation state for progress reporting.
         """
-        if response is None:
+        if request_info.status == "completed":
+            prefix = "completed_"
+        elif request_info.status == "errored":
+            prefix = "errored_"
+        elif request_info.status == "cancelled":
+            prefix = "cancelled_"
+        else:
+            # Only compile progress stats for processed requests
             return None
 
-        if (
-            request_info.status == "completed"
-            and request_info.request_timings.request_end is not None
-        ):
-            agg_state["requests_per_second"] = scheduler_state.successful_requests / (
-                request_info.request_timings.request_end - scheduler_state.start_time
+        start_time = scheduler_state.start_time
+        end_time = (
+            safe_getattr(request_info.request_timings, "request_end")
+            or request_info.scheduler_timings.resolve_end
+        )
+        duration = safe_subtract(end_time, start_time)
+
+        if all_defined(end_time):
+            # request rate
+            requests = (
+                scheduler_state.successful_requests
+                if request_info.status == "completed"
+                else scheduler_state.cancelled_requests
+                if request_info.status == "cancelled"
+                else scheduler_state.errored_requests
             )
+            agg_state[f"{prefix}requests_per_second"] = safe_divide(requests, duration)
+            agg_state["requests_per_second"] = safe_divide(
+                scheduler_state.processed_requests, duration
+            )
+
+        if all_defined(
+            safe_getattr(request_info.request_timings, "request_end"),
+            safe_getattr(request_info.request_timings, "request_start"),
+        ):
+            # request latency
+            self.add_aggregate_metric(
+                f"{prefix}request_latency",
+                agg_state,
+                request_info.request_timings.request_end,
+                request_info.request_timings.request_start,
+            )
+            self.add_aggregate_metric_rate(f"{prefix}request_latency", agg_state)
             self.add_aggregate_metric(
                 "request_latency",
                 agg_state,
                 request_info.request_timings.request_end,
                 request_info.request_timings.request_start,
             )
+            self.add_aggregate_metric_rate("request_latency", agg_state)
 
-        if (
-            request_info.status == "completed"
-            and request_info.request_timings.first_iteration is not None
-            and request_info.request_timings.last_iteration is not None
-            and response.output_tokens
+        if all_defined(
+            safe_getattr(request_info.request_timings, "last_iteration"),
+            safe_getattr(request_info.request_timings, "request_start"),
         ):
+            # TPOT
+            self.add_aggregate_metric(
+                f"{prefix}time_per_output_token",
+                agg_state,
+                request_info.request_timings.last_iteration,
+                request_info.request_timings.request_start,
+            )
+            self.add_aggregate_metric_rate(f"{prefix}time_per_output_token", agg_state)
             self.add_aggregate_metric(
                 "time_per_output_token",
                 agg_state,
                 request_info.request_timings.last_iteration,
                 request_info.request_timings.request_start,
-                count=response.output_tokens,
             )
+            self.add_aggregate_metric_rate("time_per_output_token", agg_state)
 
-        if (
-            request_info.request_timings.first_iteration is not None
-            and request_info.request_timings.request_start is not None
+        if all_defined(
+            safe_getattr(request_info.request_timings, "first_iteration"),
+            safe_getattr(request_info.request_timings, "request_start"),
         ):
+            # TTFT
+            self.add_aggregate_metric(
+                f"{prefix}time_to_first_token",
+                agg_state,
+                request_info.request_timings.first_iteration,
+                request_info.request_timings.request_start,
+            )
+            self.add_aggregate_metric_rate(f"{prefix}time_to_first_token", agg_state)
             self.add_aggregate_metric(
                 "time_to_first_token",
                 agg_state,
                 request_info.request_timings.first_iteration,
                 request_info.request_timings.request_start,
             )
+            self.add_aggregate_metric_rate("time_to_first_token", agg_state)
 
         if (
-            request_info.request_timings.first_iteration is not None
-            and request_info.request_timings.last_iteration is not None
-            and response.output_tokens is not None
+            all_defined(
+                safe_getattr(request_info.request_timings, "first_iteration"),
+                safe_getattr(request_info.request_timings, "last_iteration"),
+                safe_getattr(response, "output_tokens"),
+            )
             and response.output_tokens > 1
         ):
+            # ITL
+            self.add_aggregate_metric(
+                f"{prefix}inter_token_latency",
+                agg_state,
+                request_info.request_timings.last_iteration,
+                request_info.request_timings.first_iteration,
+                count=response.output_tokens - 1,
+            )
+            self.add_aggregate_metric_rate(f"{prefix}inter_token_latency", agg_state)
             self.add_aggregate_metric(
                 "inter_token_latency",
                 agg_state,
@@ -515,50 +589,76 @@ class GenerativeStatsProgressAggregator(
                 request_info.request_timings.first_iteration,
                 count=response.output_tokens - 1,
             )
+            self.add_aggregate_metric_rate("inter_token_latency", agg_state)
 
-        if response.prompt_tokens is not None:
+        if all_defined(safe_getattr(response, "prompt_tokens")):
+            # Prompt tokens totals
             self.add_aggregate_metric(
-                "prompt_tokens",
-                agg_state,
-                response.prompt_tokens,
-                0,
+                f"{prefix}prompt_tokens", agg_state, response.prompt_tokens
             )
-            if request_info.request_timings.request_end is not None:
-                agg_state["prompt_tokens_per_second"] = agg_state[
-                    "prompt_tokens_total"
-                ] / (
-                    request_info.request_timings.request_end
-                    - scheduler_state.start_time
+            agg_state[f"{prefix}prompt_tokens_per_request"] = (
+                self.add_aggregate_metric_rate(f"{prefix}prompt_tokens", agg_state)
+            )
+            self.add_aggregate_metric(
+                f"{prefix}prompt_tokens", agg_state, response.prompt_tokens
+            )
+            agg_state["prompt_tokens_per_request"] = self.add_aggregate_metric_rate(
+                "prompt_tokens", agg_state
+            )
+
+            if all_defined(end_time):
+                # Prompt tokens rate
+                agg_state[f"{prefix}prompt_tokens_rate"] = safe_divide(
+                    agg_state[f"{prefix}prompt_tokens_total"], duration
+                )
+                agg_state["prompt_tokens_rate"] = safe_divide(
+                    agg_state["prompt_tokens_total"], duration
                 )
 
-        if response.output_tokens is not None:
+        if all_defined(safe_getattr(response, "output_tokens")):
+            # Output tokens totals
             self.add_aggregate_metric(
-                "output_tokens",
-                agg_state,
-                response.output_tokens,
-                0,
+                f"{prefix}output_tokens", agg_state, response.output_tokens
             )
-            if request_info.request_timings.request_end is not None:
-                agg_state["output_tokens_per_second"] = agg_state[
-                    "output_tokens_total"
-                ] / (
-                    request_info.request_timings.request_end
-                    - scheduler_state.start_time
+            agg_state[f"{prefix}output_tokens_per_request"] = (
+                self.add_aggregate_metric_rate(f"{prefix}output_tokens", agg_state)
+            )
+            self.add_aggregate_metric(
+                "output_tokens", agg_state, response.output_tokens
+            )
+            agg_state["output_tokens_per_request"] = self.add_aggregate_metric_rate(
+                "output_tokens", agg_state
+            )
+
+            if all_defined(end_time):
+                # Output tokens rate
+                agg_state[f"{prefix}output_tokens_rate"] = safe_divide(
+                    agg_state[f"{prefix}output_tokens_total"], duration
+                )
+                agg_state["output_tokens_rate"] = safe_divide(
+                    agg_state["output_tokens_total"], duration
                 )
 
-        if response.total_tokens is not None:
+        if all_defined(safe_getattr(response, "total_tokens")):
+            # Total tokens totals
             self.add_aggregate_metric(
-                "total_tokens",
-                agg_state,
-                response.total_tokens,
-                0,
+                f"{prefix}total_tokens", agg_state, response.total_tokens
             )
-            if request_info.request_timings.request_end is not None:
-                agg_state["total_tokens_per_second"] = agg_state[
-                    "total_tokens_total"
-                ] / (
-                    request_info.request_timings.request_end
-                    - scheduler_state.start_time
+            agg_state[f"{prefix}total_tokens_per_request"] = (
+                self.add_aggregate_metric_rate(f"{prefix}total_tokens", agg_state)
+            )
+            self.add_aggregate_metric("total_tokens", agg_state, response.total_tokens)
+            agg_state["total_tokens_per_request"] = self.add_aggregate_metric_rate(
+                "total_tokens", agg_state
+            )
+
+            if all_defined(end_time):
+                # Total tokens rate
+                agg_state[f"{prefix}total_tokens_rate"] = safe_divide(
+                    agg_state[f"{prefix}total_tokens_total"], duration
+                )
+                agg_state["total_tokens_rate"] = safe_divide(
+                    agg_state["total_tokens_total"], duration
                 )
 
         return agg_state
@@ -648,13 +748,10 @@ class GenerativeRequestsAggregator(
         }
 
         # Skip invalid requests
-        if (
-            response is None
-            or request_info.status not in {"completed", "canceled", "errored"}
-            or (
-                request_info.status == "canceled"
-                and request_info.scheduler_timings.resolve_start is None
-            )
+        if request_info.status not in {"completed", "canceled", "errored"} or (
+            request_info.status == "canceled"
+            and safe_getattr(request_info.scheduler_timings, "resolve_start") is None
+            # Canceled requests that never started should not be kept
         ):
             return status
 
@@ -772,211 +869,38 @@ class GenerativeRequestsAggregator(
                 ),
             ),
             "metrics": GenerativeMetrics(
-                requests_per_second=(
-                    StatusDistributionSummary.from_request_times(
-                        request_types=total_types,
-                        requests=[
-                            (
-                                req.scheduler_info.request_timings.request_start,
-                                req.scheduler_info.request_timings.request_end,
-                            )
-                            for req in total
-                            if (
-                                req.scheduler_info.request_timings.request_start
-                                is not None
-                                and req.scheduler_info.request_timings.request_end
-                                is not None
-                            )
-                        ],
-                        distribution_type="rate",
-                    )
+                requests_per_second=self._calculate_requests_per_second(
+                    statuses=total_types, requests=total
                 ),
-                request_concurrency=(
-                    StatusDistributionSummary.from_request_times(
-                        request_types=total_types,
-                        requests=[
-                            (
-                                req.scheduler_info.request_timings.request_start,
-                                req.scheduler_info.request_timings.request_end,
-                            )
-                            for req in total
-                            if (
-                                req.scheduler_info.request_timings.request_start
-                                is not None
-                                and req.scheduler_info.request_timings.request_end
-                                is not None
-                            )
-                        ],
-                        distribution_type="concurrency",
-                    )
+                request_concurrency=self._calculate_request_concurrency(
+                    statuses=total_types, requests=total
                 ),
-                request_latency=(
-                    StatusDistributionSummary.from_values(
-                        value_types=total_types,
-                        values=[
-                            req.request_latency
-                            for req in total
-                            if req.request_latency is not None
-                        ],
-                    )
+                request_latency=self._calculate_request_latency(
+                    statuses=total_types, requests=total
                 ),
-                prompt_token_count=(
-                    StatusDistributionSummary.from_values(
-                        value_types=[
-                            type_
-                            for type_, req in zip(total_types, total)
-                            if req.prompt_tokens is not None
-                        ],
-                        values=[
-                            req.prompt_tokens
-                            for req in total
-                            if req.prompt_tokens is not None
-                        ],
-                    )
+                prompt_token_count=self._calculate_prompt_token_count(
+                    statuses=total_types, requests=total
                 ),
-                output_token_count=(
-                    StatusDistributionSummary.from_values(
-                        value_types=[
-                            type_
-                            for type_, req in zip(total_types, total)
-                            if req.output_tokens is not None
-                        ],
-                        values=[
-                            req.output_tokens
-                            for req in total
-                            if req.output_tokens is not None
-                        ],
-                    )
+                output_token_count=self._calculate_output_token_count(
+                    statuses=total_types, requests=total
                 ),
-                total_token_count=(
-                    StatusDistributionSummary.from_values(
-                        value_types=[
-                            type_
-                            for type_, req in zip(total_types, total)
-                            if req.prompt_tokens is not None
-                            or req.output_tokens is not None
-                        ],
-                        values=[
-                            (req.prompt_tokens or 0) + (req.output_tokens or 0)
-                            for req in total
-                            if req.prompt_tokens is not None
-                            or req.output_tokens is not None
-                        ],
-                    )
+                total_token_count=self._calculate_total_token_count(
+                    statuses=total_types, requests=total
                 ),
-                time_to_first_token_ms=(
-                    StatusDistributionSummary.from_values(
-                        value_types=[
-                            type_
-                            for type_, req in zip(total_types, total)
-                            if req.time_to_first_token_ms is not None
-                        ],
-                        values=[
-                            req.time_to_first_token_ms
-                            for req in total
-                            if req.time_to_first_token_ms is not None
-                        ],
-                    )
+                time_to_first_token_ms=self._calculate_time_to_first_token_ms(
+                    statuses=total_types, requests=total
                 ),
-                time_per_output_token_ms=(
-                    StatusDistributionSummary.from_values(
-                        value_types=[
-                            type_
-                            for type_, req in zip(total_types, total)
-                            if req.time_per_output_token_ms is not None
-                        ],
-                        values=[
-                            req.time_per_output_token_ms
-                            for req in total
-                            if req.time_per_output_token_ms is not None
-                        ],
-                        weights=[
-                            req.output_tokens
-                            for req in total
-                            if req.time_per_output_token_ms is not None
-                        ],
-                    )
+                time_per_output_token_ms=self._calculate_time_per_output_token_ms(
+                    statuses=total_types, requests=total
                 ),
-                inter_token_latency_ms=(
-                    StatusDistributionSummary.from_values(
-                        value_types=[
-                            type_
-                            for type_, req in zip(total_types, total)
-                            if req.inter_token_latency_ms is not None
-                        ],
-                        values=[
-                            req.inter_token_latency_ms
-                            for req in total
-                            if req.inter_token_latency_ms is not None
-                        ],
-                        weights=[
-                            req.output_tokens - 1
-                            for req in total
-                            if req.inter_token_latency_ms is not None
-                        ],
-                    )
+                inter_token_latency_ms=self._calculate_inter_token_latency_ms(
+                    statuses=total_types, requests=total
                 ),
-                output_tokens_per_second=(
-                    StatusDistributionSummary.from_iterable_request_times(
-                        request_types=[
-                            type_
-                            for type_, req in zip(total_types, total)
-                            if req.output_tokens_per_second is not None
-                        ],
-                        requests=[
-                            (
-                                req.scheduler_info.request_timings.request_start,
-                                req.scheduler_info.request_timings.request_end,
-                            )
-                            for req in total
-                            if req.output_tokens_per_second is not None
-                        ],
-                        first_iter_times=[
-                            req.scheduler_info.request_timings.first_iteration
-                            for req in total
-                            if req.output_tokens_per_second is not None
-                            and req.scheduler_info.request_timings.first_iteration
-                            is not None
-                        ],
-                        iter_counts=[
-                            req.output_tokens
-                            for req in total
-                            if req.output_tokens_per_second is not None
-                            and req.output_tokens is not None
-                        ],
-                    )
+                output_tokens_per_second=self._calculate_output_tokens_per_second(
+                    statuses=total_types, requests=total
                 ),
-                tokens_per_second=(
-                    StatusDistributionSummary.from_iterable_request_times(
-                        request_types=[
-                            type_
-                            for type_, req in zip(total_types, total)
-                            if req.tokens_per_second is not None
-                        ],
-                        requests=[
-                            (
-                                req.scheduler_info.request_timings.request_start,
-                                req.scheduler_info.request_timings.request_end,
-                            )
-                            for req in total
-                            if req.tokens_per_second is not None
-                        ],
-                        first_iter_times=[
-                            req.scheduler_info.request_timings.first_iteration
-                            for req in total
-                            if req.tokens_per_second is not None
-                        ],
-                        iter_counts=[
-                            req.output_tokens
-                            for req in total
-                            if req.tokens_per_second is not None
-                        ],
-                        first_iter_counts=[
-                            req.prompt_tokens
-                            for req in total
-                            if req.tokens_per_second is not None
-                        ],
-                    )
+                tokens_per_second=self._calculate_tokens_per_second(
+                    statuses=total_types, requests=total
                 ),
             ),
         }
@@ -1068,4 +992,297 @@ class GenerativeRequestsAggregator(
                 else None
             ),
             scheduler_info=request_info,
+        )
+
+    @classmethod
+    def _calculate_requests_per_second(
+        cls,
+        statuses: list[Literal["successful", "incomplete", "error"]],
+        requests: list[GenerativeRequestStats],
+    ) -> StatusDistributionSummary:
+        filtered_statuses = []
+        filtered_times = []
+
+        for status, request in zip(statuses, requests):
+            if not all_defined(
+                safe_getattr(request.scheduler_info.request_timings, "request_start"),
+                safe_getattr(request.scheduler_info.request_timings, "request_end"),
+            ):
+                continue
+
+            filtered_statuses.append(status)
+            filtered_times.append(
+                (
+                    request.scheduler_info.request_timings.request_start,
+                    request.scheduler_info.request_timings.request_end,
+                )
+            )
+
+        return StatusDistributionSummary.from_request_times(
+            request_types=filtered_statuses,
+            requests=filtered_times,
+            distribution_type="rate",
+        )
+
+    @classmethod
+    def _calculate_request_concurrency(
+        cls,
+        statuses: list[Literal["successful", "incomplete", "error"]],
+        requests: list[GenerativeRequestStats],
+    ) -> StatusDistributionSummary:
+        filtered_statuses = []
+        filtered_times = []
+
+        for status, request in zip(statuses, requests):
+            if not all_defined(
+                safe_getattr(request.scheduler_info.request_timings, "request_start"),
+                safe_getattr(request.scheduler_info.request_timings, "request_end"),
+            ):
+                continue
+
+            filtered_statuses.append(status)
+            filtered_times.append(
+                (
+                    request.scheduler_info.request_timings.request_start,
+                    request.scheduler_info.request_timings.request_end,
+                )
+            )
+
+        return StatusDistributionSummary.from_request_times(
+            request_types=filtered_statuses,
+            requests=filtered_times,
+            distribution_type="concurrency",
+        )
+
+    @classmethod
+    def _calculate_request_latency(
+        cls,
+        statuses: list[Literal["successful", "incomplete", "error"]],
+        requests: list[GenerativeRequestStats],
+    ) -> StatusDistributionSummary:
+        filtered_statuses = []
+        filtered_values = []
+
+        for status, request in zip(statuses, requests):
+            if not all_defined(request.request_latency):
+                continue
+
+            filtered_statuses.append(status)
+            filtered_values.append(request.request_latency)
+
+        return StatusDistributionSummary.from_values(
+            value_types=filtered_statuses,
+            values=filtered_values,
+        )
+
+    @classmethod
+    def _calculate_prompt_token_count(
+        cls,
+        statuses: list[Literal["successful", "incomplete", "error"]],
+        requests: list[GenerativeRequestStats],
+    ) -> StatusDistributionSummary:
+        filtered_statuses = []
+        filtered_values = []
+
+        for status, request in zip(statuses, requests):
+            if not all_defined(request.prompt_tokens):
+                continue
+
+            filtered_statuses.append(status)
+            filtered_values.append(request.prompt_tokens)
+
+        return StatusDistributionSummary.from_values(
+            value_types=filtered_statuses,
+            values=filtered_values,
+        )
+
+    @classmethod
+    def _calculate_output_token_count(
+        cls,
+        statuses: list[Literal["successful", "incomplete", "error"]],
+        requests: list[GenerativeRequestStats],
+    ) -> StatusDistributionSummary:
+        filtered_statuses = []
+        filtered_values = []
+
+        for status, request in zip(statuses, requests):
+            if not all_defined(request.output_tokens):
+                continue
+
+            filtered_statuses.append(status)
+            filtered_values.append(request.output_tokens)
+
+        return StatusDistributionSummary.from_values(
+            value_types=filtered_statuses,
+            values=filtered_values,
+        )
+
+    @classmethod
+    def _calculate_total_token_count(
+        cls,
+        statuses: list[Literal["successful", "incomplete", "error"]],
+        requests: list[GenerativeRequestStats],
+    ) -> StatusDistributionSummary:
+        filtered_statuses = []
+        filtered_values = []
+
+        for status, request in zip(statuses, requests):
+            if not all_defined(request.total_tokens):
+                continue
+
+            filtered_statuses.append(status)
+            filtered_values.append(request.total_tokens)
+
+        return StatusDistributionSummary.from_values(
+            value_types=filtered_statuses,
+            values=filtered_values,
+        )
+
+    @classmethod
+    def _calculate_time_to_first_token_ms(
+        cls,
+        statuses: list[Literal["successful", "incomplete", "error"]],
+        requests: list[GenerativeRequestStats],
+    ) -> StatusDistributionSummary:
+        filtered_statuses = []
+        filtered_values = []
+
+        for status, request in zip(statuses, requests):
+            if not all_defined(request.time_to_first_token_ms):
+                continue
+
+            filtered_statuses.append(status)
+            filtered_values.append(request.time_to_first_token_ms)
+
+        return StatusDistributionSummary.from_values(
+            value_types=filtered_statuses,
+            values=filtered_values,
+        )
+
+    @classmethod
+    def _calculate_time_per_output_token_ms(
+        cls,
+        statuses: list[Literal["successful", "incomplete", "error"]],
+        requests: list[GenerativeRequestStats],
+    ) -> StatusDistributionSummary:
+        filtered_statuses = []
+        filtered_values = []
+        filtered_weights = []
+
+        for status, request in zip(statuses, requests):
+            if not all_defined(request.time_to_first_token_ms):
+                continue
+
+            # Add time to first token separately to better reflect in distribution
+            filtered_statuses.append(status)
+            filtered_values.append(request.time_to_first_token_ms)
+            filtered_weights.append(1)
+
+            if not all_defined(request.inter_token_latency_ms):
+                continue
+
+            # Add tokens after the first token to get the full distribution
+            filtered_statuses.append(status)
+            filtered_values.append(request.inter_token_latency_ms)
+            filtered_weights.append(request.output_tokens - 1)
+
+        return StatusDistributionSummary.from_values(
+            value_types=filtered_statuses,
+            values=filtered_values,
+            weights=filtered_weights,
+        )
+
+    @classmethod
+    def _calculate_inter_token_latency_ms(
+        cls,
+        statuses: list[Literal["successful", "incomplete", "error"]],
+        requests: list[GenerativeRequestStats],
+    ) -> StatusDistributionSummary:
+        filtered_statuses = []
+        filtered_values = []
+        filtered_weights = []
+
+        for status, request in zip(statuses, requests):
+            if not all_defined(request.inter_token_latency_ms):
+                continue
+
+            filtered_statuses.append(status)
+            filtered_values.append(request.inter_token_latency_ms)
+            filtered_weights.append(request.output_tokens - 1)
+
+        return StatusDistributionSummary.from_values(
+            value_types=filtered_statuses,
+            values=filtered_values,
+            weights=filtered_weights,
+        )
+
+    @classmethod
+    def _calculate_output_tokens_per_second(
+        cls,
+        statuses: list[Literal["successful", "incomplete", "error"]],
+        requests: list[GenerativeRequestStats],
+    ) -> StatusDistributionSummary:
+        filtered_statuses = []
+        filtered_request_times = []
+        filtered_first_iter_times = []
+        filtered_iter_counts = []
+
+        for status, request in zip(statuses, requests):
+            if not all_defined(request.output_tokens_per_second):
+                continue
+
+            filtered_statuses.append(status)
+            filtered_request_times.append(
+                (
+                    request.scheduler_info.request_timings.request_start,
+                    request.scheduler_info.request_timings.request_end,
+                )
+            )
+            filtered_first_iter_times.append(
+                request.scheduler_info.request_timings.first_iteration
+            )
+            filtered_iter_counts.append(request.output_tokens)
+
+        return StatusDistributionSummary.from_iterable_request_times(
+            request_types=filtered_statuses,
+            requests=filtered_request_times,
+            first_iter_times=filtered_first_iter_times,
+            iter_counts=filtered_iter_counts,
+        )
+
+    @classmethod
+    def _calculate_tokens_per_second(
+        cls,
+        statuses: list[Literal["successful", "incomplete", "error"]],
+        requests: list[GenerativeRequestStats],
+    ) -> StatusDistributionSummary:
+        filtered_statuses = []
+        filtered_request_times = []
+        filtered_first_iter_times = []
+        filtered_iter_counts = []
+        filtered_first_iter_counts = []
+
+        for status, request in zip(statuses, requests):
+            if not all_defined(request.tokens_per_second):
+                continue
+
+            filtered_statuses.append(status)
+            filtered_request_times.append(
+                (
+                    request.scheduler_info.request_timings.request_start,
+                    request.scheduler_info.request_timings.request_end,
+                )
+            )
+            filtered_first_iter_times.append(
+                request.scheduler_info.request_timings.first_iteration
+            )
+            filtered_iter_counts.append(request.output_tokens - 1)
+            filtered_first_iter_counts.append(request.prompt_tokens + 1)
+
+        return StatusDistributionSummary.from_iterable_request_times(
+            request_types=filtered_statuses,
+            requests=filtered_request_times,
+            first_iter_times=filtered_first_iter_times,
+            iter_counts=filtered_iter_counts,
+            first_iter_counts=filtered_first_iter_counts,
         )

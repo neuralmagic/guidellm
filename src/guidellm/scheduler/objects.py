@@ -224,6 +224,7 @@ class BackendInterface(ABC, Generic[RequestT, MeasuredRequestTimingsT, ResponseT
         :return: The maximum concurrent requests supported, or None if unlimited
         """
 
+    @property
     @abstractmethod
     def info(self) -> dict[str, Any]:
         """

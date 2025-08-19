@@ -26,7 +26,7 @@ from typing import (
 )
 
 from guidellm.benchmark.aggregator import Aggregator, CompilableAggregator
-from guidellm.benchmark.objects import BenchmarkT
+from guidellm.benchmark.objects import BenchmarkerDict, BenchmarkT, SchedulerDict
 from guidellm.benchmark.profile import Profile
 from guidellm.scheduler import (
     BackendInterface,
@@ -41,6 +41,7 @@ from guidellm.scheduler import (
     SchedulingStrategy,
 )
 from guidellm.utils import InfoMixin, ThreadSafeSingletonMixin
+from guidellm.utils.pydantic_utils import StandardBaseDict
 
 __all__ = ["Benchmarker"]
 
@@ -114,9 +115,7 @@ class Benchmarker(
                     request,
                     request_info,
                     scheduler_state,
-                ) in Scheduler[
-                    BackendInterface, RequestT, MeasuredRequestTimingsT, ResponseT
-                ]().run(
+                ) in Scheduler[RequestT, MeasuredRequestTimingsT, ResponseT]().run(
                     requests=requests,
                     backend=backend,
                     strategy=strategy,
@@ -200,43 +199,65 @@ class Benchmarker(
         benchmark_kwargs = {
             "run_id": run_id,
             "run_index": run_index,
-            "scheduler": {
-                "strategy": strategy,
-                "constraints": {
-                    key: InfoMixin.extract_from_obj(val) for key, val in constraints
+            "scheduler": SchedulerDict(
+                strategy=strategy,
+                constraints={
+                    key: InfoMixin.extract_from_obj(val)
+                    for key, val in constraints.items()
                 },
-                "state": scheduler_state,
-            },
-            "benchmarker": {
-                "profile": profile,
-                "requests": InfoMixin.extract_from_obj(requests),
-                "backend": InfoMixin.extract_from_obj(backend),
-                "environment": InfoMixin.extract_from_obj(environment),
-                "aggregators": {
+                state=scheduler_state,
+            ),
+            "benchmarker": BenchmarkerDict(
+                profile=profile,
+                requests=InfoMixin.extract_from_obj(requests),
+                backend=backend.info,
+                environment=environment.info,
+                aggregators={
                     key: InfoMixin.extract_from_obj(aggregator)
                     for key, aggregator in aggregators.items()
                 },
-            },
-            "system": {},
-            "extras": {},
+            ),
+            "env_args": StandardBaseDict(),
+            "extras": StandardBaseDict(),
         }
+
+        def _combine(
+            existing: dict[str, Any] | StandardBaseDict,
+            addition: dict[str, Any] | StandardBaseDict,
+        ) -> dict[str, Any] | StandardBaseDict:
+            if not isinstance(existing, (dict, StandardBaseDict)):
+                raise ValueError(
+                    f"Existing value {existing} (type: {type(existing).__name__}) "
+                    f"is not a valid type for merging."
+                )
+            if not isinstance(addition, (dict, StandardBaseDict)):
+                raise ValueError(
+                    f"Addition value {addition} (type: {type(addition).__name__}) "
+                    f"is not a valid type for merging."
+                )
+
+            add_kwargs = (
+                addition if isinstance(addition, dict) else addition.model_dump()
+            )
+
+            if isinstance(existing, dict):
+                return {**add_kwargs, **existing}
+
+            return existing.__class__(**{**add_kwargs, **existing.model_dump()})
+
         for key, aggregator in aggregators.items():
             if not isinstance(aggregator, CompilableAggregator):
                 continue
 
             compiled = aggregator.compile(aggregators_state[key], scheduler_state)
 
-            if key not in benchmark_kwargs:
-                benchmark_kwargs[key] = compiled
-                continue
-
-            existing_val = benchmark_kwargs[key]
-            if not (isinstance(existing_val, dict) and isinstance(compiled, dict)):
-                raise ValueError(
-                    f"Key '{key}' already exists with value {existing_val} "
-                    f"(type: {type(existing_val).__name__}) and cannot be "
-                    f"overwritten with {compiled} (type: {type(compiled).__name__})"
-                )
-            existing_val.update(compiled)
+            for field_name, field_val in compiled.items():
+                if field_name in benchmark_kwargs:
+                    # If the key already exists, merge the values
+                    benchmark_kwargs[field_name] = _combine(
+                        benchmark_kwargs[field_name], field_val
+                    )
+                else:
+                    benchmark_kwargs[field_name] = field_val
 
         return benchmark_kwargs
