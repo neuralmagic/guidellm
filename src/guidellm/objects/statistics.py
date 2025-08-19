@@ -219,7 +219,7 @@ class DistributionSummary(StandardBaseModel):
         )
 
     @staticmethod
-    def from_request_times(  # noqa: C901
+    def from_request_times(
         requests: list[tuple[float, float]],
         distribution_type: Literal["concurrency", "rate"],
         include_cdf: bool = False,
@@ -243,12 +243,9 @@ class DistributionSummary(StandardBaseModel):
         """
         if distribution_type == "concurrency":
             # convert to delta changes based on when requests were running
-            time_deltas: dict[float, int] = defaultdict(int)
-            for start, end in requests:
-                time_deltas[start] += 1
-                time_deltas[end] -= 1
-
-            events = list(time_deltas.items())
+            events = [(start, 1) for start, _ in requests] + [
+                (end, -1) for _, end in requests
+            ]
         elif distribution_type == "rate":
             # convert to events for when requests finished
             global_start = min(start for start, _ in requests) if requests else 0
