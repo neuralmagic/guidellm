@@ -1,27 +1,17 @@
-# test_server_interaction.py
+# E2E test for max error rate constraint functionality
 
-import json
-import subprocess
-import sys
-import time
 from pathlib import Path
 
 import pytest
-from loguru import logger
 
+from tests.e2e.utils import (
+    GuidellmClient,
+    assert_constraint_triggered,
+    assert_no_python_exceptions,
+    cleanup_report_file,
+    load_benchmark_report,
+)
 from tests.e2e.vllm_sim_server import VllmSimServer
-
-
-def get_guidellm_executable():
-    """Get the path to the guidellm executable in the current environment."""
-    # Get the directory where the current Python executable is located
-    python_bin_dir = Path(sys.executable).parent
-    guidellm_path = python_bin_dir / "guidellm"
-    if guidellm_path.exists():
-        return str(guidellm_path)
-    else:
-        # Fallback to just "guidellm" if not found
-        return "guidellm"
 
 
 @pytest.fixture(scope="module")
@@ -41,73 +31,42 @@ def server():
 @pytest.mark.timeout(30)
 def test_max_error_benchmark(server: VllmSimServer):
     """
-    Another example test interacting with the server.
+    Test that the max error rate constraint is properly triggered when server goes down.
     """
     report_path = Path("tests/e2e/max_error_benchmarks.json")
     rate = 10
     max_error_rate = 0.1
-    guidellm_exe = get_guidellm_executable()
-    command = f"""
-GUIDELLM__MAX_CONCURRENCY=10 GUIDELLM__MAX_WORKER_PROCESSES=10 {guidellm_exe} benchmark \
-  --target "{server.get_url()}" \
-  --rate-type constant \
-  --rate {rate} \
-  --max-seconds 60 \
-  --max-error-rate {max_error_rate} \
-  --data "prompt_tokens=256,output_tokens=128" \
-  --processor "gpt2" \
-  --output-path {report_path}
-              """
-    logger.info(f"Client command: {command}")
-    process = subprocess.Popen(  # noqa: S603
-        ["/bin/bash", "-c", command],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-    )
-    logger.info("Waiting for client to start...")
-    time.sleep(10)
-    server.stop()
+
+    # Create and configure the guidellm client
+    client = GuidellmClient(target=server.get_url(), output_path=report_path)
 
     try:
-        logger.info("Fetching client output")
-        stdout, stderr = process.communicate()
-        logger.debug(f"Client stdout:\n{stdout}")
-        logger.debug(f"Client stderr:\n{stderr}")
+        # Start the benchmark
+        client.start_benchmark(
+            rate=rate,
+            max_seconds=25,
+            max_error_rate=max_error_rate,
+        )
 
-        assert report_path.exists()
-        with report_path.open("r") as f:
-            report = json.load(f)
+        # Wait for the benchmark to complete (server will be stopped after 10 seconds)
+        client.wait_for_completion(timeout=30, stop_server_after=10, server=server)
 
-        assert "benchmarks" in report
-        benchmarks = report["benchmarks"]
-        assert len(benchmarks) > 0
-        benchmark = benchmarks[0]
+        # Assert no Python exceptions occurred
+        assert_no_python_exceptions(client.stderr)
+
+        # Load and validate the report
+        report = load_benchmark_report(report_path)
+        benchmark = report["benchmarks"][0]
+
         # Check that the max error rate constraint was triggered
-        assert "scheduler" in benchmark
-        scheduler = benchmark["scheduler"]
-        assert "state" in scheduler
-        state = scheduler["state"]
-        assert "end_processing_constraints" in state
-        constraints = state["end_processing_constraints"]
-        assert "max_error_rate" in constraints
-        max_error_constraint = constraints["max_error_rate"]
-        assert "metadata" in max_error_constraint
-        metadata = max_error_constraint["metadata"]
-        assert "exceeded_error_rate" in metadata
-        assert metadata["exceeded_error_rate"] is True
-        assert "current_error_rate" in metadata
-        current_error_rate = metadata["current_error_rate"]
-        assert current_error_rate >= max_error_rate
-    finally:
-        process.terminate()  # Send SIGTERM
-        try:
-            process.wait(timeout=5)  # Wait for the process to terminate
-            logger.info("Client stopped successfully.")
-        except subprocess.TimeoutExpired:
-            logger.warning("Client did not terminate gracefully, killing it...")
-            process.kill()  # Send SIGKILL if it doesn't terminate
-            process.wait()
+        assert_constraint_triggered(
+            benchmark,
+            "max_error_rate",
+            {
+                "exceeded_error_rate": True,
+                "current_error_rate": lambda rate: rate >= max_error_rate,
+            },
+        )
 
-    if report_path.exists():
-        report_path.unlink()
+    finally:
+        cleanup_report_file(report_path)
