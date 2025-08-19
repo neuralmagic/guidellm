@@ -88,7 +88,7 @@ class MockBackend(BackendInterface):
         ):
             raise RuntimeError(f"mock_error_for_{request.payload}")
 
-        yield f"response_for_{request.payload}"
+        yield f"response_for_{request.payload}", request_info
 
 
 @pytest.mark.smoke
