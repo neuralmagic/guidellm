@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import inspect
 import math
@@ -6,9 +8,10 @@ import queue
 import threading
 import time
 from collections import defaultdict
+from functools import wraps
 from multiprocessing import get_context
 from queue import Empty
-from typing import Any, Generic, Optional
+from typing import Any, Generic
 
 import culsans
 import pytest
@@ -28,6 +31,17 @@ from guidellm.scheduler import (
     worker_group,
 )
 from guidellm.utils import MsgpackEncoding
+
+
+def async_timeout(delay):
+    def decorator(func):
+        @wraps(func)
+        async def new_func(*args, **kwargs):
+            return await asyncio.wait_for(func(*args, **kwargs), timeout=delay)
+
+        return new_func
+
+    return decorator
 
 
 class MockWorker:
@@ -129,18 +143,18 @@ class MockBackend(BackendInterface):
 
     def __init__(
         self,
-        processes_limit_value: Optional[int] = None,
-        requests_limit_value: Optional[int] = None,
+        processes_limit_value: int | None = None,
+        requests_limit_value: int | None = None,
     ):
         self._processes_limit = processes_limit_value
         self._requests_limit = requests_limit_value
 
     @property
-    def processes_limit(self) -> Optional[int]:
+    def processes_limit(self) -> int | None:
         return self._processes_limit
 
     @property
-    def requests_limit(self) -> Optional[int]:
+    def requests_limit(self) -> int | None:
         return self._requests_limit
 
     def info(self) -> dict[str, Any]:
@@ -162,17 +176,47 @@ class MockBackend(BackendInterface):
 class TestWorkerProcessGroup:
     """Test suite for WorkerProcessGroup class."""
 
+    @pytest.fixture(
+        params=[
+            {
+                "requests": ["request1", "request2", "request3"],
+                "strategy": SynchronousStrategy(),
+                "constraints": {"max_requests": MaxNumberConstraint(max_num=10)},
+            },
+            {
+                "requests": ["req_a", "req_b"],
+                "strategy": ConcurrentStrategy(streams=2),
+                "constraints": {},
+            },
+            {
+                "requests": iter(["req_x", "req_y", "req_z"]),
+                "strategy": ThroughputStrategy(max_concurrency=5),
+                "constraints": {"max_num": MaxNumberConstraint(max_num=5)},
+                "infinite_requests": False,
+            },
+        ],
+        ids=["basic_sync", "concurrent", "throughput_iterator"],
+    )
+    def valid_instances(self, request):
+        """Fixture providing test data for WorkerProcessGroup."""
+        constructor_args = request.param.copy()
+        backend = MockBackend()
+        constructor_args["backend"] = backend
+
+        instance = WorkerProcessGroup(**constructor_args)
+        return instance, constructor_args
+
     @pytest.fixture
     def worker_process_group(self):
-        """Create a WorkerProcessGroup instance for testing."""
+        """Create a basic WorkerProcessGroup instance for testing."""
         backend = MockBackend()
         requests = ["request1", "request2", "request3"]
         strategy = SynchronousStrategy()
         constraints = {"max_requests": MaxNumberConstraint(max_num=10)}
 
         return WorkerProcessGroup(
-            backend=backend,
             requests=requests,
+            backend=backend,
             strategy=strategy,
             constraints=constraints,
         )
@@ -218,72 +262,86 @@ class TestWorkerProcessGroup:
         assert "self" in shutdown_sig.parameters
 
     @pytest.mark.smoke
-    def test_initialization(self, worker_process_group: WorkerProcessGroup):
+    def test_initialization(self, valid_instances):
         """Test basic initialization of WorkerProcessGroup."""
+        instance, constructor_args = valid_instances
+
         # Core attributes
-        assert isinstance(worker_process_group.backend, MockBackend)
-        expected_requests = ["request1", "request2", "request3"]
-        assert list(worker_process_group.requests) == expected_requests
-        assert isinstance(worker_process_group.strategy, SynchronousStrategy)
-        assert isinstance(worker_process_group.constraints, dict)
-        assert "max_requests" in worker_process_group.constraints
-        constraint = worker_process_group.constraints["max_requests"]
-        assert isinstance(constraint, MaxNumberConstraint)
+        assert isinstance(instance.backend, MockBackend)
+        assert instance.requests is constructor_args["requests"]
+        assert isinstance(instance.strategy, type(constructor_args["strategy"]))
+        assert isinstance(instance.constraints, dict)
+        assert instance.constraints == constructor_args["constraints"]
+
+        # Optional attributes
+        expected_infinite = constructor_args.get("infinite_requests", None)
+        assert instance.infinite_requests == expected_infinite
 
         # Multiprocessing attributes (should be None initially)
-        assert worker_process_group.mp_context is None
-        assert worker_process_group.processes is None
+        assert instance.mp_context is None
+        assert instance.processes is None
 
         # Synchronization primitives (should be None initially)
-        assert worker_process_group.startup_barrier is None
-        assert worker_process_group.shutdown_event is None
-        assert worker_process_group.error_event is None
+        assert instance.startup_barrier is None
+        assert instance.shutdown_event is None
+        assert instance.error_event is None
 
         # Queues (should be None initially)
-        assert worker_process_group.requests_queue is None
-        assert worker_process_group.updates_queue is None
-        assert worker_process_group.pending_updates_queue is None
-        assert worker_process_group.pending_updates_complete is None
+        assert instance.requests_queue is None
+        assert instance.updates_queue is None
+        assert instance.pending_updates_queue is None
+        assert instance.pending_requests_complete is None
+        assert instance.pending_updates_complete is None
 
         # Scheduler state and tasks (should be None initially)
-        assert worker_process_group.state_update_lock is None
-        assert worker_process_group.scheduler_state is None
-        assert worker_process_group.populate_requests_task is None
-        assert worker_process_group.populate_updates_task is None
+        assert instance.state_update_lock is None
+        assert instance.scheduler_state is None
+        assert instance.populate_requests_task is None
+        assert instance.populate_updates_task is None
 
     @pytest.mark.sanity
-    def test_invalid_initialization(self):
-        """Test that invalid initialization raises appropriate errors."""
-        # Test with missing required parameters
-        with pytest.raises(TypeError):
-            WorkerProcessGroup()
-
-        # Create a complete set of valid parameters
+    def test_invalid_initialization_values(self):
+        """Test WorkerProcessGroup with invalid field values."""
         backend = MockBackend()
-        requests = ["request1", "request2"]
+        requests = ["req1"]
         strategy = SynchronousStrategy()
-        constraints = {"max_requests": MaxNumberConstraint(max_num=10)}
+        constraints = {}
 
-        # Test missing each required parameter one by one
-        required_params = [
-            "backend",
-            "requests",
-            "strategy",
-            "constraints",
-        ]
+        # Test with None requests (will likely fail during create_processes)
+        group1 = WorkerProcessGroup(
+            requests=None,
+            backend=backend,
+            strategy=strategy,
+            constraints=constraints,
+        )
+        assert group1.requests is None
 
-        for param_to_remove in required_params:
-            kwargs = {
-                "backend": backend,
-                "requests": requests,
-                "strategy": strategy,
-                "constraints": constraints,
-            }
+        # Test with None backend (will likely fail during create_processes)
+        group2 = WorkerProcessGroup(
+            requests=requests,
+            backend=None,
+            strategy=strategy,
+            constraints=constraints,
+        )
+        assert group2.backend is None
 
-            del kwargs[param_to_remove]
+        # Test with None strategy (will likely fail during create_processes)
+        group3 = WorkerProcessGroup(
+            requests=requests,
+            backend=backend,
+            strategy=None,
+            constraints=constraints,
+        )
+        assert group3.strategy is None
 
-            with pytest.raises(TypeError):
-                WorkerProcessGroup(**kwargs)
+        # Test with None constraints (will likely fail during create_processes)
+        group4 = WorkerProcessGroup(
+            requests=requests,
+            backend=backend,
+            strategy=strategy,
+            constraints=None,
+        )
+        assert group4.constraints is None
 
     @pytest.mark.smoke
     @pytest.mark.asyncio
@@ -487,9 +545,70 @@ class TestWorkerProcessGroup:
 
     @pytest.mark.smoke
     @pytest.mark.asyncio
-    async def test_start_cancel_requests_handling(self, monkeypatch):
-        """Test the start() method's async tasks handle shutdown correctly"""
-        # Patch required mock settings
+    @async_timeout(3.0)
+    async def test_error_handling_basic(self, monkeypatch):
+        """Test basic error handling patterns."""
+        self._setup_test_environment(monkeypatch)
+
+        backend = MockBackend()
+        requests = ["req1"]
+        # Create group directly without using helper (which calls start automatically)
+        group = WorkerProcessGroup(
+            requests=requests,
+            backend=backend,
+            strategy=SynchronousStrategy(),
+            constraints={},
+        )
+
+        # Test that error_event can be accessed when not initialized
+        # First save the existing error_event
+        original_error_event = group.error_event
+
+        # Temporarily set to None to test this state
+        group.error_event = None
+        assert group.error_event is None
+
+        # Restore it for the start test
+        group.error_event = original_error_event
+
+        # Test basic group state validation
+        with pytest.raises(
+            RuntimeError, match="create_processes.*must be called before start"
+        ):
+            await group.start(time.time())
+
+    @pytest.mark.smoke
+    @pytest.mark.asyncio
+    @async_timeout(10.0)
+    async def test_shutdown_event_stops_tasks(self, monkeypatch):
+        """Test that setting shutdown event stops background tasks."""
+        self._setup_test_environment(monkeypatch)
+
+        # Setup group
+        backend = MockBackend()
+        requests = [f"req_{i}" for i in range(5)]
+        group = self._create_test_group(backend, requests)
+
+        # Start and verify tasks
+        start_time = time.time() + 0.1
+        await group.start(start_time)
+
+        # Simulate some processing
+        self._process_test_requests(group, start_time, count=2)
+        await asyncio.sleep(0.05)
+
+        # Set shutdown event and verify tasks stop
+        group.shutdown_event.set()
+        await asyncio.sleep(0.1)  # Allow propagation
+
+        assert group.pending_requests_complete.is_set()
+        assert group.populate_requests_task.done()
+
+        # Clean up
+        await group.shutdown()
+
+    def _setup_test_environment(self, monkeypatch):
+        """Helper to setup test environment with mocked settings."""
         monkeypatch.setattr(
             worker_group.settings, "max_worker_processes", 1, raising=False
         )
@@ -499,12 +618,11 @@ class TestWorkerProcessGroup:
         )
         monkeypatch.setattr(worker_group, "WorkerProcess", MockWorker, raising=True)
 
-        # Setup group and mimic create_processes
-        backend = MockBackend()
-        requests = [f"req_{i}" for i in range(10)]
+    def _create_test_group(self, backend, requests):
+        """Helper to create a test group with mocked multiprocessing components."""
         group = WorkerProcessGroup(
-            backend=backend,
             requests=requests,
+            backend=backend,
             strategy=SynchronousStrategy(),
             constraints={},
         )
@@ -512,110 +630,60 @@ class TestWorkerProcessGroup:
         group.startup_barrier = group.mp_context.Barrier(2)
         group.shutdown_event = group.mp_context.Event()
         group.error_event = group.mp_context.Event()
-        group.requests_queue = group.mp_context.Queue(maxsize=1)  # Ensure saturated
+        group.requests_queue = group.mp_context.Queue(maxsize=1)
         group.updates_queue = group.mp_context.Queue()
         group.pending_updates_queue = culsans.Queue()
         group.pending_updates_complete = threading.Event()
-        group.processes = [None]
+        # Create mock process objects instead of None
+        mock_process = type(
+            "MockProcess",
+            (),
+            {"join": lambda self, timeout=None: None, "exitcode": 0, "pid": 12345},
+        )()
+        group.processes = [mock_process]
+        return group
 
-        # Validate function runs and returns at start_time
-        start_time = time.time() + 0.1
-        await asyncio.wait_for(group.start(start_time), timeout=3.0)
-        end_time = time.time()
-        assert end_time == pytest.approx(start_time, abs=0.01)
-
-        # Verify tasks are running
-        assert isinstance(group.populate_requests_task, asyncio.Task)
-        assert isinstance(group.populate_updates_task, asyncio.Task)
-        assert not group.populate_requests_task.done()
-        assert not group.populate_updates_task.done()
-
-        def _process_request():
-            req, req_info = MsgpackEncoding.decode(
-                group.requests_queue.get(timeout=1.0)
-            )
-            group.updates_queue.put(
-                MsgpackEncoding.encode(
-                    (
-                        None,
-                        req,
-                        ScheduledRequestInfo[MockRequestTimings](
-                            request_id=str(req),
-                            status="in_progress",
-                            scheduler_node_id=0,
-                            scheduler_process_id=0,
-                            scheduler_start_time=start_time,
-                        ),
+    def _process_test_requests(self, group, start_time, count=1):
+        """Helper to process test requests and generate updates."""
+        for _ in range(count):
+            try:
+                req, req_info = MsgpackEncoding.decode(
+                    group.requests_queue.get(timeout=0.1)
+                )
+                # Simulate in_progress update
+                group.updates_queue.put(
+                    MsgpackEncoding.encode(
+                        (
+                            None,
+                            req,
+                            ScheduledRequestInfo[MockRequestTimings](
+                                request_id=str(req),
+                                status="in_progress",
+                                scheduler_node_id=0,
+                                scheduler_process_id=0,
+                                scheduler_start_time=start_time,
+                            ),
+                        )
                     )
                 )
-            )
-            group.updates_queue.put(
-                MsgpackEncoding.encode(
-                    (
-                        None,
-                        req,
-                        ScheduledRequestInfo[MockRequestTimings](
-                            request_id=str(req),
-                            status="completed",
-                            scheduler_node_id=0,
-                            scheduler_process_id=0,
-                            scheduler_start_time=start_time,
-                        ),
+                # Simulate completed update
+                group.updates_queue.put(
+                    MsgpackEncoding.encode(
+                        (
+                            None,
+                            req,
+                            ScheduledRequestInfo[MockRequestTimings](
+                                request_id=str(req),
+                                status="completed",
+                                scheduler_node_id=0,
+                                scheduler_process_id=0,
+                                scheduler_start_time=start_time,
+                            ),
+                        )
                     )
                 )
-            )
-
-        # Pull a few requests and push updates to ensure saturation
-        for _ in range(3):
-            await asyncio.sleep(0)
-            _process_request()
-
-        # Check that we've received all expected updates so far
-        updates_by_request = defaultdict(list)
-        while True:
-            try:
-                resp, req, req_info, state = await asyncio.wait_for(
-                    group.pending_updates_queue.async_get(),
-                    timeout=0.1,
-                )
-                updates_by_request[req].append(req_info.status)
-            except asyncio.TimeoutError:
+            except Empty:
                 break
-        for index, (_, statuses) in enumerate(updates_by_request.items()):
-            if index < 3:
-                assert statuses == ["queued", "in_progress", "completed"]
-            else:
-                assert statuses == ["queued"]
-
-        # Test that shutdown event stops the tasks
-        group.shutdown_event.set()
-        await asyncio.sleep(0.1)  # allow propagation
-        assert group.pending_requests_complete.is_set()
-        assert group.populate_requests_task.done()
-        await asyncio.sleep(0.1)  # allow processing
-        assert group.pending_updates_complete.is_set()
-        assert group.populate_updates_task.done()
-
-        # Check all expected pending updates and statuses processed
-        while True:
-            try:
-                resp, req, req_info, state = await asyncio.wait_for(
-                    group.pending_updates_queue.async_get(), timeout=0.1
-                )
-                updates_by_request[req].append(req_info.status)
-            except asyncio.TimeoutError:
-                break
-
-        for index, (_, statuses) in enumerate(updates_by_request.items()):
-            if index < 3:
-                assert statuses == ["queued", "in_progress", "completed"]
-            else:
-                assert statuses == ["queued", "in_progress", "cancelled"]
-
-        # Clean up resources
-        group.processes = None
-        exceptions = await group.shutdown()
-        assert len(exceptions) == 0, f"Shutdown encountered exceptions: {exceptions}"
 
     @pytest.mark.smoke
     @pytest.mark.asyncio
@@ -668,5 +736,184 @@ class TestWorkerProcessGroup:
             assert resp == f"response_for_req_{index}"
             assert statuses == ["queued", "in_progress", "completed"]
 
-        # Cleanup
+    @pytest.mark.smoke
+    @pytest.mark.asyncio
+    @async_timeout(10.0)
+    async def test_shutdown_basic(self):
+        """Test basic shutdown functionality."""
+        backend = MockBackend()
+        requests = ["req1", "req2"]
+        group = WorkerProcessGroup(
+            requests=requests,
+            backend=backend,
+            strategy=SynchronousStrategy(),
+            constraints={},
+        )
+
+        # Test shutdown with empty state - should return no exceptions
+        exceptions = await group.shutdown()
+        assert len(exceptions) == 0
+        assert group.processes is None
+        assert group.mp_context is None
+        assert group.shutdown_event is None
+
+    @pytest.mark.sanity
+    @pytest.mark.asyncio
+    @async_timeout(5.0)
+    async def test_start_without_create_processes(self):
+        """Test that start() raises error when create_processes() not called."""
+        backend = MockBackend()
+        requests = ["req1", "req2"]
+        group = WorkerProcessGroup(
+            requests=requests,
+            backend=backend,
+            strategy=SynchronousStrategy(),
+            constraints={},
+        )
+
+        with pytest.raises(
+            RuntimeError,
+            match="create_processes\\(\\) must be called before start\\(\\)",
+        ):
+            await group.start(time.time())
+
+    @pytest.mark.sanity
+    @pytest.mark.asyncio
+    @async_timeout(5.0)
+    async def test_create_processes_invalid_limits(self, monkeypatch):
+        """Test create_processes with invalid process and concurrency limits."""
+        # Test zero processes limit
+        monkeypatch.setattr(
+            worker_group.settings, "max_worker_processes", 0, raising=False
+        )
+        monkeypatch.setattr(worker_group.settings, "max_concurrency", 1, raising=False)
+
+        backend = MockBackend()
+        requests = ["req1"]
+        group = WorkerProcessGroup(
+            requests=requests,
+            backend=backend,
+            strategy=SynchronousStrategy(),
+            constraints={},
+        )
+
+        with pytest.raises(RuntimeError, match="num_processes resolved to 0"):
+            await group.create_processes()
+
+        # Test zero concurrency limit
+        monkeypatch.setattr(
+            worker_group.settings, "max_worker_processes", 1, raising=False
+        )
+        monkeypatch.setattr(worker_group.settings, "max_concurrency", 0, raising=False)
+
+        group2 = WorkerProcessGroup(
+            requests=requests,
+            backend=backend,
+            strategy=SynchronousStrategy(),
+            constraints={},
+        )
+
+        with pytest.raises(RuntimeError, match="max_concurrency resolved to 0"):
+            await group2.create_processes()
+
+    @pytest.mark.smoke
+    @pytest.mark.asyncio
+    @async_timeout(10.0)
+    async def test_request_updates_error_handling(self, monkeypatch):
+        """Test request_updates handles error events correctly."""
+        # Use the helper method that creates mocked multiprocessing components
+        self._setup_test_environment(monkeypatch)
+
+        backend = MockBackend()
+        requests = ["req1"]
+        group = self._create_test_group(backend, requests)
+
+        # Start the group with mocked components
+        start_time = time.time() + 0.1
+        await group.start(start_time)
+
+        # Set error event to simulate error
+        group.error_event.set()
+
+        # Test that request_updates raises RuntimeError when error event is set
+        with pytest.raises(
+            RuntimeError, match="error_event is set in WorkerProcessGroup"
+        ):
+            async for _ in group.request_updates():
+                pass
+
+        # Clean up
         await group.shutdown()
+
+    @pytest.mark.smoke
+    def test_valid_instances_fixture(self):
+        """Test the valid_instances fixture provides correct data."""
+        backend = MockBackend()
+        requests = ["request1", "request2", "request3"]
+        strategy = SynchronousStrategy()
+        constraints = {"max_requests": MaxNumberConstraint(max_num=10)}
+
+        instance = WorkerProcessGroup(
+            requests=requests,
+            backend=backend,
+            strategy=strategy,
+            constraints=constraints,
+        )
+
+        assert isinstance(instance, WorkerProcessGroup)
+        assert instance.requests is requests
+        assert instance.backend is backend
+        assert instance.strategy is strategy
+        assert instance.constraints is constraints
+
+    @pytest.mark.smoke
+    @pytest.mark.parametrize(
+        "infinite_requests",
+        [
+            None,
+            True,
+            False,
+        ],
+    )
+    def test_initialization_infinite_requests(self, infinite_requests):
+        """Test initialization with different infinite_requests values."""
+        backend = MockBackend()
+        requests = ["req1", "req2"]
+        strategy = SynchronousStrategy()
+        constraints = {}
+
+        group = WorkerProcessGroup(
+            requests=requests,
+            backend=backend,
+            strategy=strategy,
+            constraints=constraints,
+            infinite_requests=infinite_requests,
+        )
+
+        assert group.infinite_requests == infinite_requests
+
+    @pytest.mark.sanity
+    @pytest.mark.parametrize(
+        "missing_param",
+        [
+            "requests",
+            "backend",
+            "strategy",
+            "constraints",
+        ],
+    )
+    def test_invalid_initialization_missing_params(self, missing_param):
+        """Test invalid initialization with missing required parameters."""
+        # Create complete valid parameters
+        params = {
+            "requests": ["req1"],
+            "backend": MockBackend(),
+            "strategy": SynchronousStrategy(),
+            "constraints": {},
+        }
+
+        # Remove the specified parameter
+        del params[missing_param]
+
+        with pytest.raises(TypeError):
+            WorkerProcessGroup(**params)

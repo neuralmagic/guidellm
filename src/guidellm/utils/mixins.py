@@ -49,6 +49,32 @@ class InfoMixin:
             ),
         }
 
+    @classmethod
+    def create_info_dict(cls, obj: Any) -> dict[str, Any]:
+        """
+        Create a structured info dictionary for the given object.
+
+        :param obj: Object to extract info from.
+        :return: Dictionary containing structured metadata about the object.
+        """
+        return {
+            "str": str(obj),
+            "type": type(obj).__name__,
+            "class": obj.__class__.__name__ if hasattr(obj, "__class__") else None,
+            "module": obj.__class__.__module__ if hasattr(obj, "__class__") else None,
+            "attributes": (
+                {
+                    key: val
+                    if isinstance(val, (str, int, float, bool, list, dict))
+                    else str(val)
+                    for key, val in obj.__dict__.items()
+                    if not key.startswith("_")
+                }
+                if hasattr(obj, "__dict__")
+                else {}
+            ),
+        }
+
     @property
     def info(self) -> dict[str, Any]:
         """
@@ -56,4 +82,4 @@ class InfoMixin:
 
         :return: Dictionary containing class name, module, and public attributes.
         """
-        return self.extract_from_obj(self)
+        return self.create_info_dict(self)

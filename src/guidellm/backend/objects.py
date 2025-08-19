@@ -11,8 +11,8 @@ from typing import Any, Literal, Optional
 
 from pydantic import Field
 
-from guidellm.objects.pydantic import StandardBaseModel
 from guidellm.scheduler import MeasuredRequestTimings
+from guidellm.utils import StandardBaseModel
 
 __all__ = [
     "GenerationRequest",

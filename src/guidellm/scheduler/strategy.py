@@ -33,12 +33,12 @@ import math
 import random
 import time
 from abc import ABC, abstractmethod
-from typing import Literal, TypeVar
+from typing import ClassVar, Literal, TypeVar
 
 from pydantic import Field, PrivateAttr
 
-from guidellm.objects import StandardBaseModel
 from guidellm.scheduler.objects import ScheduledRequestInfo
+from guidellm.utils import InfoMixin, PydanticClassRegistryMixin, StandardBaseModel
 
 __all__ = [
     "AsyncConstantStrategy",
@@ -197,7 +197,7 @@ class NoDelayRequestTimings(ScheduledRequestTimings):
         ge=0,
     )
     startup_target_requests: int = Field(
-        default=1.0,
+        default=1,
         description=(
             "The target number of requests to converge to in the startup phase."
         ),
@@ -338,11 +338,22 @@ class PoissonRateRequestTimings(ScheduledRequestTimings):
         """
 
 
-class SchedulingStrategy(StandardBaseModel):
+class SchedulingStrategy(
+    PydanticClassRegistryMixin["type[SchedulingStrategy]"], InfoMixin
+):
     """
     An abstract base class for scheduling strategies enabling control over how
     requests are processed by the scheduler.
     """
+
+    schema_discriminator: ClassVar[str] = "type_"
+
+    @classmethod
+    def __pydantic_schema_base_type__(cls) -> type[SchedulingStrategy]:
+        if cls.__name__ == "SchedulingStrategy":
+            return cls
+
+        return SchedulingStrategy
 
     type_: Literal["strategy"] = Field(
         description="The type of scheduling strategy to schedule requests with.",
@@ -385,6 +396,7 @@ class SchedulingStrategy(StandardBaseModel):
 StrategyT = TypeVar("StrategyT", bound=SchedulingStrategy)
 
 
+@SchedulingStrategy.register("synchronous")
 class SynchronousStrategy(SchedulingStrategy):
     """
     Sequential request processing strategy with maximum throughput constraints.
@@ -443,6 +455,7 @@ class SynchronousStrategy(SchedulingStrategy):
         return LastCompletionRequestTimings()
 
 
+@SchedulingStrategy.register("concurrent")
 class ConcurrentStrategy(SchedulingStrategy):
     """
     Parallel request processing strategy with controlled concurrency limits.
@@ -549,6 +562,7 @@ class ConcurrentStrategy(SchedulingStrategy):
         )
 
 
+@SchedulingStrategy.register("throughput")
 class ThroughputStrategy(SchedulingStrategy):
     """
     Maximum throughput strategy with optional concurrency limits.
@@ -633,6 +647,7 @@ class ThroughputStrategy(SchedulingStrategy):
         )
 
 
+@SchedulingStrategy.register("constant")
 class AsyncConstantStrategy(ThroughputStrategy):
     """
     Asynchronous constant-rate scheduling strategy for predictable load patterns.
@@ -692,6 +707,7 @@ class AsyncConstantStrategy(ThroughputStrategy):
         )
 
 
+@SchedulingStrategy.register("poisson")
 class AsyncPoissonStrategy(ThroughputStrategy):
     """
     Asynchronous Poisson-distributed scheduling strategy for realistic load simulation.

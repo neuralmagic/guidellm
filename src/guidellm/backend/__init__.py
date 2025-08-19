@@ -14,6 +14,7 @@ from .objects import (
     GenerationRequestTimings,
     GenerationResponse,
 )
+from .openai import OpenAIHTTPBackend
 
 __all__ = [
     "Backend",
@@ -21,4 +22,5 @@ __all__ = [
     "GenerationRequest",
     "GenerationRequestTimings",
     "GenerationResponse",
+    "OpenAIHTTPBackend",
 ]

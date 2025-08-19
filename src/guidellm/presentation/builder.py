@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from guidellm.benchmark.benchmark import GenerativeBenchmark
+    from guidellm.benchmark.objects import GenerativeBenchmark
 
 from .data_models import BenchmarkDatum, RunInfo, WorkloadDetails
 

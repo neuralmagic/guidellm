@@ -16,35 +16,60 @@ from guidellm.scheduler import (
     SchedulerState,
     SynchronousStrategy,
 )
+from guidellm.utils import InfoMixin
 
 
 class TestEnvironment:
     @pytest.mark.smoke
-    def test_is_abstract_base_class(self):
-        """Test that Environment is an abstract base class."""
+    def test_class_signatures(self):
+        """Test Environment inheritance and type relationships."""
+        # Inheritance and abstract class properties
         assert issubclass(Environment, ABC)
+        assert issubclass(Environment, Generic)
+        assert issubclass(Environment, InfoMixin)
         assert inspect.isabstract(Environment)
+        assert hasattr(Environment, "info")
 
-    @pytest.mark.smoke
-    def test_abstract_methods_defined(self):
-        """Test that the required abstract methods are defined."""
-        abstract_methods = Environment.__abstractmethods__
-        expected_methods = {
+        # Abstract methods validation
+        expected_abstract_methods = {
             "sync_run_params",
             "sync_run_start",
             "update_run_iteration",
             "sync_run_error",
             "sync_run_end",
         }
-        assert abstract_methods == expected_methods
+        assert Environment.__abstractmethods__ == expected_abstract_methods
 
-    @pytest.mark.smoke
-    def test_generic_type_parameters(self):
-        """Test that Environment is generic with correct type parameters."""
-        assert issubclass(Environment, Generic)
-        # Environment should be Generic[RequestT, ResponseT]
+        # Method signatures and async properties
+        method_signatures = {
+            "sync_run_params": ["self", "requests", "strategy", "constraints"],
+            "sync_run_start": ["self"],
+            "update_run_iteration": [
+                "self",
+                "response",
+                "request",
+                "request_info",
+                "state",
+            ],
+            "sync_run_error": ["self", "err"],
+            "sync_run_end": ["self"],
+        }
+
+        for method_name, expected_params in method_signatures.items():
+            method = getattr(Environment, method_name)
+            sig = inspect.signature(method)
+
+            # Check parameter names and count
+            param_names = list(sig.parameters.keys())
+            assert param_names == expected_params
+
+            # Check async nature
+            assert inspect.iscoroutinefunction(method) or inspect.isasyncgenfunction(
+                method
+            )
+
+        # Generic type parameters
         orig_bases = getattr(Environment, "__orig_bases__", ())
-        assert len(orig_bases) > 0
         generic_base = next(
             (
                 base
@@ -58,7 +83,7 @@ class TestEnvironment:
         assert RequestT in type_args
         assert ResponseT in type_args
 
-    @pytest.mark.smoke
+    @pytest.mark.sanity
     def test_invalid_implementation(self):
         """Test that invalid implementations raise TypeError."""
 
@@ -67,6 +92,22 @@ class TestEnvironment:
 
         with pytest.raises(TypeError):
             InvalidImplementation()
+
+    @pytest.mark.sanity
+    def test_partial_invalid_implementation(self):
+        """Test that partial implementations raise TypeError."""
+
+        class PartialImplementation(Environment):
+            async def sync_run_params(self, requests, strategy, constraints):
+                return requests, strategy, constraints
+
+            async def sync_run_start(self):
+                return 0.0
+
+            # Missing other required methods
+
+        with pytest.raises(TypeError):
+            PartialImplementation()
 
     @pytest.mark.smoke
     def test_implementation_construction(self):
@@ -91,54 +132,24 @@ class TestEnvironment:
         env = TestEnvironment()
         assert isinstance(env, Environment)
 
-    @pytest.mark.smoke
-    def test_method_signatures(self):
-        """Test that method signatures match expected interface."""
-        params_sig = inspect.signature(Environment.sync_run_params)
-        assert len(params_sig.parameters) == 4
-        param_names = list(params_sig.parameters.keys())
-        assert param_names == ["self", "requests", "strategy", "constraints"]
-
-        start_sig = inspect.signature(Environment.sync_run_start)
-        assert len(start_sig.parameters) == 1
-        assert "self" in start_sig.parameters
-
-        update_sig = inspect.signature(Environment.update_run_iteration)
-        assert len(update_sig.parameters) == 5
-        param_names = list(update_sig.parameters.keys())
-        assert param_names == ["self", "response", "request", "request_info", "state"]
-
-        error_sig = inspect.signature(Environment.sync_run_error)
-        assert len(error_sig.parameters) == 2
-        param_names = list(error_sig.parameters.keys())
-        assert param_names == ["self", "err"]
-
-        end_sig = inspect.signature(Environment.sync_run_end)
-        assert len(end_sig.parameters) == 1
-        assert "self" in end_sig.parameters
-
 
 class TestNonDistributedEnvironment:
-    @pytest.mark.smoke
-    def test_initialization(self):
-        """Test basic initialization of NonDistributedEnvironment."""
-        env = NonDistributedEnvironment()
-        assert env.run_errors == []
-        assert isinstance(env, Environment)
-
-    @pytest.mark.sanity
-    def test_invalid_initialization(self):
-        """Test that initialization doesn't accept invalid arguments."""
-        with pytest.raises(TypeError):
-            NonDistributedEnvironment("invalid_arg")
+    @pytest.fixture
+    def valid_instances(self):
+        """Fixture providing test data for NonDistributedEnvironment."""
+        instance = NonDistributedEnvironment()
+        return instance, {}
 
     @pytest.mark.smoke
-    def test_inheritance_and_typing(self):
-        """Test inheritance and type relationships."""
-        env = NonDistributedEnvironment()
+    def test_class_signatures(self, valid_instances):
+        """Test NonDistributedEnvironment inheritance and type relationships."""
+        instance, constructor_args = valid_instances
+        assert issubclass(NonDistributedEnvironment, Environment)
+        assert issubclass(NonDistributedEnvironment, InfoMixin)
+        assert not inspect.isabstract(NonDistributedEnvironment)
 
         # Should inherit from Environment
-        assert isinstance(env, Environment)
+        assert isinstance(instance, Environment)
         assert issubclass(NonDistributedEnvironment, Environment)
 
         # Should implement all required methods
@@ -151,69 +162,112 @@ class TestNonDistributedEnvironment:
         ]
 
         for method_name in required_methods:
-            assert hasattr(env, method_name)
-            assert callable(getattr(env, method_name))
+            assert hasattr(instance, method_name)
+            assert callable(getattr(instance, method_name))
+
+    @pytest.mark.smoke
+    def test_initialization(self, valid_instances):
+        """Test NonDistributedEnvironment initialization."""
+        instance, constructor_args = valid_instances
+        assert isinstance(instance, NonDistributedEnvironment)
+        assert isinstance(instance, Environment)
+        assert instance.run_errors == []
+
+    @pytest.mark.sanity
+    def test_invalid_initialization(self):
+        """Test that initialization doesn't accept invalid arguments."""
+        with pytest.raises(TypeError):
+            NonDistributedEnvironment("invalid_arg")
 
     @pytest.mark.smoke
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
-        ("requests", "strategy", "constraints", "error_to_inject"),
+        ("requests", "strategy", "constraints"),
         [
             (
                 ["request1", "request2"],
                 SynchronousStrategy(),
                 {"max_requests": MaxNumberConstraint(max_num=10)},
-                None,
             ),
             (
                 [],
                 SynchronousStrategy(),
                 {},
-                None,
             ),
             (
                 ["single_request"],
                 SynchronousStrategy(),
                 {"max_requests": MaxNumberConstraint(max_num=1)},
-                RuntimeError("Test error"),
             ),
             (
                 range(5),
                 SynchronousStrategy(),
                 {"max_requests": MaxNumberConstraint(max_num=5)},
-                ValueError("Connection failed"),
             ),
         ],
         ids=[
-            "normal_execution",
+            "multiple_requests",
             "empty_requests",
-            "with_error",
-            "multiple_requests_with_error",
+            "single_request",
+            "range_requests",
         ],
     )
-    async def test_lifecycle(self, requests, strategy, constraints, error_to_inject):
-        """Test the complete lifecycle of environment methods."""
-        env = NonDistributedEnvironment()
+    async def test_sync_run_params(
+        self, valid_instances, requests, strategy, constraints
+    ):
+        """Test sync_run_params returns parameters unchanged."""
+        instance, constructor_args = valid_instances
 
         (
             returned_requests,
             returned_strategy,
             returned_constraints,
-        ) = await env.sync_run_params(requests, strategy, constraints)
+        ) = await instance.sync_run_params(requests, strategy, constraints)
+
         assert returned_requests is requests
         assert returned_strategy is strategy
         assert returned_constraints is constraints
 
+    @pytest.mark.smoke
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("mock_time", "delay", "expected"),
+        [
+            (1000.0, 0.0, 1000.0),
+            (500.0, 1.5, 501.5),
+            (100.0, 10.0, 110.0),
+            (0.0, 2.5, 2.5),
+        ],
+        ids=["no_delay", "small_delay", "large_delay", "zero_time"],
+    )
+    async def test_sync_run_start(self, valid_instances, mock_time, delay, expected):
+        """Test sync_run_start uses configuration value correctly."""
+        instance, constructor_args = valid_instances
+
         with (
-            patch("time.time", return_value=1000.0),
+            patch("time.time", return_value=mock_time),
             patch("guidellm.scheduler.environment.settings") as mock_settings,
         ):
-            mock_settings.scheduler_start_delay_non_distributed = 2.5
-            start_time = await env.sync_run_start()
-            assert start_time == 1002.5
+            mock_settings.scheduler_start_delay_non_distributed = delay
+            start_time = await instance.sync_run_start()
+            assert start_time == expected
 
-        mock_response = "mock_response"
-        mock_request = "mock_request"
+    @pytest.mark.smoke
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("response", "req"),
+        [
+            ("mock_response", "mock_request"),
+            (None, "mock_request"),
+            ("mock_response", None),
+            (None, None),
+        ],
+        ids=["both_present", "no_response", "no_request", "both_none"],
+    )
+    async def test_update_run_iteration(self, valid_instances, response, req):
+        """Test update_run_iteration no-op behavior."""
+        instance, constructor_args = valid_instances
+
         mock_request_info = ScheduledRequestInfo(
             request_id="test-123",
             status="completed",
@@ -227,50 +281,49 @@ class TestNonDistributedEnvironment:
             start_time=time.time(),
         )
 
-        await env.update_run_iteration(
-            mock_response, mock_request, mock_request_info, mock_state
+        # Should not raise any errors and is a no-op
+        await instance.update_run_iteration(
+            response, req, mock_request_info, mock_state
         )
-        await env.update_run_iteration(
-            None, mock_request, mock_request_info, mock_state
-        )
-        await env.update_run_iteration(
-            mock_response, None, mock_request_info, mock_state
-        )
-
-        if error_to_inject:
-            await env.sync_run_error(error_to_inject)
-            assert error_to_inject in env.run_errors
-
-        if error_to_inject:
-            with pytest.raises(type(error_to_inject)) as exc_info:
-                async for _ in env.sync_run_end():
-                    pass
-            assert str(exc_info.value) == str(error_to_inject)
-        else:
-            results = []
-            async for result in env.sync_run_end():
-                results.append(result)
-            assert results == []
 
     @pytest.mark.smoke
     @pytest.mark.asyncio
-    async def test_sync_run_start_uses_config(self):
-        """Test that sync_run_start uses configuration value."""
-        env = NonDistributedEnvironment()
+    async def test_sync_run_error(self, valid_instances):
+        """Test sync_run_error stores errors correctly."""
+        instance, constructor_args = valid_instances
 
-        with (
-            patch("time.time", return_value=500.0),
-            patch("guidellm.scheduler.environment.settings") as mock_settings,
-        ):
-            # Test different delay values
-            mock_settings.scheduler_start_delay_non_distributed = 0.0
-            start_time = await env.sync_run_start()
-            assert start_time == 500.0
+        error1 = RuntimeError("First error")
+        error2 = ValueError("Second error")
 
-            mock_settings.scheduler_start_delay_non_distributed = 1.5
-            start_time = await env.sync_run_start()
-            assert start_time == 501.5
+        await instance.sync_run_error(error1)
+        assert error1 in instance.run_errors
+        assert len(instance.run_errors) == 1
 
-            mock_settings.scheduler_start_delay_non_distributed = 10.0
-            start_time = await env.sync_run_start()
-            assert start_time == 510.0
+        await instance.sync_run_error(error2)
+        assert len(instance.run_errors) == 2
+
+    @pytest.mark.smoke
+    @pytest.mark.asyncio
+    async def test_sync_run_end(self, valid_instances):
+        """Test sync_run_end behavior with no errors and multiple errors."""
+        instance, constructor_args = valid_instances
+
+        # No errors - empty iterator
+        results = []
+        async for result in instance.sync_run_end():
+            results.append(result)
+        assert results == []
+
+        # Single error - raises original error
+        error = RuntimeError("Test error")
+        await instance.sync_run_error(error)
+        with pytest.raises(RuntimeError):
+            async for _ in instance.sync_run_end():
+                pass
+
+        # Multiple errors - raises RuntimeError with combined message
+        await instance.sync_run_error(ValueError("Second error"))
+        with pytest.raises(RuntimeError) as exc_info:
+            async for _ in instance.sync_run_end():
+                pass
+        assert "Errors occurred during execution" in str(exc_info.value)

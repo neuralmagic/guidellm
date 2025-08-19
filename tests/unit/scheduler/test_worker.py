@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import contextlib
 import inspect
@@ -5,11 +7,12 @@ import math
 import threading
 import time
 from collections import defaultdict
+from functools import wraps
 from multiprocessing import Barrier, Event, Queue
 from multiprocessing.synchronize import Barrier as ProcessingBarrier
 from multiprocessing.synchronize import Event as ProcessingEvent
 from queue import Empty
-from typing import Any, Callable, Generic, Literal, Optional
+from typing import Any, Callable, Generic, Literal
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -28,6 +31,17 @@ from guidellm.scheduler.strategy import (
     PoissonRateRequestTimings,
 )
 from guidellm.utils import MsgpackEncoding, random
+
+
+def async_timeout(delay):
+    def decorator(func):
+        @wraps(func)
+        async def new_func(*args, **kwargs):
+            return await asyncio.wait_for(func(*args, **kwargs), timeout=delay)
+
+        return new_func
+
+    return decorator
 
 
 class MockRequestTimings(MeasuredRequestTimings):
@@ -52,11 +66,11 @@ class MockBackend(BackendInterface):
         self.resolve_called = False
 
     @property
-    def processes_limit(self) -> Optional[int]:
+    def processes_limit(self) -> int | None:
         return None
 
     @property
-    def requests_limit(self) -> Optional[int]:
+    def requests_limit(self) -> int | None:
         return None
 
     def info(self) -> dict[str, Any]:
@@ -88,6 +102,47 @@ class MockBackend(BackendInterface):
 
 class TestWorkerProcess:
     """Test suite for WorkerProcess class."""
+
+    @pytest.fixture(
+        params=[
+            {
+                "local_rank": 0,
+                "local_world_size": 2,
+                "async_limit": 5,
+                "poll_intervals": 0.01,
+            },
+            {
+                "local_rank": 1,
+                "local_world_size": 3,
+                "async_limit": 10,
+                "poll_intervals": 0.05,
+            },
+            {
+                "local_rank": 2,
+                "local_world_size": 4,
+                "async_limit": 1,
+                "poll_intervals": 0.1,
+            },
+        ],
+        ids=["basic_config", "multi_worker", "single_async"],
+    )
+    def valid_instances(self, request):
+        """Fixture providing test data for WorkerProcess."""
+        constructor_args = request.param
+        backend = MockBackend()
+        request_timings = LastCompletionRequestTimings()
+
+        instance = WorkerProcess(
+            startup_barrier=Barrier(constructor_args["local_world_size"]),
+            shutdown_event=Event(),
+            error_event=Event(),
+            requests_queue=Queue(),
+            updates_queue=Queue(),
+            backend=backend,
+            request_timings=request_timings,
+            **constructor_args,
+        )
+        return instance, constructor_args
 
     @pytest.fixture
     def worker_process(self):
@@ -151,30 +206,33 @@ class TestWorkerProcess:
         assert "self" in requests_processing_sig.parameters
 
     @pytest.mark.smoke
-    def test_initialization(self, worker_process: WorkerProcess):
+    def test_initialization(self, valid_instances):
         """Test basic initialization of WorkerProcess."""
+        instance, constructor_args = valid_instances
+
         # worker info
-        assert worker_process.local_rank == 0
-        assert worker_process.local_world_size == 2
-        assert worker_process.async_limit == 5
+        assert instance.local_rank == constructor_args["local_rank"]
+        assert instance.local_world_size == constructor_args["local_world_size"]
+        assert instance.async_limit == constructor_args["async_limit"]
 
         # process synchronization
-        assert isinstance(worker_process.startup_barrier, ProcessingBarrier)
-        assert isinstance(worker_process.shutdown_event, ProcessingEvent)
-        assert isinstance(worker_process.error_event, ProcessingEvent)
-        assert hasattr(worker_process.requests_queue, "put")
-        assert hasattr(worker_process.requests_queue, "get")
-        assert hasattr(worker_process.updates_queue, "put")
-        assert hasattr(worker_process.updates_queue, "get")
+        assert isinstance(instance.startup_barrier, ProcessingBarrier)
+        assert isinstance(instance.shutdown_event, ProcessingEvent)
+        assert isinstance(instance.error_event, ProcessingEvent)
+        assert hasattr(instance.requests_queue, "put")
+        assert hasattr(instance.requests_queue, "get")
+        assert hasattr(instance.updates_queue, "put")
+        assert hasattr(instance.updates_queue, "get")
 
         # local synchronization
-        assert worker_process.pending_requests_queue is None
-        assert worker_process.pending_updates_queue is None
+        assert instance.pending_requests_queue is None
+        assert instance.pending_updates_queue is None
 
         # request processing
-        assert isinstance(worker_process.backend, MockBackend)
-        assert worker_process.poll_intervals == 0.01
-        assert isinstance(worker_process.request_timings, LastCompletionRequestTimings)
+        assert isinstance(instance.backend, MockBackend)
+        assert instance.poll_intervals == constructor_args["poll_intervals"]
+        assert isinstance(instance.request_timings, LastCompletionRequestTimings)
+        assert instance.startup_completed is False
 
     @pytest.mark.sanity
     def test_invalid_initialization(self):
@@ -258,6 +316,7 @@ class TestWorkerProcess:
 
     @pytest.mark.smoke
     @pytest.mark.asyncio
+    @async_timeout(5.0)
     @pytest.mark.parametrize(
         ("stop_action", "req_action"),
         [
@@ -378,6 +437,7 @@ class TestWorkerProcess:
 
     @pytest.mark.smoke
     @pytest.mark.asyncio
+    @async_timeout(3.0)
     @pytest.mark.parametrize(
         "stop_action",
         ["error_event", "shutdown_event", "cancel_event"],
@@ -438,6 +498,7 @@ class TestWorkerProcess:
 
     @pytest.mark.smoke
     @pytest.mark.asyncio
+    @async_timeout(10.0)
     @pytest.mark.parametrize(
         ("request_timings_const", "async_limit"),
         [
@@ -709,3 +770,269 @@ class TestWorkerProcess:
         assert all(
             "start" in parts and "complete" in parts for parts in per_request.values()
         )
+
+    @pytest.mark.smoke
+    @pytest.mark.asyncio
+    @async_timeout(10.0)
+    async def test_initialize_requests_processing(self, valid_instances):
+        """Test _initialize_requests_processing method."""
+        instance, _ = valid_instances
+
+        await instance._initialize_requests_processing()
+
+        # Verify backend methods were called
+        assert instance.backend.process_startup_called
+        assert instance.backend.validate_called
+
+        # Verify queues are initialized
+        assert instance.pending_requests_queue is not None
+        assert instance.pending_updates_queue is not None
+        assert instance.requests_canceled is not None
+        assert instance.pull_requests_stopped is not None
+        assert instance.pull_task is not None
+        assert instance.push_task is not None
+
+    @pytest.mark.smoke
+    @pytest.mark.asyncio
+    @async_timeout(5.0)
+    async def test_start_ready_requests_processing(self, valid_instances):
+        """Test _start_ready_requests_processing method."""
+        instance, constructor_args = valid_instances
+
+        def _trip_barrier_later():
+            time.sleep(0.02)
+            with contextlib.suppress(RuntimeError):
+                instance.startup_barrier.wait(timeout=1.0)
+
+        threading.Thread(target=_trip_barrier_later, daemon=True).start()
+
+        await instance._start_ready_requests_processing()
+        assert instance.startup_completed is True
+
+    @pytest.mark.smoke
+    @pytest.mark.asyncio
+    @async_timeout(5.0)
+    async def test_shutdown_requests_processing(self, valid_instances):
+        """Test _shutdown_requests_processing method."""
+        instance, _ = valid_instances
+
+        # Initialize first to have something to shutdown
+        await instance._initialize_requests_processing()
+
+        # Now shutdown
+        await instance._shutdown_requests_processing()
+
+        # Verify backend shutdown was called
+        assert instance.backend.process_shutdown_called
+
+        # Verify state reset
+        assert instance.pending_requests_queue is None
+        assert instance.pending_updates_queue is None
+        assert instance.pull_task is None
+        assert instance.push_task is None
+        assert instance.requests_canceled is None
+
+    @pytest.mark.sanity
+    @pytest.mark.asyncio
+    @async_timeout(3.0)
+    async def test_handle_request_update_status_transitions(self, valid_instances):
+        """Test _handle_request_update with different status transitions."""
+        instance, _ = valid_instances
+        await instance._initialize_requests_processing()
+
+        request = "test_request"
+        request_info = ScheduledRequestInfo[MeasuredRequestTimings](
+            request_id="test-123",
+            status="queued",
+            scheduler_node_id=0,
+            scheduler_process_id=0,
+            scheduler_start_time=time.time(),
+        )
+
+        # Simulate that we've got this request from the queue (so task_done is expected)
+        await instance.pending_requests_queue.async_put((request, request_info))
+
+        # Test handling different status updates - but go through full flow
+        await instance._handle_request_update(
+            new_status="completed",
+            response="test_response",
+            request=request,
+            request_info=request_info,
+        )
+
+    @pytest.mark.smoke
+    def test_pull_requests_generator(self, valid_instances):
+        """Test _pull_requests_generator method."""
+        instance, _ = valid_instances
+
+        # Initialize necessary attributes that the generator needs
+        instance.requests_canceled = threading.Event()
+        instance.pull_requests_stopped = threading.Event()
+        # Create a minimal pending_requests_queue for the generator
+        import culsans
+
+        instance.pending_requests_queue = culsans.Queue(maxsize=2)
+
+        # Set the stop condition before creating the generator
+        instance.requests_canceled.set()
+
+        # Initialize the generator
+        generator = instance._pull_requests_generator()
+
+        # Test that generator can be created
+        assert generator is not None
+
+        # The generator should stop when requests_canceled is set
+        with pytest.raises(StopIteration):
+            next(generator)
+
+    @pytest.mark.smoke
+    def test_push_updates_generator(self, valid_instances):
+        """Test _push_updates_generator method."""
+        instance, _ = valid_instances
+
+        # Initialize the generator
+        generator = instance._push_updates_generator()
+
+        # Test that generator can be created
+        assert generator is not None
+
+    @pytest.mark.sanity
+    @pytest.mark.asyncio
+    @async_timeout(3.0)
+    async def test_process_next_request_multi_turn_error(self, valid_instances):
+        """Test _process_next_request with multi-turn requests raises
+        NotImplementedError."""
+        instance, _ = valid_instances
+        await instance._initialize_requests_processing()
+
+        # Put a multi-turn request (tuple/list) in the queue
+        multi_turn_request = ["request1", "request2"]
+        request_info = ScheduledRequestInfo[MeasuredRequestTimings](
+            request_id="test-123",
+            status="queued",
+            scheduler_node_id=0,
+            scheduler_process_id=0,
+            scheduler_start_time=time.time(),
+        )
+
+        await instance.pending_requests_queue.async_put(
+            (multi_turn_request, request_info)
+        )
+
+        # The NotImplementedError gets caught and converted to an errored status update
+        # So the method completes normally, but we can check that the error is set
+        await instance._process_next_request()
+
+        # Check that the request_info.error contains the expected error message
+        assert "Multi-turn requests are not yet supported" in request_info.error
+
+    @pytest.mark.sanity
+    @pytest.mark.asyncio
+    @async_timeout(3.0)
+    async def test_process_next_request_cancellation(self, valid_instances):
+        """Test _process_next_request handles cancellation properly."""
+        instance, _ = valid_instances
+        await instance._initialize_requests_processing()
+
+        request = "test_request"
+        request_info = ScheduledRequestInfo[MeasuredRequestTimings](
+            request_id="test-123",
+            status="queued",
+            scheduler_node_id=0,
+            scheduler_process_id=0,
+            scheduler_start_time=time.time(),
+        )
+
+        await instance.pending_requests_queue.async_put((request, request_info))
+
+        # Create task and cancel it immediately
+        task = asyncio.create_task(instance._process_next_request())
+        await asyncio.sleep(0.01)  # Let it start
+        task.cancel()
+
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+    @pytest.mark.sanity
+    @pytest.mark.asyncio
+    @async_timeout(5.0)
+    async def test_cancel_pending_requests(self, valid_instances):
+        """Test _cancel_pending_requests method."""
+        instance, _ = valid_instances
+
+        # Create worker with larger queue buffer to avoid blocking
+        backend = MockBackend()
+        request_timings = LastCompletionRequestTimings()
+        worker_with_larger_buffer = WorkerProcess(
+            local_rank=0,
+            local_world_size=2,
+            async_limit=5,
+            startup_barrier=Barrier(2),
+            shutdown_event=Event(),
+            error_event=Event(),
+            requests_queue=Queue(),
+            updates_queue=Queue(),
+            backend=backend,
+            request_timings=request_timings,
+            poll_intervals=0.01,
+            max_requests_queue_buffer=10,  # Larger buffer to avoid blocking
+        )
+
+        await worker_with_larger_buffer._initialize_requests_processing()
+
+        # Add some requests to cancel - use smaller number to avoid queue size issues
+        for i in range(3):
+            request = f"test_request_{i}"
+            request_info = ScheduledRequestInfo[MeasuredRequestTimings](
+                request_id=f"test-{i}",
+                status="queued",
+                scheduler_node_id=0,
+                scheduler_process_id=0,
+                scheduler_start_time=time.time(),
+            )
+            await worker_with_larger_buffer.pending_requests_queue.async_put(
+                (request, request_info)
+            )
+
+        # Set the stop flag
+        worker_with_larger_buffer.pull_requests_stopped.set()
+
+        await worker_with_larger_buffer._cancel_pending_requests()
+
+        # Verify queue is empty
+        assert worker_with_larger_buffer.pending_requests_queue.qsize() == 0
+
+    @pytest.mark.smoke
+    @pytest.mark.parametrize(
+        ("max_requests_queue_buffer", "poll_intervals"),
+        [
+            (1, 0.01),
+            (5, 0.05),
+            (10, 0.1),
+        ],
+    )
+    def test_initialization_with_optional_params(
+        self, max_requests_queue_buffer, poll_intervals
+    ):
+        """Test WorkerProcess initialization with optional parameters."""
+        backend = MockBackend()
+        request_timings = LastCompletionRequestTimings()
+
+        instance = WorkerProcess(
+            local_rank=0,
+            local_world_size=2,
+            async_limit=5,
+            startup_barrier=Barrier(2),
+            shutdown_event=Event(),
+            error_event=Event(),
+            requests_queue=Queue(),
+            updates_queue=Queue(),
+            backend=backend,
+            request_timings=request_timings,
+            poll_intervals=poll_intervals,
+            max_requests_queue_buffer=max_requests_queue_buffer,
+        )
+
+        assert instance.poll_intervals == poll_intervals
+        assert instance.max_requests_queue_buffer == max_requests_queue_buffer

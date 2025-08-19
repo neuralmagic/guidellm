@@ -1,10 +1,12 @@
 """
 Unit tests for OpenAIHTTPBackend implementation.
-
-### WRITTEN BY AI ###
 """
 
+from __future__ import annotations
+
+import asyncio
 import base64
+from functools import wraps
 from pathlib import Path
 from unittest.mock import AsyncMock, Mock, patch
 
@@ -12,6 +14,7 @@ import httpx
 import pytest
 from PIL import Image
 
+from guidellm.backend.backend import Backend
 from guidellm.backend.objects import (
     GenerationRequest,
     GenerationRequestTimings,
@@ -21,15 +24,127 @@ from guidellm.backend.openai import OpenAIHTTPBackend, UsageStats
 from guidellm.scheduler import ScheduledRequestInfo
 
 
+def async_timeout(delay):
+    def decorator(func):
+        @wraps(func)
+        async def new_func(*args, **kwargs):
+            return await asyncio.wait_for(func(*args, **kwargs), timeout=delay)
+
+        return new_func
+
+    return decorator
+
+
+def test_usage_stats():
+    """Test that UsageStats is defined correctly as a dataclass."""
+    stats = UsageStats()
+    assert stats.prompt_tokens is None
+    assert stats.output_tokens is None
+
+    stats_with_values = UsageStats(prompt_tokens=10, output_tokens=5)
+    assert stats_with_values.prompt_tokens == 10
+    assert stats_with_values.output_tokens == 5
+
+
 class TestOpenAIHTTPBackend:
     """Test cases for OpenAIHTTPBackend."""
 
-    @pytest.mark.smoke
-    def test_openai_backend_initialization_minimal(self):
-        """Test minimal OpenAIHTTPBackend initialization.
+    @pytest.fixture(
+        params=[
+            {"target": "http://localhost:8000"},
+            {
+                "target": "https://api.openai.com",
+                "model": "gpt-4",
+                "api_key": "test-key",
+                "timeout": 30.0,
+                "stream_response": False,
+            },
+            {
+                "target": "http://test-server:8080",
+                "model": "test-model",
+                "api_key": "Bearer test-token",
+                "organization": "test-org",
+                "project": "test-proj",
+                "timeout": 120.0,
+                "http2": False,
+                "follow_redirects": False,
+                "max_output_tokens": 500,
+                "extra_query": {"param": "value"},
+                "extra_body": {"setting": "test"},
+                "remove_from_body": ["unwanted"],
+                "headers": {"Custom": "header"},
+                "verify": True,
+            },
+        ]
+    )
+    def valid_instances(self, request):
+        """Fixture providing valid OpenAIHTTPBackend instances."""
+        constructor_args = request.param
+        instance = OpenAIHTTPBackend(**constructor_args)
+        return instance, constructor_args
 
-        ### WRITTEN BY AI ###
-        """
+    @pytest.mark.smoke
+    def test_class_signatures(self):
+        """Test OpenAIHTTPBackend inheritance and type relationships."""
+        assert issubclass(OpenAIHTTPBackend, Backend)
+        assert hasattr(OpenAIHTTPBackend, "HEALTH_PATH")
+        assert OpenAIHTTPBackend.HEALTH_PATH == "/health"
+        assert hasattr(OpenAIHTTPBackend, "MODELS_PATH")
+        assert OpenAIHTTPBackend.MODELS_PATH == "/v1/models"
+        assert hasattr(OpenAIHTTPBackend, "TEXT_COMPLETIONS_PATH")
+        assert OpenAIHTTPBackend.TEXT_COMPLETIONS_PATH == "/v1/completions"
+        assert hasattr(OpenAIHTTPBackend, "CHAT_COMPLETIONS_PATH")
+        assert OpenAIHTTPBackend.CHAT_COMPLETIONS_PATH == "/v1/chat/completions"
+        assert hasattr(OpenAIHTTPBackend, "MODELS_KEY")
+        assert OpenAIHTTPBackend.MODELS_KEY == "models"
+        assert hasattr(OpenAIHTTPBackend, "TEXT_COMPLETIONS_KEY")
+        assert OpenAIHTTPBackend.TEXT_COMPLETIONS_KEY == "text_completions"
+        assert hasattr(OpenAIHTTPBackend, "CHAT_COMPLETIONS_KEY")
+        assert OpenAIHTTPBackend.CHAT_COMPLETIONS_KEY == "chat_completions"
+
+    @pytest.mark.smoke
+    def test_initialization(self, valid_instances):
+        """Test OpenAIHTTPBackend initialization."""
+        instance, constructor_args = valid_instances
+        assert isinstance(instance, OpenAIHTTPBackend)
+        expected_target = constructor_args["target"].rstrip("/").removesuffix("/v1")
+        assert instance.target == expected_target
+        if "model" in constructor_args:
+            assert instance.model == constructor_args["model"]
+        if "timeout" in constructor_args:
+            assert instance.timeout == constructor_args["timeout"]
+        else:
+            assert instance.timeout == 60.0
+
+    @pytest.mark.sanity
+    @pytest.mark.parametrize(
+        ("field", "value"),
+        [
+            ("target", ""),
+            ("timeout", -1.0),
+            ("http2", "invalid"),
+            ("verify", "invalid"),
+        ],
+    )
+    def test_invalid_initialization_values(self, field, value):
+        """Test OpenAIHTTPBackend with invalid field values."""
+        base_args = {"target": "http://localhost:8000"}
+        base_args[field] = value
+        # OpenAI backend doesn't validate types at init, accepts whatever is passed
+        backend = OpenAIHTTPBackend(**base_args)
+        assert getattr(backend, field) == value
+
+    @pytest.mark.smoke
+    def test_factory_registration(self):
+        """Test that OpenAIHTTPBackend is registered with Backend factory."""
+        assert Backend.is_registered("openai_http")
+        backend = Backend.create("openai_http", target="http://test")
+        assert isinstance(backend, OpenAIHTTPBackend)
+        assert backend.type_ == "openai_http"
+
+    @pytest.mark.smoke
+    def test_initialization_minimal(self):
+        """Test minimal OpenAIHTTPBackend initialization."""
         backend = OpenAIHTTPBackend(target="http://localhost:8000")
 
         assert backend.target == "http://localhost:8000"
@@ -43,11 +158,8 @@ class TestOpenAIHTTPBackend:
         assert backend._async_client is None
 
     @pytest.mark.smoke
-    def test_openai_backend_initialization_full(self):
-        """Test full OpenAIHTTPBackend initialization.
-
-        ### WRITTEN BY AI ###
-        """
+    def test_initialization_full(self):
+        """Test full OpenAIHTTPBackend initialization."""
         extra_query = {"param": "value"}
         extra_body = {"setting": "test"}
         remove_from_body = ["unwanted"]
@@ -84,11 +196,8 @@ class TestOpenAIHTTPBackend:
         assert backend.remove_from_body == remove_from_body
 
     @pytest.mark.sanity
-    def test_openai_backend_target_normalization(self):
-        """Test target URL normalization.
-
-        ### WRITTEN BY AI ###
-        """
+    def test_target_normalization(self):
+        """Test target URL normalization."""
         # Remove trailing slashes and /v1
         backend1 = OpenAIHTTPBackend(target="http://localhost:8000/")
         assert backend1.target == "http://localhost:8000"
@@ -100,11 +209,8 @@ class TestOpenAIHTTPBackend:
         assert backend3.target == "http://localhost:8000"
 
     @pytest.mark.sanity
-    def test_openai_backend_header_building(self):
-        """Test header building logic.
-
-        ### WRITTEN BY AI ###
-        """
+    def test_header_building(self):
+        """Test header building logic."""
         # Test with API key
         backend1 = OpenAIHTTPBackend(target="http://test", api_key="test-key")
         assert "Authorization" in backend1.headers
@@ -123,11 +229,10 @@ class TestOpenAIHTTPBackend:
 
     @pytest.mark.smoke
     @pytest.mark.asyncio
-    async def test_openai_backend_info(self):
-        """Test info method.
-
-        ### WRITTEN BY AI ###
-        """
+    @async_timeout(10.0)
+    @async_timeout(5.0)
+    async def test_info(self):
+        """Test info method."""
         backend = OpenAIHTTPBackend(
             target="http://test", model="test-model", timeout=30.0
         )
@@ -144,11 +249,10 @@ class TestOpenAIHTTPBackend:
 
     @pytest.mark.smoke
     @pytest.mark.asyncio
-    async def test_openai_backend_process_startup(self):
-        """Test process startup.
-
-        ### WRITTEN BY AI ###
-        """
+    @async_timeout(10.0)
+    @async_timeout(5.0)
+    async def test_process_startup(self):
+        """Test process startup."""
         backend = OpenAIHTTPBackend(target="http://test")
 
         assert not backend._in_process
@@ -162,11 +266,10 @@ class TestOpenAIHTTPBackend:
 
     @pytest.mark.smoke
     @pytest.mark.asyncio
-    async def test_openai_backend_process_startup_already_started(self):
-        """Test process startup when already started.
-
-        ### WRITTEN BY AI ###
-        """
+    @async_timeout(10.0)
+    @async_timeout(5.0)
+    async def test_process_startup_already_started(self):
+        """Test process startup when already started."""
         backend = OpenAIHTTPBackend(target="http://test")
         await backend.process_startup()
 
@@ -175,11 +278,10 @@ class TestOpenAIHTTPBackend:
 
     @pytest.mark.smoke
     @pytest.mark.asyncio
-    async def test_openai_backend_process_shutdown(self):
-        """Test process shutdown.
-
-        ### WRITTEN BY AI ###
-        """
+    @async_timeout(10.0)
+    @async_timeout(5.0)
+    async def test_process_shutdown(self):
+        """Test process shutdown."""
         backend = OpenAIHTTPBackend(target="http://test")
         await backend.process_startup()
 
@@ -193,11 +295,10 @@ class TestOpenAIHTTPBackend:
 
     @pytest.mark.smoke
     @pytest.mark.asyncio
-    async def test_openai_backend_process_shutdown_not_started(self):
-        """Test process shutdown when not started.
-
-        ### WRITTEN BY AI ###
-        """
+    @async_timeout(10.0)
+    @async_timeout(5.0)
+    async def test_process_shutdown_not_started(self):
+        """Test process shutdown when not started."""
         backend = OpenAIHTTPBackend(target="http://test")
 
         with pytest.raises(RuntimeError, match="Backend not started up"):
@@ -205,11 +306,10 @@ class TestOpenAIHTTPBackend:
 
     @pytest.mark.sanity
     @pytest.mark.asyncio
-    async def test_openai_backend_check_in_process(self):
-        """Test _check_in_process method.
-
-        ### WRITTEN BY AI ###
-        """
+    @async_timeout(10.0)
+    @async_timeout(5.0)
+    async def test_check_in_process(self):
+        """Test _check_in_process method."""
         backend = OpenAIHTTPBackend(target="http://test")
 
         with pytest.raises(RuntimeError, match="Backend not started up"):
@@ -224,11 +324,10 @@ class TestOpenAIHTTPBackend:
 
     @pytest.mark.sanity
     @pytest.mark.asyncio
-    async def test_openai_backend_available_models(self):
-        """Test available_models method.
-
-        ### WRITTEN BY AI ###
-        """
+    @async_timeout(10.0)
+    @async_timeout(5.0)
+    async def test_available_models(self):
+        """Test available_models method."""
         backend = OpenAIHTTPBackend(target="http://test")
         await backend.process_startup()
 
@@ -246,11 +345,10 @@ class TestOpenAIHTTPBackend:
 
     @pytest.mark.sanity
     @pytest.mark.asyncio
-    async def test_openai_backend_default_model(self):
-        """Test default_model method.
-
-        ### WRITTEN BY AI ###
-        """
+    @async_timeout(10.0)
+    @async_timeout(5.0)
+    async def test_default_model(self):
+        """Test default_model method."""
         # Test when model is already set
         backend1 = OpenAIHTTPBackend(target="http://test", model="test-model")
         result1 = await backend1.default_model()
@@ -271,11 +369,10 @@ class TestOpenAIHTTPBackend:
 
     @pytest.mark.regression
     @pytest.mark.asyncio
-    async def test_openai_backend_validate_with_model(self):
-        """Test validate method when model is set.
-
-        ### WRITTEN BY AI ###
-        """
+    @async_timeout(10.0)
+    @async_timeout(10.0)
+    async def test_validate_with_model(self):
+        """Test validate method when model is set."""
         backend = OpenAIHTTPBackend(target="http://test", model="test-model")
         await backend.process_startup()
 
@@ -291,11 +388,9 @@ class TestOpenAIHTTPBackend:
 
     @pytest.mark.regression
     @pytest.mark.asyncio
-    async def test_openai_backend_validate_without_model(self):
-        """Test validate method when no model is set.
-
-        ### WRITTEN BY AI ###
-        """
+    @async_timeout(10.0)
+    async def test_validate_without_model(self):
+        """Test validate method when no model is set."""
         backend = OpenAIHTTPBackend(target="http://test")
         await backend.process_startup()
 
@@ -305,11 +400,9 @@ class TestOpenAIHTTPBackend:
 
     @pytest.mark.regression
     @pytest.mark.asyncio
-    async def test_openai_backend_validate_fallback_to_text_completions(self):
-        """Test validate method fallback to text completions.
-
-        ### WRITTEN BY AI ###
-        """
+    @async_timeout(10.0)
+    async def test_validate_fallback_to_text_completions(self):
+        """Test validate method fallback to text completions."""
         backend = OpenAIHTTPBackend(target="http://test")
         await backend.process_startup()
 
@@ -331,11 +424,9 @@ class TestOpenAIHTTPBackend:
 
     @pytest.mark.regression
     @pytest.mark.asyncio
-    async def test_openai_backend_validate_failure(self):
-        """Test validate method when all validation methods fail.
-
-        ### WRITTEN BY AI ###
-        """
+    @async_timeout(10.0)
+    async def test_validate_failure(self):
+        """Test validate method when all validation methods fail."""
         backend = OpenAIHTTPBackend(target="http://test")
         await backend.process_startup()
 
@@ -353,11 +444,8 @@ class TestOpenAIHTTPBackend:
             await backend.validate()
 
     @pytest.mark.sanity
-    def test_openai_backend_get_headers(self):
-        """Test _get_headers method.
-
-        ### WRITTEN BY AI ###
-        """
+    def test_get_headers(self):
+        """Test _get_headers method."""
         backend = OpenAIHTTPBackend(
             target="http://test", api_key="test-key", headers={"Custom": "value"}
         )
@@ -372,11 +460,8 @@ class TestOpenAIHTTPBackend:
         assert headers == expected
 
     @pytest.mark.sanity
-    def test_openai_backend_get_params(self):
-        """Test _get_params method.
-
-        ### WRITTEN BY AI ###
-        """
+    def test_get_params(self):
+        """Test _get_params method."""
         extra_query = {
             "general": "value",
             "text_completions": {"specific": "text"},
@@ -394,11 +479,8 @@ class TestOpenAIHTTPBackend:
         assert other_params == extra_query
 
     @pytest.mark.regression
-    def test_openai_backend_get_chat_messages_string(self):
-        """Test _get_chat_messages with string content.
-
-        ### WRITTEN BY AI ###
-        """
+    def test_get_chat_messages_string(self):
+        """Test _get_chat_messages with string content."""
         backend = OpenAIHTTPBackend(target="http://test")
 
         messages = backend._get_chat_messages("Hello world")
@@ -407,11 +489,8 @@ class TestOpenAIHTTPBackend:
         assert messages == expected
 
     @pytest.mark.regression
-    def test_openai_backend_get_chat_messages_list(self):
-        """Test _get_chat_messages with list content.
-
-        ### WRITTEN BY AI ###
-        """
+    def test_get_chat_messages_list(self):
+        """Test _get_chat_messages with list content."""
         backend = OpenAIHTTPBackend(target="http://test")
 
         content = [
@@ -435,11 +514,8 @@ class TestOpenAIHTTPBackend:
         assert messages == expected
 
     @pytest.mark.regression
-    def test_openai_backend_get_chat_messages_invalid(self):
-        """Test _get_chat_messages with invalid content.
-
-        ### WRITTEN BY AI ###
-        """
+    def test_get_chat_messages_invalid(self):
+        """Test _get_chat_messages with invalid content."""
         backend = OpenAIHTTPBackend(target="http://test")
 
         with pytest.raises(ValueError, match="Unsupported content type"):
@@ -449,11 +525,8 @@ class TestOpenAIHTTPBackend:
             backend._get_chat_messages([123])
 
     @pytest.mark.regression
-    def test_openai_backend_get_chat_message_media_item_image(self):
-        """Test _get_chat_message_media_item with PIL Image.
-
-        ### WRITTEN BY AI ###
-        """
+    def test_get_chat_message_media_item_image(self):
+        """Test _get_chat_message_media_item with PIL Image."""
         backend = OpenAIHTTPBackend(target="http://test")
 
         # Create a mock PIL Image
@@ -470,11 +543,8 @@ class TestOpenAIHTTPBackend:
         assert result == expected
 
     @pytest.mark.regression
-    def test_openai_backend_get_chat_message_media_item_path(self):
-        """Test _get_chat_message_media_item with file paths.
-
-        ### WRITTEN BY AI ###
-        """
+    def test_get_chat_message_media_item_path(self):
+        """Test _get_chat_message_media_item with file paths."""
         backend = OpenAIHTTPBackend(target="http://test")
 
         # Test unsupported file type
@@ -483,11 +553,8 @@ class TestOpenAIHTTPBackend:
             backend._get_chat_message_media_item(unsupported_path)
 
     @pytest.mark.regression
-    def test_openai_backend_get_body(self):
-        """Test _get_body method.
-
-        ### WRITTEN BY AI ###
-        """
+    def test_get_body(self):
+        """Test _get_body method."""
         extra_body = {"general": "value", "text_completions": {"temperature": 0.5}}
 
         backend = OpenAIHTTPBackend(
@@ -517,11 +584,8 @@ class TestOpenAIHTTPBackend:
         assert "stop" not in body
 
     @pytest.mark.regression
-    def test_openai_backend_get_completions_text_content(self):
-        """Test _get_completions_text_content method.
-
-        ### WRITTEN BY AI ###
-        """
+    def test_get_completions_text_content(self):
+        """Test _get_completions_text_content method."""
         backend = OpenAIHTTPBackend(target="http://test")
 
         # Test with text field
@@ -545,11 +609,8 @@ class TestOpenAIHTTPBackend:
         assert result4 is None
 
     @pytest.mark.regression
-    def test_openai_backend_get_completions_usage_stats(self):
-        """Test _get_completions_usage_stats method.
-
-        ### WRITTEN BY AI ###
-        """
+    def test_get_completions_usage_stats(self):
+        """Test _get_completions_usage_stats method."""
         backend = OpenAIHTTPBackend(target="http://test")
 
         # Test with usage data
@@ -566,11 +627,9 @@ class TestOpenAIHTTPBackend:
 
     @pytest.mark.regression
     @pytest.mark.asyncio
-    async def test_openai_backend_resolve_not_implemented_history(self):
-        """Test resolve method raises error for conversation history.
-
-        ### WRITTEN BY AI ###
-        """
+    @async_timeout(10.0)
+    async def test_resolve_not_implemented_history(self):
+        """Test resolve method raises error for conversation history."""
         backend = OpenAIHTTPBackend(target="http://test")
         await backend.process_startup()
 
@@ -591,11 +650,9 @@ class TestOpenAIHTTPBackend:
 
     @pytest.mark.regression
     @pytest.mark.asyncio
-    async def test_openai_backend_resolve_text_completions(self):
-        """Test resolve method for text completions.
-
-        ### WRITTEN BY AI ###
-        """
+    @async_timeout(10.0)
+    async def test_resolve_text_completions(self):
+        """Test resolve method for text completions."""
         backend = OpenAIHTTPBackend(target="http://test")
         await backend.process_startup()
 
@@ -635,11 +692,9 @@ class TestOpenAIHTTPBackend:
 
     @pytest.mark.regression
     @pytest.mark.asyncio
-    async def test_openai_backend_resolve_chat_completions(self):
-        """Test resolve method for chat completions.
-
-        ### WRITTEN BY AI ###
-        """
+    @async_timeout(10.0)
+    async def test_resolve_chat_completions(self):
+        """Test resolve method for chat completions."""
         backend = OpenAIHTTPBackend(target="http://test")
         await backend.process_startup()
 
@@ -679,11 +734,9 @@ class TestOpenAICompletions:
 
     @pytest.mark.smoke
     @pytest.mark.asyncio
+    @async_timeout(10.0)
     async def test_text_completions_not_in_process(self):
-        """Test text_completions when backend not started.
-
-        ### WRITTEN BY AI ###
-        """
+        """Test text_completions when backend not started."""
         backend = OpenAIHTTPBackend(target="http://test")
 
         with pytest.raises(RuntimeError, match="Backend not started up"):
@@ -692,11 +745,9 @@ class TestOpenAICompletions:
 
     @pytest.mark.smoke
     @pytest.mark.asyncio
+    @async_timeout(10.0)
     async def test_text_completions_basic(self):
-        """Test basic text_completions functionality.
-
-        ### WRITTEN BY AI ###
-        """
+        """Test basic text_completions functionality."""
         backend = OpenAIHTTPBackend(target="http://test", model="gpt-4")
         await backend.process_startup()
 
@@ -728,11 +779,9 @@ class TestOpenAICompletions:
 
     @pytest.mark.smoke
     @pytest.mark.asyncio
+    @async_timeout(10.0)
     async def test_chat_completions_not_in_process(self):
-        """Test chat_completions when backend not started.
-
-        ### WRITTEN BY AI ###
-        """
+        """Test chat_completions when backend not started."""
         backend = OpenAIHTTPBackend(target="http://test")
 
         with pytest.raises(RuntimeError, match="Backend not started up"):
@@ -741,11 +790,9 @@ class TestOpenAICompletions:
 
     @pytest.mark.smoke
     @pytest.mark.asyncio
+    @async_timeout(10.0)
     async def test_chat_completions_basic(self):
-        """Test basic chat_completions functionality.
-
-        ### WRITTEN BY AI ###
-        """
+        """Test basic chat_completions functionality."""
         backend = OpenAIHTTPBackend(target="http://test", model="gpt-4")
         await backend.process_startup()
 
@@ -777,11 +824,9 @@ class TestOpenAICompletions:
 
     @pytest.mark.sanity
     @pytest.mark.asyncio
+    @async_timeout(10.0)
     async def test_text_completions_with_parameters(self):
-        """Test text_completions with additional parameters.
-
-        ### WRITTEN BY AI ###
-        """
+        """Test text_completions with additional parameters."""
         backend = OpenAIHTTPBackend(target="http://test", model="gpt-4")
         await backend.process_startup()
 
@@ -816,11 +861,9 @@ class TestOpenAICompletions:
 
     @pytest.mark.sanity
     @pytest.mark.asyncio
+    @async_timeout(10.0)
     async def test_chat_completions_content_formatting(self):
-        """Test chat_completions content formatting.
-
-        ### WRITTEN BY AI ###
-        """
+        """Test chat_completions content formatting."""
         backend = OpenAIHTTPBackend(target="http://test", model="gpt-4")
         await backend.process_startup()
 
@@ -848,11 +891,9 @@ class TestOpenAICompletions:
 
     @pytest.mark.regression
     @pytest.mark.asyncio
-    async def test_openai_backend_validate_no_models_available(self):
-        """Test validate method when no models are available.
-
-        ### WRITTEN BY AI ###
-        """
+    @async_timeout(10.0)
+    async def test_validate_no_models_available(self):
+        """Test validate method when no models are available."""
         backend = OpenAIHTTPBackend(target="http://test")
         await backend.process_startup()
 
@@ -876,6 +917,7 @@ class TestOpenAICompletions:
 
     @pytest.mark.sanity
     @pytest.mark.asyncio
+    @async_timeout(10.0)
     async def test_text_completions_streaming(self):
         """Test text_completions with streaming enabled."""
         backend = OpenAIHTTPBackend(target="http://test", model="gpt-4")
@@ -928,11 +970,9 @@ class TestOpenAICompletions:
 
     @pytest.mark.sanity
     @pytest.mark.asyncio
+    @async_timeout(10.0)
     async def test_chat_completions_streaming(self):
-        """Test chat_completions with streaming enabled.
-
-        ### WRITTEN BY AI ###
-        """
+        """Test chat_completions with streaming enabled."""
         backend = OpenAIHTTPBackend(target="http://test", model="gpt-4")
         await backend.process_startup()
 
@@ -977,11 +1017,9 @@ class TestOpenAICompletions:
 
     @pytest.mark.regression
     @pytest.mark.asyncio
+    @async_timeout(10.0)
     async def test_streaming_response_edge_cases(self):
-        """Test streaming response edge cases for line processing.
-
-        ### WRITTEN BY AI ###
-        """
+        """Test streaming response edge cases for line processing."""
         backend = OpenAIHTTPBackend(target="http://test", model="gpt-4")
         await backend.process_startup()
 
@@ -1024,11 +1062,8 @@ class TestOpenAICompletions:
             await backend.process_shutdown()
 
     @pytest.mark.sanity
-    def test_openai_backend_get_chat_message_media_item_jpeg_file(self):
-        """Test _get_chat_message_media_item with JPEG file path.
-
-        ### WRITTEN BY AI ###
-        """
+    def test_get_chat_message_media_item_jpeg_file(self):
+        """Test _get_chat_message_media_item with JPEG file path."""
         backend = OpenAIHTTPBackend(target="http://test")
 
         # Create a mock Path object for JPEG file
@@ -1050,11 +1085,8 @@ class TestOpenAICompletions:
         assert result == expected
 
     @pytest.mark.sanity
-    def test_openai_backend_get_chat_message_media_item_wav_file(self):
-        """Test _get_chat_message_media_item with WAV file path.
-
-        ### WRITTEN BY AI ###
-        """
+    def test_get_chat_message_media_item_wav_file(self):
+        """Test _get_chat_message_media_item with WAV file path."""
         backend = OpenAIHTTPBackend(target="http://test")
 
         # Create a mock Path object for WAV file
@@ -1072,11 +1104,8 @@ class TestOpenAICompletions:
         assert result == expected
 
     @pytest.mark.sanity
-    def test_openai_backend_get_chat_messages_with_pil_image(self):
-        """Test _get_chat_messages with PIL Image in content list.
-
-        ### WRITTEN BY AI ###
-        """
+    def test_get_chat_messages_with_pil_image(self):
+        """Test _get_chat_messages with PIL Image in content list."""
         backend = OpenAIHTTPBackend(target="http://test")
 
         # Create a mock PIL Image
@@ -1103,11 +1132,9 @@ class TestOpenAICompletions:
 
     @pytest.mark.regression
     @pytest.mark.asyncio
+    @async_timeout(10.0)
     async def test_resolve_timing_edge_cases(self):
-        """Test resolve method timing edge cases.
-
-        ### WRITTEN BY AI ###
-        """
+        """Test resolve method timing edge cases."""
         backend = OpenAIHTTPBackend(target="http://test")
         await backend.process_startup()
 

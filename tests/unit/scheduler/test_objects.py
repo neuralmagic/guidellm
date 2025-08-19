@@ -1,16 +1,21 @@
+from __future__ import annotations
+
 import inspect
 import typing
+from abc import ABC
 from collections.abc import AsyncIterator
-from typing import Any, Optional, TypeVar
+from typing import Any, Optional, TypeVar, Union
 
 import pytest
 from pydantic import ValidationError
+from typing_extensions import TypeAliasType
 
 from guidellm.scheduler import (
     BackendInterface,
     BackendT,
     MeasuredRequestTimings,
     MeasuredRequestTimingsT,
+    MultiTurnRequestT,
     RequestSchedulerTimings,
     RequestT,
     ResponseT,
@@ -19,6 +24,7 @@ from guidellm.scheduler import (
     SchedulerUpdateAction,
     SchedulerUpdateActionProgress,
 )
+from guidellm.utils import StandardBaseModel
 
 
 def test_request_t():
@@ -53,14 +59,26 @@ def test_backend_t():
     assert BackendT.__constraints__ == ()
 
 
+def test_multi_turn_request_t():
+    """Validate MultiTurnRequestT is a TypeAliasType for multi-turn requests."""
+    assert isinstance(MultiTurnRequestT, TypeAliasType)
+    assert MultiTurnRequestT.__name__ == "MultiTurnRequestT"
+
+    value = MultiTurnRequestT.__value__
+    assert hasattr(value, "__origin__")
+    assert value.__origin__ is Union
+
+    type_params = getattr(MultiTurnRequestT, "__type_params__", ())
+    assert len(type_params) == 1
+    assert type_params[0].__name__ == "RequestT"
+
+
 class TestBackendInterface:
     """Test the BackendInterface abstract base class."""
 
     @pytest.mark.smoke
     def test_is_abstract_base_class(self):
         """Test that BackendInterface is an ABC and cannot be instantiated directly."""
-        from abc import ABC
-
         assert issubclass(BackendInterface, ABC)
         with pytest.raises(TypeError, match="Can't instantiate abstract class"):
             BackendInterface()
@@ -144,11 +162,11 @@ class TestBackendInterface:
 
         class ConcreteBackend(BackendInterface[str, MeasuredRequestTimings, str]):
             @property
-            def processes_limit(self) -> Optional[int]:
+            def processes_limit(self) -> int | None:
                 return 4
 
             @property
-            def requests_limit(self) -> Optional[int]:
+            def requests_limit(self) -> int | None:
                 return 100
 
             def info(self) -> dict[str, Any]:
@@ -167,7 +185,7 @@ class TestBackendInterface:
                 self,
                 request: str,
                 request_info: ScheduledRequestInfo[MeasuredRequestTimings],
-                history: Optional[list[tuple[str, str]]] = None,
+                history: list[tuple[str, str]] | None = None,
             ) -> AsyncIterator[
                 tuple[str, ScheduledRequestInfo[MeasuredRequestTimings]]
             ]:
@@ -193,11 +211,11 @@ class TestBackendInterface:
                 self.shutdown_called = False
 
             @property
-            def processes_limit(self) -> Optional[int]:
+            def processes_limit(self) -> int | None:
                 return None  # Unlimited
 
             @property
-            def requests_limit(self) -> Optional[int]:
+            def requests_limit(self) -> int | None:
                 return None  # Unlimited
 
             def info(self) -> dict[str, Any]:
@@ -216,7 +234,7 @@ class TestBackendInterface:
                 self,
                 request: dict,
                 request_info: ScheduledRequestInfo[MeasuredRequestTimings],
-                history: Optional[list[tuple[dict, dict]]] = None,
+                history: list[tuple[dict, dict]] | None = None,
             ) -> AsyncIterator[
                 tuple[dict, ScheduledRequestInfo[MeasuredRequestTimings]]
             ]:
@@ -278,6 +296,8 @@ class TestBackendInterface:
 
 
 class TestRequestSchedulerTimings:
+    """Test the RequestSchedulerTimings model class."""
+
     CHECK_KEYS = [
         "targeted_start",
         "queued",
@@ -289,9 +309,7 @@ class TestRequestSchedulerTimings:
 
     @pytest.fixture(
         params=[
-            # Default empty configuration
             {},
-            # All None values explicitly set
             {
                 "targeted_start": None,
                 "queued": None,
@@ -300,7 +318,6 @@ class TestRequestSchedulerTimings:
                 "resolve_end": None,
                 "finalized": None,
             },
-            # Complete timing sequence
             {
                 "targeted_start": 1000.0,
                 "queued": 200.0,
@@ -309,13 +326,11 @@ class TestRequestSchedulerTimings:
                 "resolve_end": 1100.0,
                 "finalized": 1100.5,
             },
-            # Partial timing data
             {
                 "queued": 200.0,
                 "resolve_start": 1000.5,
                 "resolve_end": 1100.0,
             },
-            # Edge case: zero timestamps
             {
                 "targeted_start": 0.0,
                 "queued": 0.0,
@@ -334,15 +349,25 @@ class TestRequestSchedulerTimings:
         ],
     )
     def valid_instances(self, request):
-        """Creates various valid configurations of RequestSchedulerTimings.
-
-        Returns:
-            tuple: (instance, constructor_args) where instance is the constructed
-                   RequestSchedulerTimings and constructor_args are the kwargs used.
-        """
+        """Creates various valid configurations of RequestSchedulerTimings."""
         constructor_args = request.param
         instance = RequestSchedulerTimings(**constructor_args)
         return instance, constructor_args
+
+    @pytest.mark.smoke
+    def test_class_signatures(self):
+        """Test RequestSchedulerTimings inheritance and type relationships."""
+        assert issubclass(RequestSchedulerTimings, StandardBaseModel)
+        assert hasattr(RequestSchedulerTimings, "model_dump")
+        assert hasattr(RequestSchedulerTimings, "model_validate")
+
+        # Check all expected fields are defined
+        fields = RequestSchedulerTimings.model_fields
+        for key in self.CHECK_KEYS:
+            assert key in fields
+            field_info = fields[key]
+            assert field_info.annotation in (Union[float, None], Optional[float])
+            assert field_info.default is None
 
     @pytest.mark.smoke
     def test_initialization(self, valid_instances):
@@ -398,6 +423,8 @@ class TestRequestSchedulerTimings:
 
 
 class TestRequestTimings:
+    """Test the MeasuredRequestTimings model class."""
+
     CHECK_KEYS = [
         "request_start",
         "request_end",
@@ -405,23 +432,18 @@ class TestRequestTimings:
 
     @pytest.fixture(
         params=[
-            # Default empty configuration
             {},
-            # All None values explicitly set
             {
                 "request_start": None,
                 "request_end": None,
             },
-            # Complete timing sequence
             {
                 "request_start": 1000.0,
                 "request_end": 1100.0,
             },
-            # Partial timing data
             {
                 "request_start": 1000.0,
             },
-            # Edge case: zero timestamps
             {
                 "request_start": 0.0,
                 "request_end": 0.0,
@@ -436,15 +458,25 @@ class TestRequestTimings:
         ],
     )
     def valid_instances(self, request):
-        """Creates various valid configurations of RequestTimings.
-
-        Returns:
-            tuple: (instance, constructor_args) where instance is the constructed
-                   RequestTimings and constructor_args are the kwargs used.
-        """
+        """Creates various valid configurations of MeasuredRequestTimings."""
         constructor_args = request.param
         instance = MeasuredRequestTimings(**constructor_args)
         return instance, constructor_args
+
+    @pytest.mark.smoke
+    def test_class_signatures(self):
+        """Test MeasuredRequestTimings inheritance and type relationships."""
+        assert issubclass(MeasuredRequestTimings, StandardBaseModel)
+        assert hasattr(MeasuredRequestTimings, "model_dump")
+        assert hasattr(MeasuredRequestTimings, "model_validate")
+
+        # Check all expected fields are defined
+        fields = MeasuredRequestTimings.model_fields
+        for key in self.CHECK_KEYS:
+            assert key in fields
+            field_info = fields[key]
+            assert field_info.annotation in (Union[float, None], Optional[float])
+            assert field_info.default is None
 
     @pytest.mark.smoke
     def test_initialization(self, valid_instances):
@@ -592,6 +624,37 @@ class TestScheduledRequestInfo:
 
         instance = ScheduledRequestInfo(**constructor_args)
         return instance, constructor_args
+
+    @pytest.mark.smoke
+    def test_class_signatures(self):
+        """Test ScheduledRequestInfo inheritance and type relationships."""
+        assert issubclass(ScheduledRequestInfo, StandardBaseModel)
+        assert issubclass(ScheduledRequestInfo, typing.Generic)
+        assert hasattr(ScheduledRequestInfo, "model_dump")
+        assert hasattr(ScheduledRequestInfo, "model_validate")
+
+        # Check computed properties
+        assert hasattr(ScheduledRequestInfo, "started_at")
+        assert hasattr(ScheduledRequestInfo, "completed_at")
+        assert isinstance(ScheduledRequestInfo.started_at, property)
+        assert isinstance(ScheduledRequestInfo.completed_at, property)
+
+        # Check that it's properly generic
+        orig_bases = getattr(ScheduledRequestInfo, "__orig_bases__", ())
+        generic_base = next(
+            (
+                base
+                for base in orig_bases
+                if hasattr(base, "__origin__") and base.__origin__ is typing.Generic
+            ),
+            None,
+        )
+        assert generic_base is not None
+
+        # Check required fields
+        fields = ScheduledRequestInfo.model_fields
+        for key in self.CHECK_KEYS:
+            assert key in fields
 
     @pytest.mark.smoke
     def test_initialization(self, valid_instances):
@@ -855,6 +918,37 @@ class TestSchedulerState:
         return instance, constructor_args
 
     @pytest.mark.smoke
+    def test_class_signatures(self):
+        """Test SchedulerState inheritance and type relationships."""
+        assert issubclass(SchedulerState, StandardBaseModel)
+        assert hasattr(SchedulerState, "model_dump")
+        assert hasattr(SchedulerState, "model_validate")
+
+        # Check all expected fields are defined
+        fields = SchedulerState.model_fields
+        for key in self.CHECK_KEYS:
+            assert key in fields
+
+        # Check field defaults for key counters
+        counter_fields = [
+            "created_requests",
+            "queued_requests",
+            "pending_requests",
+            "processing_requests",
+            "processed_requests",
+            "successful_requests",
+            "errored_requests",
+            "cancelled_requests",
+        ]
+        for field in counter_fields:
+            field_info = fields[field]
+            assert field_info.default == 0
+
+        # Check that start_time has a default factory
+        start_time_field = fields["start_time"]
+        assert start_time_field.default_factory is not None
+
+    @pytest.mark.smoke
     def test_initialization(self, valid_instances):
         """Test initialization with valid configurations."""
         instance, constructor_args = valid_instances
@@ -1029,6 +1123,26 @@ class TestSchedulerUpdateAction:
         constructor_args = request.param
         instance = SchedulerUpdateAction(**constructor_args)
         return instance, constructor_args
+
+    @pytest.mark.smoke
+    def test_class_signatures(self):
+        """Test SchedulerUpdateAction inheritance and type relationships."""
+        assert issubclass(SchedulerUpdateAction, StandardBaseModel)
+        assert hasattr(SchedulerUpdateAction, "model_dump")
+        assert hasattr(SchedulerUpdateAction, "model_validate")
+
+        # Check all expected fields are defined
+        fields = SchedulerUpdateAction.model_fields
+        for key in self.CHECK_KEYS:
+            assert key in fields
+
+        # Check field defaults
+        assert fields["request_queuing"].default == "continue"
+        assert fields["request_processing"].default == "continue"
+        metadata_field = fields["metadata"]
+        assert metadata_field.default_factory is not None
+        progress_field = fields["progress"]
+        assert progress_field.default_factory is not None
 
     @pytest.mark.smoke
     def test_initialization(self, valid_instances):

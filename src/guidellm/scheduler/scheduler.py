@@ -1,11 +1,11 @@
 """
-Scheduler for coordinating distributed load testing and benchmarking workloads.
+Thread-safe singleton scheduler for distributed load generation workload coordination.
 
-This module provides a thread-safe singleton scheduler for orchestrating
-benchmarking operations across worker processes and distributed environments.
-
-Classes:
-    Scheduler: Generic singleton scheduler for distributed request processing.
+Provides the core orchestration engine that coordinates request processing across
+worker processes and distributed environments. Manages timing synchronization,
+resource allocation, constraint enforcement, and result aggregation for
+load generation operations. Integrates with backends, environments, and strategies
+to enable scalable load testing across various scenarios including LLM inference.
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ from guidellm.scheduler.constraints import (
     Constraint,
     ConstraintsInitializerFactory,
 )
-from guidellm.scheduler.environment import Environment
+from guidellm.scheduler.environment import Environment, NonDistributedEnvironment
 from guidellm.scheduler.objects import (
     BackendInterface,
     MeasuredRequestTimingsT,
@@ -39,37 +39,30 @@ class Scheduler(
     ThreadSafeSingletonMixin,
 ):
     """
-    Generic singleton scheduler for coordinating distributed load testing workloads.
+    Thread-safe singleton scheduler for distributed benchmarking workload coordination.
 
-    Orchestrates benchmarking operations by managing request distribution across
-    worker processes, coordinating timing with distributed environments, and
-    aggregating results. Supports generic backend types for adaptability to
-    various testing scenarios including LLM inference and API testing.
+    Orchestrates request processing across worker processes with distributed timing
+    coordination, constraint enforcement, and result aggregation. Provides a unified
+    interface for executing benchmarking operations while abstracting the complexity
+    of multi-process coordination, environment synchronization, and resource management.
+    Implements singleton pattern to ensure consistent execution state across concurrent
+    benchmark operations.
 
     Example:
     ::
         from guidellm.scheduler import Scheduler
-        from guidellm.backend import (
-            OpenAIBackend,
-            GenerationRequest,
-            GenerationResponse,
-            GenerationRequestTimings
-        )
+        from guidellm.backend import OpenAIBackend
+        from guidellm.scheduler import NonDistributedEnvironment, SynchronousStrategy
 
-        scheduler = Scheduler[
-            OpenAIBackend,
-            GenerationRequest,
-            GenerationRequestTimings,
-            GenerationResponse
-        ]()
+        scheduler = Scheduler()
         async for response, request, info, state in scheduler.run(
             requests=request_list,
             backend=backend,
-            strategy=strategy,
-            env=environment,
+            strategy=SynchronousStrategy(),
+            env=NonDistributedEnvironment(),
             max_requests=1000
         ):
-            print(f"Response: {response}")
+            print(f"Processed: {request} with info: {info} and response: {response}")
     """
 
     async def run(
@@ -77,7 +70,7 @@ class Scheduler(
         requests: Iterable[RequestT | MultiTurnRequestT[RequestT]],
         backend: BackendInterface[RequestT, MeasuredRequestTimingsT, ResponseT],
         strategy: SchedulingStrategy,
-        env: Environment,
+        env: Environment | None,
         **constraints: dict[str, Any | dict[str, Any] | Constraint],
     ) -> AsyncIterator[
         tuple[
@@ -88,26 +81,32 @@ class Scheduler(
         ]
     ]:
         """
-        Execute request processing with the provided configuration.
+        Execute distributed request processing with coordinated timing and constraints.
 
-        Coordinates execution across worker processes with the specified backend
-        and scheduling strategy. Manages timing, synchronization, and resource
-        cleanup while yielding real-time updates.
+        Orchestrates the complete benchmarking workflow across worker processes with
+        environment synchronization, constraint enforcement, and error handling.
+        Manages resource lifecycle from initialization through cleanup while yielding
+        real-time processing updates for monitoring and aggregation.
 
-        :param requests: Requests to process. Supports single requests
-            (Iterable[RequestT]) or multi-turn sequences (Iterable[Iterable]) where
-            each item is either a RequestT or tuple of (RequestT, delay_seconds).
-        :param backend: Backend instance for processing requests.
-        :param strategy: Scheduling strategy for request timing.
-        :param env: Environment for distributed execution coordination.
-        :param constraints: Execution control constraints (max_requests, duration,
-            etc.). Values can be primitives or callable functions.
-        :yields: Tuples of (response, request, scheduling_info, scheduler_state).
-            Response may be None for failed requests.
-        :raises Exception: Worker process, environment, or constraint evaluation errors
-            are propagated after cleanup.
+        :param requests: Request collection to process. Supports single requests or
+            multi-turn sequences with optional inter-request delays
+        :param backend: Backend interface for request processing and response generation
+        :param strategy: Scheduling strategy controlling request timing and distribution
+        :param env: Environment interface for distributed coordination and
+            synchronization
+        :param constraints: Runtime constraints for execution control (max_requests,
+            max_duration, max_error_rate, etc.). Values can be primitives, dictionaries,
+            or constraint instances
+        :yields: Requests udpates as (response, request, request_info, scheduler_state)
+        tuples. Each request will generate three ordered updates:
+            queued, in_progress, completed | errored | cancelled.
+        :raises Exception: Worker process errors, environment synchronization failures,
+            or constraint evaluation errors are propagated after cleanup
         """
         with self.thread_lock:
+            if env is None:
+                env = NonDistributedEnvironment()
+
             worker_group: (
                 WorkerProcessGroup[RequestT, MeasuredRequestTimingsT, ResponseT] | None
             ) = None

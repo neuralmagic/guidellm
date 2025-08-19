@@ -37,7 +37,7 @@ from rich.progress import (
     TimeRemainingColumn,
 )
 
-from guidellm.benchmark.benchmark import BenchmarkT, GenerativeBenchmark
+from guidellm.benchmark.objects import BenchmarkT, GenerativeBenchmark
 from guidellm.benchmark.profile import Profile
 from guidellm.scheduler import (
     SchedulerState,
@@ -367,8 +367,9 @@ class GenerativeConsoleBenchmarkerProgress(
         :param enabled: Whether to enable progress tracking and display.
         :param display_scheduler_stats: Whether to display scheduler statistics.
         """
-        super(BenchmarkerProgress, self).__init__(enabled=enabled)
-        super(Live, self).__init__(
+        BenchmarkerProgress.__init__(self, enabled=enabled)
+        Live.__init__(
+            self,
             refresh_per_second=4,
             auto_refresh=True,
             redirect_stdout=True,
@@ -566,8 +567,8 @@ class _GenerativeProgressTasks(Progress):
 
 @dataclass
 class _GenerativeProgressTaskState:
-    task_id: TaskID = None
     strategy_type: StrategyType
+    task_id: TaskID = None
     strategy: SchedulingStrategy | None = None
     benchmark_status: Literal[
         "pending", "in_warmup", "in_progress", "in_cooldown", "completed"
@@ -599,8 +600,8 @@ class _GenerativeProgressTaskState:
             "requests_summary": self.formatted_requests_summary,
             "tokens_summary": self.formatted_tokens_summary,
             "scheduler_stats": self.formatted_scheduler_stats,
-            "completed": None,
-            "total": None,
+            "completed": self.completed,
+            "total": self.total,
         }
 
     @property

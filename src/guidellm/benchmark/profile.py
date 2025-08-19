@@ -17,15 +17,20 @@ Type Aliases:
     ProfileType: Literal type for supported profile configurations.
 """
 
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from collections.abc import Generator
-from typing import Any, Generic, Literal, Optional, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    ClassVar,
+    Literal,
+)
 
 import numpy as np
-from pydantic import Field, computed_field
+from pydantic import Field, computed_field, field_serializer, field_validator
 
-from guidellm.benchmark.benchmark import BenchmarkT
-from guidellm.objects import StandardBaseModel
 from guidellm.scheduler import (
     AsyncConstantStrategy,
     AsyncPoissonStrategy,
@@ -34,12 +39,14 @@ from guidellm.scheduler import (
     ConstraintInitializer,
     ConstraintsInitializerFactory,
     SchedulingStrategy,
-    StrategyT,
     StrategyType,
     SynchronousStrategy,
     ThroughputStrategy,
 )
-from guidellm.utils import RegistryMixin
+from guidellm.utils import PydanticClassRegistryMixin
+
+if TYPE_CHECKING:
+    from guidellm.benchmark.objects import Benchmark
 
 __all__ = [
     "AsyncProfile",
@@ -55,10 +62,8 @@ ProfileType = Literal["synchronous", "concurrent", "throughput", "async", "sweep
 
 
 class Profile(
-    StandardBaseModel,
+    PydanticClassRegistryMixin["type[Profile]"],
     ABC,
-    Generic[StrategyT, BenchmarkT],
-    RegistryMixin,
 ):
     """
     Abstract base for multi-strategy benchmarking execution profiles.
@@ -68,14 +73,23 @@ class Profile(
     comprehensive benchmarking workflows.
     """
 
+    schema_discriminator: ClassVar[str] = "type_"
+
+    @classmethod
+    def __pydantic_schema_base_type__(cls) -> type[Profile]:
+        if cls.__name__ == "Profile":
+            return cls
+
+        return Profile
+
     @classmethod
     def create(
         cls,
         rate_type: str,
-        rate: Optional[Union[float, int, list[float, int]]],
-        random_seed: int,
+        rate: float | int | list[float | int] | None,
+        random_seed: int = 42,
         **kwargs: Any,
-    ) -> "Profile":
+    ) -> Profile:
         """
         Create a profile instance based on the specified type.
 
@@ -98,7 +112,7 @@ class Profile(
     def resolve_args(
         cls,
         rate_type: str,
-        rate: Optional[Union[float, int, list[float, int]]],
+        rate: float | int | list[float, int] | None,
         random_seed: int,
         **kwargs: Any,
     ) -> dict[str, Any]:
@@ -120,9 +134,7 @@ class Profile(
         default_factory=list,
         description="The strategies that have completed execution",
     )
-    constraints: Optional[
-        dict[str, Union[Any, dict[str, Any], ConstraintInitializer]]
-    ] = Field(
+    constraints: dict[str, Any | dict[str, Any] | ConstraintInitializer] | None = Field(
         default=None,
         description="Runtime constraints to apply during strategy execution",
     )
@@ -131,7 +143,9 @@ class Profile(
     @property
     def strategy_types(self) -> list[StrategyType]:
         """
-        :return: List of all strategy types expected to be executed in this profile.
+        :return: List of all strategy types expected to be executed or have been
+            executed in this profile. By default, this returns just the
+            completed strategies.
         """
         return [strat.type_ for strat in self.completed_strategies]
 
@@ -139,10 +153,10 @@ class Profile(
         self,
     ) -> Generator[
         tuple[
-            Optional[StrategyT],
-            Optional[dict[str, Union[Any, dict[str, Any], Constraint]]],
+            SchedulingStrategy | None,
+            dict[str, Any | dict[str, Any] | Constraint] | None,
         ],
-        BenchmarkT,
+        Benchmark | None,
         None,
     ]:
         """
@@ -151,8 +165,8 @@ class Profile(
         :return: Generator yielding (strategy, constraints) tuples and
             receiving benchmark results from each execution.
         """
-        prev_strategy: Optional[StrategyT] = None
-        prev_benchmark: Optional[BenchmarkT] = None
+        prev_strategy: SchedulingStrategy | None = None
+        prev_benchmark: Benchmark | None = None
 
         while (
             strategy := self.next_strategy(prev_strategy, prev_benchmark)
@@ -170,9 +184,9 @@ class Profile(
     @abstractmethod
     def next_strategy(
         self,
-        prev_strategy: Optional[StrategyT],
-        prev_benchmark: Optional[BenchmarkT],
-    ) -> Optional[StrategyT]:
+        prev_strategy: SchedulingStrategy | None,
+        prev_benchmark: Benchmark | None,
+    ) -> SchedulingStrategy | None:
         """
         Generate the next strategy to execute in the profile sequence.
 
@@ -184,10 +198,10 @@ class Profile(
 
     def next_strategy_constraints(
         self,
-        next_strategy: Optional[StrategyT],
-        prev_strategy: Optional[StrategyT],
-        prev_benchmark: Optional[BenchmarkT],
-    ) -> Optional[dict[str, Union[Any, dict[str, Any], Constraint]]]:
+        next_strategy: SchedulingStrategy | None,
+        prev_strategy: SchedulingStrategy | None,
+        prev_benchmark: Benchmark | None,
+    ) -> dict[str, Any | dict[str, Any] | Constraint] | None:
         """
         Generate constraints for the next strategy execution.
 
@@ -202,9 +216,46 @@ class Profile(
             else None
         )
 
+    @field_validator("constraints", mode="before")
+    @classmethod
+    def _constraints_validator(
+        cls, value: Any
+    ) -> dict[str, Any | dict[str, Any] | ConstraintInitializer] | None:
+        if value is None:
+            return None
+
+        if not isinstance(value, dict):
+            raise ValueError("Constraints must be a dictionary")
+
+        return {
+            key: (
+                val
+                if not isinstance(val, ConstraintInitializer)
+                else ConstraintsInitializerFactory.deserialize(initializer_dict=val)
+            )
+            for key, val in value.items()
+        }
+
+    @field_serializer
+    def _constraints_serializer(
+        self,
+        constraints: dict[str, Any | dict[str, Any] | ConstraintInitializer] | None,
+    ) -> dict[str, Any | dict[str, Any]] | None:
+        if constraints is None:
+            return None
+
+        return {
+            key: (
+                val
+                if not isinstance(val, ConstraintInitializer)
+                else ConstraintsInitializerFactory.serialize(initializer=val)
+            )
+            for key, val in constraints.items()
+        }
+
 
 @Profile.register("synchronous")
-class SynchronousProfile(Profile[StrategyT, BenchmarkT]):
+class SynchronousProfile(Profile):
     """Single synchronous strategy execution profile."""
 
     type_: Literal["synchronous"] = "synchronous"  # type: ignore[assignment]
@@ -213,7 +264,7 @@ class SynchronousProfile(Profile[StrategyT, BenchmarkT]):
     def resolve_args(
         cls,
         rate_type: str,
-        rate: Optional[Union[float, int, list[float, int]]],
+        rate: float | int | list[float, int] | None,
         random_seed: int,
         **kwargs: Any,
     ) -> dict[str, Any]:
@@ -234,14 +285,16 @@ class SynchronousProfile(Profile[StrategyT, BenchmarkT]):
 
     @property
     def strategy_types(self) -> list[StrategyType]:
-        """Get the single synchronous strategy type."""
+        """
+        :return: The single synchronous strategy type.
+        """
         return [self.type_]
 
     def next_strategy(
         self,
-        prev_strategy: Optional[StrategyT],
-        prev_benchmark: Optional[BenchmarkT],
-    ) -> Optional[StrategyT]:
+        prev_strategy: SchedulingStrategy | None,
+        prev_benchmark: Benchmark | None,
+    ) -> SynchronousStrategy | None:
         """
         Generate synchronous strategy or None if already completed.
 
@@ -256,11 +309,11 @@ class SynchronousProfile(Profile[StrategyT, BenchmarkT]):
 
 
 @Profile.register("concurrent")
-class ConcurrentProfile(Profile[StrategyT, BenchmarkT]):
+class ConcurrentProfile(Profile):
     """Fixed-concurrency strategy execution profile with configurable stream counts."""
 
     type_: Literal["concurrent"] = "concurrent"  # type: ignore[assignment]
-    streams: Union[int, list[int]] = Field(
+    streams: int | list[int] = Field(
         description="Number of concurrent streams for request scheduling",
         gt=0,
     )
@@ -277,7 +330,7 @@ class ConcurrentProfile(Profile[StrategyT, BenchmarkT]):
     def resolve_args(
         cls,
         rate_type: str,
-        rate: Optional[Union[float, int, list[float, int]]],
+        rate: float | int | list[float, int] | None,
         random_seed: int,
         **kwargs: Any,
     ) -> dict[str, Any]:
@@ -302,9 +355,9 @@ class ConcurrentProfile(Profile[StrategyT, BenchmarkT]):
 
     def next_strategy(
         self,
-        prev_strategy: Optional[StrategyT],
-        prev_benchmark: Optional[BenchmarkT],
-    ) -> Optional[StrategyT]:
+        prev_strategy: SchedulingStrategy | None,
+        prev_benchmark: Benchmark | None,
+    ) -> ConcurrentStrategy | None:
         """
         Generate concurrent strategy for the next stream count.
 
@@ -324,13 +377,13 @@ class ConcurrentProfile(Profile[StrategyT, BenchmarkT]):
 
 
 @Profile.register("throughput")
-class ThroughputProfile(Profile[StrategyT, BenchmarkT]):
+class ThroughputProfile(Profile):
     """
     Maximum throughput strategy execution profile with optional concurrency limits.
     """
 
     type_: Literal["throughput"] = "throughput"  # type: ignore[assignment]
-    max_concurrency: Optional[int] = Field(
+    max_concurrency: int | None = Field(
         default=None,
         description="Maximum number of concurrent requests to schedule",
         gt=0,
@@ -348,7 +401,7 @@ class ThroughputProfile(Profile[StrategyT, BenchmarkT]):
     def resolve_args(
         cls,
         rate_type: str,
-        rate: Optional[Union[float, int, list[float, int]]],
+        rate: float | int | list[float, int] | None,
         random_seed: int,
         **kwargs: Any,
     ) -> dict[str, Any]:
@@ -374,9 +427,9 @@ class ThroughputProfile(Profile[StrategyT, BenchmarkT]):
 
     def next_strategy(
         self,
-        prev_strategy: Optional[StrategyT],
-        prev_benchmark: Optional[BenchmarkT],
-    ) -> Optional[StrategyT]:
+        prev_strategy: SchedulingStrategy | None,
+        prev_benchmark: Benchmark | None,
+    ) -> ThroughputStrategy | None:
         """
         Generate throughput strategy or None if already completed.
 
@@ -394,16 +447,16 @@ class ThroughputProfile(Profile[StrategyT, BenchmarkT]):
 
 
 @Profile.register(["async", "constant", "poisson"])
-class AsyncProfile(Profile[StrategyT, BenchmarkT]):
+class AsyncProfile(Profile):
     """
     Rate-based asynchronous strategy execution profile with configurable patterns.
     """
 
-    type_: Literal["async"] = "async"  # type: ignore[assignment]
+    type_: Literal["async", "constant", "poisson"] = "async"  # type: ignore[assignment]
     strategy_type: Literal["constant", "poisson"] = Field(
         description="Type of asynchronous strategy pattern to use",
     )
-    rate: Union[float, list[float]] = Field(
+    rate: float | list[float] = Field(
         description="Request scheduling rate in requests per second",
         gt=0,
     )
@@ -415,7 +468,7 @@ class AsyncProfile(Profile[StrategyT, BenchmarkT]):
         ),
         ge=0,
     )
-    max_concurrency: Optional[int] = Field(
+    max_concurrency: int | None = Field(
         default=None,
         description="Maximum number of concurrent requests to schedule",
         gt=0,
@@ -428,8 +481,8 @@ class AsyncProfile(Profile[StrategyT, BenchmarkT]):
     @classmethod
     def resolve_args(
         cls,
-        rate_type: Union[ProfileType, StrategyT],
-        rate: Optional[Union[float, int, list[float, int]]],
+        rate_type: str,
+        rate: float | int | list[float, int] | None,
         random_seed: int,
         **kwargs: Any,
     ) -> dict[str, Any]:
@@ -446,6 +499,11 @@ class AsyncProfile(Profile[StrategyT, BenchmarkT]):
         if rate is None:
             raise ValueError("AsyncProfile requires a rate parameter")
 
+        kwargs["type_"] = (
+            rate_type
+            if rate_type in ["async", "constant", "poisson"]
+            else kwargs.get("type_", "async")
+        )
         kwargs["strategy_type"] = (
             rate_type
             if rate_type in ["constant", "poisson"]
@@ -463,9 +521,9 @@ class AsyncProfile(Profile[StrategyT, BenchmarkT]):
 
     def next_strategy(
         self,
-        prev_strategy: Optional[StrategyT],
-        prev_benchmark: Optional[BenchmarkT],
-    ) -> Optional[StrategyT]:
+        prev_strategy: SchedulingStrategy | None,
+        prev_benchmark: Benchmark | None,
+    ) -> AsyncConstantStrategy | AsyncPoissonStrategy | None:
         """
         Generate async strategy for the next configured rate.
 
@@ -500,7 +558,7 @@ class AsyncProfile(Profile[StrategyT, BenchmarkT]):
 
 
 @Profile.register("sweep")
-class SweepProfile(Profile[StrategyT, BenchmarkT]):
+class SweepProfile(Profile):
     """
     Adaptive multi-strategy sweep execution profile with rate discovery.
     """
@@ -508,6 +566,7 @@ class SweepProfile(Profile[StrategyT, BenchmarkT]):
     type_: Literal["sweep"] = "sweep"  # type: ignore[assignment]
     sweep_size: int = Field(
         description="Number of strategies to generate for the sweep",
+        ge=2,
     )
     strategy_type: Literal["constant", "poisson"] = "constant"
     startup_duration: float = Field(
@@ -518,7 +577,7 @@ class SweepProfile(Profile[StrategyT, BenchmarkT]):
         ),
         ge=0,
     )
-    max_concurrency: Optional[int] = Field(
+    max_concurrency: int | None = Field(
         default=None,
         description="Maximum number of concurrent requests to schedule",
         gt=0,
@@ -548,7 +607,7 @@ class SweepProfile(Profile[StrategyT, BenchmarkT]):
     def resolve_args(
         cls,
         rate_type: str,
-        rate: Optional[Union[float, int, list[float, int]]],
+        rate: float | int | list[float, int] | None,
         random_seed: int,
         **kwargs: Any,
     ) -> dict[str, Any]:
@@ -576,9 +635,15 @@ class SweepProfile(Profile[StrategyT, BenchmarkT]):
 
     def next_strategy(
         self,
-        prev_strategy: Optional[StrategyT],
-        prev_benchmark: Optional[BenchmarkT],
-    ) -> Optional[StrategyT]:
+        prev_strategy: SchedulingStrategy | None,
+        prev_benchmark: Benchmark | None,
+    ) -> (
+        AsyncConstantStrategy
+        | AsyncPoissonStrategy
+        | SynchronousProfile
+        | ThroughputProfile
+        | None
+    ):
         """
         Generate the next strategy in the adaptive sweep sequence.
 

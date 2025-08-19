@@ -21,37 +21,30 @@ Type Variables:
     BenchmarkT: Generic benchmark container type.
 """
 
+from __future__ import annotations
+
 import json
 import uuid
 from pathlib import Path
-from typing import Any, ClassVar, Generic, Literal, Optional, TypedDict, TypeVar, Union
+from typing import Any, ClassVar, Generic, Literal, TypeVar
 
 import yaml
 from pydantic import Field, computed_field
 
 from guidellm.backend import GenerationRequestTimings
 from guidellm.benchmark.profile import (
-    AsyncProfile,
-    ConcurrentProfile,
     Profile,
-    SweepProfile,
-    SynchronousProfile,
-    ThroughputProfile,
-)
-from guidellm.objects import (
-    StandardBaseModel,
-    StatusBreakdown,
-    StatusDistributionSummary,
 )
 from guidellm.scheduler import (
-    AsyncConstantStrategy,
-    AsyncPoissonStrategy,
-    ConcurrentStrategy,
     ScheduledRequestInfo,
     SchedulerState,
     SchedulingStrategy,
-    SynchronousStrategy,
-    ThroughputStrategy,
+)
+from guidellm.utils import (
+    StandardBaseDict,
+    StandardBaseModel,
+    StatusBreakdown,
+    StatusDistributionSummary,
 )
 
 __all__ = [
@@ -66,7 +59,7 @@ __all__ = [
 ]
 
 
-class BenchmarkSchedulerStats(StandardBaseModel):
+class BenchmarkSchedulerStats(StandardBaseDict):
     """Scheduler timing and performance statistics."""
 
     start_time: float = Field(
@@ -103,39 +96,25 @@ class BenchmarkSchedulerStats(StandardBaseModel):
     )
 
 
-class SchedulerDict(TypedDict, total=False):
+class SchedulerDict(StandardBaseDict):
     """Scheduler configuration and execution state dictionary."""
 
-    strategy: Union[
-        AsyncConstantStrategy,
-        AsyncPoissonStrategy,
-        ConcurrentStrategy,
-        SynchronousStrategy,
-        ThroughputStrategy,
-        SchedulingStrategy,
-    ]
+    strategy: SchedulingStrategy
     constraints: dict[str, dict[str, Any]]
     state: SchedulerState
 
 
-class BenchmarkerDict(TypedDict, total=False):
+class BenchmarkerDict(StandardBaseDict):
     """Benchmarker configuration and component settings dictionary."""
 
-    profile: Union[
-        AsyncProfile,
-        ConcurrentProfile,
-        SynchronousProfile,
-        ThroughputProfile,
-        SweepProfile,
-        Profile,
-    ]
+    profile: Profile
     requests: dict[str, Any]
     backend: dict[str, Any]
     environment: dict[str, Any]
     aggregators: dict[str, dict[str, Any]]
 
 
-class BenchmarkMetrics(StandardBaseModel):
+class BenchmarkMetrics(StandardBaseDict):
     """Core benchmark metrics and statistical distributions."""
 
     requests_per_second: StatusDistributionSummary = Field(
@@ -152,7 +131,7 @@ class BenchmarkMetrics(StandardBaseModel):
 BenchmarkMetricsT = TypeVar("BenchmarkMetricsT", bound=BenchmarkMetrics)
 
 
-class BenchmarkRequestStats(StandardBaseModel):
+class BenchmarkRequestStats(StandardBaseDict):
     """Individual request processing statistics and scheduling metadata."""
 
     scheduler_info: ScheduledRequestInfo[GenerationRequestTimings] = Field(
@@ -163,7 +142,7 @@ class BenchmarkRequestStats(StandardBaseModel):
 BenchmarkRequestStatsT = TypeVar("BenchmarkRequestStatsT", bound=BenchmarkRequestStats)
 
 
-class Benchmark(StandardBaseModel, Generic[BenchmarkMetricsT, BenchmarkRequestStatsT]):
+class Benchmark(StandardBaseDict, Generic[BenchmarkMetricsT, BenchmarkRequestStatsT]):
     """Base benchmark result container with execution metadata."""
 
     type_: Literal["benchmark"] = "benchmark"
@@ -183,10 +162,10 @@ class Benchmark(StandardBaseModel, Generic[BenchmarkMetricsT, BenchmarkRequestSt
     benchmarker: BenchmarkerDict = Field(
         description="Benchmarker configuration and component settings"
     )
-    env_args: dict[str, Any] = Field(
+    env_args: StandardBaseDict = Field(
         description="Environment arguments and runtime configuration"
     )
-    extras: dict[str, Any] = Field(
+    extras: StandardBaseDict = Field(
         description="Additional metadata and custom benchmark parameters"
     )
     run_stats: BenchmarkSchedulerStats = Field(
@@ -240,22 +219,22 @@ class GenerativeRequestStats(BenchmarkRequestStats):
     request_args: dict[str, Any] = Field(
         description="Generation parameters and configuration options"
     )
-    output: Optional[str] = Field(
+    output: str | None = Field(
         description="Generated text output, if request completed successfully"
     )
     iterations: int = Field(
         description="Number of processing iterations for the request"
     )
-    prompt_tokens: Optional[int] = Field(
+    prompt_tokens: int | None = Field(
         description="Number of tokens in the input prompt"
     )
-    output_tokens: Optional[int] = Field(
+    output_tokens: int | None = Field(
         description="Number of tokens in the generated output"
     )
 
     @computed_field  # type: ignore[misc]
     @property
-    def total_tokens(self) -> Optional[int]:
+    def total_tokens(self) -> int | None:
         """
         Total token count including prompt and output tokens.
 
@@ -268,7 +247,7 @@ class GenerativeRequestStats(BenchmarkRequestStats):
 
     @computed_field  # type: ignore[misc]
     @property
-    def request_latency(self) -> Optional[float]:
+    def request_latency(self) -> float | None:
         """
         End-to-end request processing latency in seconds.
 
@@ -287,7 +266,7 @@ class GenerativeRequestStats(BenchmarkRequestStats):
 
     @computed_field  # type: ignore[misc]
     @property
-    def time_to_first_token_ms(self) -> Optional[float]:
+    def time_to_first_token_ms(self) -> float | None:
         """
         Time to first token generation in milliseconds.
 
@@ -306,7 +285,7 @@ class GenerativeRequestStats(BenchmarkRequestStats):
 
     @computed_field  # type: ignore[misc]
     @property
-    def time_per_output_token_ms(self) -> Optional[float]:
+    def time_per_output_token_ms(self) -> float | None:
         """
         Average time per output token in milliseconds.
 
@@ -332,7 +311,7 @@ class GenerativeRequestStats(BenchmarkRequestStats):
 
     @computed_field  # type: ignore[misc]
     @property
-    def inter_token_latency_ms(self) -> Optional[float]:
+    def inter_token_latency_ms(self) -> float | None:
         """
         Average inter-token latency in milliseconds.
 
@@ -359,7 +338,7 @@ class GenerativeRequestStats(BenchmarkRequestStats):
 
     @computed_field  # type: ignore[misc]
     @property
-    def tokens_per_second(self) -> Optional[float]:
+    def tokens_per_second(self) -> float | None:
         """
         Overall token throughput including prompt and output tokens.
 
@@ -372,7 +351,7 @@ class GenerativeRequestStats(BenchmarkRequestStats):
 
     @computed_field  # type: ignore[misc]
     @property
-    def output_tokens_per_second(self) -> Optional[float]:
+    def output_tokens_per_second(self) -> float | None:
         """
         Output token generation throughput.
 
@@ -426,8 +405,8 @@ class GenerativeBenchmarksReport(StandardBaseModel):
 
     @staticmethod
     def load_file(
-        path: Union[str, Path], type_: Literal["json", "yaml"] | None = None
-    ) -> "GenerativeBenchmarksReport":
+        path: str | Path, type_: Literal["json", "yaml"] | None = None
+    ) -> GenerativeBenchmarksReport:
         """
         Load a report from a file.
 
@@ -460,7 +439,7 @@ class GenerativeBenchmarksReport(StandardBaseModel):
     )
 
     def save_file(
-        self, path: Union[str, Path], type_: Literal["json", "yaml"] | None = None
+        self, path: str | Path | None, type_: Literal["json", "yaml"] | None = None
     ) -> Path:
         """
         Save the report to a file.
@@ -470,7 +449,10 @@ class GenerativeBenchmarksReport(StandardBaseModel):
         :return: The path to the saved report.
         :raises ValueError: If file type is unsupported.
         """
-        path = Path(path) if not isinstance(path, Path) else path
+        if path is None:
+            path = Path.cwd()
+        elif not isinstance(path, Path):
+            path = Path(path)
 
         if path.is_dir():
             path = path / GenerativeBenchmarksReport.DEFAULT_FILE

@@ -375,8 +375,11 @@ class WorkerProcess(Generic[RequestT, MeasuredRequestTimingsT, ResponseT]):
                 request=request,
                 request_info=request_info,
             )
-            async for resp in self.backend.resolve(request, request_info, None):
+            async for resp, updated_request_info in self.backend.resolve(
+                request, request_info, None
+            ):
                 response = resp
+                request_info = updated_request_info
 
             # Complete
             request_info.scheduler_timings.resolve_end = time.time()

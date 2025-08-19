@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import csv
 import json
 import math
@@ -5,14 +7,14 @@ from abc import ABC, abstractmethod
 from collections import OrderedDict
 from datetime import datetime
 from pathlib import Path
-from typing import Any, ClassVar, Optional, Union
+from typing import Any, ClassVar
 
-import humps  # type: ignore[import-not-found]
+from pydantic import ConfigDict, Field
 from rich.console import Console
 from rich.padding import Padding
 from rich.text import Text
 
-from guidellm.benchmark.benchmark import (
+from guidellm.benchmark.objects import (
     GenerativeBenchmark,
     GenerativeBenchmarksReport,
     GenerativeMetrics,
@@ -24,14 +26,15 @@ from guidellm.benchmark.profile import (
     ThroughputProfile,
 )
 from guidellm.config import settings
-from guidellm.objects import (
-    DistributionSummary,
-    StatusDistributionSummary,
-)
 from guidellm.presentation import UIDataBuilder
 from guidellm.presentation.injector import create_report
-from guidellm.scheduler import strategy_display_str
-from guidellm.utils import Colors, split_text_list_by_length
+from guidellm.utils import (
+    Colors,
+    DistributionSummary,
+    PydanticClassRegistryMixin,
+    StatusDistributionSummary,
+    split_text_list_by_length,
+)
 
 __all__ = [
     "GenerativeBenchmarkerCSV",
@@ -41,19 +44,66 @@ __all__ = [
 ]
 
 
-class GenerativeBenchmarkerOutput(ABC):
+class GenerativeBenchmarkerOutput(
+    PydanticClassRegistryMixin[type["GenerativeBenchmarkerOutput"]], ABC
+):
+    @classmethod
+    @abstractmethod
+    def validated_kwargs(cls, *args, **kwargs) -> dict[str, Any]:
+        """
+        Validate and process arguments for constraint creation.
+
+        Must be implemented by subclasses to handle their specific parameter patterns.
+
+        :param args: Positional arguments passed to the constraint
+        :param kwargs: Keyword arguments passed to the constraint
+        :return: Validated dictionary of parameters for constraint creation
+        :raises NotImplementedError: Must be implemented by subclasses
+        """
+        ...
+
+    @classmethod
+    def resolve(
+        cls,
+        outputs: dict[
+            str,
+            Any | dict[str, Any] | GenerativeBenchmarkerOutput,
+        ],
+    ) -> dict[str, GenerativeBenchmarkerOutput]:
+        resolved = {}
+
+        for key, val in outputs.items():
+            if isinstance(val, GenerativeBenchmarkerOutput):
+                resolved[key] = val
+            else:
+                output_class = cls.get_registered_object(key)
+                kwargs = output_class.validated_kwargs(**val)
+                resolved[key] = output_class(**kwargs)
+
+        return resolved
+
     @abstractmethod
     async def finalize(self, report: GenerativeBenchmarksReport) -> Any: ...
 
 
+@GenerativeBenchmarkerOutput.register("console")
 class GenerativeBenchmarkerConsole(GenerativeBenchmarkerOutput):
     """Console output formatter for benchmark results with rich formatting."""
 
-    def __init__(self):
-        """
-        Initialize the console output formatter.
-        """
-        self.console = Console()
+    model_config = ConfigDict(
+        extra="ignore",
+        arbitrary_types_allowed=True,
+        validate_assignment=True,
+        from_attributes=True,
+        use_enum_values=True,
+    )
+
+    @classmethod
+    @abstractmethod
+    def validated_kwargs(cls, *args, **kwargs) -> dict[str, Any]:
+        return {}
+
+    console: Console = Field(default_factory=Console)
 
     async def finalize(self, report: GenerativeBenchmarksReport):
         """
@@ -114,7 +164,7 @@ class GenerativeBenchmarkerConsole(GenerativeBenchmarkerOutput):
         for benchmark in benchmarks:
             rows.append(
                 [
-                    strategy_display_str(benchmark.scheduler["strategy"]),
+                    str(benchmark.scheduler["strategy"]),
                     datetime.fromtimestamp(benchmark.start_time).strftime("%H:%M:%S"),
                     datetime.fromtimestamp(benchmark.end_time).strftime("%H:%M:%S"),
                     f"{(benchmark.end_time - benchmark.start_time):.1f}",
@@ -173,7 +223,7 @@ class GenerativeBenchmarkerConsole(GenerativeBenchmarkerOutput):
         for benchmark in benchmarks:
             rows.append(
                 [
-                    strategy_display_str(benchmark.scheduler["strategy"]),
+                    str(benchmark.scheduler["strategy"]),
                     f"{benchmark.metrics.requests_per_second.successful.mean:.2f}",
                     f"{benchmark.metrics.request_concurrency.successful.mean:.2f}",
                     f"{benchmark.metrics.output_tokens_per_second.successful.mean:.1f}",
@@ -260,8 +310,8 @@ class GenerativeBenchmarkerConsole(GenerativeBenchmarkerOutput):
 
     def _print_line(
         self,
-        value: Union[str, list[str]],
-        style: Union[str, list[str]] = "",
+        value: str | list[str],
+        style: str | list[str] = "",
         indent: int = 0,
         new_lines: int = 0,
     ):
@@ -289,7 +339,7 @@ class GenerativeBenchmarkerConsole(GenerativeBenchmarkerOutput):
         headers: list[str],
         rows: list[list[Any]],
         title: str,
-        sections: Optional[dict[str, tuple[int, int]]] = None,
+        sections: dict[str, tuple[int, int]] | None = None,
         max_char_per_col: int = 1024,
         indent: int = 0,
         new_lines: int = 2,
@@ -325,7 +375,7 @@ class GenerativeBenchmarkerConsole(GenerativeBenchmarkerOutput):
         self,
         headers: list[str],
         rows: list[list[Any]],
-        sections: Optional[dict[str, tuple[int, int]]],
+        sections: dict[str, tuple[int, int]] | None,
         max_char_per_col: int,
     ) -> list[int]:
         """Calculate maximum characters per column for table formatting."""
@@ -436,27 +486,23 @@ class GenerativeBenchmarkerConsole(GenerativeBenchmarkerOutput):
             self._print_line(print_line, print_styles, indent)
 
 
+@GenerativeBenchmarkerOutput.register("csv")
 class GenerativeBenchmarkerCSV(GenerativeBenchmarkerOutput):
     """CSV output formatter for benchmark results."""
 
     DEFAULT_FILE: ClassVar[str] = "benchmarks.json"
 
-    def __init__(self, output_path: Optional[Union[str, Path]] = None):
-        """
-        Initialize the CSV output formatter.
+    @classmethod
+    @abstractmethod
+    def validated_kwargs(cls, save_path: str | Path | None, **kwargs) -> dict[str, Any]:
+        new_kwargs = {}
+        if save_path is not None:
+            new_kwargs["save_path"] = (
+                Path(save_path) if not isinstance(save_path, Path) else save_path
+            )
+        return new_kwargs
 
-        :param output_path: Optional path where CSV file should be saved.
-            If not provided, will be saved to the default location.
-        """
-        output_path = output_path or GenerativeBenchmarkerCSV.DEFAULT_FILE
-        output_path = (
-            Path(output_path) if not isinstance(output_path, Path) else output_path
-        )
-
-        if output_path.is_dir():
-            output_path = output_path / GenerativeBenchmarkerCSV.DEFAULT_FILE
-
-        self.output_path = output_path
+    save_path: Path = Field(default_factory=lambda: Path.cwd())
 
     async def finalize(self, report: GenerativeBenchmarksReport) -> Path:
         """
@@ -465,16 +511,19 @@ class GenerativeBenchmarkerCSV(GenerativeBenchmarkerOutput):
         :param report: The completed benchmark report.
         :return: Path to the saved CSV file.
         """
-        self.output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path = self.save_path
+        if output_path.is_dir():
+            output_path = output_path / GenerativeBenchmarkerCSV.DEFAULT_FILE
+        output_path.parent.mkdir(parents=True, exist_ok=True)
 
-        with self.output_path.open("w", newline="") as file:
+        with output_path.open("w", newline="") as file:
             writer = csv.writer(file)
             headers: list[str] = []
-            rows: list[list[Union[str, float, list[float]]]] = []
+            rows: list[list[str | float | list[float]]] = []
 
             for benchmark in report.benchmarks:
                 benchmark_headers: list[str] = []
-                benchmark_values: list[Union[str, float, list[float]]] = []
+                benchmark_values: list[str | float | list[float]] = []
 
                 # Add description headers and values
                 desc_headers, desc_values = self._get_benchmark_desc_headers_and_values(
@@ -506,11 +555,11 @@ class GenerativeBenchmarkerCSV(GenerativeBenchmarkerOutput):
             for row in rows:
                 writer.writerow(row)
 
-        return self.output_path
+        return output_path
 
     def _get_benchmark_desc_headers_and_values(
         self, benchmark: GenerativeBenchmark
-    ) -> tuple[list[str], list[Union[str, float]]]:
+    ) -> tuple[list[str], list[str | float]]:
         """Get description headers and values for a benchmark."""
         headers = [
             "Type",
@@ -521,11 +570,11 @@ class GenerativeBenchmarkerCSV(GenerativeBenchmarkerOutput):
             "End Time",
             "Duration",
         ]
-        values: list[Union[str, float]] = [
+        values: list[str | float] = [
             benchmark.type_,
             benchmark.run_id,
             benchmark.id_,
-            strategy_display_str(benchmark.args.strategy),
+            str(benchmark.args.strategy),
             datetime.fromtimestamp(benchmark.start_time).strftime("%Y-%m-%d %H:%M:%S"),
             datetime.fromtimestamp(benchmark.end_time).strftime("%Y-%m-%d %H:%M:%S"),
             benchmark.duration,
@@ -547,7 +596,7 @@ class GenerativeBenchmarkerCSV(GenerativeBenchmarkerOutput):
 
     def _get_benchmark_status_headers_and_values(
         self, benchmark: GenerativeBenchmark, status: str
-    ) -> tuple[list[str], list[Union[float, list[float]]]]:
+    ) -> tuple[list[str], list[float | list[float]]]:
         """Get status-based metrics headers and values for a benchmark."""
         headers = [f"{status.capitalize()} Requests"]
         values = [getattr(benchmark.request_totals, status)]
@@ -563,7 +612,7 @@ class GenerativeBenchmarkerCSV(GenerativeBenchmarkerOutput):
 
     def _get_benchmark_status_metrics_stats(
         self, benchmark: GenerativeBenchmark, status: str, metric: str
-    ) -> tuple[list[str], list[Union[float, list[float]]]]:
+    ) -> tuple[list[str], list[float | list[float]]]:
         """Get statistical metrics for a specific status and metric."""
         status_display = status.capitalize()
         metric_display = metric.replace("_", " ").capitalize()
@@ -578,7 +627,7 @@ class GenerativeBenchmarkerCSV(GenerativeBenchmarkerOutput):
             f"{status_display} {metric_display} std dev",
             f"{status_display} {metric_display} [min, 0.1, 1, 5, 10, 25, 75, 90, 95, 99, max]",
         ]
-        values: list[Union[float, list[float]]] = [
+        values: list[float | list[float]] = [
             dist_summary.mean,
             dist_summary.median,
             dist_summary.std_dev,
@@ -599,27 +648,23 @@ class GenerativeBenchmarkerCSV(GenerativeBenchmarkerOutput):
         return headers, values
 
 
+@GenerativeBenchmarkerOutput.register("html")
 class GenerativeBenchmarkerHTML(GenerativeBenchmarkerOutput):
     """HTML output formatter for benchmark results."""
 
     DEFAULT_FILE: ClassVar[str] = "benchmarks.html"
 
-    def __init__(self, output_path: Optional[Union[str, Path]] = None):
-        """
-        Initialize the HTML output formatter.
+    @classmethod
+    @abstractmethod
+    def validated_kwargs(cls, save_path: str | Path | None, **kwargs) -> dict[str, Any]:
+        new_kwargs = {}
+        if save_path is not None:
+            new_kwargs["save_path"] = (
+                Path(save_path) if not isinstance(save_path, Path) else save_path
+            )
+        return new_kwargs
 
-        :param output_path: Optional path where HTML file should be saved.
-            If not provided, will be saved to the default location.
-        """
-        output_path = output_path or GenerativeBenchmarkerCSV.DEFAULT_FILE
-        output_path = (
-            Path(output_path) if not isinstance(output_path, Path) else output_path
-        )
-
-        if output_path.is_dir():
-            output_path = output_path / GenerativeBenchmarkerCSV.DEFAULT_FILE
-
-        self.output_path = output_path
+    save_path: Path = Field(default_factory=lambda: Path.cwd())
 
     async def finalize(self, report: GenerativeBenchmarksReport) -> Path:
         """
@@ -628,6 +673,13 @@ class GenerativeBenchmarkerHTML(GenerativeBenchmarkerOutput):
         :param report: The completed benchmark report.
         :return: Path to the saved HTML file.
         """
+        import humps
+
+        output_path = self.save_path
+        if output_path.is_dir():
+            output_path = output_path / GenerativeBenchmarkerHTML.DEFAULT_FILE
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
         data_builder = UIDataBuilder(report.benchmarks)
         data = data_builder.to_dict()
         camel_data = humps.camelize(data)
@@ -640,6 +692,6 @@ class GenerativeBenchmarkerHTML(GenerativeBenchmarkerOutput):
             )
             ui_api_data[placeholder_key] = replacement_value
 
-        create_report(ui_api_data, self.output_path)
+        create_report(ui_api_data, output_path)
 
-        return str(self.output_path)
+        return str(output_path)

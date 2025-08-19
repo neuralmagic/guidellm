@@ -2,25 +2,15 @@
 Core data structures and interfaces for the GuideLLM scheduler system.
 
 Provides type-safe abstractions for distributed request processing, timing
-measurements, and backend interfaces for benchmarking operations.
-
-Classes:
-    RequestSchedulerTimings: Scheduler-level request timing measurements.
-    RequestTimings: Base backend request timing measurements.
-    ScheduledRequestInfo: Complete request lifecycle information.
-    BackendInterface: Abstract backend processing interface.
-    SchedulerState: Scheduler operation state tracking.
-    SchedulerUpdateAction: Scheduler behavior control directives.
-
-Type Variables:
-    RequestT: Generic request object type.
-    ResponseT: Generic response object type.
-    RequestTimingsT: Generic request timing object type.
-    BackendT: Generic backend interface type.
+measurements, and backend interfaces for benchmarking operations. Central to
+the scheduler architecture, enabling request lifecycle tracking, backend
+coordination, and state management across distributed worker processes.
 """
 
 from __future__ import annotations
 
+import time
+import uuid
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
 from typing import (
@@ -34,7 +24,7 @@ from typing import (
 from pydantic import Field, computed_field
 from typing_extensions import TypeAliasType, TypedDict
 
-from guidellm.objects import StandardBaseModel
+from guidellm.utils import StandardBaseModel
 
 __all__ = [
     "BackendInterface",
@@ -52,6 +42,11 @@ __all__ = [
 ]
 
 RequestT = TypeVar("RequestT")
+"""Generic request object type for scheduler processing."""
+
+ResponseT = TypeVar("ResponseT")
+"""Generic response object type returned by backend processing."""
+
 MultiTurnRequestT = TypeAliasType(
     "MultiTurnRequestT",
     Union[
@@ -60,7 +55,7 @@ MultiTurnRequestT = TypeAliasType(
     ],
     type_params=(RequestT,),
 )
-ResponseT = TypeVar("ResponseT")
+"""Multi-turn request structure supporting conversation history with optional delays."""
 
 
 class RequestSchedulerTimings(StandardBaseModel):
@@ -107,23 +102,50 @@ class MeasuredRequestTimings(StandardBaseModel):
 MeasuredRequestTimingsT = TypeVar(
     "MeasuredRequestTimingsT", bound=MeasuredRequestTimings
 )
+"""Generic timing measurements type for backend-specific request processing."""
 
 
 class ScheduledRequestInfo(StandardBaseModel, Generic[MeasuredRequestTimingsT]):
-    """Complete request information including status, timings, and metadata."""
+    """
+    Complete request information including status, timings, and metadata.
 
-    request_id: str = Field(description="Unique identifier for the request")
+    Central data structure for tracking request lifecycle from creation through
+    completion, containing scheduling metadata, timing measurements, and processing
+    status. Used by scheduler components to coordinate request processing across
+    distributed worker processes.
+
+    Example:
+    ::
+        from guidellm.scheduler.objects import ScheduledRequestInfo
+
+        # Create request info with automatic ID generation
+        request_info = ScheduledRequestInfo()
+        request_info.status = "in_progress"
+        request_info.scheduler_timings.queued = time.time()
+
+        # Check processing completion
+        if request_info.completed_at:
+            duration = request_info.completed_at - request_info.started_at
+    """
+
+    request_id: str = Field(
+        description="Unique identifier for the request",
+        default_factory=lambda: str(uuid.uuid4()),
+    )
     status: Literal[
         "queued", "pending", "in_progress", "completed", "errored", "cancelled"
-    ] = Field(description="Current processing status of the request")
+    ] = Field(description="Current processing status of the request", default="queued")
     scheduler_node_id: int = Field(
-        description="ID/rank of the scheduler node handling the request"
+        description="ID/rank of the scheduler node handling the request",
+        default=-1,
     )
     scheduler_process_id: int = Field(
-        description="ID/rank of the node's scheduler process handling the request"
+        description="ID/rank of the node's scheduler process handling the request",
+        default=-1,
     )
     scheduler_start_time: float = Field(
-        description="Unix timestamp for the local time when scheduler processing began"
+        description="Unix timestamp for the local time when scheduler processing began",
+        default=-1,
     )
 
     error: str | None = Field(
@@ -167,25 +189,45 @@ class ScheduledRequestInfo(StandardBaseModel, Generic[MeasuredRequestTimingsT]):
 
 class BackendInterface(ABC, Generic[RequestT, MeasuredRequestTimingsT, ResponseT]):
     """
-    Abstract interface for request processing backends. Note: before process_startup
-    is invoked, the implementation must ensure all properties are pickleable.
+    Abstract interface for request processing backends.
+
+    Defines the contract for backend implementations that process requests within
+    the scheduler system. Backends handle initialization, validation, processing,
+    and shutdown lifecycle management. Must ensure all properties are pickleable
+    before process_startup is invoked for multi-process environments.
+
+    Example:
+    ::
+        from guidellm.scheduler.objects import BackendInterface
+
+        class CustomBackend(BackendInterface):
+            @property
+            def processes_limit(self) -> int:
+                return 4
+
+            async def resolve(self, request, request_info, history=None):
+                # Process request and yield responses
+                yield response, updated_request_info
     """
 
     @property
     @abstractmethod
     def processes_limit(self) -> int | None:
-        """Maximum worker processes supported, or None if unlimited."""
+        """
+        :return: The maximum worker processes supported, or None if unlimited
+        """
 
     @property
     @abstractmethod
     def requests_limit(self) -> int | None:
-        """Maximum concurrent requests supported, or None if unlimited."""
+        """
+        :return: The maximum concurrent requests supported, or None if unlimited
+        """
 
     @abstractmethod
     def info(self) -> dict[str, Any]:
         """
-        :return: Backend metadata including model any initializaiton and
-            configuration information.
+        :return: The backend metadata including model initialization and configuration.
         """
         ...
 
@@ -223,27 +265,56 @@ class BackendInterface(ABC, Generic[RequestT, MeasuredRequestTimingsT, ResponseT
         """
         Process a request and yield incremental response updates.
 
-        :param request: The request object to process.
-        :param request_info: Scheduling metadata and timing information.
-        :param history: Optional conversation history for multi-turn requests.
-        :yield: Tuples of (response, updated_request_info) for each response chunk.
-        :raises: Implementation-specific exceptions for processing failures.
+        :param request: The request object to process
+        :param request_info: Scheduling metadata and timing information
+        :param history: Optional conversation history for multi-turn requests
+        :yield: Tuples of (response, updated_request_info) for each response chunk
+        :raises: Implementation-specific exceptions for processing failures
         """
 
 
 BackendT = TypeVar("BackendT", bound=BackendInterface)
+"""Generic backend interface type for request processing."""
 
 
 class SchedulerUpdateActionProgress(TypedDict, total=False):
-    """Progress information for a scheduler update action."""
+    """
+    Progress information for a scheduler update action.
+
+    Optional progress tracking data that provides estimates for remaining work
+    in scheduler operations. Used by constraints and monitoring systems to
+    track execution progress and make termination decisions.
+    """
 
     remaining_fraction: float | None = None
+    """Estimated fraction of work remaining (0.0 to 1.0), if known."""
+
     remaining_requests: float | None = None
+    """Estimated number of requests remaining to be processed, if known."""
+
     remaining_duration: float | None = None
+    """Estimated time remaining in seconds for completion, if known."""
 
 
 class SchedulerUpdateAction(StandardBaseModel):
-    """Scheduler behavior control directives and actions."""
+    """
+    Scheduler behavior control directives and actions.
+
+    Encapsulates control signals for scheduler operations including request
+    queuing and processing directives. Used by constraints to communicate
+    termination conditions and progress information to scheduler components.
+
+    Example:
+    ::
+        from guidellm.scheduler.objects import SchedulerUpdateAction
+
+        # Signal to stop queuing but continue processing
+        action = SchedulerUpdateAction(
+            request_queuing="stop",
+            request_processing="continue",
+            metadata={"reason": "max_requests_reached"}
+        )
+    """
 
     request_queuing: Literal["continue", "stop"] = Field(
         default="continue", description="Action to take for request queuing operations"
@@ -263,13 +334,39 @@ class SchedulerUpdateAction(StandardBaseModel):
 
 
 class SchedulerState(StandardBaseModel):
-    """Scheduler operation state tracking and statistics."""
+    """
+    Scheduler operation state tracking and statistics.
 
-    node_id: int = Field(description="Unique identifier for this scheduler node")
-    num_processes: int = Field(
-        description="Number of worker processes in this scheduler"
+    Comprehensive state container for tracking scheduler execution progress,
+    request counts, timing information, and constraint enforcement. Central
+    to scheduler coordination and provides real-time metrics for monitoring
+    and decision-making across distributed worker processes.
+
+    Example:
+    ::
+        from guidellm.scheduler.objects import SchedulerState
+
+        # Initialize scheduler state
+        state = SchedulerState(node_id=0, num_processes=4)
+
+        # Track request processing
+        state.created_requests += 1
+        state.queued_requests += 1
+
+        # Monitor completion progress
+        completion_rate = state.processed_requests / state.created_requests
+    """
+
+    node_id: int = Field(
+        description="Unique identifier for this scheduler node", default=-1
     )
-    start_time: float = Field(description="Unix timestamp when the scheduler started")
+    num_processes: int = Field(
+        description="Number of worker processes in this scheduler", default=-1
+    )
+    start_time: float = Field(
+        description="Unix timestamp when the scheduler started",
+        default_factory=time.time,
+    )
     end_time: float | None = Field(
         default=None, description="Unix timestamp when the scheduler stopped"
     )
@@ -289,12 +386,16 @@ class SchedulerState(StandardBaseModel):
     )
     scheduler_constraints: dict[str, SchedulerUpdateAction] = Field(
         default_factory=dict,
-        description="The latest state from all constraints applied during the scheduler run",
+        description=(
+            "The latest state from all constraints applied during the scheduler run"
+        ),
     )
 
     remaining_fraction: float | None = Field(
         default=None,
-        description="Estimated fraction for the remaining progress of the scheduler run, if known",
+        description=(
+            "Estimated fraction for the remaining progress of the run, if known"
+        ),
     )
     remaining_requests: int | None = Field(
         default=None,
@@ -302,7 +403,9 @@ class SchedulerState(StandardBaseModel):
     )
     remaining_duration: float | None = Field(
         default=None,
-        description="Estimated time remaining in seconds for the scheduler run, if known",
+        description=(
+            "Estimated time remaining in seconds for the scheduler run, if known"
+        ),
     )
 
     created_requests: int = Field(

@@ -15,24 +15,25 @@ Type Variables:
     ResponseT: Generic response object type.
 """
 
+from __future__ import annotations
+
 import uuid
 from abc import ABC
 from collections.abc import AsyncIterator, Iterable
 from typing import (
     Any,
     Generic,
-    Optional,
-    Union,
 )
 
 from guidellm.benchmark.aggregator import Aggregator, CompilableAggregator
-from guidellm.benchmark.benchmark import BenchmarkT
+from guidellm.benchmark.objects import BenchmarkT
 from guidellm.benchmark.profile import Profile
 from guidellm.scheduler import (
-    BackendT,
+    BackendInterface,
     Constraint,
     Environment,
     MeasuredRequestTimingsT,
+    NonDistributedEnvironment,
     RequestT,
     ResponseT,
     Scheduler,
@@ -62,26 +63,22 @@ class Benchmarker(
 
     async def run(
         self,
-        requests: Iterable[
-            Union[RequestT, Iterable[Union[RequestT, tuple[RequestT, float]]]]
-        ],
-        backend: BackendT[RequestT, MeasuredRequestTimingsT, ResponseT],
+        requests: Iterable[RequestT | Iterable[RequestT | tuple[RequestT, float]]],
+        backend: BackendInterface[RequestT, MeasuredRequestTimingsT, ResponseT],
         profile: Profile,
-        environment: Environment,
+        benchmark_class: type[BenchmarkT],
         benchmark_aggregators: dict[
             str,
-            Union[
-                Aggregator[ResponseT, RequestT, MeasuredRequestTimingsT],
-                CompilableAggregator[ResponseT, RequestT, MeasuredRequestTimingsT],
-            ],
+            Aggregator[ResponseT, RequestT, MeasuredRequestTimingsT]
+            | CompilableAggregator[ResponseT, RequestT, MeasuredRequestTimingsT],
         ],
-        benchmark_class: type[BenchmarkT],
+        environment: Environment | None = None,
     ) -> AsyncIterator[
         tuple[
             dict[str, Any],
-            Optional[BenchmarkT],
+            BenchmarkT | None,
             SchedulingStrategy,
-            Optional[SchedulerState],
+            SchedulerState | None,
         ]
     ]:
         """
@@ -101,6 +98,9 @@ class Benchmarker(
         :raises Exception: If benchmark execution or compilation fails.
         """
         with self.thread_lock:
+            if environment is None:
+                environment = NonDistributedEnvironment()
+
             run_id = str(uuid.uuid4())
             strategies_generator = profile.strategies_generator()
             strategy, constraints = next(strategies_generator)
@@ -115,8 +115,8 @@ class Benchmarker(
                     request_info,
                     scheduler_state,
                 ) in Scheduler[
-                    BackendT, RequestT, MeasuredRequestTimingsT, ResponseT
-                ].run(
+                    BackendInterface, RequestT, MeasuredRequestTimingsT, ResponseT
+                ]().run(
                     requests=requests,
                     backend=backend,
                     strategy=strategy,
@@ -152,7 +152,11 @@ class Benchmarker(
                 benchmark = benchmark_class(**benchmark_kwargs)
                 yield {}, benchmark, strategy, None
 
-                strategy, constraints = strategies_generator.send(benchmark)
+                try:
+                    strategy, constraints = strategies_generator.send(benchmark)
+                except StopIteration:
+                    strategy = None
+                    constraints = None
 
     @classmethod
     def _compile_benchmark_kwargs(
@@ -160,22 +164,18 @@ class Benchmarker(
         run_id: str,
         run_index: int,
         profile: Profile,
-        requests: Iterable[
-            Union[RequestT, Iterable[Union[RequestT, tuple[RequestT, float]]]]
-        ],
-        backend: BackendT[RequestT, MeasuredRequestTimingsT, ResponseT],
+        requests: Iterable[RequestT | Iterable[RequestT | tuple[RequestT, float]]],
+        backend: BackendInterface[RequestT, MeasuredRequestTimingsT, ResponseT],
         environment: Environment,
         aggregators: dict[
             str,
-            Union[
-                Aggregator[ResponseT, RequestT, MeasuredRequestTimingsT],
-                CompilableAggregator[ResponseT, RequestT, MeasuredRequestTimingsT],
-            ],
+            Aggregator[ResponseT, RequestT, MeasuredRequestTimingsT]
+            | CompilableAggregator[ResponseT, RequestT, MeasuredRequestTimingsT],
         ],
         aggregators_state: dict[str, dict[str, Any]],
         strategy: SchedulingStrategy,
-        constraints: dict[str, Union[Any, dict[str, Any], Constraint]],
-        scheduler_state: Optional[SchedulerState],
+        constraints: dict[str, Any | dict[str, Any] | Constraint],
+        scheduler_state: SchedulerState | None,
     ) -> dict[str, Any]:
         """
         Compile benchmark construction parameters from execution results.
@@ -224,7 +224,7 @@ class Benchmarker(
             if not isinstance(aggregator, CompilableAggregator):
                 continue
 
-            compiled = aggregator.compile(aggregators_state[key])
+            compiled = aggregator.compile(aggregators_state[key], scheduler_state)
 
             if key not in benchmark_kwargs:
                 benchmark_kwargs[key] = compiled

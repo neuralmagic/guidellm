@@ -1,8 +1,11 @@
+from __future__ import annotations
+
 import inspect
 import math
 import statistics
 import time
 from abc import ABC
+from typing import TypeVar
 
 import pytest
 from pydantic import ValidationError
@@ -18,6 +21,7 @@ from guidellm.scheduler import (
     ScheduledRequestInfo,
     ScheduledRequestTimings,
     SchedulingStrategy,
+    StrategyT,
     SynchronousStrategy,
     ThroughputStrategy,
 )
@@ -27,7 +31,26 @@ from guidellm.scheduler.strategy import (
 )
 
 
-class TestExponentialDecayHelpers:
+def test_strategy_type():
+    """Test that StrategyType is defined correctly as a Literal type."""
+    # StrategyType is a type alias/literal type, we can't test its runtime value
+    # but we can test that it exists and is importable
+    from guidellm.scheduler.strategy import StrategyType
+
+    assert StrategyType is not None
+
+
+def test_strategy_t():
+    """Test that StrategyT is filled out correctly as a TypeVar."""
+    assert isinstance(StrategyT, type(TypeVar("test")))
+    assert StrategyT.__name__ == "StrategyT"
+    assert StrategyT.__bound__ == SchedulingStrategy
+    assert StrategyT.__constraints__ == ()
+
+
+class TestExponentialDecay:
+    """Test suite for _exponential_decay_tau function."""
+
     @pytest.mark.smoke
     @pytest.mark.parametrize(
         ("max_progress", "convergence", "expected_range"),
@@ -37,8 +60,8 @@ class TestExponentialDecayHelpers:
             (10.0, 0.95, (3.33, 3.35)),
         ],
     )
-    def test_exponential_decay_tau(self, max_progress, convergence, expected_range):
-        """Test exponential decay tau calculation."""
+    def test_tau_invocation(self, max_progress, convergence, expected_range):
+        """Test exponential decay tau calculation with valid inputs."""
         tau = _exponential_decay_tau(max_progress, convergence)
         assert expected_range[0] <= tau <= expected_range[1]
         expected_tau = max_progress / (-math.log(1 - convergence))
@@ -54,17 +77,15 @@ class TestExponentialDecayHelpers:
             (3.0, 1.0, 0.95, 0.96),  # 3 tau ≈ 95.0%
         ],
     )
-    def test_exponential_decay_fraction(
-        self, progress, tau, expected_min, expected_max
-    ):
-        """Test exponential decay fraction calculation."""
+    def test_exp_decay_invocation(self, progress, tau, expected_min, expected_max):
+        """Test exponential decay fraction calculation with valid inputs."""
         fraction = _exponential_decay_fraction(progress, tau)
         assert expected_min <= fraction <= expected_max
         expected_fraction = 1 - math.exp(-progress / tau)
         assert fraction == pytest.approx(expected_fraction, rel=1e-10)
 
     @pytest.mark.smoke
-    def test_exponential_decay_fraction_boundary_conditions(self):
+    def test_exp_boundary_conditions(self):
         """Test boundary conditions for exponential decay fraction."""
         assert _exponential_decay_fraction(0.0, 1.0) == 0.0
         assert _exponential_decay_fraction(0.0, 10.0) == 0.0
@@ -75,14 +96,11 @@ class TestExponentialDecayHelpers:
 
 class TestScheduledRequestTimings:
     @pytest.mark.smoke
-    def test_is_abstract_base_class(self):
+    def test_signatures(self):
         """Test that ScheduledRequestTimings is an abstract base class."""
         assert issubclass(ScheduledRequestTimings, ABC)
         assert inspect.isabstract(ScheduledRequestTimings)
 
-    @pytest.mark.smoke
-    def test_abstract_methods_defined(self):
-        """Test that the required abstract methods are defined."""
         abstract_methods = ScheduledRequestTimings.__abstractmethods__
         expected_methods = {"next_offset", "request_completed"}
         assert abstract_methods == expected_methods
@@ -117,7 +135,6 @@ class TestScheduledRequestTimings:
     def test_child_implementation(self):
         """Test that concrete implementations can be constructed."""
 
-        # Test with a proper concrete implementation in this test scope
         class TestRequestTimings(ScheduledRequestTimings):
             offset: float = 0.0
 
@@ -445,6 +462,23 @@ class TestPoissonRateRequestTimings:
         for key, value in constructor_args.items():
             assert getattr(instance, key) == value
 
+    @pytest.mark.sanity
+    @pytest.mark.parametrize(
+        ("field", "value"),
+        [
+            ("rate", 0),
+            ("rate", -1.0),
+            ("offset", "invalid"),
+            ("random_seed", "invalid"),
+        ],
+    )
+    def test_invalid_initialization(self, field, value):
+        """Test invalid initialization scenarios."""
+        kwargs = {"rate": 1.0}
+        kwargs[field] = value
+        with pytest.raises(ValidationError):
+            PoissonRateRequestTimings(**kwargs)
+
     @pytest.mark.smoke
     def test_lifecycle(self, valid_instances: tuple[PoissonRateRequestTimings, dict]):
         """Test that Poisson timing produces variable intervals."""
@@ -491,10 +525,11 @@ class TestPoissonRateRequestTimings:
 
 class TestSchedulingStrategy:
     @pytest.mark.smoke
-    def test_base(self):
-        """Test that base methods are defined in SchedulingStrategy."""
-        # Validate inheritance and interface compliance
+    def test_class_signatures(self):
+        """Test SchedulingStrategy inheritance and type relationships."""
+        # Inheritance and abstract class properties
         assert issubclass(SchedulingStrategy, object)
+        assert hasattr(SchedulingStrategy, "info")
 
         # Validate expected methods exist
         expected_methods = {
@@ -530,9 +565,9 @@ class TestSchedulingStrategy:
         """Test that invalid implementations raise NotImplementedError."""
 
         class InvalidStrategy(SchedulingStrategy):
-            pass
+            type_: str = "strategy"
 
-        strategy = InvalidStrategy(type_="strategy")
+        strategy = InvalidStrategy()
         with pytest.raises(NotImplementedError):
             strategy.create_request_timings(0, 1, 1)
 
@@ -595,6 +630,34 @@ class TestSynchronousStrategy:
         strategy = SynchronousStrategy()
         result = str(strategy)
         assert result == "synchronous"
+
+    @pytest.mark.smoke
+    def test_marshalling(self):
+        """Test marshalling to/from pydantic dict formats."""
+        strategy = SynchronousStrategy()
+        data = strategy.model_dump()
+        assert isinstance(data, dict)
+        assert data["type_"] == "synchronous"
+
+        reconstructed = SynchronousStrategy.model_validate(data)
+        assert isinstance(reconstructed, SynchronousStrategy)
+        assert reconstructed.type_ == "synchronous"
+
+        # Test polymorphic reconstruction via base registry class
+        base_reconstructed = SchedulingStrategy.model_validate(data)
+        assert isinstance(base_reconstructed, SynchronousStrategy)
+        assert base_reconstructed.type_ == "synchronous"
+
+        # Test model_validate_json pathway
+        json_str = strategy.model_dump_json()
+        json_reconstructed = SynchronousStrategy.model_validate_json(json_str)
+        assert isinstance(json_reconstructed, SynchronousStrategy)
+        assert json_reconstructed.type_ == "synchronous"
+
+        # Test polymorphic model_validate_json via base class
+        base_json_reconstructed = SchedulingStrategy.model_validate_json(json_str)
+        assert isinstance(base_json_reconstructed, SynchronousStrategy)
+        assert base_json_reconstructed.type_ == "synchronous"
 
 
 class TestConcurrentStrategy:
@@ -702,6 +765,48 @@ class TestConcurrentStrategy:
         result = str(instance)
         assert result == f"concurrent@{streams}"
 
+    @pytest.mark.smoke
+    def test_marshalling(self, valid_instances: tuple[ConcurrentStrategy, dict]):
+        """Test marshalling to/from pydantic dict formats."""
+        instance, constructor_args = valid_instances
+
+        data = instance.model_dump()
+        assert isinstance(data, dict)
+        assert data["type_"] == "concurrent"
+
+        for key, value in constructor_args.items():
+            assert data[key] == value
+
+        reconstructed = ConcurrentStrategy.model_validate(data)
+        assert isinstance(reconstructed, ConcurrentStrategy)
+
+        for key, value in constructor_args.items():
+            assert getattr(reconstructed, key) == value
+
+        # Test polymorphic reconstruction via base registry class
+        base_reconstructed = SchedulingStrategy.model_validate(data)
+        assert isinstance(base_reconstructed, ConcurrentStrategy)
+        assert base_reconstructed.type_ == "concurrent"
+
+        for key, value in constructor_args.items():
+            assert getattr(base_reconstructed, key) == value
+
+        # Test model_validate_json pathway
+        json_str = instance.model_dump_json()
+        json_reconstructed = ConcurrentStrategy.model_validate_json(json_str)
+        assert isinstance(json_reconstructed, ConcurrentStrategy)
+
+        for key, value in constructor_args.items():
+            assert getattr(json_reconstructed, key) == value
+
+        # Test polymorphic model_validate_json via base class
+        base_json_reconstructed = SchedulingStrategy.model_validate_json(json_str)
+        assert isinstance(base_json_reconstructed, ConcurrentStrategy)
+        assert base_json_reconstructed.type_ == "concurrent"
+
+        for key, value in constructor_args.items():
+            assert getattr(base_json_reconstructed, key) == value
+
 
 class TestThroughputStrategy:
     @pytest.fixture(
@@ -786,6 +891,48 @@ class TestThroughputStrategy:
         result = str(instance)
         assert result == "throughput"
 
+    @pytest.mark.smoke
+    def test_marshalling(self, valid_instances: tuple[ThroughputStrategy, dict]):
+        """Test marshalling to/from pydantic dict formats."""
+        instance, constructor_args = valid_instances
+
+        data = instance.model_dump()
+        assert isinstance(data, dict)
+        assert data["type_"] == "throughput"
+
+        for key, value in constructor_args.items():
+            assert data[key] == value
+
+        reconstructed = ThroughputStrategy.model_validate(data)
+        assert isinstance(reconstructed, ThroughputStrategy)
+
+        for key, value in constructor_args.items():
+            assert getattr(reconstructed, key) == value
+
+        # Test polymorphic reconstruction via base registry class
+        base_reconstructed = SchedulingStrategy.model_validate(data)
+        assert isinstance(base_reconstructed, ThroughputStrategy)
+        assert base_reconstructed.type_ == "throughput"
+
+        for key, value in constructor_args.items():
+            assert getattr(base_reconstructed, key) == value
+
+        # Test model_validate_json pathway
+        json_str = instance.model_dump_json()
+        json_reconstructed = ThroughputStrategy.model_validate_json(json_str)
+        assert isinstance(json_reconstructed, ThroughputStrategy)
+
+        for key, value in constructor_args.items():
+            assert getattr(json_reconstructed, key) == value
+
+        # Test polymorphic model_validate_json via base class
+        base_json_reconstructed = SchedulingStrategy.model_validate_json(json_str)
+        assert isinstance(base_json_reconstructed, ThroughputStrategy)
+        assert base_json_reconstructed.type_ == "throughput"
+
+        for key, value in constructor_args.items():
+            assert getattr(base_json_reconstructed, key) == value
+
 
 class TestAsyncConstantStrategy:
     @pytest.fixture(
@@ -849,6 +996,48 @@ class TestAsyncConstantStrategy:
         rate = constructor_args["rate"]
         result = str(instance)
         assert result == f"constant@{rate:.2f}"
+
+    @pytest.mark.smoke
+    def test_marshalling(self, valid_instances: tuple[AsyncConstantStrategy, dict]):
+        """Test marshalling to/from pydantic dict formats."""
+        instance, constructor_args = valid_instances
+
+        data = instance.model_dump()
+        assert isinstance(data, dict)
+        assert data["type_"] == "constant"
+
+        for key, value in constructor_args.items():
+            assert data[key] == value
+
+        reconstructed = AsyncConstantStrategy.model_validate(data)
+        assert isinstance(reconstructed, AsyncConstantStrategy)
+
+        for key, value in constructor_args.items():
+            assert getattr(reconstructed, key) == value
+
+        # Test polymorphic reconstruction via base registry class
+        base_reconstructed = SchedulingStrategy.model_validate(data)
+        assert isinstance(base_reconstructed, AsyncConstantStrategy)
+        assert base_reconstructed.type_ == "constant"
+
+        for key, value in constructor_args.items():
+            assert getattr(base_reconstructed, key) == value
+
+        # Test model_validate_json pathway
+        json_str = instance.model_dump_json()
+        json_reconstructed = AsyncConstantStrategy.model_validate_json(json_str)
+        assert isinstance(json_reconstructed, AsyncConstantStrategy)
+
+        for key, value in constructor_args.items():
+            assert getattr(json_reconstructed, key) == value
+
+        # Test polymorphic model_validate_json via base class
+        base_json_reconstructed = SchedulingStrategy.model_validate_json(json_str)
+        assert isinstance(base_json_reconstructed, AsyncConstantStrategy)
+        assert base_json_reconstructed.type_ == "constant"
+
+        for key, value in constructor_args.items():
+            assert getattr(base_json_reconstructed, key) == value
 
 
 class TestAsyncPoissonStrategy:
@@ -921,3 +1110,45 @@ class TestAsyncPoissonStrategy:
         rate = constructor_args["rate"]
         result = str(instance)
         assert result == f"poisson@{rate:.2f}"
+
+    @pytest.mark.smoke
+    def test_marshalling(self, valid_instances: tuple[AsyncPoissonStrategy, dict]):
+        """Test marshalling to/from pydantic dict formats."""
+        instance, constructor_args = valid_instances
+
+        data = instance.model_dump()
+        assert isinstance(data, dict)
+        assert data["type_"] == "poisson"
+
+        for key, value in constructor_args.items():
+            assert data[key] == value
+
+        reconstructed = AsyncPoissonStrategy.model_validate(data)
+        assert isinstance(reconstructed, AsyncPoissonStrategy)
+
+        for key, value in constructor_args.items():
+            assert getattr(reconstructed, key) == value
+
+        # Test polymorphic reconstruction via base registry class
+        base_reconstructed = SchedulingStrategy.model_validate(data)
+        assert isinstance(base_reconstructed, AsyncPoissonStrategy)
+        assert base_reconstructed.type_ == "poisson"
+
+        for key, value in constructor_args.items():
+            assert getattr(base_reconstructed, key) == value
+
+        # Test model_validate_json pathway
+        json_str = instance.model_dump_json()
+        json_reconstructed = AsyncPoissonStrategy.model_validate_json(json_str)
+        assert isinstance(json_reconstructed, AsyncPoissonStrategy)
+
+        for key, value in constructor_args.items():
+            assert getattr(json_reconstructed, key) == value
+
+        # Test polymorphic model_validate_json via base class
+        base_json_reconstructed = SchedulingStrategy.model_validate_json(json_str)
+        assert isinstance(base_json_reconstructed, AsyncPoissonStrategy)
+        assert base_json_reconstructed.type_ == "poisson"
+
+        for key, value in constructor_args.items():
+            assert getattr(base_json_reconstructed, key) == value

@@ -11,7 +11,10 @@ Type Aliases:
     BackendType: Literal type defining supported backend implementations.
 """
 
-from typing import Literal, Optional
+from __future__ import annotations
+
+from abc import abstractmethod
+from typing import Literal
 
 from guidellm.backend.objects import (
     GenerationRequest,
@@ -19,7 +22,7 @@ from guidellm.backend.objects import (
     GenerationResponse,
 )
 from guidellm.scheduler import BackendInterface
-from guidellm.utils.registry import RegistryMixin
+from guidellm.utils import RegistryMixin
 
 __all__ = [
     "Backend",
@@ -66,7 +69,7 @@ class Backend(
     """
 
     @classmethod
-    def create(cls, type_: BackendType, **kwargs) -> "Backend":
+    def create(cls, type_: BackendType, **kwargs) -> Backend:
         """
         Create a backend instance based on the backend type.
 
@@ -77,6 +80,12 @@ class Backend(
         """
 
         backend = cls.get_registered_object(type_)
+
+        if backend is None:
+            raise ValueError(
+                f"Backend type '{type_}' is not registered. "
+                f"Available types: {list(cls.registry.keys()) if cls.registry else []}"
+            )
 
         return backend(**kwargs)
 
@@ -89,16 +98,23 @@ class Backend(
         self.type_ = type_
 
     @property
-    def processes_limit(self) -> Optional[int]:
+    def processes_limit(self) -> int | None:
         """
         :return: Maximum number of worker processes supported. None if unlimited.
         """
         return None
 
     @property
-    def requests_limit(self) -> Optional[int]:
+    def requests_limit(self) -> int | None:
         """
         :return: Maximum number of concurrent requests supported globally.
             None if unlimited.
         """
         return None
+
+    @abstractmethod
+    async def default_model(self) -> str | None:
+        """
+        :return: The default model name or identifier for generation requests.
+        """
+        ...
