@@ -67,7 +67,25 @@ class RunInfo(BaseModel):
 
     @classmethod
     def from_benchmarks(cls, benchmarks: list["GenerativeBenchmark"]):
-        model = benchmarks[0].worker.backend_model or "N/A"
+        # TODO: Review Cursor generated code (start)
+        # Try to extract model from benchmarker.backend with safe fallbacks
+        model = "N/A"
+        try:
+            backend = benchmarks[0].benchmarker.backend
+            if isinstance(backend, dict) and "model" in backend:
+                model = backend["model"] or "N/A"
+            elif hasattr(backend, "model"):
+                model = getattr(backend, "model", "N/A") or "N/A"
+            elif isinstance(backend, dict) and "info" in backend:
+                # Try to extract model from info string
+                info = backend["info"]
+                if isinstance(info, str) and "model" in info.lower():
+                    model = info
+                else:
+                    model = "N/A"
+        except Exception:
+            model = "N/A"
+        # TODO: Review Cursor generated code (end)
         timestamp = max(
             bm.run_stats.start_time for bm in benchmarks if bm.start_time is not None
         )
@@ -108,8 +126,31 @@ class WorkloadDetails(BaseModel):
 
     @classmethod
     def from_benchmarks(cls, benchmarks: list["GenerativeBenchmark"]):
-        target = benchmarks[0].worker.backend_target
-        rate_type = benchmarks[0].args.profile.type_
+        # TODO: Review Cursor generated code (start)
+        # Try to extract target from benchmarker.backend with safe fallbacks
+        target = "N/A"
+        try:
+            backend = benchmarks[0].benchmarker.backend
+            if isinstance(backend, dict) and "target" in backend:
+                target = backend["target"] or "N/A"
+            elif hasattr(backend, "target"):
+                target = getattr(backend, "target", "N/A") or "N/A"
+        except Exception:
+            target = "N/A"
+        # TODO: Review Cursor generated code (end)
+
+        # TODO: Review Cursor generated code (start)
+        # Try to extract rate_type from benchmarker.profile with safe fallbacks
+        rate_type = "N/A"
+        try:
+            profile = benchmarks[0].benchmarker.profile
+            if hasattr(profile, "type_"):
+                rate_type = getattr(profile, "type_", "N/A") or "N/A"
+            elif isinstance(profile, dict) and "type_" in profile:
+                rate_type = profile["type_"] or "N/A"
+        except Exception:
+            rate_type = "N/A"
+        # TODO: Review Cursor generated code (end)
         successful_requests = [
             req for bm in benchmarks for req in bm.requests.successful
         ]
@@ -155,10 +196,14 @@ class WorkloadDetails(BaseModel):
         min_start_time = benchmarks[0].run_stats.start_time
 
         all_req_times = [
-            req.start_time - min_start_time
+            # TODO: Review Cursor generated code (start)
+            req.scheduler_info.request_timings.request_start - min_start_time
+            # TODO: Review Cursor generated code (end)
             for bm in benchmarks
             for req in bm.requests.successful
-            if req.start_time is not None
+            # TODO: Review Cursor generated code (start)
+            if req.scheduler_info.request_timings.request_start is not None
+            # TODO: Review Cursor generated code (end)
         ]
         number_of_buckets = len(benchmarks)
         request_over_time_buckets, bucket_width = Bucket.from_data(

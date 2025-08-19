@@ -114,9 +114,9 @@ class Benchmarker(
                     request,
                     request_info,
                     scheduler_state,
-                ) in Scheduler[
-                    BackendInterface, RequestT, MeasuredRequestTimingsT, ResponseT
-                ]().run(
+                    # TODO: Review Cursor generated code (start)
+                ) in Scheduler[RequestT, MeasuredRequestTimingsT, ResponseT]().run(
+                    # TODO: Review Cursor generated code (end)
                     requests=requests,
                     backend=backend,
                     strategy=strategy,
@@ -203,7 +203,10 @@ class Benchmarker(
             "scheduler": {
                 "strategy": strategy,
                 "constraints": {
-                    key: InfoMixin.extract_from_obj(val) for key, val in constraints
+                    # TODO: Review Cursor generated code (start)
+                    key: InfoMixin.extract_from_obj(val)
+                    for key, val in constraints.items()
+                    # TODO: Review Cursor generated code (end)
                 },
                 "state": scheduler_state,
             },
@@ -217,6 +220,11 @@ class Benchmarker(
                     for key, aggregator in aggregators.items()
                 },
             },
+            # TODO: Review Cursor generated code (start)
+            "env_args": InfoMixin.extract_from_obj(
+                environment
+            ),  # Add required env_args field
+            # TODO: Review Cursor generated code (end)
             "system": {},
             "extras": {},
         }
@@ -225,6 +233,31 @@ class Benchmarker(
                 continue
 
             compiled = aggregator.compile(aggregators_state[key], scheduler_state)
+
+            # TODO: Review Cursor generated code (start)
+            # Handle field name mappings for specific aggregators
+            if key == "scheduler_stats" and "scheduler_stats" in compiled:
+                # Map scheduler_stats to run_stats for GenerativeBenchmark
+                benchmark_kwargs["run_stats"] = compiled["scheduler_stats"]
+                continue
+            # TODO: Review Cursor generated code (end)
+
+            # TODO: Review Cursor generated code (start)
+            if key == "requests":
+                # Extract fields from GenerativeRequestsAggregator to top level
+                for field_name in [
+                    "metrics",
+                    "request_totals",
+                    "start_time",
+                    "end_time",
+                ]:
+                    if field_name in compiled:
+                        benchmark_kwargs[field_name] = compiled[field_name]
+                # Extract the requests StatusBreakdown specifically for the requests field
+                if "requests" in compiled:
+                    benchmark_kwargs[key] = compiled["requests"]
+                continue
+            # TODO: Review Cursor generated code (end)
 
             if key not in benchmark_kwargs:
                 benchmark_kwargs[key] = compiled

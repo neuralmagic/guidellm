@@ -300,10 +300,15 @@ class WorkerProcessGroup(Generic[RequestT, MeasuredRequestTimingsT, ResponseT]):
         """
         exceptions: list[Exception] = []
 
+        # TODO: Review Cursor generated code (start)
+        # Signal shutdown to workers but don't clear the event yet
+        # TODO: Review Cursor generated code (end)
         if self.shutdown_event is not None:
             self.shutdown_event.set()
-            self.shutdown_event = None
 
+        # TODO: Review Cursor generated code (start)
+        # Cancel and wait for background tasks first before clearing events
+        # TODO: Review Cursor generated code (end)
         cancel_tasks = [
             task
             for task in (self.populate_requests_task, self.populate_updates_task)
@@ -332,7 +337,13 @@ class WorkerProcessGroup(Generic[RequestT, MeasuredRequestTimingsT, ResponseT]):
         self.processes = None
         self.mp_context = None
 
+        # TODO: Review Cursor generated code (start)
+        # Now it's safe to clear the events since tasks are cancelled
+        # TODO: Review Cursor generated code (end)
         self.startup_barrier = None
+        # TODO: Review Cursor generated code (start)
+        self.shutdown_event = None
+        # TODO: Review Cursor generated code (end)
         self.error_event = None
         self.requests_queue = None
         self.updates_queue = None
@@ -450,6 +461,20 @@ class WorkerProcessGroup(Generic[RequestT, MeasuredRequestTimingsT, ResponseT]):
                     )
                     yield None  # Yield to check for error in wrapper to stop
         except Exception as err:  # noqa: BLE001
+            # TODO: Review Cursor generated code (start)
+            # Add detailed logging for debugging worker group request processing failures
+            from loguru import logger
+            # TODO: Review Cursor generated code (end)
+
+            # TODO: Review Cursor generated code (start)
+            logger.error(
+                f"WorkerProcessGroup request processing error: {type(err).__name__}: {err}"
+            )
+            logger.error(
+                "WorkerProcessGroup request processing traceback:", exc_info=True
+            )
+            # TODO: Review Cursor generated code (end)
+
             self.error_event.set()
             raise err
         finally:
@@ -489,17 +514,59 @@ class WorkerProcessGroup(Generic[RequestT, MeasuredRequestTimingsT, ResponseT]):
     ) -> tuple[tuple[bytes, bytes] | None, bool]:
         try:
             request = next(request_iter)
-            request_info = ScheduledRequestInfo[MeasuredRequestTimingsT](
+            # TODO: Review Cursor generated code (start)
+            # Initialize the request_timings based on backend type
+            from guidellm.backend.objects import GenerationRequestTimings
+            from guidellm.backend.openai import OpenAIHTTPBackend
+            # TODO: Review Cursor generated code (end)
+
+            # TODO: Review Cursor generated code (start)
+            request_timings = None
+            if isinstance(self.backend, OpenAIHTTPBackend):
+                request_timings = GenerationRequestTimings()
+            # TODO: Review Cursor generated code (end)
+
+            # TODO: Review Cursor generated code (start)
+            request_info = ScheduledRequestInfo[GenerationRequestTimings](
+                # TODO: Review Cursor generated code (end)
                 request_id=(
                     request
                     if isinstance(request, str)
-                    else getattr(request, "id_", getattr(request, "id", id(request)))
+                    # TODO: Review Cursor generated code (start)
+                    else str(
+                        getattr(request, "id_", getattr(request, "id", id(request)))
+                    )
+                    # TODO: Review Cursor generated code (end)
                 ),
                 status="queued",
                 scheduler_node_id=-1,
                 scheduler_process_id=0,
                 scheduler_start_time=scheduler_start_time,
+                # TODO: Review Cursor generated code (start)
+                request_timings=request_timings,
             )
+            # TODO: Review Cursor generated code (end)
+
+            # TODO: Review Cursor generated code (start)
+            # Debug: Check what type the request_timings actually has
+            from loguru import logger
+            # TODO: Review Cursor generated code (end)
+
+            # TODO: Review Cursor generated code (start)
+            logger.debug(
+                f"WorkerGroup: Created request_info with request_timings type: {type(request_info.request_timings)}"
+                # TODO: Review Cursor generated code (end)
+            )
+            # TODO: Review Cursor generated code (start)
+            if hasattr(request_info.request_timings, "first_iteration"):
+                logger.debug(
+                    "WorkerGroup: request_timings HAS first_iteration attribute"
+                )
+            else:
+                logger.debug(
+                    "WorkerGroup: request_timings MISSING first_iteration attribute"
+                )
+            # TODO: Review Cursor generated code (end)
             state, continue_requests, _ = self._update_state(request_info)
 
             request_msg = MsgpackEncoding.encode((request, request_info))
@@ -558,6 +625,20 @@ class WorkerProcessGroup(Generic[RequestT, MeasuredRequestTimingsT, ResponseT]):
 
                     yield None  # Yield to check for error in wrapper to stop
         except Exception as err:  # noqa: BLE001
+            # TODO: Review Cursor generated code (start)
+            # Add detailed logging for debugging worker group updates processing failures
+            from loguru import logger
+            # TODO: Review Cursor generated code (end)
+
+            # TODO: Review Cursor generated code (start)
+            logger.error(
+                f"WorkerProcessGroup updates processing error: {type(err).__name__}: {err}"
+            )
+            logger.error(
+                "WorkerProcessGroup updates processing traceback:", exc_info=True
+            )
+            # TODO: Review Cursor generated code (end)
+
             self.error_event.set()
             raise err
         finally:
@@ -568,7 +649,94 @@ class WorkerProcessGroup(Generic[RequestT, MeasuredRequestTimingsT, ResponseT]):
     ) -> tuple[SchedulerState | None, bool]:
         try:
             message = self.updates_queue.get(timeout=settings.scheduler_poll_interval)
+            # TODO: Review Cursor generated code (start)
+            # Debug raw message before decoding
+            from loguru import logger
+            # TODO: Review Cursor generated code (end)
+
+            # TODO: Review Cursor generated code (start)
+            logger.debug(
+                f"WorkerGroup: Raw message type: {type(message)}, size: {len(message) if hasattr(message, '__len__') else 'unknown'}"
+            )
+            # TODO: Review Cursor generated code (end)
+
+            # TODO: Review Cursor generated code (start)
+            # Debug the decoded structure to see what's inside
+            try:
+                import msgpack
+                # TODO: Review Cursor generated code (end)
+
+                # TODO: Review Cursor generated code (start)
+                raw_decoded = msgpack.unpackb(message, strict_map_key=False)
+                logger.debug(
+                    f"WorkerGroup: Raw msgpack decoded type: {type(raw_decoded)}"
+                )
+                if isinstance(raw_decoded, (list, tuple)) and len(raw_decoded) >= 3:
+                    _, _, request_info_data = raw_decoded
+                    logger.debug(
+                        f"WorkerGroup: Raw request_info_data type: {type(request_info_data)}"
+                    )
+                    if isinstance(request_info_data, dict):
+                        logger.debug(
+                            f"WorkerGroup: Raw request_info_data keys: {list(request_info_data.keys())}"
+                        )
+                        # TODO: Review Cursor generated code (end)
+
+                        # TODO: Review Cursor generated code (start)
+                        # Check the actual Pydantic data inside the 'data' key
+                        if "data" in request_info_data:
+                            pydantic_data = request_info_data["data"]
+                            logger.debug(
+                                f"WorkerGroup: Pydantic data type: {type(pydantic_data)}"
+                            )
+                            if isinstance(pydantic_data, dict):
+                                logger.debug(
+                                    f"WorkerGroup: Pydantic data has request_timings: {'request_timings' in pydantic_data}"
+                                )
+                                if "request_timings" in pydantic_data:
+                                    rt_data = pydantic_data["request_timings"]
+                                    logger.debug(
+                                        f"WorkerGroup: Raw request_timings data: {rt_data}"
+                                    )
+                                    if isinstance(rt_data, dict):
+                                        logger.debug(
+                                            f"WorkerGroup: Raw first_iteration: {rt_data.get('first_iteration')}"
+                                        )
+                                        logger.debug(
+                                            f"WorkerGroup: Raw last_iteration: {rt_data.get('last_iteration')}"
+                                        )
+                                else:
+                                    logger.debug(
+                                        f"WorkerGroup: Pydantic data keys: {list(pydantic_data.keys())}"
+                                    )
+                        else:
+                            logger.debug(
+                                "WorkerGroup: No 'data' key in request_info_data"
+                            )
+            except Exception as e:
+                logger.debug(f"WorkerGroup: Error inspecting raw msgpack: {e}")
+                # TODO: Review Cursor generated code (end)
+
             response, request, request_info = MsgpackEncoding.decode(message)
+
+            # TODO: Review Cursor generated code (start)
+            # Debug timing data received from worker process
+            if (
+                hasattr(request_info, "request_timings")
+                and request_info.request_timings
+            ):
+                logger.debug(
+                    f"WorkerGroup: Received timing data from worker: "
+                    f"status={request_info.status}, "
+                    f"first_iteration={getattr(request_info.request_timings, 'first_iteration', None)}, "
+                    f"last_iteration={getattr(request_info.request_timings, 'last_iteration', None)}"
+                )
+            else:
+                logger.debug(
+                    f"WorkerGroup: Received from worker with no timing data: status={request_info.status}, "
+                    f"request_timings type: {type(getattr(request_info, 'request_timings', None))}"
+                )
+            # TODO: Review Cursor generated code (end)
 
             scheduler_state, _, continue_updates = self._update_state(request_info)
             self.pending_updates_queue.sync_put(

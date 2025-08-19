@@ -34,6 +34,11 @@ from typing import (
 )
 
 import numpy
+
+# TODO: Review Cursor generated code (start)
+from loguru import logger
+
+# TODO: Review Cursor generated code (end)
 from pydantic import Field, PrivateAttr
 
 from guidellm.backend import (
@@ -310,7 +315,9 @@ class SchedulerStatsAggregator(
             "worker_resolve_start_delay",
             agg_state,
             request_info.scheduler_timings.resolve_start,
-            request_info.scheduler_timings.scheduled,
+            # TODO: Review Cursor generated code (start)
+            request_info.scheduler_timings.scheduled_at,
+            # TODO: Review Cursor generated code (end)
         )
         self.add_aggregate_metric(
             "worker_resolve_time",
@@ -479,7 +486,14 @@ class GenerativeStatsProgressAggregator(
 
         if (
             request_info.status == "completed"
+            # TODO: Review Cursor generated code (start)
+            and request_info.request_timings is not None
+            and hasattr(request_info.request_timings, "first_iteration")
+            # TODO: Review Cursor generated code (end)
             and request_info.request_timings.first_iteration is not None
+            # TODO: Review Cursor generated code (start)
+            and hasattr(request_info.request_timings, "last_iteration")
+            # TODO: Review Cursor generated code (end)
             and request_info.request_timings.last_iteration is not None
             and response.output_tokens
         ):
@@ -492,7 +506,11 @@ class GenerativeStatsProgressAggregator(
             )
 
         if (
-            request_info.request_timings.first_iteration is not None
+            # TODO: Review Cursor generated code (start)
+            request_info.request_timings is not None
+            and hasattr(request_info.request_timings, "first_iteration")
+            and request_info.request_timings.first_iteration is not None
+            # TODO: Review Cursor generated code (end)
             and request_info.request_timings.request_start is not None
         ):
             self.add_aggregate_metric(
@@ -503,7 +521,12 @@ class GenerativeStatsProgressAggregator(
             )
 
         if (
-            request_info.request_timings.first_iteration is not None
+            # TODO: Review Cursor generated code (start)
+            request_info.request_timings is not None
+            and hasattr(request_info.request_timings, "first_iteration")
+            and request_info.request_timings.first_iteration is not None
+            and hasattr(request_info.request_timings, "last_iteration")
+            # TODO: Review Cursor generated code (end)
             and request_info.request_timings.last_iteration is not None
             and response.output_tokens is not None
             and response.output_tokens > 1
@@ -674,8 +697,10 @@ class GenerativeRequestsAggregator(
         # Categorize request by status
         if request_info.status == "completed":
             agg_state["completed"].append((response, request, request_info))
+
         elif request_info.status == "canceled":
             agg_state["incomplete"].append((response, request, request_info))
+
         else:
             agg_state["errored"].append((response, request, request_info))
 
@@ -696,10 +721,29 @@ class GenerativeRequestsAggregator(
         :param scheduler_state: Final scheduler execution state.
         :return: Complete benchmark results with metrics and request statistics.
         """
+        # TODO: Review Cursor generated code (start)
+        logger.debug(
+            f"DEBUG GenerativeRequestsAggregator.compile: agg_state keys: {list(agg_state.keys())}"
+        )
+        completed_data = agg_state.get("completed", [])
+        incomplete_data = agg_state.get("incomplete", [])
+        errored_data = agg_state.get("errored", [])
+        logger.debug(
+            f"DEBUG GenerativeRequestsAggregator.compile: completed={len(completed_data)}, incomplete={len(incomplete_data)}, errored={len(errored_data)}"
+        )
+        # TODO: Review Cursor generated code (end)
+
         successful: list[GenerativeRequestStats] = [
             self._create_generate_stats(response, request, request_info)
-            for (response, request, request_info) in agg_state.get("completed", [])
+            # TODO: Review Cursor generated code (start)
+            for (response, request, request_info) in completed_data
+            # TODO: Review Cursor generated code (end)
         ]
+        # TODO: Review Cursor generated code (start)
+        logger.debug(
+            f"DEBUG GenerativeRequestsAggregator.compile: Created {len(successful)} successful request stats"
+        )
+        # TODO: Review Cursor generated code (end)
         incomplete: list[GenerativeRequestStats] = [
             self._create_generate_stats(response, request, request_info)
             for (response, request, request_info) in agg_state.get("incomplete", [])
@@ -733,6 +777,104 @@ class GenerativeRequestsAggregator(
             ]
         )
 
+        # TODO: Review Cursor generated code (start)
+        # Debug logging before StatusBreakdown creation
+        successful_requests = (
+            (
+                list(
+                    numpy.random.choice(
+                        successful, size=self.request_samples, replace=False
+                    )
+                )
+                if self.request_samples is not None
+                and len(successful) >= self.request_samples
+                else successful
+            )
+            if successful
+            else []
+        )
+        # TODO: Review Cursor generated code (end)
+
+        # TODO: Review Cursor generated code (start)
+        incomplete_requests = (
+            (
+                list(
+                    numpy.random.choice(
+                        incomplete, size=self.request_samples, replace=False
+                    )
+                )
+                if self.request_samples is not None
+                and len(incomplete) >= self.request_samples
+                else incomplete
+            )
+            if incomplete
+            else []
+        )
+        # TODO: Review Cursor generated code (end)
+
+        # TODO: Review Cursor generated code (start)
+        errored_requests = (
+            (
+                list(
+                    numpy.random.choice(
+                        errored, size=self.request_samples, replace=False
+                    )
+                )
+                if self.request_samples is not None
+                and len(errored) >= self.request_samples
+                else errored
+            )
+            if errored
+            else []
+        )
+        # TODO: Review Cursor generated code (end)
+
+        # TODO: Review Cursor generated code (start)
+        # Rebuild total and total_types from sampled lists to match for metrics calculations
+        total: list[GenerativeRequestStats] = (
+            successful_requests + incomplete_requests + errored_requests
+        )
+        total_types: list[Literal["successful", "incomplete", "error"]] = [
+            *["successful"] * len(successful_requests),
+            *["incomplete"] * len(incomplete_requests),
+            *["error"] * len(errored_requests),
+        ]
+        # TODO: Review Cursor generated code (end)
+
+        # TODO: Review Cursor generated code (start)
+        logger.debug(
+            f"DEBUG GenerativeRequestsAggregator.compile: About to create StatusBreakdown with successful={len(successful_requests)}, incomplete={len(incomplete_requests)}, errored={len(errored_requests)}"
+        )
+        logger.debug(
+            f"DEBUG GenerativeRequestsAggregator.compile: request_samples={self.request_samples}"
+        )
+        if successful_requests:
+            logger.debug(
+                f"DEBUG GenerativeRequestsAggregator.compile: First successful request type: {type(successful_requests[0])}"
+            )
+        # TODO: Review Cursor generated code (end)
+
+        # TODO: Review Cursor generated code (start)
+        # Create the StatusBreakdown object and test it
+        requests_breakdown = StatusBreakdown(
+            successful=successful_requests,
+            incomplete=incomplete_requests,
+            errored=errored_requests,
+        )
+        logger.debug(
+            "DEBUG GenerativeRequestsAggregator.compile: StatusBreakdown created"
+        )
+        logger.debug(
+            f"DEBUG GenerativeRequestsAggregator.compile: StatusBreakdown.successful type: {type(requests_breakdown.successful)}"
+        )
+        logger.debug(
+            f"DEBUG GenerativeRequestsAggregator.compile: StatusBreakdown.successful length: {len(requests_breakdown.successful) if requests_breakdown.successful is not None else 'None'}"
+        )
+        logger.debug(
+            f"DEBUG GenerativeRequestsAggregator.compile: StatusBreakdown.successful is None: {requests_breakdown.successful is None}"
+        )
+        # TODO: Review Cursor generated code (end)
+
         return {
             "start_time": start_time,
             "end_time": end_time,
@@ -742,39 +884,24 @@ class GenerativeRequestsAggregator(
                 errored=len(errored),
                 total=len(total),
             ),
-            "requests": StatusBreakdown(
-                successful=(
-                    list(
-                        numpy.random.choice(
-                            successful, size=self.request_samples, replace=False
-                        )
-                    )
-                    if self.request_samples
-                    else successful
-                ),
-                incomplete=(
-                    list(
-                        numpy.random.choice(
-                            incomplete, size=self.request_samples, replace=False
-                        )
-                    )
-                    if self.request_samples
-                    else incomplete
-                ),
-                errored=(
-                    list(
-                        numpy.random.choice(
-                            errored, size=self.request_samples, replace=False
-                        )
-                    )
-                    if self.request_samples
-                    else errored
-                ),
-            ),
+            # TODO: Review Cursor generated code (start)
+            "requests": requests_breakdown,
+            # TODO: Review Cursor generated code (end)
             "metrics": GenerativeMetrics(
                 requests_per_second=(
                     StatusDistributionSummary.from_request_times(
-                        request_types=total_types,
+                        # TODO: Review Cursor generated code (start)
+                        request_types=[
+                            req_type
+                            for req, req_type in zip(total, total_types)
+                            if (
+                                req.scheduler_info.request_timings.request_start
+                                is not None
+                                and req.scheduler_info.request_timings.request_end
+                                is not None
+                            )
+                        ],
+                        # TODO: Review Cursor generated code (end)
                         requests=[
                             (
                                 req.scheduler_info.request_timings.request_start,
@@ -793,7 +920,18 @@ class GenerativeRequestsAggregator(
                 ),
                 request_concurrency=(
                     StatusDistributionSummary.from_request_times(
-                        request_types=total_types,
+                        # TODO: Review Cursor generated code (start)
+                        request_types=[
+                            req_type
+                            for req, req_type in zip(total, total_types)
+                            if (
+                                req.scheduler_info.request_timings.request_start
+                                is not None
+                                and req.scheduler_info.request_timings.request_end
+                                is not None
+                            )
+                        ],
+                        # TODO: Review Cursor generated code (end)
                         requests=[
                             (
                                 req.scheduler_info.request_timings.request_start,
@@ -812,7 +950,13 @@ class GenerativeRequestsAggregator(
                 ),
                 request_latency=(
                     StatusDistributionSummary.from_values(
-                        value_types=total_types,
+                        # TODO: Review Cursor generated code (start)
+                        value_types=[
+                            req_type
+                            for req, req_type in zip(total, total_types)
+                            if req.request_latency is not None
+                        ],
+                        # TODO: Review Cursor generated code (end)
                         values=[
                             req.request_latency
                             for req in total
@@ -933,16 +1077,27 @@ class GenerativeRequestsAggregator(
                         ],
                         first_iter_times=[
                             req.scheduler_info.request_timings.first_iteration
+                            # TODO: Review Cursor generated code (start)
+                            if (
+                                req.scheduler_info.request_timings is not None
+                                and hasattr(
+                                    req.scheduler_info.request_timings,
+                                    "first_iteration",
+                                )
+                                and req.scheduler_info.request_timings.first_iteration
+                                is not None
+                            )
+                            else req.scheduler_info.request_timings.request_start
+                            # TODO: Review Cursor generated code (end)
                             for req in total
                             if req.output_tokens_per_second is not None
-                            and req.scheduler_info.request_timings.first_iteration
-                            is not None
                         ],
                         iter_counts=[
-                            req.output_tokens
+                            # TODO: Review Cursor generated code (start)
+                            req.output_tokens if req.output_tokens is not None else 1
+                            # TODO: Review Cursor generated code (end)
                             for req in total
                             if req.output_tokens_per_second is not None
-                            and req.output_tokens is not None
                         ],
                     )
                 ),
@@ -963,11 +1118,25 @@ class GenerativeRequestsAggregator(
                         ],
                         first_iter_times=[
                             req.scheduler_info.request_timings.first_iteration
+                            # TODO: Review Cursor generated code (start)
+                            if (
+                                req.scheduler_info.request_timings is not None
+                                and hasattr(
+                                    req.scheduler_info.request_timings,
+                                    "first_iteration",
+                                )
+                                and req.scheduler_info.request_timings.first_iteration
+                                is not None
+                            )
+                            else req.scheduler_info.request_timings.request_start
+                            # TODO: Review Cursor generated code (end)
                             for req in total
                             if req.tokens_per_second is not None
                         ],
                         iter_counts=[
-                            req.output_tokens
+                            # TODO: Review Cursor generated code (start)
+                            req.output_tokens if req.output_tokens is not None else 1
+                            # TODO: Review Cursor generated code (end)
                             for req in total
                             if req.tokens_per_second is not None
                         ],
@@ -1052,6 +1221,11 @@ class GenerativeRequestsAggregator(
         output_tokens = response.preferred_output_tokens(
             settings.preferred_output_tokens_source
         )
+
+        # TODO: Review Cursor generated code (start)
+        # Debug timing data
+        timings = request_info.request_timings
+        # TODO: Review Cursor generated code (end)
 
         return GenerativeRequestStats(
             request_id=request.request_id,

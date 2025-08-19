@@ -47,6 +47,15 @@ __all__ = [
 class GenerativeBenchmarkerOutput(
     PydanticClassRegistryMixin[type["GenerativeBenchmarkerOutput"]], ABC
 ):
+    # TODO: Review Cursor generated code (start)
+    @classmethod
+    def __pydantic_schema_base_type__(cls) -> type[GenerativeBenchmarkerOutput]:
+        if cls.__name__ == "GenerativeBenchmarkerOutput":
+            return cls
+        return GenerativeBenchmarkerOutput
+
+    # TODO: Review Cursor generated code (end)
+
     @classmethod
     @abstractmethod
     def validated_kwargs(cls, *args, **kwargs) -> dict[str, Any]:
@@ -99,7 +108,6 @@ class GenerativeBenchmarkerConsole(GenerativeBenchmarkerOutput):
     )
 
     @classmethod
-    @abstractmethod
     def validated_kwargs(cls, *args, **kwargs) -> dict[str, Any]:
         return {}
 
@@ -164,10 +172,14 @@ class GenerativeBenchmarkerConsole(GenerativeBenchmarkerOutput):
         for benchmark in benchmarks:
             rows.append(
                 [
-                    str(benchmark.scheduler["strategy"]),
-                    datetime.fromtimestamp(benchmark.start_time).strftime("%H:%M:%S"),
-                    datetime.fromtimestamp(benchmark.end_time).strftime("%H:%M:%S"),
-                    f"{(benchmark.end_time - benchmark.start_time):.1f}",
+                    # TODO: Review Cursor generated code (start)
+                    str(benchmark.scheduler.strategy),
+                    self._safe_format_timestamp(benchmark.start_time),
+                    self._safe_format_timestamp(benchmark.end_time),
+                    f"{(benchmark.end_time - benchmark.start_time):.1f}"
+                    if benchmark.end_time > 0 and benchmark.start_time > 0
+                    else "N/A",
+                    # TODO: Review Cursor generated code (end)
                     f"{benchmark.request_totals.successful:.0f}",
                     f"{benchmark.request_totals.incomplete:.0f}",
                     f"{benchmark.request_totals.errored:.0f}",
@@ -223,7 +235,9 @@ class GenerativeBenchmarkerConsole(GenerativeBenchmarkerOutput):
         for benchmark in benchmarks:
             rows.append(
                 [
-                    str(benchmark.scheduler["strategy"]),
+                    # TODO: Review Cursor generated code (start)
+                    str(benchmark.scheduler.strategy),
+                    # TODO: Review Cursor generated code (end)
                     f"{benchmark.metrics.requests_per_second.successful.mean:.2f}",
                     f"{benchmark.metrics.request_concurrency.successful.mean:.2f}",
                     f"{benchmark.metrics.output_tokens_per_second.successful.mean:.1f}",
@@ -246,7 +260,9 @@ class GenerativeBenchmarkerConsole(GenerativeBenchmarkerOutput):
         self._print_table(headers, rows, "Benchmarks Stats", sections)
 
     def _get_profile_str(self, benchmark: GenerativeBenchmark) -> str:
-        profile = benchmark.benchmarker.get("profile")
+        # TODO: Review Cursor generated code (start)
+        profile = benchmark.benchmarker.profile
+        # TODO: Review Cursor generated code (end)
         if profile is None:
             return "None"
 
@@ -264,11 +280,90 @@ class GenerativeBenchmarkerConsole(GenerativeBenchmarkerOutput):
         elif isinstance(profile, AsyncProfile):
             profile_args["max_concurrency"] = str(profile.max_concurrency)
             profile_args["rate"] = str(profile.rate)
-            profile_args["initial_burst"] = str(profile.initial_burst)
+            # TODO: Review Cursor generated code (start)
+            profile_args["startup_duration"] = str(profile.startup_duration)
+            # TODO: Review Cursor generated code (end)
         elif isinstance(profile, SweepProfile):
             profile_args["sweep_size"] = str(profile.sweep_size)
 
         return ", ".join(f"{key}={value}" for key, value in profile_args.items())
+
+    # TODO: Review Cursor generated code (start)
+    def _get_scheduler_str(self, benchmark: GenerativeBenchmark) -> str:
+        scheduler = benchmark.scheduler
+        scheduler_args = OrderedDict()
+        # TODO: Review Cursor generated code (end)
+
+        # TODO: Review Cursor generated code (start)
+        if "strategy" in scheduler:
+            strategy = scheduler["strategy"]
+            scheduler_args["strategy"] = getattr(strategy, "type_", str(strategy))
+        # TODO: Review Cursor generated code (end)
+
+        # TODO: Review Cursor generated code (start)
+        if "constraints" in scheduler and scheduler["constraints"]:
+            constraints = scheduler["constraints"]
+            scheduler_args["constraints"] = ", ".join(constraints.keys())
+        # TODO: Review Cursor generated code (end)
+
+        # TODO: Review Cursor generated code (start)
+        return (
+            ", ".join(f"{key}={value}" for key, value in scheduler_args.items())
+            if scheduler_args
+            else "None"
+        )
+        # TODO: Review Cursor generated code (end)
+
+    # TODO: Review Cursor generated code (start)
+    def _get_env_args_str(self, benchmark: GenerativeBenchmark) -> str:
+        env_args = benchmark.env_args
+        if not env_args:
+            return "None"
+        # TODO: Review Cursor generated code (end)
+
+        # TODO: Review Cursor generated code (start)
+        # Extract key-value pairs from env_args using model_dump() for Pydantic objects
+        args_items = []
+        try:
+            env_dict = (
+                env_args.model_dump()
+                if hasattr(env_args, "model_dump")
+                else dict(env_args)
+            )
+            for key, value in env_dict.items():
+                if isinstance(value, (str, int, float, bool)):
+                    args_items.append(f"{key}={value}")
+                elif value is None:
+                    args_items.append(f"{key}=None")
+        except Exception:
+            # Fallback: return string representation
+            return str(env_args)
+        # TODO: Review Cursor generated code (end)
+
+        # TODO: Review Cursor generated code (start)
+        return ", ".join(args_items) if args_items else "None"
+        # TODO: Review Cursor generated code (end)
+
+    # TODO: Review Cursor generated code (start)
+    def _safe_format_timestamp(self, timestamp: float) -> str:
+        """
+            Safely format a timestamp, handling invalid values.
+        # TODO: Review Cursor generated code (end)
+
+            # TODO: Review Cursor generated code (start)
+            :param timestamp: Unix timestamp to format
+            :return: Formatted time string or "N/A" for invalid timestamps
+        """
+        try:
+            # Check if timestamp is valid (positive and within reasonable range)
+            if (
+                timestamp <= 0 or timestamp > 2147483647
+            ):  # Max 32-bit timestamp (year 2038)
+                return "N/A"
+            return datetime.fromtimestamp(timestamp).strftime("%H:%M:%S")
+        except (ValueError, OverflowError, OSError):
+            return "N/A"
+        # TODO: Review Cursor generated code (end)
 
     def _get_args_str(self, benchmark: GenerativeBenchmark) -> str:
         args = benchmark.args
@@ -288,7 +383,17 @@ class GenerativeBenchmarkerConsole(GenerativeBenchmarkerOutput):
         extras = benchmark.extras
         if not extras:
             return "None"
-        return ", ".join(f"{key}={value}" for key, value in extras.items())
+
+        # TODO: Review Cursor generated code (start)
+        try:
+            extras_dict = (
+                extras.model_dump() if hasattr(extras, "model_dump") else dict(extras)
+            )
+            return ", ".join(f"{key}={value}" for key, value in extras_dict.items())
+        except Exception:
+            # Fallback: return string representation
+            return str(extras)
+        # TODO: Review Cursor generated code (end)
 
     def _print_section_header(self, title: str, indent: int = 0, new_lines: int = 2):
         self._print_line(
@@ -493,7 +598,6 @@ class GenerativeBenchmarkerCSV(GenerativeBenchmarkerOutput):
     DEFAULT_FILE: ClassVar[str] = "benchmarks.json"
 
     @classmethod
-    @abstractmethod
     def validated_kwargs(cls, save_path: str | Path | None, **kwargs) -> dict[str, Any]:
         new_kwargs = {}
         if save_path is not None:
@@ -574,7 +678,9 @@ class GenerativeBenchmarkerCSV(GenerativeBenchmarkerOutput):
             benchmark.type_,
             benchmark.run_id,
             benchmark.id_,
-            str(benchmark.args.strategy),
+            # TODO: Review Cursor generated code (start)
+            str(benchmark.scheduler.strategy),
+            # TODO: Review Cursor generated code (end)
             datetime.fromtimestamp(benchmark.start_time).strftime("%Y-%m-%d %H:%M:%S"),
             datetime.fromtimestamp(benchmark.end_time).strftime("%Y-%m-%d %H:%M:%S"),
             benchmark.duration,
@@ -585,12 +691,62 @@ class GenerativeBenchmarkerCSV(GenerativeBenchmarkerOutput):
         self, benchmark: GenerativeBenchmark
     ) -> tuple[list[str], list[str]]:
         """Get extra fields headers and values for a benchmark."""
-        headers = ["Args", "Worker", "Request Loader", "Extras"]
+        # TODO: Review Cursor generated code (start)
+        headers = ["Benchmarker", "Environment", "Scheduler", "Extras"]
+        # TODO: Review Cursor generated code (end)
+
+        # TODO: Review Cursor generated code (start)
+        # Use available fields with safe access for Pydantic objects
+        try:
+            benchmarker_data = (
+                benchmark.benchmarker.model_dump()
+                if hasattr(benchmark.benchmarker, "model_dump")
+                else str(benchmark.benchmarker)
+            )
+        except Exception:
+            benchmarker_data = str(benchmark.benchmarker)
+        # TODO: Review Cursor generated code (end)
+
+        # TODO: Review Cursor generated code (start)
+        try:
+            env_data = (
+                benchmark.env_args.model_dump()
+                if hasattr(benchmark.env_args, "model_dump")
+                else str(benchmark.env_args)
+            )
+        except Exception:
+            env_data = str(benchmark.env_args)
+        # TODO: Review Cursor generated code (end)
+
+        # TODO: Review Cursor generated code (start)
+        try:
+            scheduler_data = (
+                benchmark.scheduler.model_dump()
+                if hasattr(benchmark.scheduler, "model_dump")
+                else str(benchmark.scheduler)
+            )
+        except Exception:
+            scheduler_data = str(benchmark.scheduler)
+        # TODO: Review Cursor generated code (end)
+
+        # TODO: Review Cursor generated code (start)
+        try:
+            extras_data = (
+                benchmark.extras.model_dump()
+                if hasattr(benchmark.extras, "model_dump")
+                else str(benchmark.extras)
+            )
+        except Exception:
+            extras_data = str(benchmark.extras)
+        # TODO: Review Cursor generated code (end)
+
         values: list[str] = [
-            json.dumps(benchmark.args.model_dump()),
-            json.dumps(benchmark.worker.model_dump()),
-            json.dumps(benchmark.request_loader.model_dump()),
-            json.dumps(benchmark.extras),
+            # TODO: Review Cursor generated code (start)
+            json.dumps(benchmarker_data),
+            json.dumps(env_data),
+            json.dumps(scheduler_data),
+            json.dumps(extras_data),
+            # TODO: Review Cursor generated code (end)
         ]
         return headers, values
 
@@ -655,7 +811,6 @@ class GenerativeBenchmarkerHTML(GenerativeBenchmarkerOutput):
     DEFAULT_FILE: ClassVar[str] = "benchmarks.html"
 
     @classmethod
-    @abstractmethod
     def validated_kwargs(cls, save_path: str | Path | None, **kwargs) -> dict[str, Any]:
         new_kwargs = {}
         if save_path is not None:
