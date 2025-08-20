@@ -70,37 +70,37 @@ dev = [
     "setuptools-git-versioning>=2.0,<3",
 
     # general and configurations
-    "pre-commit>=3.5.0",
-    "scipy>=1.10",
-    "sphinx>=7.1.2",
-    "tox>=4.16.0",
+    "pre-commit~=3.5.0",
+    "scipy~=1.10",
+    "sphinx~=7.1.2",
+    "tox~=4.16.0",
 
     # testing
-    "lorem>=0.1.1",
-    "pytest>=8.2.2",
-    "pytest-asyncio>=0.23.8",
-    "pytest-cov>=5.0.0",
-    "pytest-mock>=3.14.0",
-    "pytest-rerunfailures>=14.0",
-    "respx>=0.22.0",
+    "lorem~=0.1.1",
+    "pytest~=8.2.2",
+    "pytest-asyncio~=0.23.8",
+    "pytest-cov~=5.0.0",
+    "pytest-mock~=3.14.0",
+    "pytest-rerunfailures~=14.0",
+    "respx~=0.22.0",
 
     # code quality
-    "mypy>=1.15.0",
-    "ruff>=0.11.7",
+    "mypy~=1.15.0",
+    "ruff~=0.11.7",
 
     # docs quality
-    "mdformat>=0.7.17",
-    "mdformat-footnote>=0.1.1",
-    "mdformat-frontmatter>=2.0.8",
-    "mdformat-gfm>=0.3.6",
+    "mdformat~=0.7.17",
+    "mdformat-footnote~=0.1.1",
+    "mdformat-frontmatter~=2.0.8",
+    "mdformat-gfm~=0.3.6",
 
     # type-checking
-    "types-PyYAML>=6.0.1",
-    "types-requests>=2.32.0",
+    "types-PyYAML~=6.0.1",
+    "types-requests~=2.32.0",
     "types-toml",
 
     # link checking
-    "mkdocs-linkcheck>=1.0.6",
+    "mkdocs-linkcheck~=1.0.6",
 ]
 
 # For PEP 735 compliant tools
