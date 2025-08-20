@@ -33,7 +33,7 @@ from typing import (
     runtime_checkable,
 )
 
-import numpy
+import numpy as np
 from pydantic import Field, PrivateAttr
 
 from guidellm.backend import (
@@ -70,6 +70,7 @@ __all__ = [
     "CompilableAggregator",
     "GenerativeRequestsAggregator",
     "GenerativeStatsProgressAggregator",
+    "InjectExtrasAggregator",
     "SchedulerStatsAggregator",
     "SerializableAggregator",
 ]
@@ -282,6 +283,47 @@ class SerializableAggregator(
         :param scheduler_state: Final scheduler execution state.
         :return: Compiled benchmark results and metrics.
         """
+
+
+@SerializableAggregator.register("inject_extras")
+class InjectExtrasAggregator(
+    SerializableAggregator[ResponseT, RequestT, MeasuredRequestTimingsT], InfoMixin
+):
+    """
+    Aggregator for injecting extra metadata into the output.
+    """
+
+    @classmethod
+    def validated_kwargs(cls, extras: dict[str, Any], **kwargs) -> dict[str, Any]:
+        return {"extras": extras}
+
+    type_: Literal["inject_extras"] = Field(default="inject_extras")
+    extras: dict[str, Any] | None = Field(default_factory=None)
+
+    def __call__(
+        self,
+        agg_state: dict[str, Any],
+        response: ResponseT | None,
+        request: RequestT,
+        request_info: ScheduledRequestInfo[MeasuredRequestTimingsT],
+        scheduler_state: SchedulerState,
+    ) -> dict[str, Any] | None:
+        """
+        Inject extra metadata into the aggregation state.
+
+        :param agg_state: Current aggregation state to update.
+        :param response: Response generated for the request, if successful.
+        :param request: The processed request object.
+        :param request_info: Scheduling metadata and timing information.
+        :param scheduler_state: Current scheduler execution state.
+        :return: Updated aggregation state with injected extras.
+        """
+        return None
+
+    def compile(
+        self, agg_state: dict[str, Any], scheduler_state: SchedulerState
+    ) -> dict[str, Any]:
+        return {"extras": self.extras} if self.extras else {}
 
 
 @SerializableAggregator.register("scheduler_stats")
@@ -600,7 +642,7 @@ class GenerativeStatsProgressAggregator(
                 self.add_aggregate_metric_rate(f"{prefix}prompt_tokens", agg_state)
             )
             self.add_aggregate_metric(
-                f"{prefix}prompt_tokens", agg_state, response.prompt_tokens
+                "prompt_tokens", agg_state, response.prompt_tokens
             )
             agg_state["prompt_tokens_per_request"] = self.add_aggregate_metric_rate(
                 "prompt_tokens", agg_state
@@ -842,8 +884,10 @@ class GenerativeRequestsAggregator(
             "requests": StatusBreakdown(
                 successful=(
                     list(
-                        numpy.random.choice(
-                            successful, size=self.request_samples, replace=False
+                        np.random.choice(
+                            successful,
+                            size=min(self.request_samples, len(successful)),
+                            replace=False,
                         )
                     )
                     if self.request_samples
@@ -851,8 +895,10 @@ class GenerativeRequestsAggregator(
                 ),
                 incomplete=(
                     list(
-                        numpy.random.choice(
-                            incomplete, size=self.request_samples, replace=False
+                        np.random.choice(
+                            incomplete,
+                            size=min(self.request_samples, len(incomplete)),
+                            replace=False,
                         )
                     )
                     if self.request_samples
@@ -860,8 +906,10 @@ class GenerativeRequestsAggregator(
                 ),
                 errored=(
                     list(
-                        numpy.random.choice(
-                            errored, size=self.request_samples, replace=False
+                        np.random.choice(
+                            errored,
+                            size=min(self.request_samples, len(errored)),
+                            replace=False,
                         )
                     )
                     if self.request_samples

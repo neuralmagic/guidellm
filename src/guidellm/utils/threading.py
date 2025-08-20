@@ -145,3 +145,5 @@ async def synchronous_to_exitable_async(
                 exit_barrier.abort()
         canceled_event.set()
         raise
+    except Exception as err:  # noqa: BLE001
+        print(f"******EXCEPTION in synchronous_to_exitable_async: {err}")

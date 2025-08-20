@@ -10,7 +10,7 @@ Classes:
 """
 
 import importlib
-from typing import Any
+from typing import Any, get_args, get_origin
 
 import msgpack
 from pydantic import BaseModel
@@ -62,26 +62,34 @@ class MsgpackEncoding:
         :return: Primitive representation suitable for MessagePack.
         """
         if isinstance(obj, BaseModel):
+            # Get the module, class, and any generics for reconstruction later
             model_cls = obj.__class__
-
-            origin = getattr(model_cls, "__origin__", None)
-            if origin is None and hasattr(model_cls, "__pydantic_generic_metadata__"):
-                origin = model_cls.__pydantic_generic_metadata__.get("origin", None)
-            if origin is None:
-                origin = model_cls
-
-            args = getattr(model_cls, "__args__", ())
+            origin = get_origin(model_cls) or model_cls
+            args = tuple(get_args(model_cls))
             if not args and hasattr(model_cls, "__pydantic_generic_metadata__"):
-                args = model_cls.__pydantic_generic_metadata__.get("args", ())
+                meta = model_cls.__pydantic_generic_metadata__
+                origin = meta.get("origin", origin) or origin
+                args = tuple(meta.get("args") or [])
+
+            # Construct data by manually running model_dump and encoding BaseModel
+            data: dict[str, Any] = {}
+            for name in origin.model_fields:
+                value = getattr(obj, name, None)
+                data[name] = cls.to_primitive(value)
+            extras = getattr(obj, "__pydantic_extras__", {})
+            for name, value in extras.items():
+                data[name] = cls.to_primitive(value)
 
             encoded = {
                 cls.PYDANTIC_TAG: f"{origin.__module__}.{origin.__name__}",
-                cls.PYDANTIC_DATA: obj.model_dump(),
+                cls.PYDANTIC_DATA: data,
             }
 
             if args:
                 encoded[cls.PYDANTIC_ARGS] = [
-                    f"{arg.__module__}.{arg.__name__}" for arg in args
+                    f"{arg.__module__}.{arg.__qualname__}"
+                    for arg in args
+                    if isinstance(arg, type)
                 ]
 
             return encoded
@@ -124,8 +132,12 @@ class MsgpackEncoding:
                     type_args.append(getattr(importlib.import_module(mod), clazz))
 
             model_cls = origin_cls[tuple(type_args)] if type_args else origin_cls
+            payload = {
+                key: cls.from_primitive(value)
+                for key, value in obj[cls.PYDANTIC_DATA].items()
+            }
 
-            return model_cls.model_validate(obj[cls.PYDANTIC_DATA])
+            return model_cls.model_validate(payload)
 
         if isinstance(obj, dict):
             return {

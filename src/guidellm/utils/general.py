@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any, Final
 
 __all__ = [
     "UNSET",
+    "Safe_format_timestamp",
     "UnsetType",
     "all_defined",
     "safe_add",
@@ -78,5 +80,19 @@ def safe_add(*values: int | float | None, default: float = 0.0) -> float:
 def safe_subtract(*values: int | float | None, default: float = 0.0) -> float:
     result = default
     for val in values:
-        result -= val if val is not None else 0.0
+        if val is not None:
+            result -= val
+
     return result
+
+
+def safe_format_timestamp(
+    timestamp: float | None, format_: str = "%H:%M:%S", default: str = "N/A"
+) -> str:
+    if timestamp is None or timestamp < 0 or timestamp > 2**31:
+        try:
+            return datetime.fromtimestamp(timestamp).strftime(format_)
+        except (ValueError, OverflowError, OSError):
+            return default
+
+    return default

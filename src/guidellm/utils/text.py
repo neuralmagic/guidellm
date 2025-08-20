@@ -11,7 +11,7 @@ from loguru import logger
 
 from guidellm import data as package_data
 from guidellm.config import settings
-from guidellm.utils.colors import Colors
+from guidellm.utils.console import Colors
 
 __all__ = [
     "EndlessTextCreator",
@@ -44,10 +44,10 @@ def format_value_display(
     else:
         formatted_number = f"{value:>{digits_places}.{decimal_places}f}"
 
-    result = f"{formatted_number}{units} [{Colors.INFO}]{label}[/{Colors.INFO}]"
+    result = f"{formatted_number}{units} [{Colors.info}]{label}[/{Colors.info}]"
 
     if total_characters is not None:
-        total_characters += len(Colors.INFO) * 2 + 5
+        total_characters += len(Colors.info) * 2 + 5
 
         if len(result) < total_characters:
             result = result.rjust(total_characters)

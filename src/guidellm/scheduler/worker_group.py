@@ -17,6 +17,7 @@ import math
 import queue
 import threading
 import time
+import uuid
 from asyncio import Task
 from collections.abc import AsyncIterator, Iterable, Iterator
 from multiprocessing import Queue, get_context
@@ -302,7 +303,6 @@ class WorkerProcessGroup(Generic[RequestT, MeasuredRequestTimingsT, ResponseT]):
 
         if self.shutdown_event is not None:
             self.shutdown_event.set()
-            self.shutdown_event = None
 
         cancel_tasks = [
             task
@@ -333,6 +333,7 @@ class WorkerProcessGroup(Generic[RequestT, MeasuredRequestTimingsT, ResponseT]):
         self.mp_context = None
 
         self.startup_barrier = None
+        self.shutdown_event = None
         self.error_event = None
         self.requests_queue = None
         self.updates_queue = None
@@ -450,6 +451,7 @@ class WorkerProcessGroup(Generic[RequestT, MeasuredRequestTimingsT, ResponseT]):
                     )
                     yield None  # Yield to check for error in wrapper to stop
         except Exception as err:  # noqa: BLE001
+            print(f"******EXCEPTION in _populate_requests_generator: {err}")
             self.error_event.set()
             raise err
         finally:
@@ -489,12 +491,11 @@ class WorkerProcessGroup(Generic[RequestT, MeasuredRequestTimingsT, ResponseT]):
     ) -> tuple[tuple[bytes, bytes] | None, bool]:
         try:
             request = next(request_iter)
+            request_id = (
+                request.request_id or request.id or request.id_ or str(uuid.uuid4())
+            )
             request_info = ScheduledRequestInfo[MeasuredRequestTimingsT](
-                request_id=(
-                    request
-                    if isinstance(request, str)
-                    else getattr(request, "id_", getattr(request, "id", id(request)))
-                ),
+                request_id=request_id,
                 status="queued",
                 scheduler_node_id=-1,
                 scheduler_process_id=0,
@@ -558,6 +559,7 @@ class WorkerProcessGroup(Generic[RequestT, MeasuredRequestTimingsT, ResponseT]):
 
                     yield None  # Yield to check for error in wrapper to stop
         except Exception as err:  # noqa: BLE001
+            print(f"******EXCEPTION in _populate_updates_generator: {err}")
             self.error_event.set()
             raise err
         finally:

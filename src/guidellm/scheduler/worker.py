@@ -107,6 +107,7 @@ class WorkerProcess(Generic[RequestT, MeasuredRequestTimingsT, ResponseT]):
         ] = None
         self.pending_updates_queue: culsans.Queue[
             tuple[
+                ResponseT | None,
                 RequestT | MultiTurnRequestT[RequestT],
                 ScheduledRequestInfo[MeasuredRequestTimingsT],
             ]
@@ -133,11 +134,12 @@ class WorkerProcess(Generic[RequestT, MeasuredRequestTimingsT, ResponseT]):
         """
         try:
             asyncio.run(self.run_async())
-        except Exception as exc:
+        except Exception as err:
+            print(f"******EXCEPTION in worker {self.local_rank} run: {err}")
             self.error_event.set()
             raise RuntimeError(
-                f"Worker process {self.local_rank} encountered an error: {exc}"
-            ) from exc
+                f"Worker process {self.local_rank} encountered an error: {err}"
+            ) from err
 
     async def run_async(self):
         """
@@ -514,7 +516,13 @@ class WorkerProcess(Generic[RequestT, MeasuredRequestTimingsT, ResponseT]):
                 update_tuple = self.pending_updates_queue.sync_get(
                     timeout=self.poll_intervals
                 )
-                message = MsgpackEncoding.encode(update_tuple)
+                response: ResponseT | None = update_tuple[0]
+                request: RequestT | MultiTurnRequestT[RequestT] = update_tuple[1]
+                request_info: ScheduledRequestInfo[MeasuredRequestTimingsT] = (
+                    update_tuple[2]
+                )
+
+                message = MsgpackEncoding.encode((response, request, request_info))
                 self.updates_queue.put(message)
                 self.pending_updates_queue.task_done()
             except culsans.QueueEmpty:

@@ -3,6 +3,7 @@ from .aggregator import (
     CompilableAggregator,
     GenerativeRequestsAggregator,
     GenerativeStatsProgressAggregator,
+    InjectExtrasAggregator,
     SchedulerStatsAggregator,
     SerializableAggregator,
 )
@@ -62,6 +63,7 @@ __all__ = [
     "GenerativeRequestStats",
     "GenerativeRequestsAggregator",
     "GenerativeStatsProgressAggregator",
+    "InjectExtrasAggregator",
     "Profile",
     "ProfileType",
     "SchedulerStatsAggregator",

@@ -68,7 +68,7 @@ class BenchmarkerProgress(Generic[BenchmarkT], ABC):
 
         :param enabled: Whether to enable progress tracking and display.
         """
-        self.enabled = enabled
+        self._enabled = enabled
         self.profile: Profile = None
         self.current_strategy: SchedulingStrategy = None
 
@@ -390,15 +390,15 @@ class GenerativeConsoleBenchmarkerProgress(
             profile=profile, display_scheduler_stats=self.display_scheduler_stats
         )
         self.run_progress = Progress(
-            TextColumn("Generating...", style=f"italic {Colors.PROGRESS}"),
+            TextColumn("Generating...", style=f"italic {Colors.progress}"),
             BarColumn(
                 bar_width=None,
-                complete_style=Colors.PROGRESS,
-                finished_style=Colors.SUCCESS,
+                complete_style=Colors.progress,
+                finished_style=Colors.success,
             ),
             TextColumn(
                 "({task.fields[completed_benchmarks]}/{task.fields[total_benchmarks]})",
-                style=Colors.PROGRESS,
+                style=Colors.progress,
             ),
             TextColumn("["),
             TimeElapsedColumn(),
@@ -488,8 +488,8 @@ class _GenerativeProgressTasks(Progress):
             summary_text += "\n{task.fields[scheduler_stats]}"
         super().__init__(
             TextColumn("[{task.fields[start_time]}]"),
-            SpinnerColumn(style=Colors.PROGRESS),
-            TaskProgressColumn(style=Colors.PROGRESS),
+            SpinnerColumn(style=Colors.progress),
+            TaskProgressColumn(style=Colors.progress),
             TextColumn("{task.description}"),
             TextColumn("({task.fields[progress_status]})"),
             TextColumn(" "),
@@ -605,9 +605,9 @@ class _GenerativeProgressTaskState:
         }
 
     @property
-    def completed(self) -> float | None:
+    def completed(self) -> float:
         if self.benchmark_status == "pending":
-            return None
+            return 0
 
         if self.benchmark_status == "completed":
             return _PROGRESS_SCALE
@@ -615,8 +615,8 @@ class _GenerativeProgressTaskState:
         return self.progress * _PROGRESS_SCALE if self.progress is not None else None
 
     @property
-    def total(self) -> float | None:
-        return _PROGRESS_SCALE if self.benchmark_status != "pending" else None
+    def total(self) -> float:
+        return _PROGRESS_SCALE
 
     @property
     def formatted_start_time(self) -> str:
@@ -629,19 +629,19 @@ class _GenerativeProgressTaskState:
     def formatted_progress_status(self) -> str:
         if self.benchmark_status == "in_warmup":
             status = "warmup"
-            color = Colors.PROGRESS
+            color = Colors.progress
         elif self.benchmark_status == "in_progress":
             status = "running"
-            color = Colors.PROGRESS
+            color = Colors.progress
         elif self.benchmark_status == "in_cooldown":
             status = "cooldown"
-            color = Colors.PROGRESS
+            color = Colors.progress
         elif self.benchmark_status == "completed":
             status = "complete"
-            color = Colors.SUCCESS
+            color = Colors.success
         else:
             status = "pending"
-            color = Colors.INFO
+            color = Colors.info
 
         return f"[{color}]{status.ljust(8)}[/{color}]"
 
@@ -651,7 +651,7 @@ class _GenerativeProgressTaskState:
             return " "
 
         return (
-            f"[{Colors.INFO}]Req:[/{Colors.INFO}] "
+            f"[{Colors.info}]Req:[/{Colors.info}] "
             + format_value_display(
                 value=self.requests_per_second,
                 label="req/s",
@@ -708,7 +708,7 @@ class _GenerativeProgressTaskState:
             return " "
 
         return (
-            f"[{Colors.INFO}]Tok:[/{Colors.INFO}] "
+            f"[{Colors.info}]Tok:[/{Colors.info}] "
             + format_value_display(
                 value=self.output_tokens_rate,
                 label="gen/s",
@@ -766,7 +766,7 @@ class _GenerativeProgressTaskState:
             return " "
 
         return (
-            f"[{Colors.INFO}]Sys:[/{Colors.INFO}] , "
+            f"[{Colors.info}]Sys:[/{Colors.info}] , "
             + format_value_display(
                 value=self.request_targeted_start_delay,
                 label="Start Del",
@@ -816,24 +816,26 @@ class _GenerativeProgressTaskState:
         )
         self._update_request_stats(
             request_concurrency=scheduler_state.processing_requests,
-            requests_per_second=aggregator_update.get("requests_per_second"),
-            request_latency=aggregator_update.get("request_latency"),
+            requests_per_second=aggregator_update.get("requests_per_second", 0),
+            request_latency=aggregator_update.get("request_latency", 0),
         )
         self._update_token_stats(
-            output_tokens=aggregator_update.get("output_tokens"),
-            output_tokens_rate=aggregator_update.get("output_tokens_rate"),
+            output_tokens=aggregator_update.get("output_tokens", 0),
+            output_tokens_rate=aggregator_update.get("output_tokens_rate", 0),
             prompt_tokens=aggregator_update.get("prompt_tokens"),
-            total_tokens_rate=aggregator_update.get("total_tokens_rate"),
-            time_to_first_token=aggregator_update.get("time_to_first_token")
+            total_tokens_rate=aggregator_update.get("total_tokens_rate", 0),
+            time_to_first_token=aggregator_update.get("time_to_first_token", 0)
             * 1000,  # ms
-            inter_token_latency=aggregator_update.get("inter_token_latency") * 1000,
+            inter_token_latency=aggregator_update.get("inter_token_latency", 0) * 1000,
         )
         self._update_system_stats(
             request_targeted_start_delay=aggregator_update.get(
-                "request_targeted_start_delay"
+                "request_targeted_start_delay", 0
             ),
-            queued_time=aggregator_update.get("queued_time"),
-            scheduler_overheads_time=aggregator_update.get("scheduler_overheads_time"),
+            queued_time=aggregator_update.get("queued_time", 0),
+            scheduler_overheads_time=aggregator_update.get(
+                "scheduler_overheads_time", 0
+            ),
         )
 
     def complete(self, benchmark: GenerativeBenchmark):

@@ -186,6 +186,17 @@ class ScheduledRequestInfo(StandardBaseModel, Generic[MeasuredRequestTimingsT]):
 
         return request_end or self.scheduler_timings.resolve_end
 
+    def model_copy(self) -> ScheduledRequestInfo:
+        return super().model_copy(
+            update={
+                "scheduler_timings": self.scheduler_timings.model_copy(),
+                "request_timings": (
+                    self.request_timings.model_copy() if self.request_timings else None
+                ),
+            },
+            deep=False,
+        )
+
 
 class BackendInterface(ABC, Generic[RequestT, MeasuredRequestTimingsT, ResponseT]):
     """

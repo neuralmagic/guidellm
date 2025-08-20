@@ -1,5 +1,5 @@
 from .auto_importer import AutoImporterMixin
-from .colors import Colors
+from .console import Colors, Console, ConsoleUpdateStep, StatusIcons, StatusStyles
 from .default_group import DefaultGroupHandler
 from .encoding import MsgpackEncoding
 from .general import (
@@ -8,6 +8,7 @@ from .general import (
     all_defined,
     safe_add,
     safe_divide,
+    safe_format_timestamp,
     safe_getattr,
     safe_multiply,
     safe_subtract,
@@ -54,6 +55,9 @@ __all__ = [
     "UNSET",
     "AutoImporterMixin",
     "Colors",
+    "Colors",
+    "Console",
+    "ConsoleUpdateStep",
     "DefaultGroupHandler",
     "DistributionSummary",
     "EndlessTextCreator",
@@ -70,6 +74,8 @@ __all__ = [
     "StandardBaseModel",
     "StatusBreakdown",
     "StatusDistributionSummary",
+    "StatusIcons",
+    "StatusStyles",
     "ThreadSafeSingletonMixin",
     "TimeRunningStats",
     "UnsetType",
@@ -82,6 +88,7 @@ __all__ = [
     "load_text",
     "safe_add",
     "safe_divide",
+    "safe_format_timestamp",
     "safe_getattr",
     "safe_multiply",
     "safe_subtract",
