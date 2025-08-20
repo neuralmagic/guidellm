@@ -1,18 +1,18 @@
 repos:
 - repo: https://github.com/pre-commit/pre-commit-hooks
-  rev: v4.6.0
+  rev: v6.0.0
   hooks:
   - id: trailing-whitespace
     exclude: ^tests/?.*/assets/.+
   - id: end-of-file-fixer
     exclude: ^tests/?.*/assets/.+
 - repo: https://github.com/pdm-project/pdm
-  rev: 2.25.4
+  rev: 2.25.6
   hooks:
     - id: pdm-lock-check
       name: check lock file matches pyproject
 - repo: https://github.com/astral-sh/ruff-pre-commit
-  rev: v0.11.7
+  rev: v0.12.9
   hooks:
     - id: ruff
       name: run linter
