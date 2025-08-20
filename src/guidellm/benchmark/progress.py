@@ -37,6 +37,7 @@ from rich.progress import (
     TimeRemainingColumn,
 )
 
+from guidellm.benchmark.aggregator import AggregatorState
 from guidellm.benchmark.objects import BenchmarkT, GenerativeBenchmark
 from guidellm.benchmark.profile import Profile
 from guidellm.scheduler import (
@@ -97,7 +98,7 @@ class BenchmarkerProgress(Generic[BenchmarkT], ABC):
         profile: Profile,
         agen: AsyncIterable[
             tuple[
-                dict[str, Any],
+                AggregatorState | None,
                 BenchmarkT | None,
                 SchedulingStrategy,
                 SchedulerState | None,
@@ -105,7 +106,7 @@ class BenchmarkerProgress(Generic[BenchmarkT], ABC):
         ],
     ) -> AsyncIterator[
         tuple[
-            dict[str, Any],
+            AggregatorState | None,
             BenchmarkT | None,
             SchedulingStrategy,
             SchedulerState | None,
@@ -124,7 +125,7 @@ class BenchmarkerProgress(Generic[BenchmarkT], ABC):
 
         async def aiterator() -> AsyncIterator[
             tuple[
-                dict[str, Any],
+                AggregatorState | None,
                 BenchmarkT | None,
                 SchedulingStrategy,
                 SchedulerState | None,
@@ -180,7 +181,7 @@ class BenchmarkerProgress(Generic[BenchmarkT], ABC):
 
     @abstractmethod
     async def on_benchmark_update(
-        self, aggregator_update: dict[str, Any], scheduler_state: SchedulerState
+        self, aggregator_update: AggregatorState, scheduler_state: SchedulerState
     ):
         """
         Handle benchmark execution progress update.
@@ -204,7 +205,7 @@ class BenchmarkerProgress(Generic[BenchmarkT], ABC):
     async def on_raw_update(
         self,
         profile: Profile,
-        aggregator_update: dict[str, Any],
+        aggregator_update: AggregatorState | None,
         benchmark: BenchmarkT | None,
         strategy: SchedulingStrategy,
         scheduler_state: SchedulerState | None,
@@ -289,7 +290,7 @@ class BenchmarkerProgressGroup(BenchmarkerProgress[BenchmarkT]):
         )
 
     async def on_benchmark_update(
-        self, aggregator_update: dict[str, Any], scheduler_state: SchedulerState
+        self, aggregator_update: AggregatorState, scheduler_state: SchedulerState
     ):
         """
         Distribute benchmark updates to all handlers.
@@ -321,7 +322,7 @@ class BenchmarkerProgressGroup(BenchmarkerProgress[BenchmarkT]):
     async def on_raw_update(
         self,
         profile: Profile,
-        aggregator_update: dict[str, Any],
+        aggregator_update: AggregatorState | None,
         benchmark: BenchmarkT | None,
         strategy: SchedulingStrategy,
         scheduler_state: SchedulerState | None,
@@ -431,7 +432,7 @@ class GenerativeConsoleBenchmarkerProgress(
         self._sync_run_progress()
 
     async def on_benchmark_update(
-        self, aggregator_update: dict[str, Any], scheduler_state: SchedulerState
+        self, aggregator_update: AggregatorState | None, scheduler_state: SchedulerState
     ):
         """
         Update display with current benchmark progress.
@@ -544,7 +545,7 @@ class _GenerativeProgressTasks(Progress):
         )
 
     def update_benchmark(
-        self, aggregator_update: dict[str, Any], scheduler_state: SchedulerState
+        self, aggregator_update: AggregatorState, scheduler_state: SchedulerState
     ):
         self.benchmark_task_states[self.current_index].update(
             aggregator_update, scheduler_state
@@ -575,21 +576,21 @@ class _GenerativeProgressTaskState:
     ] = "pending"
     progress: float | None = None
     start_time: float = -1.0
-    successful_requests: int = -1
-    cancelled_requests: int = -1
-    errored_requests: int = -1
-    request_concurrency: int = -1
-    requests_per_second: float = -1.0
-    request_latency: float = -1.0
-    output_tokens: int = -1
-    output_tokens_rate: float = -1.0
-    prompt_tokens: int = -1
-    total_tokens_rate: float = -1.0
-    time_to_first_token: float = -1.0
-    inter_token_latency: float = -1.0
-    queued_time: float = -1.0
-    request_targeted_start_delay: float = -1.0
-    scheduler_overheads_time: float = -1.0
+    successful_requests: int = 0
+    cancelled_requests: int = 0
+    errored_requests: int = 0
+    request_concurrency: int = 0
+    requests_per_second: float = 0
+    request_latency: float = 0
+    output_tokens: int = 0
+    output_tokens_rate: float = 0
+    prompt_tokens: int = 0
+    total_tokens_rate: float = 0
+    time_to_first_token: float = 0
+    inter_token_latency: float = 0
+    queued_time: float = 0
+    request_targeted_start_delay: float = 0
+    scheduler_overheads_time: float = 0
 
     @property
     def current(self) -> dict[str, Any]:
@@ -799,10 +800,12 @@ class _GenerativeProgressTaskState:
         self.strategy_type = strategy.type_
 
     def update(
-        self, aggregator_update: dict[str, Any], scheduler_state: SchedulerState
+        self, aggregator_update: AggregatorState, scheduler_state: SchedulerState
     ):
         self.progress = scheduler_state.remaining_fraction
-        status: Literal["in_warmup", "in_progress", "in_cooldown"] = "in_progress"
+        status: Literal["in_warmup", "in_progress", "in_cooldown"] | None = (
+            "in_progress"  # Need to handle requests_in_* isn't in aggregator_update
+        )
         if aggregator_update.get("requests_in_warmup"):
             status = "in_warmup"
         elif aggregator_update.get("requests_in_cooldown"):
@@ -815,28 +818,52 @@ class _GenerativeProgressTaskState:
             errored_requests=scheduler_state.errored_requests,
         )
         self._update_request_stats(
-            request_concurrency=scheduler_state.processing_requests,
-            requests_per_second=aggregator_update.get("requests_per_second", 0),
-            request_latency=aggregator_update.get("request_latency", 0),
+            request_concurrency=aggregator_update.get_metric(
+                key="requests", type_="avg", prefix="completed"
+            ),
+            requests_per_second=aggregator_update.get_metric(
+                key="requests",
+                type_="rate",
+                prefix="completed",
+            ),
+            request_latency=aggregator_update.get_metric(
+                key="request_latency", type_="avg", prefix="completed"
+            ),
         )
         self._update_token_stats(
-            output_tokens=aggregator_update.get("output_tokens", 0),
-            output_tokens_rate=aggregator_update.get("output_tokens_rate", 0),
-            prompt_tokens=aggregator_update.get("prompt_tokens"),
-            total_tokens_rate=aggregator_update.get("total_tokens_rate", 0),
-            time_to_first_token=aggregator_update.get("time_to_first_token", 0)
-            * 1000,  # ms
-            inter_token_latency=aggregator_update.get("inter_token_latency", 0) * 1000,
-        )
-        self._update_system_stats(
-            request_targeted_start_delay=aggregator_update.get(
-                "request_targeted_start_delay", 0
+            output_tokens=aggregator_update.get_metric(
+                key="output_tokens", type_="avg", prefix="completed"
             ),
-            queued_time=aggregator_update.get("queued_time", 0),
-            scheduler_overheads_time=aggregator_update.get(
-                "scheduler_overheads_time", 0
+            output_tokens_rate=aggregator_update.get_metric(
+                key="output_tokens", type_="rate"
+            ),
+            prompt_tokens=aggregator_update.get_metric(
+                key="prompt_tokens", type_="avg", prefix="completed"
+            ),
+            total_tokens_rate=aggregator_update.get_metric(
+                key="total_tokens", type_="rate"
+            ),
+            time_to_first_token=(
+                aggregator_update.get_metric(key="time_to_first_token", type_="avg")
+            ),
+            inter_token_latency=(
+                aggregator_update.get_metric(key="inter_token_latency", type_="avg")
             ),
         )
+        if aggregator_update.get("updated_scheduler_stats"):
+            self._update_system_stats(
+                request_targeted_start_delay=(
+                    aggregator_update.get_metric(
+                        key="request_targeted_start_delay", type_="avg", default=0.0
+                    )
+                ),
+                queued_time=(
+                    aggregator_update.get_metric(
+                        key="queued_time", type_="avg", default=0.0
+                    )
+                ),
+                scheduler_overheads_time=0.0,  # Need to add up metrics here
+            )
 
     def complete(self, benchmark: GenerativeBenchmark):
         self._update_processing_states(
@@ -875,8 +902,8 @@ class _GenerativeProgressTaskState:
         cancelled_requests: int | None = None,
         errored_requests: int | None = None,
     ):
-        self.benchmark_status = benchmark_status
-
+        if self.benchmark_status is not None:
+            self.benchmark_status = benchmark_status
         if start_time is not None:
             self.start_time = start_time
         if successful_requests is not None:

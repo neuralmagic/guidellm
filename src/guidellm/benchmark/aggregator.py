@@ -23,6 +23,7 @@ Type Variables:
 from __future__ import annotations
 
 import math
+import random
 from abc import ABC, abstractmethod
 from typing import (
     Any,
@@ -62,11 +63,11 @@ from guidellm.utils import (
     all_defined,
     safe_divide,
     safe_getattr,
-    safe_subtract,
 )
 
 __all__ = [
     "Aggregator",
+    "AggregatorState",
     "CompilableAggregator",
     "GenerativeRequestsAggregator",
     "GenerativeStatsProgressAggregator",
@@ -74,6 +75,82 @@ __all__ = [
     "SchedulerStatsAggregator",
     "SerializableAggregator",
 ]
+
+
+class AggregatorState(dict[str, Any]):
+    def add_metric(
+        self,
+        key: str,
+        value: int | float | None,
+        start_val: int | float | None = 0.0,
+        count: int | None = 1,
+        duration: float | None = None,
+        duration_div: Literal["total", "avg"] = "total",
+        prefix: str | None = None,
+    ):
+        """
+        Add timing or count metrics to aggregation state.
+        """
+        if prefix:
+            self.add_metric(
+                key=f"{prefix}_{key}",
+                value=value,
+                start_val=start_val,
+                count=count,
+                duration=duration,
+                duration_div=duration_div,
+            )
+            return
+
+        if not all_defined(value, start_val, count):
+            return
+
+        delta_val = value - start_val
+        self[f"{key}_total"] = self.get(f"{key}_total", 0) + delta_val
+        self[f"{key}_count"] = self.get(f"{key}_count", 0) + count
+        self[f"{key}_avg"] = safe_divide(
+            self.get(f"{key}_total"), self.get(f"{key}_count")
+        )
+
+        if all_defined(duration):
+            self[f"{key}_duration"] = duration
+            self[f"{key}_rate"] = safe_divide(
+                self.get(f"{key}_{duration_div}"), duration
+            )
+
+    def set_metric(
+        self,
+        key: str,
+        value: int | float | None,
+        type_: Literal["total", "count", "avg", "duration", "rate"],
+        prefix: str | None = None,
+    ):
+        if prefix:
+            self.set_metric(
+                key=f"{prefix}_{key}",
+                value=value,
+                type_=type_,
+                prefix=None,
+            )
+            return
+
+        self[f"{key}_{type_}"] = value
+
+    def get_metric(
+        self,
+        key: str,
+        type_: Literal["total", "count", "avg", "duration", "rate"],
+        default: int | float | None = None,
+        prefix: str | None = None,
+    ) -> int | float | None:
+        if prefix:
+            return self.get_metric(
+                key=f"{prefix}_{key}",
+                type_=type_,
+                default=default,
+            )
+
+        return self.get(f"{key}_{type_}", default)
 
 
 @runtime_checkable
@@ -88,7 +165,7 @@ class Aggregator(Protocol[ResponseT, RequestT, MeasuredRequestTimingsT]):
 
     def __call__(
         self,
-        agg_state: dict[str, Any],
+        state: AggregatorState,
         response: ResponseT | None,
         request: RequestT,
         request_info: ScheduledRequestInfo[MeasuredRequestTimingsT],
@@ -97,7 +174,7 @@ class Aggregator(Protocol[ResponseT, RequestT, MeasuredRequestTimingsT]):
         """
         Process a completed request and update aggregation state.
 
-        :param agg_state: Current aggregation state to update in-place.
+        :param state: Current aggregation state to update in-place.
         :param response: Response generated for the request, if successful.
         :param request: The processed request object.
         :param request_info: Scheduling metadata and timing information.
@@ -117,7 +194,7 @@ class CompilableAggregator(Protocol[ResponseT, RequestT, MeasuredRequestTimingsT
 
     def __call__(
         self,
-        agg_state: dict[str, Any],
+        state: AggregatorState,
         response: ResponseT | None,
         request: RequestT,
         request_info: ScheduledRequestInfo[MeasuredRequestTimingsT],
@@ -126,7 +203,7 @@ class CompilableAggregator(Protocol[ResponseT, RequestT, MeasuredRequestTimingsT
         """
         Process a completed request and update aggregation state.
 
-        :param agg_state: Current aggregation state to update in-place.
+        :param state: Current aggregation state to update in-place.
         :param response: Response generated for the request, if successful.
         :param request: The processed request object.
         :param request_info: Scheduling metadata and timing information.
@@ -135,7 +212,7 @@ class CompilableAggregator(Protocol[ResponseT, RequestT, MeasuredRequestTimingsT
         """
 
     def compile(
-        self, agg_state: dict[str, Any], scheduler_state: SchedulerState
+        self, state: AggregatorState, scheduler_state: SchedulerState
     ) -> dict[str, Any]:
         """
         Compile aggregated state into final benchmark results.
@@ -159,54 +236,6 @@ class SerializableAggregator(
             return cls
 
         return SerializableAggregator
-
-    @classmethod
-    def add_aggregate_metric(
-        cls,
-        base_key: str,
-        agg_state: dict[str, Any],
-        end_val: int | float | None,
-        start_val: int | float | None = 0.0,
-        count: int = 1,
-    ) -> int | float | None:
-        """
-        Add timing or count metrics to aggregation state.
-
-        Accumulates delta values and counts for computing averages and totals.
-        Creates entries for "{base_key}_total" and "{base_key}_count" in agg_state.
-
-        :param base_key: Base key name for the metric.
-        :param agg_state: Aggregation state dictionary to update.
-        :param end_val: End value for calculating delta, or None to skip.
-        :param start_val: Start value for calculating delta, defaults to 0.0.
-        :param count: Number of occurrences to count, defaults to 1.
-        """
-        if not all_defined(end_val, start_val):
-            return None
-
-        delta_val = end_val - start_val
-        agg_state[f"{base_key}_total"] = (
-            agg_state.get(f"{base_key}_total", 0) + delta_val
-        )
-        agg_state[f"{base_key}_count"] = agg_state.get(f"{base_key}_count", 0) + count
-
-        return agg_state[f"{base_key}_total"]
-
-    @classmethod
-    def add_aggregate_metric_rate(
-        cls, base_key: str, agg_state: dict[str, Any]
-    ) -> float:
-        """
-        Calculate the rate of a metric by dividing the total by the count.
-
-        :param base_key: Base key name for the metric.
-        :param agg_state: Aggregation state dictionary to update.
-        """
-        agg_state[f"{base_key}_rate"] = safe_divide(
-            agg_state.get(f"{base_key}_total"), agg_state.get(f"{base_key}_count")
-        )
-
-        return agg_state[f"{base_key}_rate"]
 
     @classmethod
     @abstractmethod
@@ -255,7 +284,7 @@ class SerializableAggregator(
     @abstractmethod
     def __call__(
         self,
-        agg_state: dict[str, Any],
+        state: AggregatorState,
         response: ResponseT | None,
         request: RequestT,
         request_info: ScheduledRequestInfo[MeasuredRequestTimingsT],
@@ -274,7 +303,7 @@ class SerializableAggregator(
 
     @abstractmethod
     def compile(
-        self, agg_state: dict[str, Any], scheduler_state: SchedulerState
+        self, state: AggregatorState, scheduler_state: SchedulerState
     ) -> dict[str, Any]:
         """
         Compile aggregated state into final benchmark results.
@@ -302,7 +331,7 @@ class InjectExtrasAggregator(
 
     def __call__(
         self,
-        agg_state: dict[str, Any],
+        state: AggregatorState,
         response: ResponseT | None,
         request: RequestT,
         request_info: ScheduledRequestInfo[MeasuredRequestTimingsT],
@@ -321,7 +350,7 @@ class InjectExtrasAggregator(
         return None
 
     def compile(
-        self, agg_state: dict[str, Any], scheduler_state: SchedulerState
+        self, state: AggregatorState, scheduler_state: SchedulerState
     ) -> dict[str, Any]:
         return {"extras": self.extras} if self.extras else {}
 
@@ -345,7 +374,7 @@ class SchedulerStatsAggregator(
 
     def __call__(
         self,
-        agg_state: dict[str, Any],
+        state: AggregatorState,
         response: ResponseT | None,
         request: RequestT,
         request_info: ScheduledRequestInfo[MeasuredRequestTimingsT],
@@ -365,65 +394,57 @@ class SchedulerStatsAggregator(
             # Only compile scheduler stats for processed requests
             return None
 
-        self.add_aggregate_metric(
-            "queued_time",
-            agg_state,
-            request_info.scheduler_timings.dequeued,
-            request_info.scheduler_timings.queued,
+        state["updated_scheduler_stats"] = True
+        state.add_metric(
+            key="queued_time",
+            value=request_info.scheduler_timings.dequeued,
+            start_val=request_info.scheduler_timings.queued,
         )
-        self.add_aggregate_metric(
-            "worker_resolve_start_delay",
-            agg_state,
-            request_info.scheduler_timings.resolve_start,
-            request_info.scheduler_timings.scheduled_at,
+        state.add_metric(
+            key="worker_resolve_start_delay",
+            value=request_info.scheduler_timings.resolve_start,
+            start_val=request_info.scheduler_timings.scheduled_at,
         )
-        self.add_aggregate_metric(
-            "worker_resolve_time",
-            agg_state,
-            request_info.scheduler_timings.resolve_end,
-            request_info.scheduler_timings.resolve_start,
+        state.add_metric(
+            key="worker_resolve_time",
+            value=request_info.scheduler_timings.resolve_end,
+            start_val=request_info.scheduler_timings.resolve_start,
         )
-        self.add_aggregate_metric(
-            "worker_resolve_end_delay",
-            agg_state,
-            request_info.scheduler_timings.resolve_end,
-            safe_getattr(request_info.request_timings, "request_end"),
+        state.add_metric(
+            key="worker_resolve_end_delay",
+            value=request_info.scheduler_timings.resolve_end,
+            start_val=safe_getattr(request_info.request_timings, "request_end"),
         )
-        self.add_aggregate_metric(
-            "finalized_delay",
-            agg_state,
-            request_info.scheduler_timings.finalized,
-            request_info.scheduler_timings.resolve_end,
+        state.add_metric(
+            key="finalized_delay",
+            value=request_info.scheduler_timings.finalized,
+            start_val=request_info.scheduler_timings.resolve_end,
         )
-        self.add_aggregate_metric(
-            "worker_targeted_start_delay",
-            agg_state,
-            request_info.scheduler_timings.resolve_start,
-            request_info.scheduler_timings.targeted_start,
+        state.add_metric(
+            key="worker_targeted_start_delay",
+            value=request_info.scheduler_timings.resolve_start,
+            start_val=request_info.scheduler_timings.targeted_start,
         )
-        self.add_aggregate_metric(
-            "request_start_delay",
-            agg_state,
-            request_info.scheduler_timings.resolve_start,
-            safe_getattr(request_info.request_timings, "request_start"),
+        state.add_metric(
+            key="request_start_delay",
+            value=request_info.scheduler_timings.resolve_start,
+            start_val=safe_getattr(request_info.request_timings, "request_start"),
         )
-        self.add_aggregate_metric(
-            "request_time",
-            agg_state,
-            safe_getattr(request_info.request_timings, "request_end"),
-            safe_getattr(request_info.request_timings, "request_start"),
+        state.add_metric(
+            key="request_time",
+            value=safe_getattr(request_info.request_timings, "request_end"),
+            start_val=safe_getattr(request_info.request_timings, "request_start"),
         )
-        self.add_aggregate_metric(
-            "request_targeted_start_delay",
-            agg_state,
-            safe_getattr(request_info.request_timings, "request_start"),
-            request_info.scheduler_timings.targeted_start,
+        state.add_metric(
+            key="request_targeted_start_delay",
+            value=safe_getattr(request_info.request_timings, "request_start"),
+            start_val=request_info.scheduler_timings.targeted_start,
         )
 
-        return agg_state
+        return state
 
     def compile(
-        self, agg_state: dict[str, Any], scheduler_state: SchedulerState
+        self, state: AggregatorState, scheduler_state: SchedulerState
     ) -> dict[Literal["scheduler_stats"], BenchmarkSchedulerStats]:
         """
         Compile scheduler timing metrics into benchmark statistics.
@@ -446,32 +467,32 @@ class SchedulerStatsAggregator(
                         + scheduler_state.errored_requests
                     ),
                 ),
-                queued_time_avg=self.add_aggregate_metric_rate(
-                    "queued_time", agg_state
+                queued_time_avg=state.get_metric(
+                    key="queued_time", type_="avg", default=0.0
                 ),
-                worker_resolve_start_delay_avg=self.add_aggregate_metric_rate(
-                    "worker_resolve_start_delay", agg_state
+                worker_resolve_start_delay_avg=state.get_metric(
+                    key="worker_resolve_start_delay", type_="avg", default=0.0
                 ),
-                worker_resolve_time_avg=self.add_aggregate_metric_rate(
-                    "worker_resolve_time", agg_state
+                worker_resolve_time_avg=state.get_metric(
+                    key="worker_resolve_time", type_="avg", default=0.0
                 ),
-                worker_resolve_end_delay_avg=self.add_aggregate_metric_rate(
-                    "worker_resolve_end_delay", agg_state
+                worker_resolve_end_delay_avg=state.get_metric(
+                    key="worker_resolve_end_delay", type_="avg"
                 ),
-                finalized_delay_avg=self.add_aggregate_metric_rate(
-                    "finalized_delay", agg_state
+                finalized_delay_avg=state.get_metric(
+                    key="finalized_delay", type_="avg", default=0.0
                 ),
-                worker_targeted_start_delay_avg=self.add_aggregate_metric_rate(
-                    "worker_targeted_start_delay", agg_state
+                worker_targeted_start_delay_avg=state.get_metric(
+                    key="worker_targeted_start_delay", type_="avg", default=0.0
                 ),
-                request_start_delay_avg=self.add_aggregate_metric_rate(
-                    "request_start_delay", agg_state
+                request_start_delay_avg=state.get_metric(
+                    key="request_start_delay", type_="avg", default=0.0
                 ),
-                request_time_avg=self.add_aggregate_metric_rate(
-                    "request_time", agg_state
+                request_time_avg=state.get_metric(
+                    key="request_time", type_="avg", default=0.0
                 ),
-                request_targeted_delay_avg=self.add_aggregate_metric_rate(
-                    "request_targeted_delay", agg_state
+                request_targeted_start_delay_avg=state.get_metric(
+                    key="request_targeted_start_delay", type_="avg", default=0.0
                 ),
             ),
         }
@@ -500,7 +521,7 @@ class GenerativeStatsProgressAggregator(
 
     def __call__(
         self,
-        agg_state: dict[str, Any],
+        state: AggregatorState,
         response: GenerationResponse | None,
         request: GenerationRequest,
         request_info: ScheduledRequestInfo[GenerationRequestTimings],
@@ -516,197 +537,121 @@ class GenerativeStatsProgressAggregator(
         :param scheduler_state: Current scheduler execution state.
         :return: Updated aggregation state for progress reporting.
         """
-        if request_info.status == "completed":
-            prefix = "completed_"
-        elif request_info.status == "errored":
-            prefix = "errored_"
-        elif request_info.status == "cancelled":
-            prefix = "cancelled_"
-        else:
+        if request_info.status not in {"completed", "errored", "cancelled"}:
             # Only compile progress stats for processed requests
             return None
 
+        state["updated_generative_stats"] = True
         start_time = scheduler_state.start_time
         end_time = (
             safe_getattr(request_info.request_timings, "request_end")
             or request_info.scheduler_timings.resolve_end
         )
-        duration = safe_subtract(end_time, start_time)
+        duration = end_time - start_time if end_time else None
 
-        if all_defined(end_time):
-            # request rate
-            requests = (
-                scheduler_state.successful_requests
+        for prefix in (request_info.status, None):
+            requests_count = (
+                scheduler_state.processed_requests
+                if prefix is None
+                else scheduler_state.successful_requests
                 if request_info.status == "completed"
                 else scheduler_state.cancelled_requests
                 if request_info.status == "cancelled"
                 else scheduler_state.errored_requests
             )
-            agg_state[f"{prefix}requests_per_second"] = safe_divide(requests, duration)
-            agg_state["requests_per_second"] = safe_divide(
-                scheduler_state.processed_requests, duration
-            )
 
-        if all_defined(
-            safe_getattr(request_info.request_timings, "request_end"),
-            safe_getattr(request_info.request_timings, "request_start"),
-        ):
-            # request latency
-            self.add_aggregate_metric(
-                f"{prefix}request_latency",
-                agg_state,
-                request_info.request_timings.request_end,
-                request_info.request_timings.request_start,
-            )
-            self.add_aggregate_metric_rate(f"{prefix}request_latency", agg_state)
-            self.add_aggregate_metric(
-                "request_latency",
-                agg_state,
-                request_info.request_timings.request_end,
-                request_info.request_timings.request_start,
-            )
-            self.add_aggregate_metric_rate("request_latency", agg_state)
-
-        if all_defined(
-            safe_getattr(request_info.request_timings, "last_iteration"),
-            safe_getattr(request_info.request_timings, "request_start"),
-        ):
-            # TPOT
-            self.add_aggregate_metric(
-                f"{prefix}time_per_output_token",
-                agg_state,
-                request_info.request_timings.last_iteration,
-                request_info.request_timings.request_start,
-            )
-            self.add_aggregate_metric_rate(f"{prefix}time_per_output_token", agg_state)
-            self.add_aggregate_metric(
-                "time_per_output_token",
-                agg_state,
-                request_info.request_timings.last_iteration,
-                request_info.request_timings.request_start,
-            )
-            self.add_aggregate_metric_rate("time_per_output_token", agg_state)
-
-        if all_defined(
-            safe_getattr(request_info.request_timings, "first_iteration"),
-            safe_getattr(request_info.request_timings, "request_start"),
-        ):
-            # TTFT
-            self.add_aggregate_metric(
-                f"{prefix}time_to_first_token",
-                agg_state,
-                request_info.request_timings.first_iteration,
-                request_info.request_timings.request_start,
-            )
-            self.add_aggregate_metric_rate(f"{prefix}time_to_first_token", agg_state)
-            self.add_aggregate_metric(
-                "time_to_first_token",
-                agg_state,
-                request_info.request_timings.first_iteration,
-                request_info.request_timings.request_start,
-            )
-            self.add_aggregate_metric_rate("time_to_first_token", agg_state)
-
-        if (
-            all_defined(
-                safe_getattr(request_info.request_timings, "first_iteration"),
-                safe_getattr(request_info.request_timings, "last_iteration"),
-                safe_getattr(response, "output_tokens"),
-            )
-            and response.output_tokens > 1
-        ):
-            # ITL
-            self.add_aggregate_metric(
-                f"{prefix}inter_token_latency",
-                agg_state,
-                request_info.request_timings.last_iteration,
-                request_info.request_timings.first_iteration,
-                count=response.output_tokens - 1,
-            )
-            self.add_aggregate_metric_rate(f"{prefix}inter_token_latency", agg_state)
-            self.add_aggregate_metric(
-                "inter_token_latency",
-                agg_state,
-                request_info.request_timings.last_iteration,
-                request_info.request_timings.first_iteration,
-                count=response.output_tokens - 1,
-            )
-            self.add_aggregate_metric_rate("inter_token_latency", agg_state)
-
-        if all_defined(safe_getattr(response, "prompt_tokens")):
-            # Prompt tokens totals
-            self.add_aggregate_metric(
-                f"{prefix}prompt_tokens", agg_state, response.prompt_tokens
-            )
-            agg_state[f"{prefix}prompt_tokens_per_request"] = (
-                self.add_aggregate_metric_rate(f"{prefix}prompt_tokens", agg_state)
-            )
-            self.add_aggregate_metric(
-                "prompt_tokens", agg_state, response.prompt_tokens
-            )
-            agg_state["prompt_tokens_per_request"] = self.add_aggregate_metric_rate(
-                "prompt_tokens", agg_state
-            )
-
-            if all_defined(end_time):
-                # Prompt tokens rate
-                agg_state[f"{prefix}prompt_tokens_rate"] = safe_divide(
-                    agg_state[f"{prefix}prompt_tokens_total"], duration
-                )
-                agg_state["prompt_tokens_rate"] = safe_divide(
-                    agg_state["prompt_tokens_total"], duration
+            # Requests per Second
+            if duration is not None:
+                state.set_metric(
+                    key="requests",
+                    value=safe_divide(requests_count, duration),
+                    type_="rate",
+                    prefix=prefix,
                 )
 
-        if all_defined(safe_getattr(response, "output_tokens")):
-            # Output tokens totals
-            self.add_aggregate_metric(
-                f"{prefix}output_tokens", agg_state, response.output_tokens
-            )
-            agg_state[f"{prefix}output_tokens_per_request"] = (
-                self.add_aggregate_metric_rate(f"{prefix}output_tokens", agg_state)
-            )
-            self.add_aggregate_metric(
-                "output_tokens", agg_state, response.output_tokens
-            )
-            agg_state["output_tokens_per_request"] = self.add_aggregate_metric_rate(
-                "output_tokens", agg_state
+            # Request Concurrency
+            state.set_metric(
+                key="requests",
+                value=scheduler_state.processing_requests,
+                type_="avg",
+                prefix=prefix,
             )
 
-            if all_defined(end_time):
-                # Output tokens rate
-                agg_state[f"{prefix}output_tokens_rate"] = safe_divide(
-                    agg_state[f"{prefix}output_tokens_total"], duration
-                )
-                agg_state["output_tokens_rate"] = safe_divide(
-                    agg_state["output_tokens_total"], duration
-                )
-
-        if all_defined(safe_getattr(response, "total_tokens")):
-            # Total tokens totals
-            self.add_aggregate_metric(
-                f"{prefix}total_tokens", agg_state, response.total_tokens
-            )
-            agg_state[f"{prefix}total_tokens_per_request"] = (
-                self.add_aggregate_metric_rate(f"{prefix}total_tokens", agg_state)
-            )
-            self.add_aggregate_metric("total_tokens", agg_state, response.total_tokens)
-            agg_state["total_tokens_per_request"] = self.add_aggregate_metric_rate(
-                "total_tokens", agg_state
+            # Request Latency
+            state.add_metric(
+                key="request_latency",
+                value=safe_getattr(request_info.request_timings, "request_end"),
+                start_val=safe_getattr(request_info.request_timings, "request_start"),
+                prefix=prefix,
             )
 
-            if all_defined(end_time):
-                # Total tokens rate
-                agg_state[f"{prefix}total_tokens_rate"] = safe_divide(
-                    agg_state[f"{prefix}total_tokens_total"], duration
-                )
-                agg_state["total_tokens_rate"] = safe_divide(
-                    agg_state["total_tokens_total"], duration
-                )
+            # Time to First Token
+            state.add_metric(
+                key="time_to_first_token",
+                value=safe_getattr(request_info.request_timings, "first_iteration"),
+                start_val=safe_getattr(request_info.request_timings, "request_start"),
+                prefix=prefix,
+            )
 
-        return agg_state
+            output_tokens = safe_getattr(response, "output_tokens")
+            prompt_tokens = safe_getattr(response, "prompt_tokens")
+
+            # Inter Token Latency
+            state.add_metric(
+                key="inter_token_latency",
+                value=safe_getattr(request_info.request_timings, "last_iteration"),
+                start_val=safe_getattr(request_info.request_timings, "first_iteration"),
+                count=(
+                    output_tokens - 1 if output_tokens and output_tokens > 1 else None
+                ),
+                prefix=prefix,
+            )
+
+            # Time per Output Token
+            state.add_metric(
+                key="time_per_output_token",
+                value=safe_getattr(request_info.request_timings, "request_start"),
+                start_val=safe_getattr(request_info.request_timings, "last_iteration"),
+                count=output_tokens,
+                prefix=prefix,
+            )
+
+            # Prompt Tokens
+            state.add_metric(
+                key="prompt_tokens",
+                value=prompt_tokens,
+                duration=duration,
+                prefix=prefix,
+            )
+
+            # Output Tokens
+            state.add_metric(
+                key="output_tokens",
+                value=output_tokens,
+                duration=duration,
+                prefix=prefix,
+            )
+
+            # Total Tokens
+            state.add_metric(
+                key="total_tokens",
+                value=(
+                    prompt_tokens + output_tokens
+                    if all_defined(prompt_tokens, output_tokens)
+                    else prompt_tokens
+                    if all_defined(prompt_tokens)
+                    else output_tokens
+                    if all_defined(output_tokens)
+                    else None
+                ),
+                duration=duration,
+                prefix=prefix,
+            )
+
+        return state
 
     def compile(
-        self, agg_state: dict[str, Any], scheduler_state: SchedulerState
+        self, state: AggregatorState, scheduler_state: SchedulerState
     ) -> dict[str, Any]:
         """
         Compile progress metrics into final results.
@@ -765,7 +710,7 @@ class GenerativeRequestsAggregator(
 
     def __call__(
         self,
-        agg_state: dict[str, Any],
+        state: AggregatorState,
         response: GenerationResponse | None,
         request: GenerationRequest,
         request_info: ScheduledRequestInfo[GenerationRequestTimings],
@@ -784,18 +729,19 @@ class GenerativeRequestsAggregator(
         :param scheduler_state: Current scheduler execution state.
         :return: None, as this aggregator only collects for final compilation.
         """
-        status = {
-            "requests_in_warmup": False,
-            "requests_in_cooldown": False,
-        }
-
         # Skip invalid requests
         if request_info.status not in {"completed", "canceled", "errored"} or (
             request_info.status == "canceled"
             and safe_getattr(request_info.scheduler_timings, "resolve_start") is None
             # Canceled requests that never started should not be kept
         ):
-            return status
+            return None
+
+        status = {
+            "updated_generative_requests": True,
+            "requests_in_warmup": False,
+            "requests_in_cooldown": False,
+        }
 
         if self._is_in_warmup(request_info, scheduler_state):
             status["requests_in_warmup"] = True
@@ -805,24 +751,24 @@ class GenerativeRequestsAggregator(
             status["requests_in_cooldown"] = True
             return status
 
-        if "completed" not in agg_state:
-            agg_state["completed"] = []
-            agg_state["errored"] = []
-            agg_state["incomplete"] = []
+        if "completed" not in state:
+            state["completed"] = []
+            state["errored"] = []
+            state["incomplete"] = []
 
         # Categorize request by status
         if request_info.status == "completed":
-            agg_state["completed"].append((response, request, request_info))
+            state["completed"].append((response, request, request_info))
         elif request_info.status == "canceled":
-            agg_state["incomplete"].append((response, request, request_info))
+            state["incomplete"].append((response, request, request_info))
         else:
-            agg_state["errored"].append((response, request, request_info))
+            state["errored"].append((response, request, request_info))
 
         return status
 
     def compile(
         self,
-        agg_state: dict[str, Any],
+        state: AggregatorState,
         scheduler_state: SchedulerState,  # noqa: ARG002
     ) -> dict[str, Any]:
         """
@@ -836,16 +782,16 @@ class GenerativeRequestsAggregator(
         :return: Complete benchmark results with metrics and request statistics.
         """
         successful: list[GenerativeRequestStats] = [
-            self._create_generate_stats(response, request, request_info)
-            for (response, request, request_info) in agg_state.get("completed", [])
+            self._create_generative_request_stats(response, request, request_info)
+            for (response, request, request_info) in state.get("completed", [])
         ]
         incomplete: list[GenerativeRequestStats] = [
-            self._create_generate_stats(response, request, request_info)
-            for (response, request, request_info) in agg_state.get("incomplete", [])
+            self._create_generative_request_stats(response, request, request_info)
+            for (response, request, request_info) in state.get("incomplete", [])
         ]
         errored: list[GenerativeRequestStats] = [
-            self._create_generate_stats(response, request, request_info)
-            for (response, request, request_info) in agg_state.get("errored", [])
+            self._create_generative_request_stats(response, request, request_info)
+            for (response, request, request_info) in state.get("errored", [])
         ]
 
         # Use all requests for metrics calculations (not sampled)
@@ -875,46 +821,21 @@ class GenerativeRequestsAggregator(
         return {
             "start_time": start_time,
             "end_time": end_time,
-            "request_totals": StatusBreakdown(
+            "request_totals": StatusBreakdown[int, int, int, int](
                 successful=len(successful),
                 incomplete=len(incomplete),
                 errored=len(errored),
                 total=len(total),
             ),
-            "requests": StatusBreakdown(
-                successful=(
-                    list(
-                        np.random.choice(
-                            successful,
-                            size=min(self.request_samples, len(successful)),
-                            replace=False,
-                        )
-                    )
-                    if self.request_samples
-                    else successful
-                ),
-                incomplete=(
-                    list(
-                        np.random.choice(
-                            incomplete,
-                            size=min(self.request_samples, len(incomplete)),
-                            replace=False,
-                        )
-                    )
-                    if self.request_samples
-                    else incomplete
-                ),
-                errored=(
-                    list(
-                        np.random.choice(
-                            errored,
-                            size=min(self.request_samples, len(errored)),
-                            replace=False,
-                        )
-                    )
-                    if self.request_samples
-                    else errored
-                ),
+            "requests": StatusBreakdown[
+                list[GenerativeRequestStats],
+                list[GenerativeRequestStats],
+                list[GenerativeRequestStats],
+                list[GenerativeRequestStats],
+            ](
+                successful=self._sample_request_stats(successful, self.request_samples),
+                incomplete=self._sample_request_stats(incomplete, self.request_samples),
+                errored=self._sample_request_stats(errored, self.request_samples),
             ),
             "metrics": GenerativeMetrics(
                 requests_per_second=self._calculate_requests_per_second(
@@ -1012,7 +933,7 @@ class GenerativeRequestsAggregator(
         return False
 
     @classmethod
-    def _create_generate_stats(
+    def _create_generative_request_stats(
         cls,
         response: GenerationResponse,
         request: GenerationRequest,
@@ -1041,6 +962,15 @@ class GenerativeRequestsAggregator(
             ),
             scheduler_info=request_info,
         )
+
+    @classmethod
+    def _sample_request_stats(
+        cls, stats: list[GenerativeRequestStats], sample_size: int | None
+    ) -> list[GenerativeRequestStats]:
+        if sample_size is None or sample_size <= 0 or not stats:
+            return stats
+
+        return random.sample(stats, min(sample_size, len(stats)))
 
     @classmethod
     def _calculate_requests_per_second(

@@ -1,5 +1,6 @@
 from .aggregator import (
     Aggregator,
+    AggregatorState,
     CompilableAggregator,
     GenerativeRequestsAggregator,
     GenerativeStatsProgressAggregator,
@@ -42,6 +43,7 @@ from .progress import (
 
 __all__ = [
     "Aggregator",
+    "AggregatorState",
     "AsyncProfile",
     "Benchmark",
     "BenchmarkMetrics",

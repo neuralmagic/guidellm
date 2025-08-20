@@ -52,8 +52,8 @@ def all_defined(*values: Any | None) -> bool:
 
 
 def safe_divide(
-    numerator: float | None,
-    denominator: float | None,
+    numerator: int | float | None,
+    denominator: int | float | None,
     num_default: float = 0.0,
     den_default: float = 1.0,
 ) -> float:

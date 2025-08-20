@@ -25,7 +25,11 @@ from typing import (
     Generic,
 )
 
-from guidellm.benchmark.aggregator import Aggregator, CompilableAggregator
+from guidellm.benchmark.aggregator import (
+    Aggregator,
+    AggregatorState,
+    CompilableAggregator,
+)
 from guidellm.benchmark.objects import BenchmarkerDict, BenchmarkT, SchedulerDict
 from guidellm.benchmark.profile import Profile
 from guidellm.scheduler import (
@@ -76,7 +80,7 @@ class Benchmarker(
         environment: Environment | None = None,
     ) -> AsyncIterator[
         tuple[
-            dict[str, Any],
+            AggregatorState | None,
             BenchmarkT | None,
             SchedulingStrategy,
             SchedulerState | None,
@@ -107,8 +111,10 @@ class Benchmarker(
             strategy, constraints = next(strategies_generator)
 
             while strategy is not None:
-                yield {}, None, strategy, None
-                aggregators_state = {key: {} for key in benchmark_aggregators}
+                yield None, None, strategy, None
+                aggregators_state = {
+                    key: AggregatorState() for key in benchmark_aggregators
+                }
 
                 async for (
                     response,
@@ -122,7 +128,7 @@ class Benchmarker(
                     env=environment,
                     **constraints,
                 ):
-                    aggregators_update = {}
+                    aggregators_update = AggregatorState()
                     for key, aggregator in benchmark_aggregators.items():
                         update = aggregator(
                             aggregators_state[key],
@@ -149,7 +155,7 @@ class Benchmarker(
                     scheduler_state=scheduler_state,
                 )
                 benchmark = benchmark_class(**benchmark_kwargs)
-                yield {}, benchmark, strategy, None
+                yield None, benchmark, strategy, None
 
                 try:
                     strategy, constraints = strategies_generator.send(benchmark)

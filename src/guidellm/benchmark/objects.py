@@ -91,7 +91,7 @@ class BenchmarkSchedulerStats(StandardBaseDict):
         description="Avg delay after resolve til request start (seconds)"
     )
     request_time_avg: float = Field(description="Avg request processing time (seconds)")
-    request_targeted_delay_avg: float = Field(
+    request_targeted_start_delay_avg: float = Field(
         description="Avg delay from targeted start to actual request start"
     )
 
