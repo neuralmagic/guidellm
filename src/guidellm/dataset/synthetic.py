@@ -1,6 +1,7 @@
 import json
 import random
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable, Iterator, Sequence
+from itertools import cycle
 from pathlib import Path
 from typing import Any, Literal, Optional, Union
 
@@ -18,13 +19,36 @@ from guidellm.dataset.creator import ColumnInputTypes, DatasetCreator
 from guidellm.utils import EndlessTextCreator, IntegerRangeSampler, check_load_processor
 
 __all__ = [
+    "PrefixBucketConfig",
     "SyntheticDatasetConfig",
     "SyntheticDatasetCreator",
     "SyntheticTextItemsGenerator",
 ]
 
 
+class PrefixBucketConfig(BaseModel):
+    bucket_weight: int = Field(
+        description="Weight of this bucket in the overall distribution.",
+        gt=0,
+        default=100,
+    )
+    prefix_count: int = Field(
+        description="The number of unique prefixs to generate for this bucket.",
+        ge=1,
+        default=1,
+    )
+    prefix_tokens: int = Field(
+        description="The number of prefix tokens per-prompt for this bucket.",
+        ge=0,
+        default=0,
+    )
+
+
 class SyntheticDatasetConfig(BaseModel):
+    prefix_buckets: Optional[list[PrefixBucketConfig]] = Field(
+        description="Buckets for the prefix tokens distribution.",
+        default=None,
+    )
     prompt_tokens: int = Field(
         description="The average number of text tokens generated for prompts.",
         gt=0,
@@ -163,39 +187,83 @@ class SyntheticTextItemsGenerator(
         )
         # ensure diff distribution from output tokens
         rand = random.Random(self.random_seed + 2)  # noqa: S311
+        shared_prefix_iter = iter(self._create_prefixes(rand))
+        unique_prefix_iter = cycle(self.processor.get_vocab().values())
 
         for _, prompt_tokens, output_tokens in zip(
             range(self.config.samples),
             prompt_tokens_sampler,
             output_tokens_sampler,
         ):
-            start_index = rand.randint(0, len(self.text_creator.words))
+            start_index = self._rand_start_index(rand)
+            prefix_tokens = next(shared_prefix_iter, [])
+            prompt_text = self.processor.decode(
+                prefix_tokens
+                + self._create_prompt(
+                    prompt_tokens, start_index, next(unique_prefix_iter)
+                ),
+                skip_special_tokens=True,
+            )
             yield {
-                "prompt": self._create_prompt(prompt_tokens, start_index),
-                "prompt_tokens_count": prompt_tokens,
+                "prompt": prompt_text,
+                "prompt_tokens_count": len(prefix_tokens) + prompt_tokens,
                 "output_tokens_count": output_tokens,
             }
 
-    def _create_prompt(self, prompt_tokens: int, start_index: int) -> str:
+    def _rand_start_index(self, rand: random.Random) -> int:
+        """Generate a random start index for text generation."""
+        return rand.randint(0, len(self.text_creator.words) - 1)
+
+    def _create_prefixes(self, rand: random.Random) -> Sequence[list[int]]:
+        """Create an iterator for shared prefix tokens."""
+        buckets = self.config.prefix_buckets
+
+        if not buckets:
+            return []
+
+        total_weight = sum(bucket.bucket_weight for bucket in buckets)
+        if total_weight <= 0:
+            raise ValueError("Total weight of prefix buckets must be greater than 0.")
+
+        prompts = []
+        for bucket in buckets:
+            for _ in range(bucket.prefix_count):
+                start_index = self._rand_start_index(rand)
+                prompt_tokens = self._create_prompt(bucket.prefix_tokens, start_index)
+                sample_percent = (
+                    bucket.bucket_weight / bucket.prefix_count / total_weight
+                )
+                sample_count = sample_percent * self.config.samples
+                for _ in range(int(round(sample_count))):
+                    prompts.append(prompt_tokens)
+
+        rand.shuffle(prompts)
+        return prompts
+
+    def _create_prompt(
+        self, prompt_tokens: int, start_index: int, unique_prefix: Optional[int] = None
+    ) -> list[int]:
         if prompt_tokens <= 0:
-            return ""
+            return []
 
         left = start_index
         right = start_index + 4 * prompt_tokens
+        start_tokens = [unique_prefix] if unique_prefix else []
 
         while left < right:
             mid = (left + right) // 2
             test_prompt = self.text_creator.create_text(start_index, mid - start_index)
-            test_tokens = len(self.processor.tokenize(test_prompt))
+            test_tokens = start_tokens + self.processor.encode(test_prompt)
 
-            if test_tokens == prompt_tokens:
-                return test_prompt
-            elif test_tokens < prompt_tokens:
+            if len(test_tokens) == prompt_tokens:
+                return test_tokens
+            elif len(test_tokens) < prompt_tokens:
                 left = mid + 1
             else:
                 right = mid
 
-        return self.text_creator.create_text(start_index, left - start_index)
+        final_text = self.text_creator.create_text(start_index, left - start_index)
+        return start_tokens + self.processor.encode(final_text)
 
 
 class SyntheticDatasetCreator(DatasetCreator):
