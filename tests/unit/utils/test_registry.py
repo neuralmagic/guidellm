@@ -490,7 +490,6 @@ class TestRegistryMixin:
             assert TestAutoRegistry.registry_populated is True
             assert TestAutoRegistry.registry is not None
             assert "module1class" in TestAutoRegistry.registry
-        """Test complete auto-discovery workflow with mocked imports."""
 
         class TestAutoRegistry(RegistryMixin):
             registry_auto_discovery = True
