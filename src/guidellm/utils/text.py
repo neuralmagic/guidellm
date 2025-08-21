@@ -191,10 +191,8 @@ def is_puncutation(text: str) -> bool:
 
 
 def camelize_str(snake_case_string: str) -> str:
-    return (
-        words :=
-            snake_case_string.split("_"))[0].lower() + "".join(word.capitalize()
-            for word in words[1:]
+    return (words := snake_case_string.split("_"))[0].lower() + "".join(
+        word.capitalize() for word in words[1:]
     )
 
 
