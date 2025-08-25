@@ -65,7 +65,7 @@ class GuidellmClient:
 
         # Build command components
         cmd_parts = [
-            f"GUIDELLM__MAX_CONCURRENCY=10 GUIDELLM__MAX_WORKER_PROCESSES=10 HF_HOME=/tmp/huggingface_cache {guidellm_exe} benchmark",
+            f"HF_HOME=/tmp/huggingface_cache {guidellm_exe} benchmark",
             f'--target "{self.target}"',
             f"--rate-type {rate_type}",
         ]

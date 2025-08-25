@@ -33,32 +33,27 @@ BACKEND_PROFILES = {
 
 
 # Server fixture factory
-def create_server_fixture(profile_name: str, port: int):
+def create_server_fixture(profile_name: str, port: int = 8000):
     """Create session-scoped server fixture for a backend profile."""
     profile = BACKEND_PROFILES[profile_name]
 
-    @pytest.fixture(scope="session")
+    @pytest.fixture
     def server():
         server = VllmSimServer(
-            port=port,
-            model="test-model",
-            mode="echo",
+            mode="random",
             time_to_first_token=profile["ttft"],
             inter_token_latency=profile["itl"],
         )
-        try:
-            server.start()
+        with server:
             yield server
-        finally:
-            server.stop()
 
     return server
 
 
 # Create server fixtures
-fast_server = create_server_fixture("fast", 8101)
-medium_server = create_server_fixture("medium", 8102)
-slow_server = create_server_fixture("slow", 8103)
+fast_server = create_server_fixture("fast")
+medium_server = create_server_fixture("medium")
+slow_server = create_server_fixture("slow")
 
 SERVER_FIXTURES = {
     "fast": fast_server,
@@ -100,6 +95,9 @@ def run_benchmark_test(
     # Increased buffer from 30s to 60s for high-latency servers
     timeout = int((timeout_base + 60) * timeout_multiplier)
 
+    if strategy == "sweep":
+        timeout = timeout * 10
+
     # Start benchmark
     benchmark_args = {
         "rate_type": strategy,
@@ -134,13 +132,13 @@ def run_benchmark_test(
 
 
 # =============================================================================
-# SMOKE TESTS - Mark Kurtz's 5 specific use cases
+# SMOKE TESTS
 # =============================================================================
 
 
 @pytest.mark.smoke
 @pytest.mark.timeout(90)
-def test_interactive_chat_use_case(fast_server, request):
+def test_interactive_chat_use_case(fast_server):
     """
     Interactive chat style use case:
     - data: emulated 512x512
@@ -149,10 +147,9 @@ def test_interactive_chat_use_case(fast_server, request):
     - constraints: max_seconds=60, max_requests=1000
     - aggregation: warmup=10%, cooldown=10%
     """
-    server = request.getfixturevalue("fast_server")
 
     benchmark = run_benchmark_test(
-        server=server,
+        server=fast_server,
         strategy="constant",  # Changed from sweep to avoid baseline issues
         rate=5,  # constant rate (reduced for 512x512 tokens)
         data_config="prompt_tokens=512,output_tokens=512",
@@ -167,7 +164,7 @@ def test_interactive_chat_use_case(fast_server, request):
 
 @pytest.mark.smoke
 @pytest.mark.timeout(60)
-def test_rag_throughput_use_case(fast_server, request):
+def test_rag_throughput_use_case(fast_server):
     """
     RAG style use case:
     - data: emulated 2048x128
@@ -176,10 +173,9 @@ def test_rag_throughput_use_case(fast_server, request):
     - constraints: max_seconds=60, max_requests=500
     - aggregation: None
     """
-    server = request.getfixturevalue("fast_server")
 
     benchmark = run_benchmark_test(
-        server=server,
+        server=fast_server,
         strategy="throughput",
         rate=10,  # Normal rate for fast server
         data_config="prompt_tokens=512,output_tokens=128",
@@ -192,7 +188,7 @@ def test_rag_throughput_use_case(fast_server, request):
 
 @pytest.mark.smoke
 @pytest.mark.timeout(60)
-def test_rag_constant_rate_use_case(fast_server, request):
+def test_rag_constant_rate_use_case(fast_server):
     """
     RAG style with constant rate:
     - data: emulated 2048x128
@@ -200,10 +196,9 @@ def test_rag_constant_rate_use_case(fast_server, request):
     - strategy: constant at 10 RPS
     - constraints: max_seconds=60, max_requests=500
     """
-    server = request.getfixturevalue("fast_server")
 
     benchmark = run_benchmark_test(
-        server=server,
+        server=fast_server,
         strategy="constant",
         rate=5,  # Normal rate for fast server
         data_config="prompt_tokens=512,output_tokens=128",
@@ -216,7 +211,7 @@ def test_rag_constant_rate_use_case(fast_server, request):
 
 @pytest.mark.smoke
 @pytest.mark.timeout(60)
-def test_code_generation_use_case(fast_server, request):
+def test_code_generation_use_case(fast_server):
     """
     Code generation style use case:
     - data: emulated 512x2048
@@ -224,10 +219,9 @@ def test_code_generation_use_case(fast_server, request):
     - strategy: concurrent at 50
     - constraints: max_seconds=120
     """
-    server = request.getfixturevalue("fast_server")
 
     benchmark = run_benchmark_test(
-        server=server,
+        server=fast_server,
         strategy="concurrent",
         rate=5,  # Normal rate for fast server
         data_config="prompt_tokens=512,output_tokens=512",
@@ -240,7 +234,7 @@ def test_code_generation_use_case(fast_server, request):
 
 @pytest.mark.smoke
 @pytest.mark.timeout(60)
-def test_fast_perf_stress_use_case(request):
+def test_fast_perf_stress_use_case(fast_server):
     """
     Fast performance stress test:
     - data: emulated 64x64
@@ -248,10 +242,9 @@ def test_fast_perf_stress_use_case(request):
     - strategy: constant at 50
     - aggregation: warmup=5%
     """
-    server = request.getfixturevalue("fast_server")
 
     benchmark = run_benchmark_test(
-        server=server,
+        server=fast_server,
         strategy="constant",
         rate=5,  # Reduced rate for quick test
         data_config="prompt_tokens=64,output_tokens=64",
@@ -265,7 +258,7 @@ def test_fast_perf_stress_use_case(request):
 
 @pytest.mark.smoke
 @pytest.mark.timeout(60)
-def test_synchronous_fast_use_case(fast_server, request):
+def test_synchronous_fast_use_case(fast_server):
     """
     Synchronous strategy test with fast backend:
     - data: emulated 512x512 (interactive chat size)
@@ -273,10 +266,9 @@ def test_synchronous_fast_use_case(fast_server, request):
     - strategy: synchronous
     - constraints: max_seconds=15, max_requests=30
     """
-    server = request.getfixturevalue("fast_server")
 
     benchmark = run_benchmark_test(
-        server=server,
+        server=fast_server,
         strategy="synchronous",
         rate=None,  # synchronous doesn't use rate
         data_config="prompt_tokens=512,output_tokens=512",
@@ -289,7 +281,7 @@ def test_synchronous_fast_use_case(fast_server, request):
 
 @pytest.mark.smoke
 @pytest.mark.timeout(60)
-def test_synchronous_alternative_use_case(fast_server, request):
+def test_synchronous_alternative_use_case(fast_server):
     """
     Synchronous strategy test with alternative data:
     - data: emulated 512x256 (different from other fast server tests)
@@ -297,15 +289,39 @@ def test_synchronous_alternative_use_case(fast_server, request):
     - strategy: synchronous
     - constraints: max_seconds=15, max_requests=20
     """
-    server = request.getfixturevalue("fast_server")
 
     benchmark = run_benchmark_test(
-        server=server,
+        server=fast_server,
         strategy="synchronous",
         rate=None,  # synchronous doesn't use rate
         data_config="prompt_tokens=512,output_tokens=256",
         max_seconds=15,  # Normal timeout for fast server
         max_requests=10,  # Small count for smoke test
+    )
+
+    assert len(benchmark["requests"]["successful"]) > 0
+
+
+@pytest.mark.smoke
+@pytest.mark.timeout(90)
+def test_sweep_smoke_use_case(fast_server):
+    """
+    Sweep strategy smoke test:
+    - data: emulated 64x64 (small tokens for fast sweep)
+    - backend: fast (TTFT <100ms, ITL <10ms)
+    - strategy: sweep (runs 10 sub-benchmarks)
+    - constraints: max_seconds=8, max_requests=20 (per sub-benchmark)
+    - Higher timeout due to 10 sub-benchmarks
+    """
+
+    benchmark = run_benchmark_test(
+        server=fast_server,
+        strategy="sweep",
+        rate=10,  # Sweep max rate
+        data_config="prompt_tokens=64,output_tokens=64",
+        max_seconds=8,  # Short per sub-benchmark (8s * 10 = ~80s total)
+        max_requests=20,  # Small count per sub-benchmark
+        timeout_multiplier=2.0,  # Higher multiplier for sweep overhead
     )
 
     assert len(benchmark["requests"]["successful"]) > 0
@@ -381,7 +397,7 @@ def aggregation_strategy(draw):
 
 
 @pytest.mark.sanity
-@pytest.mark.timeout(90)
+@pytest.mark.timeout(3600)
 @given(
     backend=backend_strategy(),
     data_config=data_strategy(),
@@ -395,7 +411,7 @@ def aggregation_strategy(draw):
     suppress_health_check=[HealthCheck.function_scoped_fixture],
 )
 def test_sanity_property_based_benchmark(
-    backend, data_config, strategy_rate, constraints, aggregation, request
+    backend, data_config, strategy_rate, constraints, aggregation
 ):
     """
     Property-based sanity tests covering cartesian product of configurations.
@@ -405,21 +421,25 @@ def test_sanity_property_based_benchmark(
     max_seconds, max_requests = constraints
     warmup_percent, cooldown_percent = aggregation
 
-    # Get appropriate server
-    server_fixture_name = f"{backend}_server"
-    server = request.getfixturevalue(server_fixture_name)
+    profile = BACKEND_PROFILES[backend]
 
-    benchmark = run_benchmark_test(
-        server=server,
-        strategy=strategy,
-        rate=rate,
-        data_config=data_config,
-        max_seconds=max_seconds,
-        max_requests=max_requests,
-        warmup_percent=warmup_percent,
-        cooldown_percent=cooldown_percent,
-        timeout_multiplier=1.2,
+    server = VllmSimServer(
+        mode="random",
+        time_to_first_token=profile["ttft"],
+        inter_token_latency=profile["itl"],
     )
+    with server:
+        benchmark = run_benchmark_test(
+            server=server,
+            strategy=strategy,
+            rate=rate,
+            data_config=data_config,
+            max_seconds=max_seconds,
+            max_requests=max_requests,
+            warmup_percent=warmup_percent,
+            cooldown_percent=cooldown_percent,
+            timeout_multiplier=1.2,
+        )
 
     # Property-based assertions
     assert "requests" in benchmark
@@ -441,17 +461,16 @@ def test_sanity_property_based_benchmark(
 
 @pytest.mark.regression
 @pytest.mark.timeout(600)
-def test_regression_high_load_code_generation(medium_server, request):
+def test_regression_high_load_code_generation(medium_server):
     """
     Long-running code generation stress test.
     - High concurrent load (100)
     - Long duration (120s)
     - Large outputs (2048 tokens)
     """
-    server = request.getfixturevalue("medium_server")
 
     benchmark = run_benchmark_test(
-        server=server,
+        server=medium_server,
         strategy="concurrent",
         rate=100,
         data_config="prompt_tokens=512,output_tokens=2048",
@@ -472,17 +491,16 @@ def test_regression_high_load_code_generation(medium_server, request):
 
 @pytest.mark.regression
 @pytest.mark.timeout(600)
-def test_regression_offline_throughput_stress(slow_server, request):
+def test_regression_offline_throughput_stress(slow_server):
     """
     Long-running offline throughput test.
     - Large inputs/outputs (2048x2048)
     - Slow backend simulation
     - High request volume (5000)
     """
-    server = request.getfixturevalue("slow_server")
 
     benchmark = run_benchmark_test(
-        server=server,
+        server=slow_server,
         strategy="throughput",
         rate=50,
         data_config="prompt_tokens=2048,output_tokens=2048",
@@ -499,16 +517,15 @@ def test_regression_offline_throughput_stress(slow_server, request):
 
 @pytest.mark.regression
 @pytest.mark.timeout(600)
-def test_regression_sustained_high_rate_constant(fast_server, request):
+def test_regression_sustained_high_rate_constant(fast_server):
     """
     Long-running sustained high rate test.
     - Fast backend with high constant rate
     - Extended duration to test stability
     """
-    server = request.getfixturevalue("fast_server")
 
     benchmark = run_benchmark_test(
-        server=server,
+        server=fast_server,
         strategy="constant",
         rate=500,
         data_config="prompt_tokens=64,output_tokens=64",
