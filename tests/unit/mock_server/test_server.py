@@ -15,6 +15,7 @@ from sanic import Sanic
 
 from guidellm.mock_server.server import MockServer
 from guidellm.schemas.mock_server.config import MockServerConfig
+from tests.fixtures.tokenizers import MINIMAL_TOKENIZER_DIR
 
 
 # Start server in a separate process
@@ -1214,3 +1215,19 @@ class TestMockServerFailAfterAndConcurrency:
         # Two non-stream requests each sleep ~ttft (0.2s); serialized => slower
         # request should take at least ~0.3s when they contend for one slot.
         assert max(durations) >= 0.3
+
+
+@pytest.mark.regression
+def test_initializes_with_huggingface_processor():
+    """Test all handlers initialize with a Hugging Face tokenizer.
+
+    ## WRITTEN BY AI ##
+    """
+    config = MockServerConfig(processor=str(MINIMAL_TOKENIZER_DIR))
+
+    server = MockServer(config)
+
+    assert server.chat_handler.tokenizer is not None
+    assert server.completions_handler.tokenizer is not None
+    assert server.responses_handler.tokenizer is not None
+    assert server.tokenizer_handler.tokenizer is not None
