@@ -38,7 +38,7 @@ Next, the desired audio column within the deserializable data source must be sup
 - Base64-encoded audio data
 - Numpy or PyTorch arrays with raw audio samples (one-dimensional mono or channel-first arrays)
 
-Raw floating-point arrays require a sample rate. For example, an audio item can be provided as `{"data": samples, "sample_rate": 16000}`, where `samples` has shape `(num_samples,)` for mono or `(num_channels, num_samples)` for multiple channels.
+Raw floating-point arrays require a sample rate and are converted to float32 for encoding. For example, an audio item can be provided as `{"data": samples, "sample_rate": 16000}`, where `samples` has shape `(num_samples,)` for mono or `(num_channels, num_samples)` for multiple channels.
 
 ### Data Column Mapping
 

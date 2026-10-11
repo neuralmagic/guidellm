@@ -74,15 +74,19 @@ def test_encode_audio_with_tensor_input(sample_audio_tensor):
 
 @pytest.mark.regression
 @pytest.mark.parametrize("as_numpy", [False, True])
+@pytest.mark.parametrize("dtype", [torch.float32, torch.float64])
 @pytest.mark.parametrize("max_duration", [None, 0.25])
 def test_encode_audio_with_mono_waveform(
-    sample_audio_tensor: torch.Tensor, as_numpy: bool, max_duration: float | None
+    sample_audio_tensor: torch.Tensor,
+    as_numpy: bool,
+    dtype: torch.dtype,
+    max_duration: float | None,
 ) -> None:
     """One-dimensional float samples encode as mono and honor truncation.
 
     ## WRITTEN BY AI ##
     """
-    waveform = sample_audio_tensor.squeeze(0)
+    waveform = sample_audio_tensor.squeeze(0).to(dtype)
     audio = waveform.numpy() if as_numpy else waveform
     result = _audio_mod.encode_audio(
         audio=audio, sample_rate=16000, max_duration=max_duration, audio_format="wav"
@@ -96,6 +100,7 @@ def test_encode_audio_with_mono_waveform(
         assert encoded.getframerate() == 16000
         assert encoded.getnframes() == expected_frames
     assert audio.ndim == 1
+    assert audio.dtype == (waveform.numpy().dtype if as_numpy else dtype)
 
 
 @pytest.mark.regression
@@ -138,16 +143,19 @@ def test_encode_audio_with_encoded_uint8_vector(
 
 
 @pytest.mark.regression
+@pytest.mark.parametrize("as_numpy", [False, True])
+@pytest.mark.parametrize("dtype", [torch.float32, torch.float64])
 def test_encode_audio_preserves_multiple_channels(
-    sample_audio_tensor: torch.Tensor,
+    sample_audio_tensor: torch.Tensor, as_numpy: bool, dtype: torch.dtype
 ) -> None:
     """Channel-first float waveforms keep both channels when mono is disabled.
 
     ## WRITTEN BY AI ##
     """
-    stereo = torch.cat((sample_audio_tensor, -sample_audio_tensor), dim=0)
+    stereo = torch.cat((sample_audio_tensor, -sample_audio_tensor), dim=0).to(dtype)
+    audio = stereo.numpy() if as_numpy else stereo
     result = _audio_mod.encode_audio(
-        audio=stereo, sample_rate=16000, audio_format="wav", mono=False
+        audio=audio, sample_rate=16000, audio_format="wav", mono=False
     )
 
     assert result["audio_samples"] == 16000
@@ -158,14 +166,15 @@ def test_encode_audio_preserves_multiple_channels(
 
 @pytest.mark.regression
 @pytest.mark.parametrize("as_numpy", [False, True])
+@pytest.mark.parametrize("dtype", [torch.float32, torch.float64])
 def test_media_encoder_with_mono_waveform(
-    sample_audio_tensor: torch.Tensor, as_numpy: bool
+    sample_audio_tensor: torch.Tensor, as_numpy: bool, dtype: torch.dtype
 ) -> None:
     """Dataset audio dictionaries encode one-dimensional float samples.
 
     ## WRITTEN BY AI ##
     """
-    waveform = sample_audio_tensor.squeeze(0)
+    waveform = sample_audio_tensor.squeeze(0).to(dtype)
     audio = waveform.numpy() if as_numpy else waveform
     encoder = MediaEncoder(MediaEncoderArgs())
     result = encoder.encode_turn(
