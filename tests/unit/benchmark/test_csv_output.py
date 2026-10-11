@@ -224,6 +224,43 @@ class TestHasDistributionData:
 
 
 @pytest.mark.asyncio
+@pytest.mark.regression
+@pytest.mark.parametrize("status", ["successful", "incomplete", "errored"])
+async def test_finalize_exports_zero_observations_and_intervals(tmp_path: Path, status):
+    """Measured zeros retain statistics and intervals; empty statuses stay absent.
+
+    ## WRITTEN BY AI ##
+    """
+    benchmark = make_benchmark(strategy=ThroughputStrategy(), rps=1.0, tps=10.0)
+    observations = {name: [] for name in ("successful", "incomplete", "errored")}
+    observations[status] = [0.0] * 200
+    benchmark.metrics.time_to_first_token_ms = StatusDistributionSummary.from_values(
+        **observations,
+        uncertainty=SampleUncertainty(confidence=0.95),
+    )
+
+    output = GenerativeBenchmarkerCSV(output_path=tmp_path / "zero_metrics.csv")
+    path = await output.finalize(report(benchmark))
+    rows = list(csv.reader(path.open()))
+    columns = {
+        (group, name, stat): value
+        for group, name, stat, value in zip(*rows, strict=True)
+    }
+    label = f"{status.capitalize()} ms"
+
+    for statistic in ("Mean", "Median", "Std Dev"):
+        assert columns[("Time to First Token", label, statistic)] == "0.0"
+    assert columns[("Time to First Token", label, "Mean CI")] == "[0.0, 0.0]"
+    percentile_cis = json.loads(
+        columns[("Time to First Token", label, "Percentile CIs")]
+    )
+    assert percentile_cis["p50"] == [0.0, 0.0]
+    assert {name for group, name, _ in columns if group == "Time to First Token"} == {
+        label
+    }
+
+
+@pytest.mark.asyncio
 @pytest.mark.sanity
 async def test_finalize_aligns_columns_in_written_csv(tmp_path: Path):
     """
@@ -523,10 +560,6 @@ class TestServerThroughputGoodputColumns:
         """
         The goodput columns are written even when no request met the
         objectives.
-
-        _add_stats_for_metric drops any status whose total is 0.0, which would
-        omit the columns from the CSV while the console and JSON still report
-        0.0 for the same run.
 
         ## WRITTEN BY AI ##
         """
