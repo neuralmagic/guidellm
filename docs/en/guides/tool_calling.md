@@ -11,6 +11,8 @@ Tool calling is supported with both `/v1/chat/completions` and `/v1/responses`. 
 - **`/v1/chat/completions`** uses `role: "assistant"` messages with a `tool_calls` array, followed by `role: "tool"` messages carrying tool results.
 - **`/v1/responses`** uses `function_call` items in the `input` array, followed by `function_call_output` items.
 
+When a response includes both text and tool calls, client-side history preserves both for follow-up requests. Reasoning text is included when `multiturn_reasoning` is enabled in the backend configuration.
+
 For the full wire format of tool-call messages, see the [OpenAI function calling guide](https://developers.openai.com/api/docs/guides/function-calling).
 
 ## Mocked Client-side Tool Calls
