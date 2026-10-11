@@ -23,6 +23,8 @@ The following arguments configure datasets and their processing:
   - `db_file` — loads rows from a database using `load_kwargs.sql`. Required field: `uri`, using a SQLAlchemy-style URI. GuideLLM currently supports only SQLite URIs, such as `sqlite:///prompts.db`.
   - `trace_synthetic`, `mooncake`, `weka`, `otel` — replay traces with `--profile kind=replay`. Required field: nested `source` pointing at another dataset kind, for example `source.kind=json_file,source.path=trace.jsonl` or `source.kind=huggingface,source.source=org/dataset`. Optional: `timestamp_column`, `prompt_tokens_column`, `output_tokens_column`, `time_scale`, `copies`, and other format-specific options. See [Trace File Formats](./trace_replay.md).
 
+Local file `path` values identify one exact file. Glob characters in file or directory names are treated literally.
+
 In addition, you can specify additional arguments to the dataset loading with the data argument `load_kwargs`:
 
 - load_kwargs: Additional arguments to the dataset loading. For example, dataset splits can be specified with `--data '{"kind":"huggingface","source":"my/dataset","load_kwargs":{"split":"test"}}'`. Trace kinds accept `load_kwargs` the same way and forward them to the source loader.
