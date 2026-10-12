@@ -9,6 +9,7 @@ __all__ = [
     "DatasetDictType",
     "DatasetType",
     "GenerativeDatasetColumnType",
+    "InvalidRowError",
 ]
 
 
@@ -17,14 +18,17 @@ GenerativeDatasetColumnType = Literal[
     "output_tokens_count_column",
     "prefix_column",
     "text_column",
+    "raw_messages_column",
     "image_column",
     "video_column",
     "audio_column",
     "tools_column",
     "tool_response_column",
+    "tool_choice_column",
     "turn_type_column",
     "relative_timestamp_column",
     "requeue_delay_column",
+    "request_duration_column",
     "conversation_turns_column",
 ]
 
@@ -38,3 +42,7 @@ class DataNotSupportedError(Exception):
     """
     Exception raised when the data format is not supported by deserializer or config.
     """
+
+
+class InvalidRowError(Exception):
+    """A single dataset row failed validation and should be skipped."""

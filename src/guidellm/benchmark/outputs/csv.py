@@ -13,7 +13,7 @@ from __future__ import annotations
 import csv
 import json
 from pathlib import Path
-from typing import Annotated, Any, ClassVar, Literal
+from typing import Annotated, Any, ClassVar
 
 from pydantic import Field
 
@@ -138,15 +138,18 @@ class GenerativeBenchmarkerCSV(GenerativeBenchmarkerOutput):
                 self._add_server_throughput_metrics(
                     benchmark, benchmark_headers, benchmark_values
                 )
-                for modality_name in ["text", "image", "video", "audio"]:
+                for modality_name in MODALITY_METRICS:
                     self._add_modality_metrics(
                         benchmark,
-                        modality_name,  # type: ignore[arg-type]
+                        modality_name,
                         benchmark_headers,
                         benchmark_values,
                     )
                 self._add_scheduler_info(benchmark, benchmark_headers, benchmark_values)
                 self._add_runtime_info(report, benchmark_headers, benchmark_values)
+                self._add_interval_columns(
+                    benchmark, benchmark_headers, benchmark_values
+                )
 
                 all_headers.append(benchmark_headers)
                 all_values.append(benchmark_values)
@@ -158,6 +161,99 @@ class GenerativeBenchmarkerCSV(GenerativeBenchmarkerOutput):
                 writer.writerow(row)
 
         return output_path
+
+    def _add_interval_columns(
+        self,
+        benchmark: GenerativeBenchmark,
+        headers: list[list[str]],
+        values: list[str | int | float],
+    ) -> None:
+        """
+        Add confidence interval columns for the metrics that carry them.
+
+        Written after every other column so that existing column positions are
+        unchanged. Only metrics recorded once per request carry intervals, so
+        only those are listed, under the same labels the row already uses for
+        them.
+
+        :param benchmark: Benchmark data to extract intervals from
+        :param headers: List of header hierarchies to append to
+        :param values: List of values to append to
+        """
+        self._add_field(
+            headers,
+            values,
+            "Measurement Uncertainty",
+            "Confidence Level",
+            "" if benchmark.config.confidence is None else benchmark.config.confidence,
+        )
+
+        metrics = benchmark.metrics
+        interval_metrics: list[tuple[StatusDistributionSummary | None, str, str]] = [
+            (metrics.request_latency, "Request Latency", "Sec"),
+            (metrics.request_dispatch_delay, "Dispatch Delay", "Sec"),
+            (metrics.request_scheduled_latency, "Scheduled Latency", "Sec"),
+            (
+                metrics.request_streaming_iterations_count,
+                "Streaming Iterations",
+                "Count",
+            ),
+            (metrics.time_to_first_token_ms, "Time to First Token", "ms"),
+            (
+                metrics.time_to_first_output_token_ms,
+                "Time to First Output Token",
+                "ms",
+            ),
+            (metrics.time_to_last_round_trip_ms, "Time To Last Round Trip", "ms"),
+            (metrics.avg_round_trip_time_ms, "Avg Round Trip Time", "ms"),
+            (metrics.prompt_token_count, "Token Metrics", "Input Tokens"),
+            (metrics.output_token_count, "Token Metrics", "Output Tokens"),
+            (metrics.total_token_count, "Token Metrics", "Total Tokens"),
+        ]
+
+        for metric, group, units in interval_metrics:
+            if metric is None:
+                continue
+            for status, dist in (
+                ("Successful", metric.successful),
+                ("Incomplete", metric.incomplete),
+                ("Errored", metric.errored),
+            ):
+                # Skip the statuses the metric columns skip, so each interval
+                # column has a matching set of statistics earlier in the row.
+                if dist.total_sum == 0.0:
+                    continue
+                headers.append([group, f"{status} {units}", "Mean CI"])
+                values.append(
+                    ""
+                    if dist.mean_ci is None
+                    else f"[{dist.mean_ci.lower}, {dist.mean_ci.upper}]"
+                )
+                headers.append([group, f"{status} {units}", "Percentile CIs"])
+                values.append(self._format_percentile_intervals(dist))
+
+    @staticmethod
+    def _format_percentile_intervals(dist: DistributionSummary) -> str:
+        """
+        Render the percentile intervals as one JSON object keyed by percentile.
+
+        Every percentile is present, so one without an interval reads as null
+        rather than as missing.
+
+        :param dist: Distribution summary to read the intervals from
+        :return: JSON object of percentile to [lower, upper] or null, or an
+            empty string when no intervals were estimated
+        """
+        if dist.percentile_cis is None:
+            return ""
+
+        return json.dumps(
+            {
+                name: None if bounds is None else [bounds["lower"], bounds["upper"]]
+                for name, bounds in dist.percentile_cis.model_dump().items()
+            },
+            separators=(",", ":"),
+        )
 
     @staticmethod
     def _align_columns(
@@ -317,7 +413,7 @@ class GenerativeBenchmarkerCSV(GenerativeBenchmarkerOutput):
         self._add_field(headers, values, "Benchmark", "Type", benchmark.type_)
         self._add_field(headers, values, "Benchmark", "ID", benchmark.config.id_)
         self._add_field(
-            headers, values, "Benchmark", "Strategy", benchmark.config.strategy.type_
+            headers, values, "Benchmark", "Strategy", str(benchmark.config.strategy)
         )
         self._add_field(
             headers,
@@ -414,6 +510,22 @@ class GenerativeBenchmarkerCSV(GenerativeBenchmarkerOutput):
                 "Dispatch Delay",
                 "Sec",
             )
+        if benchmark.metrics.turn_predecessor_delay is not None:
+            self._add_stats_for_metric(
+                headers,
+                values,
+                benchmark.metrics.turn_predecessor_delay,
+                "Turn Predecessor Delay",
+                "Sec",
+            )
+        if benchmark.metrics.turn_scheduling_delay is not None:
+            self._add_stats_for_metric(
+                headers,
+                values,
+                benchmark.metrics.turn_scheduling_delay,
+                "Turn Scheduling Delay",
+                "Sec",
+            )
         if benchmark.metrics.request_scheduled_latency is not None:
             self._add_stats_for_metric(
                 headers,
@@ -499,6 +611,22 @@ class GenerativeBenchmarkerCSV(GenerativeBenchmarkerOutput):
             "Server Throughput",
             "Concurrency",
         )
+        # Emitted whenever objectives were configured, so a workload that
+        # cannot evaluate them still reports attainment as empty rather than
+        # dropping the columns and reading as though none were set. Every
+        # benchmark in a run shares one objective set, so the columns stay
+        # aligned across rows.
+        if benchmark.config.slo is not None:
+            # Written directly rather than through _add_stats_for_metric,
+            # which drops any status whose total is 0.0. A run that conforms to
+            # nothing would otherwise lose these columns from the CSV while the
+            # console and JSON still report 0.0.
+            goodput = benchmark.metrics.request_goodput
+            headers.append(["Server Throughput", "Successful Goodput/Sec", "mean"])
+            values.append("" if goodput is None else goodput.successful.mean)
+            headers.append(["Server Throughput", "SLO Attainment", ""])
+            attainment = benchmark.metrics.slo_attainment
+            values.append("" if attainment is None else attainment)
         self._add_stats_for_metric(
             headers,
             values,
@@ -559,12 +687,12 @@ class GenerativeBenchmarkerCSV(GenerativeBenchmarkerOutput):
     def _add_modality_metrics(
         self,
         benchmark: GenerativeBenchmark,
-        modality: Literal["text", "image", "video", "audio"],
+        modality: str,
         headers: list[list[str]],
         values: list[str | int | float],
     ) -> None:
         """
-        Add modality-specific metrics for text, image, video, or audio data.
+        Add modality-specific metrics for text, image, video, audio, or tool calls.
 
         :param benchmark: Benchmark data to extract modality metrics from
         :param modality: Type of modality to extract metrics for
@@ -591,7 +719,7 @@ class GenerativeBenchmarkerCSV(GenerativeBenchmarkerOutput):
                     headers,
                     values,
                     dist_summary,
-                    f"{modality.capitalize()} {display_name}",
+                    f"{modality.replace('_', ' ').title()} {display_name}",
                     io_type.capitalize(),
                 )
 
@@ -742,6 +870,14 @@ class GenerativeBenchmarkerCSV(GenerativeBenchmarkerOutput):
             self._add_field(
                 headers, values, "Scheduler Metrics", field_name, timing, "Sec"
             )
+
+        self._add_stats_for_metric(
+            headers,
+            values,
+            metrics.generation_delay,
+            "Generation Delay",
+            "Sec",
+        )
 
     def _add_stats_for_metric(
         self,

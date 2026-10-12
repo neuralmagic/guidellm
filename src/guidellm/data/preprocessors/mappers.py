@@ -51,6 +51,10 @@ class GenerativeColumnMapper(DataDependentPreprocessor):
             "turn",
             "text",
         ],
+        "raw_messages_column": [
+            "messages",
+            "chat_messages",
+        ],
         "image_column": [
             "image",
             "picture",
@@ -84,8 +88,12 @@ class GenerativeColumnMapper(DataDependentPreprocessor):
             "tool_result",
             "tool_output",
         ],
+        "tool_choice_column": [
+            "tool_choice",
+        ],
         "relative_timestamp_column": ["relative_timestamp"],
         "requeue_delay_column": ["requeue_delay"],
+        "request_duration_column": ["duration", "request_duration"],
         "conversation_turns_column": ["conversation_turns"],
     }
     column_name_pattern: str = (

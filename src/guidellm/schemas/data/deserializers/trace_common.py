@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from pathlib import Path
-
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from guidellm.schemas.data.entrypoints import DataArgs
+from guidellm.utils.dict import deep_update
 
 __all__ = ["TraceDataArgs"]
 
@@ -16,7 +15,9 @@ class TraceDataArgs(DataArgs):
     kind: str = Field(
         description="Type identifier for the trace dataset deserializer.",
     )
-    path: Path = Field(description="Path to the trace file.")
+    source: DataArgs = Field(
+        description="Source dataset to read trace data from.",
+    )
     timestamp_column: str = Field(
         default="timestamp",
         description="Column name for timestamps in the trace file.",
@@ -28,6 +29,15 @@ class TraceDataArgs(DataArgs):
     output_tokens_column: str = Field(
         default="output_length",
         description="Column name for output token counts in the trace file.",
+    )
+    duration_column: str = Field(
+        default="duration",
+        description=(
+            "Optional column for how long each request ran, in seconds. "
+            "schedule_turn=idle_gap keeps the idle gap after this duration. "
+            "When the column is absent, idle_gap treats each request "
+            "as instantaneous."
+        ),
     )
     conversation_id_column: str | None = Field(
         default=None,
@@ -73,3 +83,31 @@ class TraceDataArgs(DataArgs):
             "values below 1.0 compress them."
         ),
     )
+    copies: int = Field(
+        default=1,
+        ge=1,
+        description=(
+            "Number of sequential full-dataset replays. Pass k+1 starts when "
+            "pass k's last request is scheduled. Use wait/pack options to "
+            "raise parallelism first; raise copies when the packed pass is "
+            "too short for the benchmark. Hash-id formats use a separately "
+            "salted global token-block table per pass."
+        ),
+    )
+    copy_offset: float = Field(
+        default=1.0,
+        ge=0,
+        description=(
+            "Where the next copy starts relative to the prior copy's wait-capped "
+            "span. 0 is the prior start, 1 is the prior end, values between "
+            "interpolate, and values above 1 add a gap."
+        ),
+    )
+
+    @model_validator(mode="after")
+    def merge_kwargs(self):
+        """Merge load_kwargs from this object into the source DataArgs."""
+        if self.load_kwargs:
+            deep_update(self.source.load_kwargs, self.load_kwargs)
+
+        return self

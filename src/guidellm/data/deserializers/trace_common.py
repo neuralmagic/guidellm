@@ -6,10 +6,9 @@ requested input_length for replay benchmarks."""
 
 from __future__ import annotations
 
-import dataclasses
 import json
-from collections.abc import Callable, Iterable
-from pathlib import Path
+import math
+from collections.abc import Callable, Iterable, Sequence
 from typing import Any, Protocol
 
 import numpy as np
@@ -29,25 +28,31 @@ from guidellm.data.deserializers.deserializer import (
     DatasetDeserializer,
     DatasetDeserializerFactory,
 )
-from guidellm.data.deserializers.trace_session_timing import TraceSessionTiming
+from guidellm.data.deserializers.trace_session_timing import (
+    TraceSessionTiming,
+    graph_max_timestamp,
+    graph_min_timestamp,
+    shift_graph_timestamps,
+)
+from guidellm.data.schemas import InvalidRowError
 from guidellm.data.schemas.conversation_graph_data import (
     ConversationGraphData,
     ConversationParentRef,
     ConversationTurnData,
 )
+from guidellm.logger import logger
 from guidellm.schemas.data.deserializers import TraceDataArgs
-from guidellm.utils.hf_datasets import load_dataset_from_file
-from guidellm.utils.json_unwrap import try_json_load
 from guidellm.utils.registry import RegistryMixin
 
 __all__ = [
-    "MissingColumnsLocation",
     "TraceDatasetDeserializer",
     "TraceFormatBase",
     "TraceFormatRegistry",
     "create_distinct_token_block",
     "create_prompt_from_hash_ids",
     "decode_prompt",
+    "duration_columns",
+    "fill_hash_id_table",
     "generate_token_ids",
     "get_missing_columns",
 ]
@@ -91,6 +96,20 @@ def get_missing_columns(
     return [c for c in required_columns if c not in actual_columns]
 
 
+def duration_columns(row: dict, config: TraceDataArgs) -> dict[str, list[float]]:
+    """Map an optional duration column onto request scheduling columns.
+
+    :param row: Trace row that may contain ``config.duration_column``.
+    :param config: Trace format arguments naming that column.
+    :return: ``{"request_duration_column": [seconds]}`` when the column is
+        present and non-null, otherwise an empty dict.
+    """
+    column = config.duration_column
+    if column not in row or row[column] is None:
+        return {}
+    return {"request_duration_column": [float(row[column])]}
+
+
 def create_prompt_from_hash_ids(
     hash_ids: list[int],
     hash_id_table: dict[int, tuple[int, ...]],
@@ -125,16 +144,73 @@ def create_distinct_token_block(
     )
 
 
+def fill_hash_id_table(
+    ids: Sequence[int],
+    hash_id_table: dict[int, tuple[int, ...]],
+    sibling_token_blocks: dict[Any, set[tuple[int, ...]]],
+    processor: PreTrainedTokenizerBase,
+    faker: Faker,
+    tokens_for_hash_id: Callable[[int, int], int],
+) -> None:
+    """Ensure each id has a distinct sibling-aware token block in ``hash_id_table``.
+
+    Unseen hash IDs are allocated with :func:`create_distinct_token_block` so
+    siblings under the same previous id receive different token blocks.
+    Existing entries are left unchanged.
+
+    :param ids: Ordered hash IDs for one prompt.
+    :param hash_id_table: Mapping of hash ID to token block. Mutated in place.
+    :param sibling_token_blocks: Token blocks already used per previous hash ID.
+        Mutated in place.
+    :param processor: Tokenizer used to generate synthetic token blocks.
+    :param faker: Random text source for synthetic tokens.
+    :param tokens_for_hash_id: ``(idx, hash_id) -> block size`` for unseen IDs.
+    """
+    for idx, hash_id in enumerate(ids):
+        if hash_id not in hash_id_table:
+            prev_id = None if idx == 0 else ids[idx - 1]
+            sibling_token_blocks.setdefault(prev_id, set())
+            block = create_distinct_token_block(
+                tokens_for_hash_id(idx, hash_id),
+                sibling_token_blocks[prev_id],
+                processor,
+                faker,
+            )
+            hash_id_table[hash_id] = block
+            sibling_token_blocks[prev_id].add(block)
+
+
+def _seeded_faker(random_seed: int, copy_index: int) -> Faker:
+    """Build a Faker instance for sequential dataset copy ``copy_index``."""
+    faker = Faker()
+    faker.seed_instance(random_seed + copy_index * 1_000_003)
+    return faker
+
+
 class TraceFormatBase(Protocol):
     config: TraceDataArgs
+    dataset: Dataset
 
     def __init__(self, config, dataset: Dataset) -> None: ...
+
+    def has_duration_column(self) -> bool:
+        """
+        Return whether this trace includes the configured duration column.
+
+        The default checks top-level dataset columns. Nested formats override
+        this to look at the row shape they actually read. Called once at load.
+
+        :return: True when ``config.duration_column`` is present
+        """
+        return self.config.duration_column in self.dataset.column_names
 
     def __iter__(self) -> Iterable[Dataset]:
         """Returns the next conversation as a `Dataset`."""
 
     def reset(self) -> None:
         pass
+
+    def reset_hash_tables(self) -> None: ...
 
     def required_columns(self) -> Features: ...
 
@@ -143,22 +219,7 @@ class TraceFormatBase(Protocol):
         and are located in the expected place."""
 
     def validate_row(self, row: dict) -> None:
-        """Called during initialization, immediately after doing
-        format-agnostic validation."""
-
-    def validate_conversation(self, conversation: Dataset) -> None:
-        """Validate one conversation yielded by ``__iter__``.
-
-        The default treats every row as an API request with timestamp and
-        token-count columns. Formats with mixed row types (for example WEKA
-        subagent groups) should override this.
-        """
-        _validate_api_conversation(
-            conversation,
-            self.config,
-            self.required_columns(),
-            self.validate_row,
-        )
+        """Called during iteration via ``_validate_api_row``."""
 
     def create_prompt(
         self, row: dict, processor: PreTrainedTokenizerBase, faker: Faker
@@ -187,6 +248,7 @@ class TraceFormatBase(Protocol):
                     ConversationParentRef(parent_node_id=f"main_{turn_idx - 1}")
                 )
 
+            _validate_api_row(turn, self.config, self.validate_row)
             prompt = self.create_prompt(turn, processor, faker)
             relative_timestamp = turn[self.config.timestamp_column] - start_ts
             columns = {
@@ -194,6 +256,7 @@ class TraceFormatBase(Protocol):
                 "prompt_tokens_count_column": [turn[self.config.prompt_tokens_column]],
                 "output_tokens_count_column": [turn[self.config.output_tokens_column]],
                 "relative_timestamp_column": [relative_timestamp],
+                **duration_columns(turn, self.config),
             }
             turns.append(
                 ConversationTurnData(
@@ -204,6 +267,41 @@ class TraceFormatBase(Protocol):
                 )
             )
         return ConversationGraphData(turns=turns)
+
+
+class SingleTurnTraceFormat(TraceFormatBase):
+    """Replay each trace row as an independent conversation on a shared timeline."""
+
+    dataset: Dataset
+    _trace_start_timestamp: float
+
+    def __iter__(self) -> Iterable[Dataset]:
+        """Yield one timestamp-sorted row at a time for lazy prompt generation."""
+        ordered = self.dataset.sort(self.config.timestamp_column)
+        if not len(ordered):
+            return
+        self._trace_start_timestamp = ordered[0][self.config.timestamp_column]
+        for index in range(len(ordered)):
+            yield ordered.select([index])
+
+    def build_conversation_graph(
+        self,
+        conversation: Dataset,
+        processor: PreTrainedTokenizerBase,
+        faker: Faker,
+    ) -> ConversationGraphData:
+        """Build a single root turn with its offset from the start of the trace.
+
+        :param conversation: One trace row returned by iteration
+        :param processor: Tokenizer for generating the synthetic prompt
+        :param faker: Seeded synthetic text generator
+        :return: An independent conversation preserving its trace arrival time
+        """
+        graph = super().build_conversation_graph(conversation, processor, faker)
+        graph.turns[0].columns["relative_timestamp_column"] = [
+            conversation[0][self.config.timestamp_column] - self._trace_start_timestamp
+        ]
+        return graph
 
 
 class TraceFormatRegistry(RegistryMixin[type[TraceFormatBase]]):
@@ -232,36 +330,55 @@ class TraceExamplesIterable(_BaseExamplesIterable):
         self.config = config
         self.format = trace_format
         self.processor = processor
-        self.faker = Faker()
-        self.faker.seed_instance(random_seed)
+        self._copy_fakers = [
+            _seeded_faker(random_seed, copy_index)
+            for copy_index in range(config.copies)
+        ]
         self.iteration_count = 0
 
     def __iter__(self) -> Iterable[tuple[int, dict[str, Any]]]:
         self.iteration_count += 1
         samples_count = 0
-        # Fresh instance per iteration so packing state does not leak across epochs.
-        timing = TraceSessionTiming(
-            max_wait=self.config.max_wait,
-            max_session_wait=self.config.max_session_wait,
+        pass_offset = 0.0
+        # Shared across copies so packing sees the combined timeline.
+        packer = TraceSessionTiming(
             min_concurrent_sessions=self.config.min_concurrent_sessions,
-            time_scale=self.config.time_scale,
         )
-        for conv in self.format:  # type: ignore[attr-defined]
-            graph_data = self.format.build_conversation_graph(
-                conv, self.processor, self.faker
+        scaler = TraceSessionTiming(time_scale=self.config.time_scale)
+        for copy_index in range(self.config.copies):
+            self.format.reset_hash_tables()
+            faker_copy = self._copy_fakers[copy_index]
+            wait_timing = TraceSessionTiming(
+                max_wait=self.config.max_wait,
+                max_session_wait=self.config.max_session_wait,
             )
-            timing.apply(graph_data)
-            samples_count += len(graph_data.turns)
-            payload = json.dumps(graph_data.model_dump(mode="json"))
-            yield (
-                samples_count,
-                {
-                    "conversation_turns": (
-                        payload.decode() if isinstance(payload, bytes) else payload
-                    )
-                },
-            )
-            self.format.reset()
+            copy_min = math.inf
+            copy_max = -math.inf
+            for conv in self.format:  # type: ignore[attr-defined]
+                graph_data = self.format.build_conversation_graph(
+                    conv, self.processor, faker_copy
+                )
+                if not graph_data.turns:
+                    continue
+                wait_timing.apply_wait_caps(graph_data)
+                shift_graph_timestamps(graph_data, pass_offset)
+                copy_min = min(copy_min, graph_min_timestamp(graph_data))
+                copy_max = max(copy_max, graph_max_timestamp(graph_data))
+                packer.apply_pack(graph_data)
+                scaler.apply_scale(graph_data)
+                samples_count += len(graph_data.turns)
+                payload = json.dumps(graph_data.model_dump(mode="json"))
+                yield (
+                    samples_count,
+                    {
+                        "conversation_turns": (
+                            payload.decode() if isinstance(payload, bytes) else payload
+                        )
+                    },
+                )
+                self.format.reset()
+            if math.isfinite(copy_min):
+                pass_offset = copy_min + self.config.copy_offset * (copy_max - copy_min)
 
     @property
     def is_typed(self) -> bool:
@@ -326,78 +443,24 @@ class TraceDataset(IterableDataset):
             self._ex_iterable.iteration_count = epoch
 
 
-@dataclasses.dataclass
-class MissingColumnsLocation:
-    conversation_location: list[int]
-    columns: list[str]
-
-
-def _validate_path(path: Path) -> None:
-    if not path.exists():
-        raise DataNotSupportedError(f"Trace file not found: {path}")
-    if not path.is_file():
-        raise DataNotSupportedError(f"Trace path is not a file: {path}")
-    if path.stat().st_size == 0:
-        raise DataNotSupportedError(f"Trace file is empty: {path}")
-
-
-def _validate_api_conversation(
-    conversation: Dataset,
+def _validate_api_row(
+    row: dict,
     config: TraceDataArgs,
-    extra_features: Features,
     validate_row: Callable[[dict], None],
 ) -> None:
-    """Null-check and cast required API columns, then run per-row validators.
-
-    Extra columns are ignored. ``extra_features`` are format-specific required
-    fields such as hash IDs. Conversation id is dropped; it lives on the outer
-    record, not on API rows.
-    """
-    features = Features(
-        {
-            config.timestamp_column: Value("float"),
-            config.prompt_tokens_column: Value("int32"),
-            config.output_tokens_column: Value("int32"),
-            **dict(extra_features),
-        }
-    )
-    if config.conversation_id_column in features:
-        features.pop(config.conversation_id_column)
-    _raise_if_nonetype_found(conversation, features)
-    _raise_if_incorrect_types(conversation, features)
-    for row in conversation:
-        _validate_row(row, config)
-        validate_row(row)
+    """Validate one API request row during iteration."""
+    _validate_row(row, config)
+    validate_row(row)
 
 
 def _validate_row(row: dict, config: TraceDataArgs) -> None:
     n_in = row[config.prompt_tokens_column]
     n_out = row[config.output_tokens_column]
     if n_in < 0 or n_out < 0:
-        raise DataNotSupportedError(
+        raise InvalidRowError(
             f"Trace token counts must be non-negative, got "
             f"input_length={n_in}, output_length={n_out}"
         )
-
-
-def _raise_if_nonetype_found(dataset: Dataset, features: Features) -> None:
-    for col in features:
-        if dataset.data[col].null_count != 0:
-            raise DataNotSupportedError(f"Missing column values in {col}")
-
-
-def _raise_if_incorrect_types(dataset: Dataset, features: Features) -> None:
-    try:
-        dataset.select_columns(list(features)).cast(features)
-    except (TypeError, ValueError) as e:
-        raise DataNotSupportedError(str(e)) from e
-
-
-def _validate_dataset(trace_format: TraceFormatBase) -> None:
-    for conv in trace_format:  # type: ignore[attr-defined]
-        if len(conv) == 0:
-            raise DataNotSupportedError("Trace conversation is empty")
-        trace_format.validate_conversation(conv)
 
 
 def _handle_column_search(config: TraceDataArgs, trace_format: TraceFormatBase) -> None:
@@ -412,33 +475,12 @@ def _handle_column_search(config: TraceDataArgs, trace_format: TraceFormatBase) 
     missing = trace_format.find_required_columns(list(features.keys()))
     if missing:
         raise DataNotSupportedError(f"Trace missing required columns: {missing}")
-
-
-def _load_all_json_strings(data: list | dict) -> list | dict:
-    iterable = enumerate(data) if isinstance(data, list) else data.items()
-    for k, v in iterable:
-        if isinstance(v, str):
-            res = try_json_load(v)
-            if isinstance(res, (list, dict)):
-                data[k] = res
-        if isinstance(v, (list, dict)):
-            data[k] = _load_all_json_strings(data[k])
-    return data
-
-
-def _deserialize_nested_data(batch: dict[str, list]) -> dict[str, list]:
-    """Intended to be used with `datasets.Dataset.map()`."""
-    sample = {k: v[0] for k, v in batch.items()}
-    for col, val in sample.items():
-        if isinstance(val, str) and isinstance(try_json_load(val), (list, dict)):
-            batch[col] = list(map(try_json_load, batch[col]))
-        if isinstance(val, dict) or (
-            isinstance(val, list)
-            and len(val) > 0
-            and isinstance(val[0], (str, list, dict))
-        ):
-            batch[col] = list(map(_load_all_json_strings, batch[col]))
-    return batch
+    if not trace_format.has_duration_column():
+        logger.warning(
+            "Trace duration column '{}' is missing; schedule_turn=idle_gap "
+            "will treat each request as instantaneous.",
+            trace_format.config.duration_column,
+        )
 
 
 @DatasetDeserializerFactory.register(["trace_synthetic"])
@@ -451,15 +493,18 @@ class TraceDatasetDeserializer(DatasetDeserializer):
         processor_factory: Callable[[], PreTrainedTokenizerBase],
         random_seed: int = 42,
     ) -> IterableDataset:
-        _validate_path(config.path)
         try:
-            dataset = load_dataset_from_file(config.path, **config.load_kwargs)
+            dataset = DatasetDeserializerFactory.deserialize(
+                config=config.source,
+                processor_factory=processor_factory,
+                random_seed=random_seed,
+            )
         except ValueError as e:
             raise DataNotSupportedError(str(e)) from e
         if not dataset:
-            raise DataNotSupportedError(f"Trace file has no valid rows: {config.path}")
-        dataset = dataset.map(_deserialize_nested_data, batched=True)
+            raise DataNotSupportedError(
+                f"Trace file has no valid rows: {config.source}"
+            )
         trace_format = TraceFormatRegistry.dispatch(config, dataset)
         _handle_column_search(config, trace_format)
-        _validate_dataset(trace_format)
         return TraceDataset(config, trace_format, processor_factory(), random_seed)

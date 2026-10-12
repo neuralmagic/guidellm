@@ -14,6 +14,7 @@ import time
 from collections import deque
 from collections.abc import Iterable
 from dataclasses import dataclass
+from functools import cached_property
 from typing import Generic, TypeVar
 
 from guidellm.scheduler.schemas import (
@@ -188,7 +189,8 @@ class DAGExecutionState(Generic[_RequestT, _ResponseT]):
         self._in_progress.discard(node_id)
 
         delay = self._graph.nodes[node_id].settings.requeue_delay or 0.0
-        unlock_at = time.time() + delay
+        parent_completed_at = time.time()
+        unlock_at = parent_completed_at + delay
 
         newly_ready: list[str] = []
         for edge in self._outgoing_edges[node_id]:
@@ -199,6 +201,11 @@ class DAGExecutionState(Generic[_RequestT, _ResponseT]):
                 and child_id not in self._completed
             ):
                 # Think time starts only once all parents are done.
+                # predecessor_completed excludes that think time so dispatch
+                # delay can separate a slow parent from scheduler lag.
+                child_info = self.request_infos.get(child_id)
+                if child_info is not None:
+                    child_info.timings.predecessor_completed = parent_completed_at
                 self._available_after[child_id] = unlock_at
                 newly_ready.append(child_id)
 
@@ -292,6 +299,18 @@ class DAGExecutionState(Generic[_RequestT, _ResponseT]):
             return result
 
         return _depth(node_id)
+
+    @cached_property
+    def preceding_nodes(self) -> dict[str, int]:
+        """
+        Map each node ID to its index in topological order.
+
+        Independent of ``history_context``; reflects DAG structure only.
+        Index 0 is the first node in topological order.
+
+        :return: ``{node_id: index}`` for every graph node.
+        """
+        return {node_id: index for index, node_id in enumerate(self.topological_order)}
 
     def _find_full_parent_edge(
         self, incoming: Iterable[ConversationEdge]
@@ -397,9 +416,10 @@ class DAGExecutionState(Generic[_RequestT, _ResponseT]):
         """
         return [nid for nid in self._graph.nodes if nid not in self._completed]
 
+    @cached_property
     def topological_order(self) -> list[str]:
         """
-        Compute topological ordering of graph nodes via BFS (Kahn's algorithm).
+        Topological ordering of graph nodes via BFS (Kahn's algorithm).
 
         :return: List of node IDs in topological order.
         """

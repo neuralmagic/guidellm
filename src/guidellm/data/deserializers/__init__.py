@@ -1,3 +1,5 @@
+from guidellm.data.schemas import InvalidRowError
+
 from .deserializer import (
     DataNotSupportedError,
     DatasetDeserializer,
@@ -32,18 +34,19 @@ from .synthetic_video import (
     SyntheticVideoDatasetDeserializer,
 )
 from .trace_common import (
-    MissingColumnsLocation,
     TraceDatasetDeserializer,
     TraceFormatBase,
     TraceFormatRegistry,
     create_distinct_token_block,
     create_prompt_from_hash_ids,
     decode_prompt,
+    fill_hash_id_table,
     generate_token_ids,
     get_missing_columns,
 )
 from .trace_minimal import MinimalTraceFormat
 from .trace_mooncake import MooncakeTraceFormat
+from .trace_otel import OTELTraceFormat
 from .trace_weka import WEKATraceFormat
 
 __all__ = [
@@ -58,10 +61,11 @@ __all__ = [
     "InMemoryDictDatasetDeserializer",
     "InMemoryDictListDatasetDeserializer",
     "InMemoryItemListDatasetDeserializer",
+    "InvalidRowError",
     "JSONFileDatasetDeserializer",
     "MinimalTraceFormat",
-    "MissingColumnsLocation",
     "MooncakeTraceFormat",
+    "OTELTraceFormat",
     "ParquetFileDatasetDeserializer",
     "SyntheticImageDataset",
     "SyntheticImageDatasetDeserializer",
@@ -78,6 +82,7 @@ __all__ = [
     "create_distinct_token_block",
     "create_prompt_from_hash_ids",
     "decode_prompt",
+    "fill_hash_id_table",
     "generate_token_ids",
     "get_missing_columns",
 ]

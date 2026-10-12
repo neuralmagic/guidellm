@@ -10,7 +10,6 @@ same previous hash ID.
 from __future__ import annotations
 
 import math
-from collections.abc import Iterable
 from typing import Any
 
 from datasets import Dataset, Features, List, Value
@@ -18,17 +17,17 @@ from faker import Faker
 from transformers import PreTrainedTokenizerBase
 
 from guidellm.data.deserializers.deserializer import (
-    DataNotSupportedError,
     DatasetDeserializerFactory,
 )
 from guidellm.data.deserializers.trace_common import (
+    SingleTurnTraceFormat,
     TraceDatasetDeserializer,
-    TraceFormatBase,
     TraceFormatRegistry,
-    create_distinct_token_block,
     create_prompt_from_hash_ids,
+    fill_hash_id_table,
     get_missing_columns,
 )
+from guidellm.data.schemas import InvalidRowError
 from guidellm.schemas.data.deserializers import MooncakeTraceFormatArgs
 
 __all__ = ["MooncakeTraceFormat"]
@@ -50,7 +49,7 @@ DatasetDeserializerFactory.register_decorator(TraceDatasetDeserializer, "mooncak
 
 
 @TraceFormatRegistry.register("mooncake")
-class MooncakeTraceFormat(TraceFormatBase):
+class MooncakeTraceFormat(SingleTurnTraceFormat):
     """Mooncake trace format requires a column for timestamps, prompt token counts,
     ouput token counts and lists of hash IDs.
 
@@ -67,12 +66,13 @@ class MooncakeTraceFormat(TraceFormatBase):
     def __init__(self, config: MooncakeTraceFormatArgs, dataset: Dataset) -> None:
         self.config = config
         self.dataset = dataset
+        self._hash_id_table: dict[int, tuple[int, ...]] = {}
+        self._sibling_table: dict[Any, set[tuple[int, ...]]] = {}
 
-        self.hash_id_table: dict[int, tuple[int, ...]] = {}
-        self.sibling_token_blocks: dict[Any, set[tuple[int, ...]]] = {}
-
-    def __iter__(self) -> Iterable[Dataset]:
-        yield self.dataset.sort(self.config.timestamp_column)
+    def reset_hash_tables(self) -> None:
+        """Replace hash tables so this copy does not reuse earlier tokens."""
+        self._hash_id_table = {}
+        self._sibling_table = {}
 
     def required_columns(self) -> Features:
         return Features({self.config.hash_ids_column: List(Value("int32"))})
@@ -86,11 +86,9 @@ class MooncakeTraceFormat(TraceFormatBase):
         block_size = self.config.hash_id_block_size
         for hash_id in row[self.config.hash_ids_column]:
             if hash_id < 0:
-                raise DataNotSupportedError(
-                    f"Hash ID must be non-negative, got {hash_id}"
-                )
+                raise InvalidRowError(f"Hash ID must be non-negative, got {hash_id}")
         if math.ceil(n_in / block_size) != n_blocks:
-            raise DataNotSupportedError(
+            raise InvalidRowError(
                 f"Input token count of {n_in} split into blocks of size "
                 f"{block_size} does not match given {n_blocks} blocks"
             )
@@ -101,18 +99,14 @@ class MooncakeTraceFormat(TraceFormatBase):
         """Before generating the prompt, this first generates a block of tokens for
         each hash ID that has not already been seen."""
         ids = row[self.config.hash_ids_column]
-        for idx, hash_id in enumerate(ids):
-            if hash_id not in self.hash_id_table:
-                prev_id = None if idx == 0 else ids[idx - 1]
-                num_tokens = _calculate_required_prompt_tokens(
-                    self.config, row, hash_id
-                )
-                self.sibling_token_blocks.setdefault(prev_id, set())
-                self.hash_id_table[hash_id] = create_distinct_token_block(
-                    num_tokens,
-                    self.sibling_token_blocks[prev_id],
-                    processor,
-                    faker,
-                )
-                self.sibling_token_blocks[prev_id].add(self.hash_id_table[hash_id])
-        return create_prompt_from_hash_ids(ids, self.hash_id_table, processor)
+        fill_hash_id_table(
+            ids,
+            self._hash_id_table,
+            self._sibling_table,
+            processor,
+            faker,
+            lambda _idx, hash_id: _calculate_required_prompt_tokens(
+                self.config, row, hash_id
+            ),
+        )
+        return create_prompt_from_hash_ids(ids, self._hash_id_table, processor)

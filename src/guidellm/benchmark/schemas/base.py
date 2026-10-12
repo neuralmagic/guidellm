@@ -29,7 +29,12 @@ from guidellm.schemas import (
     StandardBaseDict,
     StatusDistributionSummary,
 )
+from guidellm.schemas.benchmark.goodput import GoodputSLO
 from guidellm.schemas.benchmark.transient import TransientPhaseConfig
+from guidellm.schemas.benchmark.warnings import (
+    WarningRuleArgs,
+    default_warning_rules,
+)
 
 __all__ = [
     "Benchmark",
@@ -93,6 +98,26 @@ class BenchmarkConfig(StandardBaseDict):
     prefer_response_metrics: bool = Field(
         default=True,
         description="Prioritize response-based metrics over request-based metrics",
+    )
+    slo: GoodputSLO | None = Field(
+        default=None,
+        description=(
+            "Per-request latency objectives defining which requests count "
+            "toward goodput. None disables goodput measurement"
+        ),
+    )
+    confidence: float | None = Field(
+        default=0.95,
+        gt=0.0,
+        lt=1.0,
+        description=(
+            "Two-sided confidence level for the intervals reported alongside "
+            "request-level metrics. None reports those metrics without intervals"
+        ),
+    )
+    warnings: list[WarningRuleArgs] = Field(
+        default_factory=default_warning_rules,
+        description="Post-benchmark warning checks and their thresholds",
     )
     profile: dict[str, Any] = Field(
         description="Profile instance coordinating multi-strategy execution",

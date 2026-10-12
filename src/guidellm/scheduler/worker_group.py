@@ -47,6 +47,7 @@ from guidellm.utils.messaging import (
     InterProcessMessagingPipe,
     InterProcessMessagingQueue,
 )
+from guidellm.utils.pipe_stdout import PipeReaderThread
 from guidellm.utils.synchronous import wait_for_sync_objects
 
 __all__ = ["WorkerGroupState", "WorkerProcessGroup"]
@@ -134,6 +135,9 @@ class WorkerProcessGroup(Generic[RequestT, ResponseT]):
         # Background health monitor, created in create_processes
         self._health_monitor_task: asyncio.Task | None = None
         self._worker_error_details: str | None = None
+
+        # Pipe-based stdout/stderr capture, created in create_processes
+        self._pipe_reader_thread: PipeReaderThread | None = None
 
         # Scheduler and messaging state, created in start
         self.state: WorkerGroupState[RequestT, ResponseT] | None = None
@@ -223,6 +227,10 @@ class WorkerProcessGroup(Generic[RequestT, ResponseT]):
                 poll_interval=settings.mp_poll_interval,
             )
 
+        # Create shared pipes for capturing worker stdout/stderr
+        stdout_reader, stdout_writer = self.mp_context.Pipe(duplex=False)
+        stderr_reader, stderr_writer = self.mp_context.Pipe(duplex=False)
+
         # Initialize worker processes
         self.processes = []
         self.strategy.init_processes_timings(
@@ -252,10 +260,21 @@ class WorkerProcessGroup(Generic[RequestT, ResponseT]):
                 constraint_reached_event=self.constraint_reached_event,
                 shutdown_event=self.shutdown_event,
                 error_event=self.error_event,
+                stdout_conn=stdout_writer,
+                stderr_conn=stderr_writer,
+                parent_logger=logger,
             )
             proc = self.mp_context.Process(target=worker.run, daemon=False)
             proc.start()
             self.processes.append(proc)
+
+        # Close write-ends in parent so EOF fires when last worker exits
+        stdout_writer.close()
+        stderr_writer.close()
+
+        # Start reader thread to route worker output through main sys.stdout/stderr
+        self._pipe_reader_thread = PipeReaderThread(stdout_reader, stderr_reader)
+        self._pipe_reader_thread.start()
 
         self._health_monitor_task = asyncio.create_task(self._process_health_monitor())
 
@@ -460,6 +479,11 @@ class WorkerProcessGroup(Generic[RequestT, ResponseT]):
             )
             exceptions.extend(err for err in join_errors if err is not None)
         self.processes = None
+
+        if self._pipe_reader_thread is not None:
+            self._pipe_reader_thread.stop()
+            self._pipe_reader_thread = None
+
         self.startup_barrier = None
         self.requests_generated_event = None
         self.constraint_reached_event = None
@@ -600,15 +624,23 @@ class WorkerGroupState(Generic[RequestT, ResponseT]):
         constraints to determine when to stop request generation.
 
         :param requests: Finite iterable of requests to process sequentially
-        :return: Generator yielding (request, request_info) tuples
+        :return: Generator yielding conversation graphs for worker processing
         """
 
         try:
             count = 0
             stop_queueing: bool = False
+            yield_attempted = time.monotonic()
 
             for graph in requests:
-                topo_dag_nodes = DAGExecutionState(graph).topological_order()
+                # NOTE: This must be at the start of the loop
+                generation_delay = time.monotonic() - yield_attempted
+                self.update_state(generation_delay=generation_delay)
+
+                dag_state: DAGExecutionState[RequestT, ResponseT] = DAGExecutionState(
+                    graph
+                )
+                topo_dag_nodes = dag_state.topological_order
                 incoming_map: dict[str, list[str]] = {nid: [] for nid in graph.nodes}
                 for edge in graph.edges:
                     incoming_map[edge.target_node_id].append(edge.source_node_id)
@@ -624,6 +656,7 @@ class WorkerGroupState(Generic[RequestT, ResponseT]):
                         node_id=node_id,
                         agent_id=node.agent_id,
                         parent_node_ids=incoming_map[node_id],
+                        preceding_nodes=dag_state.preceding_nodes[node_id],
                         status="queued",
                         scheduler_process_id=0,
                         scheduler_start_time=self.start_time,
@@ -656,6 +689,9 @@ class WorkerGroupState(Generic[RequestT, ResponseT]):
                 if stop_queueing:
                     self.stop_send_requests_event.set()
                     return
+
+                # NOTE: This must be at the end of the loop
+                yield_attempted = time.monotonic()
 
             self.update_state(
                 add_constraints={
@@ -739,6 +775,7 @@ class WorkerGroupState(Generic[RequestT, ResponseT]):
         self,
         info: RequestInfo | None = None,
         add_constraints: dict[str, Constraint] | None = None,
+        generation_delay: float | None = None,
     ) -> _StateUpdate:
         """Update scheduler state and re-evaluate constraints.
 
@@ -748,6 +785,8 @@ class WorkerGroupState(Generic[RequestT, ResponseT]):
 
         :param info: Request that changed, or ``None`` for a state-only recheck
         :param add_constraints: Constraints to register before evaluation
+        :param generation_delay: Conversation-level request-generator delay to
+            record once per conversation, or ``None`` to skip
         :return: Copied scheduler state and stop flags
         """
         with self._update_lock:
@@ -757,6 +796,8 @@ class WorkerGroupState(Generic[RequestT, ResponseT]):
             self._state.end_time = time.time()  # Always update in case last update
             if info is not None:
                 self._update_state_request_counts(info)
+            if generation_delay is not None:
+                self._state.generation_delay_samples.append(generation_delay)
 
             self._update_with_constraints(info)
 

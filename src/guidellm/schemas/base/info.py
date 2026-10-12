@@ -33,6 +33,13 @@ class RequestTimings(StandardBaseDict):
         default=None,
         description="Unix timestamp when request was initially targeted for execution",
     )
+    predecessor_completed: float | None = Field(
+        default=None,
+        description=(
+            "Unix timestamp when the last predecessor finished, excluding think "
+            "time. None when the request has no predecessor."
+        ),
+    )
     queued: float | None = Field(
         default=None,
         description="Unix timestamp when request was placed into processing queue",
@@ -169,6 +176,17 @@ class RequestSettings(StandardBaseDict):
             "lower bound on the delay, subject to scheduling."
         ),
     )
+    trace_duration: float | None = Field(
+        default=None,
+        ge=0,
+        description=(
+            "Recorded request duration in seconds from the trace, in the same "
+            "units as relative_timestamp after dataset time scaling. None when "
+            "the trace has no duration column. schedule_turn=idle_gap uses this "
+            "to keep the idle gap before the next request; a missing value is "
+            "treated as instantaneous."
+        ),
+    )
 
 
 class RequestInfo(StandardBaseModel):
@@ -214,6 +232,13 @@ class RequestInfo(StandardBaseModel):
             "resets on ``new`` edges, increments through ``full`` edges, "
             "and treats each ``last`` edge as adding up to 1 without "
             "recursion. Multiple parents take the maximum."
+        ),
+    )
+    preceding_nodes: int = Field(
+        default=0,
+        description=(
+            "Count of graph nodes that precede this node in topological "
+            "execution order (0-based). Independent of history_context."
         ),
     )
     node_id: str | None = Field(

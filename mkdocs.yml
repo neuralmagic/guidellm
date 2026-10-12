@@ -3,6 +3,9 @@ site_description: Documentation for GuideLLM focused on evaluating the deployabi
 site_url: https://vllm-project.github.io/guidellm
 repo_url: https://github.com/vllm-project/guidellm
 edit_uri: https://github.com/vllm-project/guidellm/tree/main/docs
+exclude_docs: |
+  en/**/*.md
+  zh/title_map.json
 
 theme:
   name: material
@@ -103,8 +106,18 @@ plugins:
   - social
   - tags
 
+hooks:
+  - docs/scripts/localized_nav.py
+
 extra:
   generator: false
+  alternate:
+    - name: English
+      link: /guidellm/
+      lang: en
+    - name: 简体中文
+      link: /guidellm/zh/
+      lang: zh
   version:
     provider: mike
     alias: true
@@ -116,5 +129,7 @@ extra_css:
   - stylesheets/style.css
 
 extra_javascript:
+  - scripts/translation-map.js
+  - scripts/language-switcher.js
   - scripts/mathjax.js
   - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js

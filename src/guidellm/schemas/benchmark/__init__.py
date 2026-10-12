@@ -12,6 +12,7 @@ from guidellm.schemas.benchmark.entrypoints import (
     default_kind,
     default_kind_list,
 )
+from guidellm.schemas.benchmark.goodput import GoodputSLO
 from guidellm.schemas.benchmark.outputs import (
     BenchmarkOutputArgs,
     ConsoleBenchmarkOutputArgs,
@@ -24,6 +25,8 @@ from guidellm.schemas.benchmark.outputs import (
 from guidellm.schemas.benchmark.profiles import (
     AsyncProfileArgs,
     ConcurrentProfileArgs,
+    GoodputProfileArgs,
+    KneeProfileArgs,
     ProfileArgs,
     ReplayProfileArgs,
     SweepProfileArgs,
@@ -33,6 +36,11 @@ from guidellm.schemas.benchmark.profiles import (
 from guidellm.schemas.benchmark.random import RandomArgs, StaticRandomArgs
 from guidellm.schemas.benchmark.scenarios import SCENARIO_DIR, get_builtin_scenarios
 from guidellm.schemas.benchmark.transient import TransientPhaseConfig
+from guidellm.schemas.benchmark.warnings import (
+    MetricRef,
+    WarningCondition,
+    WarningRuleArgs,
+)
 
 __all__ = [
     "SCENARIO_DIR",
@@ -45,8 +53,12 @@ __all__ = [
     "ConcurrentProfileArgs",
     "ConsoleBenchmarkOutputArgs",
     "GenerativeMetricsArgs",
+    "GoodputProfileArgs",
+    "GoodputSLO",
     "HTMLBenchmarkOutputArgs",
     "JSONBenchmarkOutputArgs",
+    "KneeProfileArgs",
+    "MetricRef",
     "MetricsArgs",
     "PlotBenchmarkOutputArgs",
     "ProfileArgs",
@@ -57,6 +69,8 @@ __all__ = [
     "SynchronousProfileArgs",
     "ThroughputProfileArgs",
     "TransientPhaseConfig",
+    "WarningCondition",
+    "WarningRuleArgs",
     "YAMLBenchmarkOutputArgs",
     "args_model_config",
     "default_kind",

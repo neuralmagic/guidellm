@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import time
+from functools import wraps
 from pathlib import Path
 from typing import Any
 from unittest.mock import Mock
@@ -28,7 +29,6 @@ from guidellm.scheduler import (
 )
 from guidellm.scheduler.schemas import (
     ConversationGraph,
-    ConversationNode,
     HistoryContext,
 )
 from guidellm.scheduler.schemas.conversation_graph import (
@@ -37,6 +37,7 @@ from guidellm.scheduler.schemas.conversation_graph import (
 )
 from guidellm.schemas import GenerationRequest, RequestSettings
 from guidellm.schemas.data import (
+    FileDataArgs,
     GenerativeColumnMapperArgs,
     GenerativeRequestFinalizerArgs,
     MinimalTraceFormatArgs,
@@ -45,13 +46,38 @@ from guidellm.schemas.scheduler import (
     MaxDurationConstraintArgs,
     MaxRequestsConstraintArgs,
 )
-from tests.unit.testing_utils import async_timeout
 
 TIME_SCALE = 2.0
 RESOLVE_DELAY = 0.03
 # Sorted trace: earliest ts=2 -> 0.0, ts=5 -> 3.0, ts=8 -> 6.0 (duplicates below)
 EXPECTED_RELATIVE = [0.0, 0.0, 0.0, 0.1, 0.1, 1.5, 2.0, 2.0, 3.5, 7.0]
 NUM_REQUESTS = len(EXPECTED_RELATIVE)
+
+
+def async_timeout(delay: float):
+    """Decorator to add timeout to async test functions."""
+
+    def decorator(func):
+        @wraps(func)
+        async def new_func(*args, **kwargs):
+            return await asyncio.wait_for(func(*args, **kwargs), timeout=delay)
+
+        return new_func
+
+    return decorator
+
+
+def _trace_file_source(trace_path: Path) -> FileDataArgs:
+    suffix = trace_path.suffix.lower()
+    if suffix in {".json", ".jsonl"}:
+        kind = "json_file"
+    elif suffix == ".csv":
+        kind = "csv_file"
+    elif suffix == ".parquet":
+        kind = "parquet_file"
+    else:
+        kind = "json_file"
+    return FileDataArgs(kind=kind, path=trace_path)
 
 
 def _mock_processor() -> Mock:
@@ -75,7 +101,10 @@ def _requests_from_trace(
 ) -> tuple[list[ConversationGraph[GenerationRequest]], list[float]]:
     deserializer = TraceDatasetDeserializer()
     dataset = deserializer(
-        config=MinimalTraceFormatArgs(path=trace_path, time_scale=time_scale),
+        config=MinimalTraceFormatArgs(
+            source=_trace_file_source(trace_path),
+            time_scale=time_scale,
+        ),
         processor_factory=_mock_processor,
         random_seed=42,
     )
@@ -85,32 +114,19 @@ def _requests_from_trace(
     finalizer = GenerativeRequestFinalizer(GenerativeRequestFinalizerArgs())
 
     relative_timestamps: list[float] = []
-    conv = next(iter(dataset))
-    mapped = mapper([{"dataset": conv}])
-    graph = finalizer(mapped)
-    assert isinstance(graph, GenerativeConversationGraph)
-    assert len(graph.nodes) == 10
-
     graphs: list[ConversationGraph[GenerationRequest]] = []
-    for idx, node in enumerate(graph.nodes.values()):
+    for idx, conversation in enumerate(dataset):
+        mapped = mapper([{"dataset": conversation}])
+        graph = finalizer(mapped)
+        assert isinstance(graph, GenerativeConversationGraph)
+        assert len(graph.nodes) == 1
+        assert not graph.edges
+        node = next(iter(graph.nodes.values()))
         node.request.request_id = f"req_{idx}"
         offset = node.settings.relative_timestamp
         assert offset is not None
         relative_timestamps.append(offset)
-        graphs.append(
-            ConversationGraph(
-                graph_id=f"graph_req_{idx}",
-                nodes={
-                    node.node_id: ConversationNode(
-                        node_id=node.node_id,
-                        agent_id=node.agent_id,
-                        request=node.request,
-                        settings=node.settings,
-                    )
-                },
-                edges=[],
-            )
-        )
+        graphs.append(graph)
 
     return graphs, relative_timestamps
 
@@ -118,12 +134,17 @@ def _requests_from_trace(
 class FastMockBackend(BackendInterface):
     """Backend with short resolve delay to exercise multiprocess dequeue."""
 
-    def __init__(self, resolve_delay: float = RESOLVE_DELAY):
+    def __init__(
+        self,
+        resolve_delay: float = RESOLVE_DELAY,
+        processes_limit: int | None = None,
+    ):
         self._resolve_delay = resolve_delay
+        self._processes_limit = processes_limit
 
     @property
     def processes_limit(self) -> int | None:
-        return None
+        return self._processes_limit
 
     @property
     def requests_limit(self) -> int | None:
@@ -290,34 +311,71 @@ def _linear_replay_graph(
 async def test_max_duration_cancels_long_replay_sleep():
     """max_duration stops workers sleeping on a future relative_timestamp.
 
-    Use two independent graphs so the delayed request is sleeping from t=0.
-    A linear parent-child graph only starts that sleep after the first request
-    finishes, which on a loaded runner can let both complete before cancel.
+    Arm duration only after the delayed request is ``pending`` (sleep started)
+    so cancel is sequenced from that event, not by racing two wall-clocks.
+    The timestamp is far enough that the request cannot complete first.
 
     ## WRITTEN BY AI ##
     """
-    immediate = _linear_replay_graph([0.0], graph_id="immediate", request_prefix="imm")
-    delayed = _linear_replay_graph([5.0], graph_id="delayed", request_prefix="del")
+    delayed_id = "del_0"
+    delayed = _linear_replay_graph(
+        [1_000_000.0], graph_id="delayed", request_prefix="del"
+    )
     strategy = TraceReplayStrategy(time_scale=1.0)
     group = WorkerProcessGroup(
-        backend=FastMockBackend(resolve_delay=RESOLVE_DELAY),
-        requests=[immediate, delayed],
+        backend=FastMockBackend(resolve_delay=RESOLVE_DELAY, processes_limit=1),
+        requests=[delayed],
         strategy=strategy,
-        max_duration=MaxDurationConstraint(args=MaxDurationConstraintArgs(seconds=0.4)),
     )
-    statuses: set[str] = set()
+    statuses_by_request: dict[str, list[str]] = {}
+    duration_armed = False
+    cancelled_count = 0
     try:
         await group.create_processes()
-        await group.start(time.time() + 0.05)
-        run_started = time.time()
+        await group.start(time.time())
         async for _, _, request_info, _state in group.request_updates():
-            statuses.add(request_info.status)
-            if "cancelled" in statuses:
+            statuses_by_request.setdefault(request_info.request_id, []).append(
+                request_info.status
+            )
+            if (
+                not duration_armed
+                and request_info.request_id == delayed_id
+                and request_info.status == "pending"
+            ):
+                # Sleep is in flight. Attach an already-elapsed duration and
+                # signal workers the same way the coordinator poll loop would.
+                duration_armed = True
+                assert group.state is not None
+                state_update = group.state.update_state(
+                    add_constraints={
+                        "max_duration": MaxDurationConstraint(
+                            args=MaxDurationConstraintArgs(seconds=1e-9)
+                        )
+                    }
+                )
+                if (
+                    state_update.stop_processing
+                    and group.constraint_reached_event is not None
+                ):
+                    group.constraint_reached_event.set()
+            if request_info.status == "cancelled":
                 break
-        elapsed = time.time() - run_started
+        if group.state is not None:
+            # received_callback may record cancel before this iterator yields it
+            cancelled_count = group.state.update_state().state.cancelled_requests
     finally:
         exceptions = await group.shutdown()
         assert exceptions == []
 
-    assert "cancelled" in statuses
-    assert elapsed < 2.5
+    delayed_statuses = statuses_by_request.get(delayed_id, [])
+    assert duration_armed, (
+        f"delayed request never reached pending; statuses={statuses_by_request}"
+    )
+    assert "cancelled" in delayed_statuses or cancelled_count >= 1, (
+        f"expected cancelled for {delayed_id}; statuses={statuses_by_request} "
+        f"cancelled_requests={cancelled_count}"
+    )
+    assert "completed" not in delayed_statuses, (
+        f"delayed request completed instead of cancelling; "
+        f"statuses={statuses_by_request}"
+    )

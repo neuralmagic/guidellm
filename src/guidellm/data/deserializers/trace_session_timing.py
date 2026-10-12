@@ -12,7 +12,12 @@ from guidellm.data.schemas.conversation_graph_data import (
     ConversationTurnData,
 )
 
-__all__ = ["TraceSessionTiming"]
+__all__ = [
+    "TraceSessionTiming",
+    "graph_max_timestamp",
+    "graph_min_timestamp",
+    "shift_graph_timestamps",
+]
 
 
 class TraceSessionTiming:
@@ -22,10 +27,13 @@ class TraceSessionTiming:
     ``max_session_wait`` then clamps idle time from the previous session's
     last request to this session's first request. ``min_concurrent_sessions``
     then shifts this session earlier if needed so at least that many
-    sessions overlap. ``time_scale`` multiplies the resulting timestamps.
+    sessions overlap. Instantaneous sessions are left at their wait-capped
+    start. ``time_scale`` multiplies the resulting timestamps.
 
-    Caps are in unscaled trace seconds. Callers should construct a new
-    instance per dataset iteration so packing state does not leak across epochs.
+    Caps are in unscaled trace seconds. Dataset copies apply wait caps per
+    copy, place the copy, then pack with shared state, then scale. Callers
+    should construct a new instance per dataset iteration so packing state
+    does not leak across epochs.
     """
 
     def __init__(
@@ -46,15 +54,45 @@ class TraceSessionTiming:
     def apply(self, graph: ConversationGraphData) -> ConversationGraphData:
         """Rewrite ``relative_timestamp`` values on ``graph`` in place.
 
+        Wait caps, then packing, then ``time_scale``. Dataset copies split
+        these steps so packing can run after copies are placed.
+
         :param graph: Conversation whose turn timestamps may be compressed
         :return: The same graph, after any timestamp rewrites
+        """
+        self.apply_wait_caps(graph)
+        self.apply_pack(graph)
+        self.apply_scale(graph)
+        return graph
+
+    def apply_wait_caps(self, graph: ConversationGraphData) -> ConversationGraphData:
+        """Clamp intra-session and inter-session waits on ``graph``.
+
+        :param graph: Conversation whose turn timestamps may be compressed
+        :return: The same graph, after any wait-cap rewrites
         """
         if self.max_wait is not None:
             self._compress_intra_session_gaps(graph)
         if self.max_session_wait is not None:
             self._compress_inter_session_gap(graph)
+        return graph
+
+    def apply_pack(self, graph: ConversationGraphData) -> ConversationGraphData:
+        """Pack ``graph`` so at least ``min_concurrent_sessions`` overlap.
+
+        :param graph: Conversation whose timestamps may be shifted earlier
+        :return: The same graph, after any packing shift
+        """
         if self.min_concurrent_sessions is not None:
             self._pack_min_concurrent_sessions(graph)
+        return graph
+
+    def apply_scale(self, graph: ConversationGraphData) -> ConversationGraphData:
+        """Multiply remaining timestamps after wait and pack caps.
+
+        :param graph: Conversation whose timestamps may be scaled
+        :return: The same graph, after any time-scale rewrite
+        """
         if self.time_scale != 1.0:
             self._apply_time_scale(graph)
         return graph
@@ -117,7 +155,8 @@ class TraceSessionTiming:
 
         The first N sessions start together. Each later session starts when
         session ``i - N`` ends, which keeps N in flight during steady state.
-        Sessions are never delayed past their current start.
+        Sessions are never delayed past their current start. Instantaneous
+        sessions (single-turn rows whose start equals end) are not shifted.
 
         :param graph: Session whose timestamps may be shifted earlier
         """
@@ -130,6 +169,14 @@ class TraceSessionTiming:
 
         session_start, session_end = bounds
         placed = self._placed_session_ends
+        if session_end == session_start:
+            # Instantaneous (single-turn) session: packing cannot overlap
+            # without collapsing distinct arrivals. Leave the start in place.
+            if self._first_session_start is None:
+                self._first_session_start = session_start
+            placed.append(session_end)
+            return
+
         target_count = self.min_concurrent_sessions
         if not placed:
             target_start = session_start
@@ -146,12 +193,12 @@ class TraceSessionTiming:
         placed.append(new_start + (session_end - session_start))
 
     def _apply_time_scale(self, graph: ConversationGraphData) -> None:
-        """Multiply remaining timestamps after wait and pack caps."""
+        """Multiply timestamps and recorded durations after wait and pack caps."""
         for turn in graph.turns:
             relative_timestamp = _turn_timestamp(turn)
-            if relative_timestamp is None:
-                continue
-            _set_turn_timestamp(turn, relative_timestamp * self.time_scale)
+            if relative_timestamp is not None:
+                _set_turn_timestamp(turn, relative_timestamp * self.time_scale)
+            _scale_turn_duration(turn, self.time_scale)
 
     def _session_bounds(
         self, graph: ConversationGraphData
@@ -175,6 +222,50 @@ class TraceSessionTiming:
             _set_turn_timestamp(turn, relative_timestamp - trim)
 
 
+def shift_graph_timestamps(graph: ConversationGraphData, offset: float) -> None:
+    """Add ``offset`` to every turn that has a relative timestamp.
+
+    Used to place dataset copies on the shared timeline.
+    ``offset == 0`` is a no-op.
+
+    :param graph: Conversation whose timestamps may be shifted later
+    :param offset: Seconds to add to each present relative timestamp
+    """
+    if offset == 0:
+        return
+    for turn in graph.turns:
+        relative_timestamp = _turn_timestamp(turn)
+        if relative_timestamp is None:
+            continue
+        _set_turn_timestamp(turn, relative_timestamp + offset)
+
+
+def graph_min_timestamp(graph: ConversationGraphData) -> float:
+    """Return the earliest relative timestamp on ``graph``.
+
+    :param graph: Conversation to inspect
+    :return: Minimum relative timestamp among timed turns
+    """
+    return min(
+        timestamp
+        for timestamp in (_turn_timestamp(turn) for turn in graph.turns)
+        if timestamp is not None
+    )
+
+
+def graph_max_timestamp(graph: ConversationGraphData) -> float:
+    """Return the latest relative timestamp on ``graph``.
+
+    :param graph: Conversation to inspect
+    :return: Maximum relative timestamp among timed turns
+    """
+    return max(
+        timestamp
+        for timestamp in (_turn_timestamp(turn) for turn in graph.turns)
+        if timestamp is not None
+    )
+
+
 def _turn_timestamp(turn: ConversationTurnData) -> float | None:
     values = turn.columns.get("relative_timestamp_column")
     if values:
@@ -182,6 +273,18 @@ def _turn_timestamp(turn: ConversationTurnData) -> float | None:
     if turn.settings is not None:
         return turn.settings.relative_timestamp
     return None
+
+
+def _scale_turn_duration(turn: ConversationTurnData, scale: float) -> None:
+    """Multiply a recorded request duration so it stays in timestamp units.
+
+    :param turn: Turn that may carry ``request_duration_column``
+    :param scale: Factor already applied to relative timestamps
+    """
+    values = turn.columns.get("request_duration_column")
+    if not values or values[0] is None:
+        return
+    turn.columns["request_duration_column"] = [float(values[0]) * scale]
 
 
 def _set_turn_timestamp(turn: ConversationTurnData, timestamp: float) -> None:

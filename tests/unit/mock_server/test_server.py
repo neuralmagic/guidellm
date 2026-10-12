@@ -1,13 +1,17 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
+import logging
+import math
 import multiprocessing
 
 import httpx
 import pytest
 import pytest_asyncio
 from pydantic import ValidationError
+from sanic import Sanic
 
 from guidellm.mock_server.server import MockServer
 from guidellm.schemas.mock_server.config import MockServerConfig
@@ -94,6 +98,7 @@ class TestMockServerConfig:
         assert config.output_tokens_std == 0.0
         assert config.fail_after_requests is None
         assert config.max_concurrent_requests is None
+        assert config.log_request_received is False
 
     @pytest.mark.smoke
     @pytest.mark.parametrize(
@@ -149,6 +154,44 @@ class TestMockServer:
         with pytest.raises(TypeError):
             MockServer()
 
+    @pytest.mark.sanity
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("enabled", [True, False])
+    async def test_log_request_received(
+        self, enabled: bool, caplog: pytest.LogCaptureFixture
+    ):
+        """Log request arrival only when log_request_received is enabled.
+
+        ## WRITTEN BY AI ##
+        """
+        config = MockServerConfig(log_request_received=enabled)
+        server = MockServer(config)
+        # httpx does not send an ASGI lifespan. Mark the app as ASGI and run
+        # startup so Sanic finalizes routing before the in-process request.
+        # Touchup rewrites Sanic methods in place, so leave it off here.
+        server.app.asgi = True
+        server.app.config.TOUCHUP = False
+        try:
+            await server.app._startup()
+            transport = httpx.ASGITransport(app=server.app)
+            async with httpx.AsyncClient(
+                transport=transport, base_url="http://test"
+            ) as client:
+                with caplog.at_level(logging.INFO, logger="sanic.root"):
+                    response = await client.get("/health")
+            assert response.status_code == 200
+            received = [
+                record.message
+                for record in caplog.records
+                if record.message.startswith("Request received:")
+            ]
+            if enabled:
+                assert any("GET /health" in message for message in received)
+            else:
+                assert received == []
+        finally:
+            Sanic.unregister_app(server.app)
+
 
 class TestMockServerEndpoints:
     """Test suite for MockServer HTTP endpoints with real server instances."""
@@ -194,6 +237,30 @@ class TestMockServerEndpoints:
             assert model["object"] == "model"
             assert model["owned_by"] == "guidellm-mock"
             assert model["id"] == "test-model"
+
+    @pytest.mark.regression
+    @pytest.mark.asyncio
+    async def test_audio_translations_returns_filename_string(
+        self, mock_server_instance
+    ):
+        """Test audio translations serialize the uploaded filename as a string.
+
+        ## WRITTEN BY AI ##
+        """
+        server_url, config = mock_server_instance
+
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{server_url}/v1/audio/translations",
+                files={"file": ("audio.wav", b"mock audio", "audio/wav")},
+                data={"model": config.model},
+                timeout=5.0,
+            )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["filename"] == "audio.wav"
+        assert isinstance(data["filename"], str)
 
     @pytest.mark.smoke
     @pytest.mark.asyncio
@@ -691,6 +758,249 @@ class TestMockServerEndpoints:
             assert completed[0]["response"]["usage"] is not None
             assert "input_tokens" in completed[0]["response"]["usage"]
             assert "output_tokens" in completed[0]["response"]["usage"]
+
+    @pytest.mark.smoke
+    @pytest.mark.asyncio
+    async def test_chat_completions_multimodal_usage(self, mock_server_instance):
+        """Test multimodal chat content is accepted and accounted in usage.
+
+        ## WRITTEN BY AI ##
+        """
+        server_url, config = mock_server_instance
+
+        wav_seconds = 1.0
+        audio_b64 = base64.b64encode(b"\x00" * 32000).decode("utf-8")
+        payload = {
+            "model": "test-model",
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "Describe these inputs."},
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": "data:image/png;base64,iVBORw0KGgo="},
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": "http://example.com/image.png"},
+                        },
+                        {
+                            "type": "video_url",
+                            "video_url": {"url": "http://example.com/clip.mp4"},
+                        },
+                        {
+                            "type": "input_audio",
+                            "input_audio": {"data": audio_b64, "format": "wav"},
+                        },
+                    ],
+                }
+            ],
+            "max_tokens": 5,
+        }
+
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{server_url}/v1/chat/completions", json=payload, timeout=10.0
+            )
+            assert response.status_code == 200
+
+            usage = response.json()["usage"]
+            details = usage["prompt_tokens_details"]
+            assert details["image_tokens"] == 2 * config.image_tokens
+            assert details["video_tokens"] == config.video_tokens
+            assert details["audio_tokens"] == math.ceil(
+                wav_seconds * config.audio_tokens_per_second
+            )
+            assert details["seconds"] == wav_seconds
+            assert usage["prompt_tokens"] == (
+                details["prompt_tokens"]
+                + details["image_tokens"]
+                + details["video_tokens"]
+                + details["audio_tokens"]
+            )
+            assert usage["total_tokens"] == (
+                usage["prompt_tokens"] + usage["completion_tokens"]
+            )
+
+    @pytest.mark.smoke
+    @pytest.mark.asyncio
+    async def test_chat_completions_text_only_no_details(self, mock_server_instance):
+        """Test text-only requests report no prompt_tokens_details breakdown.
+
+        ## WRITTEN BY AI ##
+        """
+        server_url, _ = mock_server_instance
+        payload = {
+            "model": "test-model",
+            "messages": [{"role": "user", "content": "Hello!"}],
+            "max_tokens": 5,
+        }
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{server_url}/v1/chat/completions", json=payload, timeout=10.0
+            )
+            assert response.status_code == 200
+            assert response.json()["usage"]["prompt_tokens_details"] is None
+
+    @pytest.mark.smoke
+    @pytest.mark.asyncio
+    async def test_streaming_chat_completions_multimodal_usage(
+        self, mock_server_instance
+    ):
+        """Test streaming multimodal requests report usage with details.
+
+        ## WRITTEN BY AI ##
+        """
+        server_url, config = mock_server_instance
+
+        payload = {
+            "model": "test-model",
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "What is in this image?"},
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": "data:image/png;base64,iVBORw0KGgo="},
+                        },
+                    ],
+                }
+            ],
+            "max_tokens": 5,
+            "stream": True,
+            "stream_options": {"include_usage": True},
+        }
+
+        async with (
+            httpx.AsyncClient() as client,
+            client.stream(
+                "POST",
+                f"{server_url}/v1/chat/completions",
+                json=payload,
+                timeout=10.0,
+            ) as response,
+        ):
+            assert response.status_code == 200
+
+            usage_chunks = []
+            async for line in response.aiter_lines():
+                if not line or not line.startswith("data: "):
+                    continue
+                data_str = line[6:]
+                if data_str.strip() == "[DONE]":
+                    break
+                chunk = json.loads(data_str)
+                if chunk.get("usage"):
+                    usage_chunks.append(chunk["usage"])
+
+            assert len(usage_chunks) == 1
+            usage = usage_chunks[0]
+            details = usage["prompt_tokens_details"]
+            assert details["image_tokens"] == config.image_tokens
+            assert usage["prompt_tokens"] == (
+                details["prompt_tokens"] + details["image_tokens"]
+            )
+
+    @pytest.mark.sanity
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "content_part",
+        [
+            {"type": "unknown_modality", "data": "x"},
+            {"type": "image_url", "image_url": {"url": ""}},
+            {"type": "image_url", "image_url": "http://example.com/image.png"},
+            {"type": "input_audio", "input_audio": {"data": "@@not-base64@@"}},
+            {"type": "video_url"},
+        ],
+    )
+    async def test_chat_completions_invalid_multimodal_part(
+        self, mock_server_instance, content_part
+    ):
+        """Test malformed multimodal content parts return HTTP 400.
+
+        ## WRITTEN BY AI ##
+        """
+        server_url, _ = mock_server_instance
+        payload = {
+            "model": "test-model",
+            "messages": [{"role": "user", "content": [content_part]}],
+            "max_tokens": 5,
+        }
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{server_url}/v1/chat/completions", json=payload, timeout=10.0
+            )
+            assert response.status_code == 400
+            assert response.json()["error"]["type"] == "invalid_request_error"
+
+    @pytest.mark.smoke
+    @pytest.mark.asyncio
+    async def test_audio_transcriptions_endpoint(self, mock_server_instance):
+        """Test the audio transcriptions endpoint returns text and usage.
+
+        ## WRITTEN BY AI ##
+        """
+        server_url, config = mock_server_instance
+
+        wav_seconds = 2.0
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{server_url}/v1/audio/transcriptions",
+                files={"file": ("speech.wav", b"\x00" * 64000, "audio/wav")},
+                data={"model": "test-model"},
+                timeout=10.0,
+            )
+            assert response.status_code == 200
+
+            data = response.json()
+            assert data["text"] == "Mock transcription for speech.wav"
+            assert data["file_size"] == 64000
+            assert data["model_used"] == "test-model"
+
+            usage = data["usage"]
+            assert usage["prompt_tokens"] == math.ceil(
+                wav_seconds * config.audio_tokens_per_second
+            )
+            assert usage["seconds"] == wav_seconds
+            assert usage["completion_tokens"] > 0
+            assert usage["total_tokens"] == (
+                usage["prompt_tokens"] + usage["completion_tokens"]
+            )
+
+    @pytest.mark.regression
+    @pytest.mark.asyncio
+    async def test_audio_translations_endpoint(self, mock_server_instance):
+        """Test the audio translations endpoint serializes and reports usage.
+
+        ## WRITTEN BY AI ##
+        """
+        server_url, config = mock_server_instance
+
+        mp3_seconds = 1.0
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{server_url}/v1/audio/translations",
+                files={"file": ("speech.mp3", b"\x00" * 8000, "audio/mpeg")},
+                data={"model": "test-model"},
+                timeout=10.0,
+            )
+            assert response.status_code == 200
+
+            data = response.json()
+            assert data["text"]
+            assert data["filename"] == "speech.mp3"
+            assert data["model_used"] == "test-model"
+
+            usage = data["usage"]
+            assert usage["prompt_tokens"] == math.ceil(
+                mp3_seconds * config.audio_tokens_per_second
+            )
+            assert usage["seconds"] == mp3_seconds
+            assert usage["total_tokens"] == (
+                usage["prompt_tokens"] + usage["completion_tokens"]
+            )
 
     @pytest.mark.sanity
     @pytest.mark.asyncio

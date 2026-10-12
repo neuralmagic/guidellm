@@ -1,11 +1,22 @@
 import csv
+import json
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
 from guidellm.benchmark.outputs.csv import GenerativeBenchmarkerCSV
-from guidellm.schemas import StatusDistributionSummary
+from guidellm.scheduler import ConcurrentStrategy, ThroughputStrategy
+from guidellm.schemas import (
+    SampleUncertainty,
+    StatusDistributionSummary,
+)
+from guidellm.schemas.base.statistics import PERCENTILE_PROBABILITIES
+from tests.unit.benchmark.html_report_fixtures import (
+    make_benchmark,
+    metric_summary,
+    report,
+)
 
 
 class TestAlignColumns:
@@ -247,6 +258,7 @@ async def test_finalize_aligns_columns_in_written_csv(tmp_path: Path):
         "_add_modality_metrics",
         "_add_scheduler_info",
         "_add_runtime_info",
+        "_add_interval_columns",
     ]:
         setattr(out, name, lambda *a, **k: None)
 
@@ -272,10 +284,77 @@ async def test_finalize_aligns_columns_in_written_csv(tmp_path: Path):
     assert data_rows[1] == ["a2", "b2"]
 
 
+@pytest.mark.asyncio
+@pytest.mark.regression
+async def test_finalize_exports_tool_call_metrics(tmp_path: Path):
+    """Tool call token and count metrics are included in the CSV output.
+
+    ## WRITTEN BY AI ##
+    """
+    benchmark = make_benchmark(
+        strategy=ThroughputStrategy(),
+        rps=1.0,
+        tps=10.0,
+    )
+    benchmark.metrics.tool_call.tokens = metric_summary(32.0, count=2)
+    benchmark.metrics.tool_call.mixed_tokens = metric_summary(8.0, count=2)
+    benchmark.metrics.tool_call.count = metric_summary(2.0, count=2)
+
+    output = GenerativeBenchmarkerCSV(output_path=tmp_path / "tool_calls.csv")
+    path = await output.finalize(report(benchmark))
+    rows = list(csv.reader(path.open()))
+
+    expected_means = {
+        "Tool Call Tokens": "32.0",
+        "Tool Call Mixed Tokens": "8.0",
+        "Tool Call Count": "2.0",
+    }
+    for group, expected_mean in expected_means.items():
+        column_index = next(
+            index
+            for index, header in enumerate(rows[0])
+            if header == group
+            and rows[1][index] == "Successful Output"
+            and rows[2][index] == "Mean"
+        )
+        assert rows[3][column_index] == expected_mean
+
+
+@pytest.mark.asyncio
+@pytest.mark.regression
+async def test_finalize_keeps_parameterized_strategy_label(tmp_path: Path):
+    """The Strategy column keeps the concurrent stream count (concurrent@N).
+
+    Exporting the discriminator (``strategy.type_``) instead would write a bare
+    ``concurrent`` for every concurrent row, so the rows of a multi-stream sweep
+    could not be told apart in the CSV.
+
+    ## WRITTEN BY AI ##
+    """
+    benchmark = make_benchmark(
+        strategy=ConcurrentStrategy(streams=5),
+        rps=1.0,
+        tps=10.0,
+    )
+
+    output = GenerativeBenchmarkerCSV(output_path=tmp_path / "strategy.csv")
+    path = await output.finalize(report(benchmark))
+    rows = list(csv.reader(path.open()))
+
+    strategy_index = next(
+        index
+        for index, (group, name) in enumerate(zip(rows[0], rows[1], strict=True))
+        if group == "Benchmark" and name == "Strategy"
+    )
+    assert rows[3][strategy_index] == "concurrent@5"
+
+
 # Metrics read by GenerativeBenchmarkerCSV._add_request_latency_metrics.
 _LATENCY_CSV_METRICS = (
     "request_latency",
     "request_dispatch_delay",
+    "turn_predecessor_delay",
+    "turn_scheduling_delay",
     "request_scheduled_latency",
     "request_streaming_iterations_count",
     "time_to_first_token_ms",
@@ -297,7 +376,12 @@ def _latency_metric_groups(
     distribution = StatusDistributionSummary.from_values([1.0, 2.0, 3.0], [], [])
     metrics = dict.fromkeys(_LATENCY_CSV_METRICS, distribution)
     if schedule_metrics_missing:
-        for name in ("request_dispatch_delay", "request_scheduled_latency"):
+        for name in (
+            "request_dispatch_delay",
+            "turn_predecessor_delay",
+            "turn_scheduling_delay",
+            "request_scheduled_latency",
+        ):
             metrics[name] = None
     benchmark = SimpleNamespace(metrics=SimpleNamespace(**metrics))
 
@@ -332,6 +416,8 @@ class TestRequestLatencyCSVMetrics:
         groups = _latency_metric_groups(tmp_path)
 
         assert "Dispatch Delay" in groups
+        assert "Turn Predecessor Delay" in groups
+        assert "Turn Scheduling Delay" in groups
         assert "Scheduled Latency" in groups
 
     @pytest.mark.regression
@@ -346,7 +432,13 @@ class TestRequestLatencyCSVMetrics:
         existing = [
             group
             for group in groups
-            if group not in {"Dispatch Delay", "Scheduled Latency"}
+            if group
+            not in {
+                "Dispatch Delay",
+                "Turn Predecessor Delay",
+                "Turn Scheduling Delay",
+                "Scheduled Latency",
+            }
         ]
 
         assert existing == [
@@ -373,5 +465,304 @@ class TestRequestLatencyCSVMetrics:
         groups = _latency_metric_groups(tmp_path, schedule_metrics_missing=True)
 
         assert "Dispatch Delay" not in groups
+        assert "Turn Predecessor Delay" not in groups
+        assert "Turn Scheduling Delay" not in groups
         assert "Scheduled Latency" not in groups
         assert "Request Latency" in groups
+
+
+class TestServerThroughputGoodputColumns:
+    """
+    Tests for goodput columns in the CSV server throughput section.
+
+    ## WRITTEN BY AI ##
+    """
+
+    @staticmethod
+    def _render(attainment, goodput_mean):
+        """Render the throughput section for one benchmark and return headers."""
+        goodput = (
+            None
+            if goodput_mean is None
+            else StatusDistributionSummary.from_values(
+                successful=[goodput_mean], incomplete=[], errored=[]
+            )
+        )
+        distribution = StatusDistributionSummary.from_values([1.0, 2.0], [], [])
+        # Every distribution the throughput section reads, so the stub does not
+        # need updating when unrelated columns are added.
+        metric_names = (
+            "iter_tokens_per_iteration",
+            "output_token_count",
+            "output_tokens_per_iteration",
+            "output_tokens_per_second",
+            "prompt_token_count",
+            "prompt_tokens_per_second",
+            "request_concurrency",
+            "requests_per_second",
+            "tokens_per_second",
+            "total_token_count",
+        )
+        benchmark = SimpleNamespace(
+            config=SimpleNamespace(slo=object()),
+            metrics=SimpleNamespace(
+                **dict.fromkeys(metric_names, distribution),
+                slo_attainment=attainment,
+                request_goodput=goodput,
+            ),
+        )
+        csv_out = GenerativeBenchmarkerCSV.__new__(GenerativeBenchmarkerCSV)
+        headers: list[list[str]] = []
+        values: list[str | int | float] = []
+        csv_out._add_server_throughput_metrics(benchmark, headers, values)
+
+        return headers, values
+
+    @pytest.mark.regression
+    def test_columns_present_when_nothing_conforms(self):
+        """
+        The goodput columns are written even when no request met the
+        objectives.
+
+        _add_stats_for_metric drops any status whose total is 0.0, which would
+        omit the columns from the CSV while the console and JSON still report
+        0.0 for the same run.
+
+        ## WRITTEN BY AI ##
+        """
+        headers, values = self._render(attainment=0.0, goodput_mean=0.0)
+        flat = [h[1] for h in headers]
+
+        assert "Successful Goodput/Sec" in flat
+        assert "SLO Attainment" in flat
+        assert values[flat.index("Successful Goodput/Sec")] == 0.0
+        assert values[flat.index("SLO Attainment")] == 0.0
+
+    @pytest.mark.regression
+    def test_columns_match_between_conforming_and_non_conforming_runs(self):
+        """
+        A run that conforms to nothing produces the same columns as one that
+        conforms, so rows stay aligned across a multi-benchmark report.
+
+        ## WRITTEN BY AI ##
+        """
+        conforming, _ = self._render(attainment=0.9, goodput_mean=9.0)
+        failing, _ = self._render(attainment=0.0, goodput_mean=0.0)
+
+        assert conforming == failing
+
+    @pytest.mark.regression
+    def test_columns_empty_when_objectives_cannot_be_evaluated(self):
+        """
+        Objectives that no request can be evaluated against still produce the
+        columns, with empty values.
+
+        ## WRITTEN BY AI ##
+        """
+        headers, values = self._render(attainment=None, goodput_mean=None)
+        flat = [h[1] for h in headers]
+
+        assert "Successful Goodput/Sec" in flat
+        assert values[flat.index("Successful Goodput/Sec")] == ""
+        assert values[flat.index("SLO Attainment")] == ""
+
+
+async def _write_interval_csv(tmp_path: Path, benchmark) -> list[list[str]]:
+    """Write one benchmark through the CSV output and read the rows back.
+
+    ## WRITTEN BY AI ##
+    """
+    output = GenerativeBenchmarkerCSV(output_path=tmp_path / "intervals.csv")
+    path = await output.finalize(report(benchmark))
+
+    return list(csv.reader(path.open()))
+
+
+def _interval_benchmark():
+    """Build a benchmark whose TTFT carries intervals from 200 observations.
+
+    ## WRITTEN BY AI ##
+    """
+    benchmark = make_benchmark(strategy=ThroughputStrategy(), rps=1.0, tps=10.0)
+    benchmark.metrics.time_to_first_token_ms = StatusDistributionSummary.from_values(
+        [float(index) for index in range(200)],
+        [],
+        [],
+        uncertainty=SampleUncertainty(confidence=0.95),
+    )
+
+    return benchmark
+
+
+def _is_interval_column(group: str, stat: str) -> bool:
+    """Report whether a CSV column belongs to the interval section.
+
+    ## WRITTEN BY AI ##
+    """
+    return group == "Measurement Uncertainty" or stat in ("Mean CI", "Percentile CIs")
+
+
+class TestIntervalColumns:
+    """
+    Tests for the confidence interval section of the CSV output.
+
+    ## WRITTEN BY AI ##
+    """
+
+    @pytest.mark.asyncio
+    @pytest.mark.regression
+    async def test_follow_every_existing_column(self, tmp_path: Path):
+        """
+        The interval section is written after every other column.
+
+        Every column the file emitted before intervals existed keeps its
+        position, so readers that index by column number still work.
+
+        ## WRITTEN BY AI ##
+        """
+        rows = await _write_interval_csv(tmp_path, _interval_benchmark())
+
+        flags = [
+            _is_interval_column(group, stat)
+            for group, stat in zip(rows[0], rows[2], strict=True)
+        ]
+        first = flags.index(True)
+        assert all(flags[first:])
+        assert not any(flags[:first])
+
+    @pytest.mark.asyncio
+    @pytest.mark.regression
+    async def test_labels_match_the_metric_columns(self, tmp_path: Path):
+        """
+        Each interval column shares its labels with a metric column in the row.
+
+        The section lists its metrics separately from the columns written for
+        them earlier in the row, so this fails if a label is renamed in one
+        place and not the other.
+
+        ## WRITTEN BY AI ##
+        """
+        rows = await _write_interval_csv(tmp_path, _interval_benchmark())
+
+        metric_columns = {
+            (group, name)
+            for group, name, stat in zip(rows[0], rows[1], rows[2], strict=True)
+            if stat == "Mean"
+        }
+        interval_columns = [
+            (group, name)
+            for group, name, stat in zip(rows[0], rows[1], rows[2], strict=True)
+            if stat in ("Mean CI", "Percentile CIs")
+        ]
+
+        assert interval_columns
+        assert set(interval_columns) <= metric_columns
+
+    @pytest.mark.asyncio
+    @pytest.mark.sanity
+    async def test_metrics_without_intervals_get_no_columns(self, tmp_path: Path):
+        """
+        Metrics that never carry an interval add no interval columns.
+
+        Token-weighted and rate metrics are reported without intervals, so
+        columns for them would always be empty.
+
+        ## WRITTEN BY AI ##
+        """
+        rows = await _write_interval_csv(tmp_path, _interval_benchmark())
+
+        interval_groups = {
+            group
+            for group, stat in zip(rows[0], rows[2], strict=True)
+            if stat in ("Mean CI", "Percentile CIs")
+        }
+        for group in (
+            "Inter Token Latency",
+            "Time per Output Token",
+            "Server Throughput",
+            "Token Throughput",
+            "Token Streaming",
+        ):
+            assert group not in interval_groups
+
+    @pytest.mark.asyncio
+    @pytest.mark.smoke
+    async def test_values_hold_the_intervals(self, tmp_path: Path):
+        """
+        The mean and percentile intervals reach their columns.
+
+        Percentile intervals are one JSON object keyed by percentile, so a
+        reader does not need the ordering the Percentiles column uses, and a
+        percentile without an interval is explicitly null.
+
+        ## WRITTEN BY AI ##
+        """
+        benchmark = _interval_benchmark()
+        distribution = benchmark.metrics.time_to_first_token_ms.successful
+        rows = await _write_interval_csv(tmp_path, benchmark)
+
+        def cell(stat: str) -> str:
+            index = next(
+                index
+                for index, (group, name, leaf) in enumerate(
+                    zip(rows[0], rows[1], rows[2], strict=True)
+                )
+                if group == "Time to First Token"
+                and name == "Successful ms"
+                and leaf == stat
+            )
+            return rows[3][index]
+
+        assert cell("Mean CI") == (
+            f"[{distribution.mean_ci.lower}, {distribution.mean_ci.upper}]"
+        )
+        percentile_cis = json.loads(cell("Percentile CIs"))
+        assert set(percentile_cis) == set(PERCENTILE_PROBABILITIES)
+        assert percentile_cis["p50"] == [
+            distribution.percentile_cis.p50.lower,
+            distribution.percentile_cis.p50.upper,
+        ]
+        # 200 observations cannot bound p99, which needs 368.
+        assert percentile_cis["p99"] is None
+
+    @pytest.mark.asyncio
+    @pytest.mark.sanity
+    async def test_cells_are_empty_without_intervals(self, tmp_path: Path):
+        """
+        A supported metric compiled without an estimator leaves its cells blank.
+
+        An empty cell reads as unavailable in a spreadsheet, where a zero or a
+        repeated mean would read as a measurement.
+
+        ## WRITTEN BY AI ##
+        """
+        rows = await _write_interval_csv(
+            tmp_path, make_benchmark(strategy=ThroughputStrategy(), rps=1.0, tps=10.0)
+        )
+
+        cells = [
+            value
+            for stat, value in zip(rows[2], rows[3], strict=True)
+            if stat in ("Mean CI", "Percentile CIs")
+        ]
+        assert cells
+        assert all(value == "" for value in cells)
+
+    @pytest.mark.asyncio
+    @pytest.mark.sanity
+    async def test_records_the_confidence_level(self, tmp_path: Path):
+        """
+        The confidence level the intervals were computed at is exported.
+
+        ## WRITTEN BY AI ##
+        """
+        benchmark = _interval_benchmark()
+        benchmark.config.confidence = 0.9
+        rows = await _write_interval_csv(tmp_path, benchmark)
+
+        index = next(
+            index
+            for index, (group, name) in enumerate(zip(rows[0], rows[1], strict=True))
+            if group == "Measurement Uncertainty" and name == "Confidence Level"
+        )
+        assert rows[3][index] == "0.9"

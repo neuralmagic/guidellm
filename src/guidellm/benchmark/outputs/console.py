@@ -16,12 +16,16 @@ from dataclasses import dataclass, field
 from typing import Literal, cast
 
 from pydantic import Field
+from rich.table import Table
+from rich.text import Text
 
+from guidellm.benchmark.analysis import KneeDetectionConclusion
 from guidellm.benchmark.outputs.output import GenerativeBenchmarkerOutput
 from guidellm.benchmark.schemas import GenerativeBenchmarksReport
+from guidellm.benchmark.schemas.warnings import BenchmarkWarning
 from guidellm.schemas import DistributionSummary, StatusDistributionSummary
 from guidellm.schemas.benchmark import BenchmarkOutputArgs
-from guidellm.utils.console import Console
+from guidellm.utils.console import Colors, Console, StatusIcons
 from guidellm.utils.functions import safe_format_number, safe_format_timestamp
 
 __all__ = [
@@ -29,7 +33,19 @@ __all__ = [
 ]
 
 
-StatTypesAlias = Literal["mean", "median", "p95"]
+StatTypesAlias = Literal["mean", "mean_moe", "median", "p95", "p95_ci"]
+
+_MAX_EXTRA_MARGIN_PRECISION = 3
+"""Extra decimal places a margin may use before it is shown as rounded away."""
+
+UNSUPPORTED_PERCENTILE_MARKER = "*"
+"""Suffix marking a percentile the sample cannot bound at both ends."""
+
+UNSUPPORTED_PERCENTILE_FOOTNOTE = (
+    f"{UNSUPPORTED_PERCENTILE_MARKER} confidence interval unavailable at this "
+    "sample size"
+)
+"""Footnote explaining the marker, printed only when a marked value appears."""
 
 
 @dataclass
@@ -121,12 +137,18 @@ class ConsoleTableColumnsCollection(dict[str, ConsoleTableColumn]):
 
         for stat_type in types:
             col_key = f"{key}_{stat_type}"
-            col_name, col_value = self._get_stat_type_name_val(stat_type, status_stats)
+            col_name, col_value = self._get_stat_type_name_val(
+                stat_type, status_stats, precision
+            )
             if col_key not in self:
                 self[col_key] = ConsoleTableColumn(
                     group=group,
                     name=name,
                     units=col_name,
+                    # Rendered as text where a value carries a suffix: the
+                    # mean is followed by its margin, and a percentile the
+                    # sample cannot bound is marked.
+                    type_=("text" if stat_type in ("mean_moe", "p95_ci") else "number"),
                     precision=precision,
                 )
             self[col_key].values.append(col_value)
@@ -176,16 +198,82 @@ class ConsoleTableColumnsCollection(dict[str, ConsoleTableColumn]):
 
     @classmethod
     def _get_stat_type_name_val(
-        cls, stat_type: StatTypesAlias, stats: DistributionSummary | None
-    ) -> tuple[str, float | None]:
+        cls,
+        stat_type: StatTypesAlias,
+        stats: DistributionSummary | None,
+        precision: int = 1,
+    ) -> tuple[str, str | float | None]:
         if stat_type == "mean":
             return "Mean", stats.mean if stats else None
+        elif stat_type == "mean_moe":
+            return "Mean", cls._format_mean_with_margin(stats, precision)
         elif stat_type == "median":
             return "Mdn", stats.median if stats else None
         elif stat_type == "p95":
             return "p95", stats.percentiles.p95 if stats else None
+        elif stat_type == "p95_ci":
+            return "p95", cls._format_percentile_with_marker(stats, precision)
         else:
             raise ValueError(f"Unsupported stat type: {stat_type}")
+
+    @classmethod
+    def _format_mean_with_margin(
+        cls, stats: DistributionSummary | None, precision: int
+    ) -> str:
+        """
+        Render a mean alongside the half-width of its confidence interval.
+
+        :param stats: Distribution summary to render, or None when unavailable
+        :param precision: Decimal precision for both numbers
+        :return: Formatted mean, suffixed with its margin when one was estimated
+        """
+        if stats is None:
+            return safe_format_number(None, precision=precision)
+
+        mean = safe_format_number(stats.mean, precision=precision)
+        if stats.mean_ci is None:
+            return mean
+
+        margin = (stats.mean_ci.upper - stats.mean_ci.lower) / 2.0
+
+        # A margin that rounds away at the column's precision would read as an
+        # exact measurement, so give it enough places to show one digit.
+        margin_precision = precision
+        while (
+            margin > 0.0
+            and margin_precision < precision + _MAX_EXTRA_MARGIN_PRECISION
+            and float(safe_format_number(margin, precision=margin_precision)) == 0.0
+        ):
+            margin_precision += 1
+
+        # The space after the sign gives it room where a font draws it wider than
+        # one cell. An ASCII +/- avoids the width question, but Rich highlights
+        # it as a path and colours the margin differently from the mean.
+        return f"{mean} ± {safe_format_number(margin, precision=margin_precision)}"
+
+    @classmethod
+    def _format_percentile_with_marker(
+        cls, stats: DistributionSummary | None, precision: int
+    ) -> str:
+        """
+        Render the 95th percentile, marked when the sample cannot bound it.
+
+        The percentile is an order statistic, so a sample too small to place
+        observations either side of it reports the value without an interval.
+        Marking that case keeps the console from presenting the two alike.
+
+        :param stats: Distribution summary to render, or None when unavailable
+        :param precision: Decimal precision for the value
+        :return: Formatted percentile, suffixed when it has no interval
+        """
+        if stats is None:
+            return safe_format_number(None, precision=precision)
+
+        value = safe_format_number(stats.percentiles.p95, precision=precision)
+        if stats.percentile_cis is None or stats.percentile_cis.p95 is not None:
+            return value
+
+        return f"{value}{UNSUPPORTED_PERCENTILE_MARKER}"
 
 
 @GenerativeBenchmarkerOutput.register("console")
@@ -195,7 +283,7 @@ class GenerativeBenchmarkerConsole(GenerativeBenchmarkerOutput):
 
     Renders benchmark results as formatted tables in the terminal, organizing metrics
     by category (run summary, request counts, latency, throughput, modality-specific)
-    with proper alignment and type-specific formatting for readability.
+    and displaying profile conclusions with proper alignment and formatting.
     """
 
     @classmethod
@@ -217,8 +305,7 @@ class GenerativeBenchmarkerConsole(GenerativeBenchmarkerOutput):
         """
         Print the complete benchmark report to the console.
 
-        Renders all metric tables including run summary, request counts, latency,
-        throughput, and modality-specific statistics to the console.
+        Renders metric tables and profile conclusions to the console.
 
         :param report: The completed benchmark report
         :return: Status message indicating output location
@@ -232,8 +319,94 @@ class GenerativeBenchmarkerConsole(GenerativeBenchmarkerOutput):
         self.print_request_counts_table(report)
         self.print_request_latency_table(report)
         self.print_server_throughput_table(report)
+        self.print_knee_profile_results(report)
+        self.print_warnings(report)
 
         return "printed to console"
+
+    def print_knee_profile_results(self, report: GenerativeBenchmarksReport) -> None:
+        """
+        Print the final knee and adaptive plan from profile conclusions.
+
+        :param report: Completed report with optional knee profile conclusions
+        """
+        for entry in report.conclusions:
+            if entry.get("kind") != "knee_detection":
+                continue
+
+            conclusion = KneeDetectionConclusion.model_validate(entry)
+            result = conclusion.final.throughput
+            details: list[str] = []
+            status: Literal["success", "info"]
+            if result.status == "ok" and result.knee is not None:
+                title = (
+                    "Throughput knee: "
+                    f"{safe_format_number(result.knee, precision=2)} concurrent streams"
+                )
+                if result.saturation_concurrency is not None:
+                    saturation = safe_format_number(
+                        result.saturation_concurrency, precision=0
+                    )
+                    details.append(
+                        "First measured point at/above knee: "
+                        f"{saturation} concurrent streams"
+                    )
+                status = "success"
+            else:
+                title = "Throughput knee: not detected"
+                details.append(f"Reason: {result.reason}")
+                status = "info"
+
+            plan = conclusion.adaptive_plan
+            if plan.status == "ready":
+                details.append(
+                    "Adaptive points selected: "
+                    + ", ".join(str(value) for value in plan.concurrencies)
+                )
+            else:
+                details.append(f"Adaptive refinement skipped: {plan.reason}")
+
+            self.console.print("\n")
+            self.console.print_update(title, "\n".join(details), status=status)
+
+    @staticmethod
+    def _warning_row(warning: BenchmarkWarning) -> Table:
+        """
+        Place the warning icon in a gutter and the text in the column beside it.
+
+        The note stays in the text column, so a wrapped message and the note share
+        the same left edge.
+
+        :param warning: Warning to render
+        :return: A borderless two-column row
+        """
+        body = Text(warning.message)
+        if warning.note:
+            body.append(f"\n{warning.note}")
+        row = Table.grid(padding=(0, 1))
+        row.add_column(no_wrap=True)
+        row.add_column()
+        row.add_row(Text(StatusIcons["warning"], style=Colors.warning), body)
+        return row
+
+    def print_warnings(self, report: GenerativeBenchmarksReport):
+        """
+        Print post-benchmark warnings, grouped by strategy.
+
+        :param report: The benchmark report containing per-benchmark warnings
+        """
+        for benchmark in report.benchmarks:
+            if not benchmark.warnings:
+                continue
+            self.console.print("\n")
+            self.console.print(
+                Text.assemble(
+                    ("Warnings", Colors.warning),
+                    f" ({benchmark.config.strategy})",
+                )
+            )
+            for warning in benchmark.warnings:
+                self.console.print(self._warning_row(warning))
 
     def print_run_summary_table(self, report: GenerativeBenchmarksReport):
         """
@@ -245,7 +418,7 @@ class GenerativeBenchmarkerConsole(GenerativeBenchmarkerOutput):
 
         for benchmark in report.benchmarks:
             columns.add_value(
-                benchmark.config.strategy.type_,
+                str(benchmark.config.strategy),
                 group="Benchmark",
                 name="Strategy",
                 type_="text",
@@ -265,6 +438,20 @@ class GenerativeBenchmarkerConsole(GenerativeBenchmarkerOutput):
             columns.add_value(
                 benchmark.cooldown_duration, group="Timings", name="Cool", units="Sec"
             )
+
+            request_totals = benchmark.metrics.request_totals
+            for count, name in (
+                (request_totals.successful, "Comp"),
+                (request_totals.incomplete, "Inc"),
+                (request_totals.errored, "Err"),
+            ):
+                columns.add_value(
+                    count,
+                    group="Requests",
+                    name=name,
+                    units="Tot",
+                    precision=0,
+                )
 
             for token_metrics, group in [
                 (benchmark.metrics.prompt_token_count, "Input Tokens"),
@@ -391,7 +578,7 @@ class GenerativeBenchmarkerConsole(GenerativeBenchmarkerOutput):
 
         for benchmark in report.benchmarks:
             columns.add_value(
-                benchmark.config.strategy.type_,
+                str(benchmark.config.strategy),
                 group="Benchmark",
                 name="Strategy",
                 type_="text",
@@ -440,35 +627,48 @@ class GenerativeBenchmarkerConsole(GenerativeBenchmarkerOutput):
 
         for benchmark in report.benchmarks:
             columns.add_value(
-                benchmark.config.strategy.type_,
+                str(benchmark.config.strategy),
                 group="Benchmark",
                 name="Strategy",
                 type_="text",
+            )
+            # ITL and TPOT are reported without a margin because their mean is
+            # a ratio over output tokens rather than a mean over requests; the
+            # column shows the value alone for them.
+            latency_stats: tuple[StatTypesAlias, ...] = (
+                "mean_moe",
+                "median",
+                "p95_ci",
             )
             columns.add_stats(
                 benchmark.metrics.request_latency,
                 group="Request Latency",
                 name="Sec",
+                types=latency_stats,
             )
             columns.add_stats(
                 benchmark.metrics.time_to_first_token_ms,
                 group="TTFT",
                 name="ms",
+                types=latency_stats,
             )
             columns.add_stats(
                 benchmark.metrics.time_to_first_output_token_ms,
                 group="TTFOT",
                 name="ms",
+                types=latency_stats,
             )
             columns.add_stats(
                 benchmark.metrics.inter_token_latency_ms,
                 group="ITL",
                 name="ms",
+                types=latency_stats,
             )
             columns.add_stats(
                 benchmark.metrics.time_per_output_token_ms,
                 group="TPOT",
                 name="ms",
+                types=latency_stats,
             )
         headers, values = columns.get_table_data()
         self.console.print("\n")
@@ -477,6 +677,12 @@ class GenerativeBenchmarkerConsole(GenerativeBenchmarkerOutput):
             values,
             title="Request Latency Statistics (Completed Requests)",
         )
+        if any(
+            isinstance(value, str) and value.endswith(UNSUPPORTED_PERCENTILE_MARKER)
+            for column in values
+            for value in column
+        ):
+            self.console.print(UNSUPPORTED_PERCENTILE_FOOTNOTE)
 
     def print_server_throughput_table(self, report: GenerativeBenchmarksReport):
         """
@@ -485,10 +691,17 @@ class GenerativeBenchmarkerConsole(GenerativeBenchmarkerOutput):
         :param report: The benchmark report containing throughput metrics
         """
         columns = ConsoleTableColumnsCollection()
+        # Widen the table whenever objectives were configured, not only when
+        # they could be evaluated. A workload that cannot measure an objective,
+        # such as time to first token without streaming, then shows empty cells
+        # instead of the table silently looking as though none were set.
+        report_has_goodput = any(
+            benchmark.config.slo is not None for benchmark in report.benchmarks
+        )
 
         for benchmark in report.benchmarks:
             columns.add_value(
-                benchmark.config.strategy.type_,
+                str(benchmark.config.strategy),
                 group="Benchmark",
                 name="Strategy",
                 type_="text",
@@ -528,6 +741,22 @@ class GenerativeBenchmarkerConsole(GenerativeBenchmarkerOutput):
                 name="Per Sec",
                 types=("mean",),
             )
+            if report_has_goodput:
+                attainment = benchmark.metrics.slo_attainment
+                columns.add_value(
+                    None if attainment is None else attainment * 100.0,
+                    group="Goodput",
+                    name="Attainment",
+                    units="%",
+                    precision=1,
+                )
+                columns.add_stats(
+                    benchmark.metrics.request_goodput,
+                    status="total",
+                    group="Goodput",
+                    name="Per Sec",
+                    types=("mean",),
+                )
 
         headers, values = columns.get_table_data()
         self.console.print("\n")
@@ -548,7 +777,7 @@ class GenerativeBenchmarkerConsole(GenerativeBenchmarkerOutput):
 
         for benchmark in report.benchmarks:
             columns["labels"].add_value(
-                benchmark.config.strategy.type_,
+                str(benchmark.config.strategy),
                 group="Benchmark",
                 name="Strategy",
                 type_="text",

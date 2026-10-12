@@ -3,26 +3,36 @@ import json
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import pytest
-from datasets import IterableDataset
+from datasets import Dataset, IterableDataset
 from faker import Faker
 from pydantic import ValidationError
 
-from guidellm.data.deserializers import DataNotSupportedError
+from guidellm.data.deserializers import (
+    DataNotSupportedError,
+    DatasetDeserializerFactory,
+)
 from guidellm.data.deserializers.trace_common import (
     TraceDatasetDeserializer,
+    TraceFormatBase,
     TraceFormatRegistry,
     decode_prompt,
     generate_token_ids,
 )
+from guidellm.data.deserializers.trace_minimal import MinimalTraceFormat
+from guidellm.data.deserializers.trace_session_timing import TraceSessionTiming
+from guidellm.data.finalizers.generative import GenerativeRequestFinalizer
+from guidellm.data.schemas import InvalidRowError
 from guidellm.data.schemas.conversation_graph_data import (
     ConversationGraphData,
     ConversationTurnData,
 )
-from guidellm.schemas.data import MinimalTraceFormatArgs, TraceDataArgs
-from guidellm.utils.hf_datasets import load_dataset_from_file
+from guidellm.scheduler.schemas.conversation_graph import GenerativeConversationGraph
+from guidellm.schemas.data import FileDataArgs, MinimalTraceFormatArgs, TraceDataArgs
+from guidellm.schemas.data.finalizers import GenerativeRequestFinalizerArgs
+from tests.unit.data.deserializers.trace_test_utils import trace_file_source
 
 
 def mock_processor() -> Mock:
@@ -72,8 +82,13 @@ class TestTraceFormatRegistry:
             tmp_path,
             '{"timestamp": 1, "input_length": 10, "output_length": 1}\n',
         )
-        config = TraceDataArgs(kind="unknown_kind", path=tmp_path)
-        dataset = load_dataset_from_file(trace)
+        source = FileDataArgs(kind="json_file", path=trace)
+        config = TraceDataArgs(kind="unknown_kind", source=source)
+        dataset = DatasetDeserializerFactory.deserialize(
+            config=source,
+            processor_factory=mock_processor,
+            random_seed=42,
+        )
         with pytest.raises(DataNotSupportedError, match="not registered"):
             TraceFormatRegistry.dispatch(config, dataset)
 
@@ -90,7 +105,7 @@ class TestTraceDataArgsSessionDuration:
             '{"timestamp": 0, "input_length": 1, "output_length": 1}\n',
         )
         args = MinimalTraceFormatArgs(
-            path=path,
+            source=trace_file_source(path),
             max_wait=30.0,
             max_session_wait=60.0,
             min_concurrent_sessions=8,
@@ -111,11 +126,65 @@ class TestTraceDataArgsSessionDuration:
             tmp_path,
             '{"timestamp": 0, "input_length": 1, "output_length": 1}\n',
         )
-        args = MinimalTraceFormatArgs(path=path)
+        args = MinimalTraceFormatArgs(source=trace_file_source(path))
         assert args.max_wait is None
         assert args.max_session_wait is None
         assert args.min_concurrent_sessions is None
         assert args.time_scale == 1.0
+        assert args.copies == 1
+        assert args.copy_offset == 1.0
+
+    @pytest.mark.smoke
+    def test_accepts_copies(self, tmp_path: Path):
+        """copies is a valid format-agnostic trace data argument.
+
+        ## WRITTEN BY AI ##
+        """
+        path = write_trace(
+            tmp_path,
+            '{"timestamp": 0, "input_length": 1, "output_length": 1}\n',
+        )
+        args = MinimalTraceFormatArgs(source=trace_file_source(path), copies=3)
+        assert args.copies == 3
+
+    @pytest.mark.smoke
+    def test_rejects_copies_below_one(self, tmp_path: Path):
+        """copies must be at least 1.
+
+        ## WRITTEN BY AI ##
+        """
+        path = write_trace(
+            tmp_path,
+            '{"timestamp": 0, "input_length": 1, "output_length": 1}\n',
+        )
+        with pytest.raises(ValidationError):
+            MinimalTraceFormatArgs(source=trace_file_source(path), copies=0)
+
+    @pytest.mark.smoke
+    def test_accepts_copy_offset(self, tmp_path: Path):
+        """copy_offset is a valid format-agnostic trace data argument.
+
+        ## WRITTEN BY AI ##
+        """
+        path = write_trace(
+            tmp_path,
+            '{"timestamp": 0, "input_length": 1, "output_length": 1}\n',
+        )
+        args = MinimalTraceFormatArgs(source=trace_file_source(path), copy_offset=0.5)
+        assert args.copy_offset == 0.5
+
+    @pytest.mark.smoke
+    def test_rejects_copy_offset_below_zero(self, tmp_path: Path):
+        """copy_offset must be at least 0.
+
+        ## WRITTEN BY AI ##
+        """
+        path = write_trace(
+            tmp_path,
+            '{"timestamp": 0, "input_length": 1, "output_length": 1}\n',
+        )
+        with pytest.raises(ValidationError):
+            MinimalTraceFormatArgs(source=trace_file_source(path), copy_offset=-0.1)
 
 
 @dataclasses.dataclass
@@ -170,10 +239,12 @@ class TestTraceDatasetDeserializer:
                 "max_session_wait",
                 "min_concurrent_sessions",
                 "time_scale",
+                "copies",
+                "copy_offset",
             ),
             kwargs,
         )
-        config = MinimalTraceFormatArgs(path=data, **col_kwargs)
+        config = MinimalTraceFormatArgs(source=trace_file_source(data), **col_kwargs)
         return deserializer(
             config=config,
             processor_factory=mock_processor,
@@ -193,7 +264,7 @@ class TestTraceDatasetDeserializer:
             suffix=suffix,
         )
         ds = self.deserialize(deserializer, trace)
-        conv = load_graph_turns(next(iter(ds)))
+        conv = [turn for row in ds for turn in load_graph_turns(row)]
         for i, turn in enumerate(conv):
             assert turn.columns["relative_timestamp_column"][0] == i
             assert turn.columns["prompt_tokens_count_column"][0] == (i + 1) * 10
@@ -207,7 +278,7 @@ class TestTraceDatasetDeserializer:
             suffix=".csv",
         )
         ds = self.deserialize(deserializer, trace)
-        conv = load_graph_turns(next(iter(ds)))
+        conv = [turn for row in ds for turn in load_graph_turns(row)]
         for i, turn in enumerate(conv):
             assert turn.columns["relative_timestamp_column"][0] == i
             assert turn.columns["prompt_tokens_count_column"][0] == (i + 1) * 10
@@ -231,13 +302,14 @@ class TestTraceDatasetDeserializer:
         )
         ds = self.deserialize(deserializer, trace)
         assert isinstance(ds, IterableDataset)
-        conv = load_graph(next(iter(ds)))
+        conversations = [load_graph(row) for row in ds]
         proc = mock_processor()
-        assert len(conv.turns) == n_rows
-        for i, turn in enumerate(conv.turns):
-            assert turn.node_id == f"main_{i}"
-            if i > 0:
-                assert turn.parents[0].parent_node_id == f"main_{i - 1}"
+        assert len(conversations) == n_rows
+        for i, conversation in enumerate(conversations):
+            assert len(conversation.turns) == 1
+            turn = conversation.turns[0]
+            assert turn.node_id == "main_0"
+            assert not turn.parents
             n_in = turn.columns["prompt_tokens_count_column"][0]
             assert n_in == i + 1
             assert turn.columns["output_tokens_count_column"][0] == (i + 1) * 10
@@ -260,13 +332,15 @@ class TestTraceDatasetDeserializer:
             ),
         )
         ds = self.deserialize(deserializer, trace)
-        conv = load_graph_turns(next(iter(ds)))
+        conv = [turn for row in ds for turn in load_graph_turns(row)]
         for i, turn in enumerate(conv):
             assert turn.columns["relative_timestamp_column"][0] == i
 
     @pytest.mark.smoke
-    def test_max_wait_rewrites_emitted_timestamps(self, tmp_path: Path, deserializer):
-        """max_wait compresses intra-session gaps on emitted graphs.
+    def test_max_session_wait_rewrites_emitted_timestamps(
+        self, tmp_path: Path, deserializer
+    ):
+        """max_session_wait compresses gaps between independent trace rows.
 
         ## WRITTEN BY AI ##
         """
@@ -276,8 +350,8 @@ class TestTraceDatasetDeserializer:
             '{"timestamp": 10, "input_length": 10, "output_length": 1}\n'
             '{"timestamp": 1450, "input_length": 10, "output_length": 1}\n',
         )
-        ds = self.deserialize(deserializer, trace, max_wait=30.0)
-        conv = load_graph_turns(next(iter(ds)))
+        ds = self.deserialize(deserializer, trace, max_session_wait=30.0)
+        conv = [turn for row in ds for turn in load_graph_turns(row)]
         timestamps = [turn.columns["relative_timestamp_column"][0] for turn in conv]
         assert timestamps == pytest.approx([0.0, 10.0, 40.0])
 
@@ -293,10 +367,301 @@ class TestTraceDatasetDeserializer:
             '{"timestamp": 10, "input_length": 10, "output_length": 1}\n'
             '{"timestamp": 1450, "input_length": 10, "output_length": 1}\n',
         )
-        ds = self.deserialize(deserializer, trace, max_wait=30.0, time_scale=2.0)
-        conv = load_graph_turns(next(iter(ds)))
+        ds = self.deserialize(
+            deserializer, trace, max_session_wait=30.0, time_scale=2.0
+        )
+        conv = [turn for row in ds for turn in load_graph_turns(row)]
         timestamps = [turn.columns["relative_timestamp_column"][0] for turn in conv]
         assert timestamps == pytest.approx([0.0, 20.0, 80.0])
+
+    @pytest.mark.smoke
+    def test_copies_replays_full_dataset_sequentially(
+        self, tmp_path: Path, deserializer
+    ):
+        """copies=N emits N full passes of the original conversations.
+
+        ## WRITTEN BY AI ##
+        """
+        trace = write_trace(
+            tmp_path,
+            '{"timestamp": 0, "input_length": 10, "output_length": 1}\n'
+            '{"timestamp": 10, "input_length": 10, "output_length": 1}\n'
+            '{"timestamp": 20, "input_length": 10, "output_length": 1}\n',
+        )
+        ds = self.deserialize(deserializer, trace, copies=3)
+        timestamps = [
+            turn.columns["relative_timestamp_column"][0]
+            for row in ds
+            for turn in load_graph_turns(row)
+        ]
+        assert timestamps == pytest.approx(
+            [0.0, 10.0, 20.0, 20.0, 30.0, 40.0, 40.0, 50.0, 60.0]
+        )
+
+    @pytest.mark.smoke
+    def test_copies_next_pass_starts_at_previous_last_timestamp(
+        self, tmp_path: Path, deserializer
+    ):
+        """Pass k+1's first request is scheduled at pass k's last timestamp.
+
+        ## WRITTEN BY AI ##
+        """
+        trace = write_trace(
+            tmp_path,
+            '{"timestamp": 5, "input_length": 10, "output_length": 1}\n'
+            '{"timestamp": 15, "input_length": 10, "output_length": 1}\n',
+        )
+        ds = self.deserialize(deserializer, trace, copies=2)
+        timestamps = [
+            turn.columns["relative_timestamp_column"][0]
+            for row in ds
+            for turn in load_graph_turns(row)
+        ]
+        assert timestamps[:2] == pytest.approx([0.0, 10.0])
+        assert timestamps[2] == pytest.approx(timestamps[1])
+        assert timestamps[2:] == pytest.approx([10.0, 20.0])
+
+    @pytest.mark.sanity
+    def test_copies_preserve_packed_shape_across_passes(
+        self, tmp_path: Path, deserializer
+    ):
+        """Each copies pass is packed independently, then shifted by the previous end.
+
+        ## WRITTEN BY AI ##
+        """
+        trace = write_trace(
+            tmp_path,
+            '{"timestamp": 0, "input_length": 10, "output_length": 1}\n'
+            '{"timestamp": 10, "input_length": 10, "output_length": 1}\n'
+            '{"timestamp": 1450, "input_length": 10, "output_length": 1}\n',
+        )
+        packed = self.deserialize(deserializer, trace, max_session_wait=30.0)
+        packed_ts = [
+            turn.columns["relative_timestamp_column"][0]
+            for row in packed
+            for turn in load_graph_turns(row)
+        ]
+        copied = self.deserialize(deserializer, trace, max_session_wait=30.0, copies=2)
+        copied_ts = [
+            turn.columns["relative_timestamp_column"][0]
+            for row in copied
+            for turn in load_graph_turns(row)
+        ]
+        assert packed_ts == pytest.approx([0.0, 10.0, 40.0])
+        offset = packed_ts[-1]
+        assert copied_ts[:3] == pytest.approx(packed_ts)
+        assert copied_ts[3:] == pytest.approx([ts + offset for ts in packed_ts])
+
+    @pytest.mark.regression
+    def test_copies_stay_sequential_when_min_concurrent_sessions_set(
+        self, tmp_path: Path, deserializer
+    ):
+        """Packing must not overlay copies or collapse single-turn arrivals to t=0.
+
+        ## WRITTEN BY AI ##
+        """
+        trace = write_trace(
+            tmp_path,
+            '{"timestamp": 0, "input_length": 10, "output_length": 1}\n'
+            '{"timestamp": 10, "input_length": 10, "output_length": 1}\n'
+            '{"timestamp": 20, "input_length": 10, "output_length": 1}\n',
+        )
+        ds = self.deserialize(deserializer, trace, copies=4, min_concurrent_sessions=4)
+        timestamps = [
+            turn.columns["relative_timestamp_column"][0]
+            for row in ds
+            for turn in load_graph_turns(row)
+        ]
+        inner = [0.0, 10.0, 20.0]
+        expected = []
+        offset = 0.0
+        for _ in range(4):
+            expected.extend(ts + offset for ts in inner)
+            offset += inner[-1]
+        assert timestamps == pytest.approx(expected)
+
+    @pytest.mark.regression
+    def test_wait_capped_single_turn_keeps_spacing_across_copies(
+        self, tmp_path: Path, deserializer
+    ):
+        """max_session_wait spacing survives min_concurrent_sessions and copies.
+
+        ## WRITTEN BY AI ##
+        """
+        trace = write_trace(
+            tmp_path,
+            '{"timestamp": 0.0, "input_length": 10, "output_length": 1}\n'
+            '{"timestamp": 0.5, "input_length": 10, "output_length": 1}\n'
+            '{"timestamp": 60.0, "input_length": 10, "output_length": 1}\n'
+            '{"timestamp": 60.5, "input_length": 10, "output_length": 1}\n'
+            '{"timestamp": 61.0, "input_length": 10, "output_length": 1}\n'
+            '{"timestamp": 65.0, "input_length": 10, "output_length": 1}\n'
+            '{"timestamp": 70.0, "input_length": 10, "output_length": 1}\n',
+        )
+        ds = self.deserialize(
+            deserializer,
+            trace,
+            copies=4,
+            min_concurrent_sessions=4,
+            max_session_wait=1.0,
+        )
+        timestamps = [
+            turn.columns["relative_timestamp_column"][0]
+            for row in ds
+            for turn in load_graph_turns(row)
+        ]
+        inner = [0.0, 0.5, 1.5, 2.5, 3.5, 4.5, 5.5]
+        expected = []
+        offset = 0.0
+        for _ in range(4):
+            expected.extend(ts + offset for ts in inner)
+            offset += inner[-1]
+        assert timestamps == pytest.approx(expected)
+
+    @pytest.mark.smoke
+    def test_min_concurrent_sessions_does_not_collapse_single_turn_rows(
+        self, tmp_path: Path, deserializer
+    ):
+        """Inner packing leaves single-request arrivals in place.
+
+        ## WRITTEN BY AI ##
+        """
+        trace = write_trace(
+            tmp_path,
+            '{"timestamp": 0.0, "input_length": 10, "output_length": 1}\n'
+            '{"timestamp": 0.5, "input_length": 10, "output_length": 1}\n'
+            '{"timestamp": 60.0, "input_length": 10, "output_length": 1}\n'
+            '{"timestamp": 60.5, "input_length": 10, "output_length": 1}\n',
+        )
+        ds = self.deserialize(deserializer, trace, min_concurrent_sessions=4)
+        timestamps = [
+            turn.columns["relative_timestamp_column"][0]
+            for row in ds
+            for turn in load_graph_turns(row)
+        ]
+        assert timestamps == pytest.approx([0.0, 0.5, 60.0, 60.5])
+
+    @pytest.mark.smoke
+    def test_copy_offset_zero_overlays_inner_timestamps(
+        self, tmp_path: Path, deserializer
+    ):
+        """copy_offset=0 starts each copy at the prior copy's first timestamp.
+
+        ## WRITTEN BY AI ##
+        """
+        trace = write_trace(
+            tmp_path,
+            '{"timestamp": 0, "input_length": 10, "output_length": 1}\n'
+            '{"timestamp": 10, "input_length": 10, "output_length": 1}\n'
+            '{"timestamp": 20, "input_length": 10, "output_length": 1}\n',
+        )
+        ds = self.deserialize(deserializer, trace, copies=3, copy_offset=0.0)
+        timestamps = [
+            turn.columns["relative_timestamp_column"][0]
+            for row in ds
+            for turn in load_graph_turns(row)
+        ]
+        inner = [0.0, 10.0, 20.0]
+        assert timestamps == pytest.approx(inner * 3)
+
+    @pytest.mark.sanity
+    def test_copy_offset_half_starts_at_prior_midpoint(
+        self, tmp_path: Path, deserializer
+    ):
+        """copy_offset=0.5 starts the next copy halfway through the prior span.
+
+        ## WRITTEN BY AI ##
+        """
+        trace = write_trace(
+            tmp_path,
+            '{"timestamp": 0, "input_length": 10, "output_length": 1}\n'
+            '{"timestamp": 10, "input_length": 10, "output_length": 1}\n'
+            '{"timestamp": 20, "input_length": 10, "output_length": 1}\n',
+        )
+        ds = self.deserialize(deserializer, trace, copies=2, copy_offset=0.5)
+        timestamps = [
+            turn.columns["relative_timestamp_column"][0]
+            for row in ds
+            for turn in load_graph_turns(row)
+        ]
+        assert timestamps == pytest.approx([0.0, 10.0, 20.0, 10.0, 20.0, 30.0])
+
+    @pytest.mark.sanity
+    def test_copy_offset_above_one_adds_gap(self, tmp_path: Path, deserializer):
+        """copy_offset>1 inserts a gap after the prior copy ends.
+
+        ## WRITTEN BY AI ##
+        """
+        trace = write_trace(
+            tmp_path,
+            '{"timestamp": 0, "input_length": 10, "output_length": 1}\n'
+            '{"timestamp": 10, "input_length": 10, "output_length": 1}\n'
+            '{"timestamp": 20, "input_length": 10, "output_length": 1}\n',
+        )
+        ds = self.deserialize(deserializer, trace, copies=2, copy_offset=1.5)
+        timestamps = [
+            turn.columns["relative_timestamp_column"][0]
+            for row in ds
+            for turn in load_graph_turns(row)
+        ]
+        assert timestamps == pytest.approx([0.0, 10.0, 20.0, 30.0, 40.0, 50.0])
+
+    @pytest.mark.regression
+    def test_copy_offset_gap_not_clamped_by_max_session_wait(
+        self, tmp_path: Path, deserializer
+    ):
+        """Wait caps stay per copy, so copy_offset gaps are not shortened.
+
+        ## WRITTEN BY AI ##
+        """
+        trace = write_trace(
+            tmp_path,
+            '{"timestamp": 0, "input_length": 10, "output_length": 1}\n'
+            '{"timestamp": 100, "input_length": 10, "output_length": 1}\n',
+        )
+        ds = self.deserialize(
+            deserializer,
+            trace,
+            copies=2,
+            copy_offset=3.0,
+            max_session_wait=1.0,
+        )
+        timestamps = [
+            turn.columns["relative_timestamp_column"][0]
+            for row in ds
+            for turn in load_graph_turns(row)
+        ]
+        assert timestamps == pytest.approx([0.0, 1.0, 3.0, 4.0])
+
+    @pytest.mark.smoke
+    def test_copy_offset_zero_does_not_collapse_single_turn_rows(
+        self, tmp_path: Path, deserializer
+    ):
+        """Packing after overlay still leaves single-request arrivals in place.
+
+        ## WRITTEN BY AI ##
+        """
+        trace = write_trace(
+            tmp_path,
+            '{"timestamp": 0.0, "input_length": 10, "output_length": 1}\n'
+            '{"timestamp": 0.5, "input_length": 10, "output_length": 1}\n'
+            '{"timestamp": 60.0, "input_length": 10, "output_length": 1}\n'
+            '{"timestamp": 60.5, "input_length": 10, "output_length": 1}\n',
+        )
+        ds = self.deserialize(
+            deserializer,
+            trace,
+            copies=2,
+            copy_offset=0.0,
+            min_concurrent_sessions=4,
+        )
+        timestamps = [
+            turn.columns["relative_timestamp_column"][0]
+            for row in ds
+            for turn in load_graph_turns(row)
+        ]
+        inner = [0.0, 0.5, 60.0, 60.5]
+        assert timestamps == pytest.approx(inner * 2)
 
     @pytest.mark.regression
     def test_accepts_columns_beyond_the_required_ones(
@@ -317,7 +682,7 @@ class TestTraceDatasetDeserializer:
             '"model": "a", "type": "n", "api_time": 2.87}\n',
         )
         ds = self.deserialize(deserializer, trace)
-        turns = load_graph_turns(next(iter(ds)))
+        turns = [turn for row in ds for turn in load_graph_turns(row)]
         assert len(turns) == 2
         for i, turn in enumerate(turns):
             assert turn.columns["prompt_tokens_count_column"][0] == (i + 1) * 10
@@ -341,32 +706,41 @@ class TestTraceDatasetDeserializer:
             '{"timestamp": 2, "input_length": 20, "output_length": 2, "stop": null}\n',
         )
         ds = self.deserialize(deserializer, trace)
-        turns = load_graph_turns(next(iter(ds)))
+        turns = [turn for row in ds for turn in load_graph_turns(row)]
         assert len(turns) == 2
 
     @pytest.mark.smoke
     def test_rejects_invalid_path(self, deserializer):
         with pytest.raises(ValidationError, match="not a valid path"):
-            self.deserialize(deserializer, 123)
-        with pytest.raises(DataNotSupportedError, match="file not found"):
+            MinimalTraceFormatArgs(
+                source=FileDataArgs(kind="json_file", path=123),
+            )
+        with pytest.raises(
+            DataNotSupportedError,
+            match=r"expected str or Path to a local \.json or \.jsonl file",
+        ):
             self.deserialize(deserializer, "bad_path.jsonl")
-        with pytest.raises(DataNotSupportedError, match="not a file"):
+        with pytest.raises(
+            DataNotSupportedError,
+            match=r"expected str or Path to a local \.json or \.jsonl file",
+        ):
             self.deserialize(deserializer, Path.cwd())
 
     @pytest.mark.sanity
     @pytest.mark.parametrize(
-        ("content", "kwargs", "match"),
+        ("content", "kwargs", "match", "error_type"),
         [
-            ("", {}, "empty"),
             (
                 '{"ts": 0, "input_length": 10, "output_length": 5}\n',
                 {},
                 "timestamp",
+                DataNotSupportedError,
             ),
             (
                 '{"timestamp": 0, "input_length": 10}\n',
                 {},
                 "output_length",
+                DataNotSupportedError,
             ),
             (
                 '{"timestamp": 0, "prompt_tokens": 10, "output_length": 5}\n',
@@ -375,7 +749,21 @@ class TestTraceDatasetDeserializer:
                     "output_tokens_column": "out",
                 },
                 "out",
+                DataNotSupportedError,
             ),
+        ],
+    )
+    def test_trace_validation_raises(
+        self, tmp_path: Path, deserializer, content, kwargs, match, error_type
+    ):
+        trace = write_trace(tmp_path, content)
+        with pytest.raises(error_type, match=match):
+            self.deserialize(deserializer, trace, **kwargs)
+
+    @pytest.mark.sanity
+    @pytest.mark.parametrize(
+        ("content", "kwargs", "match"),
+        [
             (
                 '{"timestamp": 0, "input_length": -1, "output_length": 5}\n',
                 {},
@@ -386,40 +774,19 @@ class TestTraceDatasetDeserializer:
                 {},
                 "non-negative",
             ),
-            (
-                '{"timestamp": "bad", "input_length": 10, "output_length": 5}\n',
-                {},
-                "scalar of type float",
-            ),
-            (
-                '{"timestamp": 0, "input_length": "bad", "output_length": 5}\n',
-                {},
-                "scalar of type int32",
-            ),
-            (
-                '{"timestamp": 0, "input_length": 10, "output_length": null}\n',
-                {},
-                "Missing column values",
-            ),
-            (
-                '{"timestamp": "bad", "input_length": 10, "output_length": 5, '
-                '"model": "a"}\n',
-                {},
-                "scalar of type float",
-            ),
-            (
-                '{"timestamp": 0, "input_length": [1, 2], "output_length": 5}\n',
-                {},
-                "Couldn't cast",
-            ),
         ],
     )
-    def test_trace_validation_raises(
+    def test_trace_row_validation_raises(
         self, tmp_path: Path, deserializer, content, kwargs, match
     ):
+        """Row-level validation runs during iteration, not at deserialize.
+
+        ## WRITTEN BY AI ##
+        """
         trace = write_trace(tmp_path, content)
-        with pytest.raises(DataNotSupportedError, match=match):
-            self.deserialize(deserializer, trace, **kwargs)
+        ds = self.deserialize(deserializer, trace, **kwargs)
+        with pytest.raises(InvalidRowError, match=match):
+            next(iter(ds))
 
     @pytest.mark.sanity
     def test_unsupported_file_suffix_raises(self, tmp_path: Path, deserializer):
@@ -429,5 +796,92 @@ class TestTraceDatasetDeserializer:
             '"hash_ids": [0]}\n',
             suffix=".txt",
         )
-        with pytest.raises(DataNotSupportedError, match=r"Unsupported.*\.txt"):
+        with pytest.raises(
+            DataNotSupportedError,
+            match=r"expected str or Path to a local \.json or \.jsonl file",
+        ):
             self.deserialize(deserializer, trace)
+
+    @pytest.mark.sanity
+    def test_missing_duration_column_warns_once(self, tmp_path: Path, deserializer):
+        """
+        A trace without a duration column logs one warning at load.
+
+        ## WRITTEN BY AI ##
+        """
+        trace = write_trace(
+            tmp_path,
+            '{"timestamp": 1, "input_length": 10, "output_length": 1}\n',
+        )
+        with patch("guidellm.data.deserializers.trace_common.logger") as mock_logger:
+            self.deserialize(deserializer, trace)
+
+        assert mock_logger.warning.call_count == 1
+
+    @pytest.mark.sanity
+    def test_present_duration_column_does_not_warn(self, tmp_path: Path, deserializer):
+        """
+        A trace that includes the duration column does not warn.
+
+        ## WRITTEN BY AI ##
+        """
+        trace = write_trace(
+            tmp_path,
+            '{"timestamp": 1, "input_length": 10, "output_length": 1, '
+            '"duration": 0.5}\n',
+        )
+        with patch("guidellm.data.deserializers.trace_common.logger") as mock_logger:
+            self.deserialize(deserializer, trace)
+
+        mock_logger.warning.assert_not_called()
+
+
+class TestTraceDurationColumn:
+    """Recorded request duration reaches scheduling settings.
+
+    ## WRITTEN BY AI ##
+    """
+
+    @pytest.mark.sanity
+    def test_duration_scales_onto_request_settings(self, tmp_path: Path):
+        """
+        A duration column is stored on RequestSettings after dataset time_scale.
+
+        ## WRITTEN BY AI ##
+        """
+        source = trace_file_source(write_trace(tmp_path, ""))
+        config = MinimalTraceFormatArgs(
+            kind="trace_synthetic",
+            source=source,
+            time_scale=2.0,
+        )
+        dataset = Dataset.from_dict(
+            {
+                "timestamp": [10.0, 15.0],
+                "input_length": [4, 4],
+                "output_length": [1, 1],
+                "duration": [1.0, 0.5],
+            }
+        )
+        trace_format = MinimalTraceFormat(config, dataset)
+        graph = TraceFormatBase.build_conversation_graph(
+            trace_format,
+            dataset,
+            mock_processor(),
+            Faker(),
+        )
+        TraceSessionTiming(time_scale=config.time_scale).apply_scale(graph)
+
+        finalized = GenerativeRequestFinalizer(GenerativeRequestFinalizerArgs())(
+            [{"conversation_turns_column": [graph.model_dump(mode="json")]}]
+        )
+
+        assert isinstance(finalized, GenerativeConversationGraph)
+        assert finalized.nodes["main_0"].settings.trace_duration == pytest.approx(2.0)
+        assert finalized.nodes["main_1"].settings.trace_duration == pytest.approx(1.0)
+        assert finalized.nodes["main_0"].settings.relative_timestamp == pytest.approx(
+            0.0
+        )
+        assert finalized.nodes["main_1"].settings.relative_timestamp == pytest.approx(
+            10.0
+        )

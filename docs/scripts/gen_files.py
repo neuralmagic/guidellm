@@ -4,10 +4,18 @@ for the documentation build and site.
 Uses mkdocs-gen-files to handle the file generation and compatibility with MkDocs.
 """
 
+import json
+import runpy
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+from typing import cast
 
 import mkdocs_gen_files
+
+TranslationRoutes = dict[str, dict[str, str | bool]]
+DOCS_ROOT = Path("docs")
+ENGLISH_DOCS_ROOT = DOCS_ROOT / "en"
 
 
 @dataclass
@@ -78,4 +86,46 @@ def migrate_developer_docs():
     process_files(files, project_root)
 
 
+def mirror_english_docs():
+    """Publish English source files at the existing documentation routes."""
+    project_root = find_project_root()
+    source_root = project_root / ENGLISH_DOCS_ROOT
+
+    for source_path in sorted(source_root.rglob("*.md")):
+        target_path = source_path.relative_to(source_root)
+        content = source_path.read_text(encoding="utf-8")
+
+        with mkdocs_gen_files.open(target_path, "w") as file_handle:
+            file_handle.write(content)
+
+        mkdocs_gen_files.set_edit_path(
+            target_path,
+            source_path.relative_to(project_root),
+        )
+
+
+def generate_translation_map():
+    """Expose translated routes and source currency to the documentation UI."""
+    project_root = find_project_root()
+    translation_module = runpy.run_path(
+        str(project_root / "docs/scripts/check_translations.py")
+    )
+    route_builder = cast(
+        "Callable[[Path], TranslationRoutes]",
+        translation_module["translation_routes"],
+    )
+    routes = route_builder(project_root)
+    content = (
+        "// Generated during the MkDocs build. Do not edit.\n"
+        "window.GUIDELLM_TRANSLATION_ROUTES = Object.freeze("
+        f"{json.dumps(routes, ensure_ascii=False, sort_keys=True)}"
+        ");\n"
+    )
+
+    with mkdocs_gen_files.open("scripts/translation-map.js", "w") as file_handle:
+        file_handle.write(content)
+
+
+mirror_english_docs()
 migrate_developer_docs()
+generate_translation_map()

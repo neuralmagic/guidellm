@@ -11,7 +11,6 @@ __getattr__, __dir__, __all__ = lazy.attach(
     "guidellm",
     submod_attrs={
         "benchmark": [
-            "GenerativeConsoleBenchmarkerProgress",
             "benchmark_generative_text",
             "reimport_benchmarks_report",
         ],

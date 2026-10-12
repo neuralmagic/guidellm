@@ -35,13 +35,15 @@ from guidellm.data.deserializers.trace_common import (
     TraceDatasetDeserializer,
     TraceFormatBase,
     TraceFormatRegistry,
-    _validate_api_conversation,
-    create_distinct_token_block,
+    _validate_api_row,
     create_prompt_from_hash_ids,
     decode_prompt,
+    duration_columns,
+    fill_hash_id_table,
     generate_token_ids,
     get_missing_columns,
 )
+from guidellm.data.schemas import InvalidRowError
 from guidellm.data.schemas.conversation_graph_data import (
     ConversationGraphData,
     ConversationParentRef,
@@ -90,7 +92,10 @@ def _first_api_request(requests: list[Any]) -> dict[str, Any] | None:
         if not isinstance(row, dict):
             continue
         if _is_subagent_entry(row):
-            found = _first_api_request(list(row.get("requests") or []))
+            inner = row.get("requests")
+            if not inner:
+                continue
+            found = _first_api_request(inner)
             if found is not None:
                 return found
             continue
@@ -129,6 +134,36 @@ def _inner_timestamp_transform(
         return inner_t
 
     return _absolute
+
+
+def _absolute_request_times(
+    requests: list[Any],
+    timestamp_column: str,
+    t_transform: Callable[[float], float],
+) -> list[float]:
+    """Collect API request times on the conversation-absolute timeline.
+
+    :param requests: API rows and nested subagent groups
+    :param timestamp_column: Request timestamp field name
+    :param t_transform: Maps this list's raw ``t`` onto conversation-absolute time
+    :return: Absolute timestamps for API requests in ``requests``
+    """
+    times: list[float] = []
+    for item in requests:
+        if not isinstance(item, dict):
+            continue
+        if _is_subagent_entry(item):
+            inner = [dict(row) for row in (item.get("requests") or [])]
+            if not inner:
+                continue
+            transform = _inner_timestamp_transform(item, inner, timestamp_column)
+            times.extend(_absolute_request_times(inner, timestamp_column, transform))
+            continue
+        raw = item.get(timestamp_column)
+        if raw is None:
+            continue
+        times.append(t_transform(float(raw)))
+    return times
 
 
 def _copy_api_row(row: dict[str, Any], hash_ids_column: str) -> dict[str, Any]:
@@ -210,7 +245,9 @@ class WEKATraceFormat(TraceFormatBase):
     blocks in a prompt. The relationships of IDs forms a tree, where every first ID
     in a prompt has a parent node of `None`. Parent nodes can have an unbounded
     number of children. Two hash IDs can represent identical blocks of tokens so long
-    as they do not share the same parent (previous ID).
+    as they do not share the same parent (previous ID). Per-row ``hash_id_scope``
+    of ``"global"`` or omitted shares that table across conversations; ``"local"``
+    isolates it to the current conversation.
 
     Declared ``type: "subagent"`` groups become isolated child chains that
     spawn from the preceding parent API turn (``history_context="new"``) and
@@ -236,11 +273,11 @@ class WEKATraceFormat(TraceFormatBase):
         self.config = config
         self.dataset = dataset
 
-        self.hash_id_table: dict[int, tuple[int, ...]] = {}
-        self.sibling_token_blocks: dict[Any, set[tuple[int, ...]]] = {}
+        self._hash_id_table: dict[int, tuple[int, ...]] = {}
+        self._sibling_table: dict[Any, set[tuple[int, ...]]] = {}
         # Filled by each ``__iter__`` pass so mixed subagent/API schemas are
         # not forced through a single HuggingFace Arrow table.
-        self._conversation_queue: list[tuple[str, list[dict[str, Any]]]] = []
+        self._conversations: list[tuple[str, list[dict[str, Any]], str | None]] = []
         self._tools_json = _serialized_tools(config.tools)
         self._tool_response_sampler: Iterator[int] | None = None
         self.requests_col = _find_requests_column(dataset)
@@ -248,21 +285,53 @@ class WEKATraceFormat(TraceFormatBase):
             raise DataNotSupportedError(
                 "WEKA format: Failed to find requests column or requests was empty"
             )
+        # Running min of API times seen during ``__iter__``. In-order files
+        # (published WEKA, typical captures) establish the shared origin on
+        # the first conversation without a pre-scan.
+        self._trace_origin: float | None = None
+
+    def reset_hash_tables(self) -> None:
+        """Replace hash tables so this copy does not reuse earlier tokens.
+
+        Local-scope conversations still use throwaway tables in
+        ``build_conversation_graph``. The tool-response sampler is reset so
+        each pass draws remainder/tool text from that pass's faker.
+        """
+        self._hash_id_table = {}
+        self._sibling_table = {}
+        self._tool_response_sampler = None
 
     def __iter__(self) -> Iterable[Dataset]:
-        self._conversation_queue = []
+        self._conversations = []
+        self._trace_origin = None
         for row in self.dataset:
             conv_id = str(row[self.config.conversation_id_column])
             # File order is spawn/join topology for every request list,
             # including nested subagent groups. Do not sort by timestamp.
             requests = [dict(item) for item in row[self.requests_col]]
-            index = len(self._conversation_queue)
-            self._conversation_queue.append((conv_id, requests))
+            times = _absolute_request_times(
+                requests, self.config.timestamp_column, float
+            )
+            if times:
+                min_t = min(times)
+                if self._trace_origin is not None and min_t < self._trace_origin:
+                    logger.warning(
+                        "WEKA conversation '{}' starts earlier than previously "
+                        "seen timestamps; the dataset is not ordered "
+                        "chronologically, so relative timestamps of "
+                        "conversations will be misaligned",
+                        conv_id,
+                    )
+                self._trace_origin = (
+                    min_t
+                    if self._trace_origin is None
+                    else min(self._trace_origin, min_t)
+                )
+            raw_scope = row.get("hash_id_scope")
+            hash_id_scope = str(raw_scope) if raw_scope is not None else None
+            index = len(self._conversations)
+            self._conversations.append((conv_id, requests, hash_id_scope))
             yield Dataset.from_dict({"_weka_index": [index]})
-
-    def reset(self) -> None:
-        self.hash_id_table = {}
-        self.sibling_token_blocks = {}
 
     def required_columns(self) -> Features:
         return Features(
@@ -274,7 +343,7 @@ class WEKATraceFormat(TraceFormatBase):
 
     def find_required_columns(self, columns: list[str]) -> list[str]:
         # Only the first API row is searchable here. Missing fields on later
-        # conversations are rejected in validate_conversation.
+        # conversations are skipped at iteration via InvalidRowError.
         conv_col = self.config.conversation_id_column
         if conv_col not in self.dataset.column_names:
             return [self.config.conversation_id_column]
@@ -284,67 +353,85 @@ class WEKATraceFormat(TraceFormatBase):
             return required
         return get_missing_columns(required, list(first_api.keys()))
 
+    def has_duration_column(self) -> bool:
+        """
+        Return whether the first API request includes the duration column.
+
+        WEKA stores request fields inside the requests list, not as dataset
+        columns. Only the first API request is checked.
+
+        :return: True when ``config.duration_column`` is on that request
+        """
+        if self.config.duration_column in self.dataset.column_names:
+            return True
+        first_api = _first_api_request(self.dataset[self.requests_col][0])
+        if first_api is None:
+            return False
+        return self.config.duration_column in first_api
+
     def validate_row(self, row: dict) -> None:
         n_in = row[self.config.prompt_tokens_column]
-        n_blocks = len(row[self.config.hash_ids_column])
+        hash_ids = row.get(self.config.hash_ids_column)
+        # Nested request schemas are unified across conversations, so a later
+        # record that omitted hash_ids arrives as None rather than a missing key.
+        if hash_ids is None:
+            raise InvalidRowError(
+                f"Missing column values in {self.config.hash_ids_column}"
+            )
+        n_blocks = len(hash_ids)
         block_size = self.config.hash_id_block_size
-        for hash_id in row[self.config.hash_ids_column]:
+        for hash_id in hash_ids:
             if hash_id < 0:
-                raise DataNotSupportedError(
-                    f"Hash ID must be non-negative, got {hash_id}"
-                )
+                raise InvalidRowError(f"Hash ID must be non-negative, got {hash_id}")
         expected = n_in / block_size
         if math.floor(expected) != n_blocks and math.ceil(expected) != n_blocks:
-            raise DataNotSupportedError(
+            raise InvalidRowError(
                 f"Input token count of {n_in} split into blocks of size "
                 f"{block_size} full blocks and "
                 f"{block_size} full blocks + partially filled "
                 f"trailing block does not match given {n_blocks} blocks"
             )
 
-    def validate_conversation(self, conversation: Dataset) -> None:
-        _, requests = self._unpack_conversation(conversation)
-        if not requests:
-            raise DataNotSupportedError("Trace conversation is empty")
-        api_rows = self._collect_api_rows(requests)
-        if not api_rows:
-            raise DataNotSupportedError(
-                "WEKA format: conversation has no API requests to replay"
-            )
-        _validate_api_conversation(
-            Dataset.from_list(api_rows),
-            self.config,
-            self.required_columns(),
-            self.validate_row,
-        )
-
     def create_prompt(
-        self, row: dict, processor: PreTrainedTokenizerBase, faker: Faker
+        self,
+        row: dict,
+        processor: PreTrainedTokenizerBase,
+        faker: Faker,
+        hash_id_table: dict[int, tuple[int, ...]] | None = None,
+        sibling_token_blocks: dict[Any, set[tuple[int, ...]]] | None = None,
     ) -> str:
         """Before generating the prompt, this first generates a block of tokens for
         each hash ID that has not already been seen.
 
         Hash IDs that are partially filled are discarded to match the specification.
         Remainder of the prompt is created after the creation via hash IDs token
-        blocks."""
+        blocks.
+
+        :param hash_id_table: Token blocks keyed by hash ID. Instance storage for
+            global scope, or a throwaway dict for local scope. Defaults to the
+            current copy's table.
+        :param sibling_token_blocks: Distinctness set per previous hash ID, matching
+            ``hash_id_table``'s lifetime. Defaults to the current copy's set.
+        """
+        if hash_id_table is None:
+            hash_id_table = self._hash_id_table
+        if sibling_token_blocks is None:
+            sibling_token_blocks = self._sibling_table
         ids = row[self.config.hash_ids_column]
         n_in = row[self.config.prompt_tokens_column]
         block_size = self.config.hash_id_block_size
         expected = n_in / block_size
         if math.floor(expected) != len(ids) and math.ceil(expected) == len(ids):
             ids.pop()
-        for idx, hash_id in enumerate(ids):
-            if hash_id not in self.hash_id_table:
-                prev_id = None if idx == 0 else ids[idx - 1]
-                self.sibling_token_blocks.setdefault(prev_id, set())
-                self.hash_id_table[hash_id] = create_distinct_token_block(
-                    block_size,
-                    self.sibling_token_blocks[prev_id],
-                    processor,
-                    faker,
-                )
-                self.sibling_token_blocks[prev_id].add(self.hash_id_table[hash_id])
-        prompt = create_prompt_from_hash_ids(ids, self.hash_id_table, processor)
+        fill_hash_id_table(
+            ids,
+            hash_id_table,
+            sibling_token_blocks,
+            processor,
+            faker,
+            lambda _idx, _hash_id: block_size,
+        )
+        prompt = create_prompt_from_hash_ids(ids, hash_id_table, processor)
         remainder = _generate_remaining_prompt(n_in % block_size, processor, faker)
         if not prompt:
             return remainder
@@ -358,7 +445,15 @@ class WEKATraceFormat(TraceFormatBase):
         processor: PreTrainedTokenizerBase,
         faker: Faker,
     ) -> ConversationGraphData:
-        conv_id, requests = self._unpack_conversation(conversation)
+        conv_id, requests, hash_id_scope = self._unpack_conversation(conversation)
+        # Local scope uses throwaway tables so this conversation cannot reuse
+        # or pollute the instance-level hash storage used by global/unset rows.
+        if hash_id_scope == "local":
+            hash_id_table: dict[int, tuple[int, ...]] = {}
+            sibling_token_blocks: dict[Any, set[tuple[int, ...]]] = {}
+        else:
+            hash_id_table = self._hash_id_table
+            sibling_token_blocks = self._sibling_table
         specs, _last = self._emit_chain(
             requests,
             agent_id="default",
@@ -370,22 +465,50 @@ class WEKATraceFormat(TraceFormatBase):
             conversation_id=conv_id,
         )
         if not specs:
-            raise DataNotSupportedError(
+            raise InvalidRowError(
                 "WEKA format: conversation has no API requests to replay"
             )
-        min_t = min(spec.absolute_t for spec in specs)
+        # One pass builds turns and stops at the first turn that would exceed
+        # the context budget, before prompt generation. The dataset origin is
+        # already known, so relative timestamps are written in this same pass.
+        max_len = self.config.max_context_len
+        prompt_col = self.config.prompt_tokens_column
+        output_col = self.config.output_tokens_column
+        origin = 0.0 if self._trace_origin is None else self._trace_origin
+        running_tokens = 0
         turns: list[ConversationTurnData] = []
-        for spec in specs:
-            prompt = self.create_prompt(spec.row, processor, faker)
+        for index, spec in enumerate(specs):
+            if max_len is not None:
+                turn_tokens = int(spec.row[prompt_col]) + int(spec.row[output_col])
+                if running_tokens + turn_tokens > max_len:
+                    logger.debug(
+                        "WEKA conversation '{}' truncated: discarding {} "
+                        "turn(s) starting at node '{}' (turn tokens={}, "
+                        "running={})",
+                        conv_id,
+                        len(specs) - index,
+                        spec.node_id,
+                        turn_tokens,
+                        running_tokens,
+                    )
+                    if len(turns) < 1:
+                        return ConversationGraphData(turns=[])
+                    break
+                running_tokens += turn_tokens
+            _validate_api_row(spec.row, self.config, self.validate_row)
+            prompt = self.create_prompt(
+                spec.row,
+                processor,
+                faker,
+                hash_id_table,
+                sibling_token_blocks,
+            )
             columns: dict[str, Any] = {
                 "text_column": [prompt],
-                "prompt_tokens_count_column": [
-                    spec.row[self.config.prompt_tokens_column]
-                ],
-                "output_tokens_count_column": [
-                    spec.row[self.config.output_tokens_column]
-                ],
-                "relative_timestamp_column": [spec.absolute_t - min_t],
+                "prompt_tokens_count_column": [spec.row[prompt_col]],
+                "output_tokens_count_column": [spec.row[output_col]],
+                "relative_timestamp_column": [spec.absolute_t - origin],
+                **duration_columns(spec.row, self.config),
             }
             if spec.turn_type is not None:
                 columns["turn_type_column"] = [spec.turn_type]
@@ -433,24 +556,26 @@ class WEKATraceFormat(TraceFormatBase):
 
     def _unpack_conversation(
         self, conversation: Dataset
-    ) -> tuple[str, list[dict[str, Any]]]:
-        index = int(conversation[0]["_weka_index"])
-        return self._conversation_queue[index]
+    ) -> tuple[str, list[dict[str, Any]], str | None]:
+        """Look up the nested request list for a conversation stub from ``__iter__``.
 
-    def _collect_api_rows(self, requests: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        api_rows: list[dict[str, Any]] = []
-        columns = (
-            self.config.timestamp_column,
-            self.config.prompt_tokens_column,
-            self.config.output_tokens_column,
-            self.config.hash_ids_column,
-        )
-        for row in requests:
-            if _is_subagent_entry(row):
-                api_rows.extend(self._collect_api_rows(list(row.get("requests") or [])))
-                continue
-            api_rows.append({col: row.get(col) for col in columns})
-        return api_rows
+        The ``requests`` column mixes API request records with
+        ``type: "subagent"`` groups, which cannot share one Arrow schema, so
+        ``__iter__`` does not put that list into the yielded Dataset. It
+        appends ``(conversation_id, requests, hash_id_scope)`` to
+        ``self._conversations`` and yields a Dataset with a single row and a
+        single column, ``_weka_index``.
+
+        ``conversation[0]`` is the only row in the yielded Dataset.
+        ``_weka_index`` is the integer index of the matching entry in
+        ``self._conversations``.
+
+        :param conversation: One-row Dataset yielded by ``__iter__``.
+        :return: ``(conversation_id, requests, hash_id_scope)`` for that
+            conversation. ``hash_id_scope`` is ``None`` when the field is omitted.
+        """
+        index = int(conversation[0]["_weka_index"])
+        return self._conversations[index]
 
     def _emit_chain(
         self,
@@ -478,11 +603,11 @@ class WEKATraceFormat(TraceFormatBase):
         pending_join_ids: list[str] = []
         last_chain_id: str | None = None
         chain_idx = 0
-        chain_events: list[tuple[float, float | None]] = []
         # Previous API row's stop on this chain only. Subagent children are
         # interleaved in the flattened spec list, so classification cannot
         # use that list's adjacency.
         prev_stop: str | None = None
+        prev_event: tuple[float, float | None] | None = None
 
         for item in requests:
             if _is_subagent_entry(item):
@@ -557,7 +682,9 @@ class WEKATraceFormat(TraceFormatBase):
             )
             last_chain_id = node_id
             chain_idx += 1
-            chain_events.append((abs_t, _optional_float(item.get("api_time"))))
+            event = (abs_t, _optional_float(item.get("api_time")))
+            self._warn_chain_overlap(conversation_id, agent_id, prev_event, event)
+            prev_event = event
             prev_stop = _weka_stop_reason(item)
 
         if pending_join_ids:
@@ -568,51 +695,51 @@ class WEKATraceFormat(TraceFormatBase):
                 agent_id,
             )
 
-        self._warn_chain_overlap(conversation_id, agent_id, chain_events)
         return specs, last_chain_id
 
     def _warn_chain_overlap(
         self,
         conversation_id: str,
         agent_id: str,
-        events: list[tuple[float, float | None]],
+        prev_event: tuple[float, float | None] | None,
+        event: tuple[float, float | None],
     ) -> None:
         """Warn when consecutive turns of one agent overlap in time.
 
+        Published WEKA traces include consecutive same-agent turns whose
+        ``api_time`` windows overlap; those turns are serialized on one chain.
         Overlap uses recorded ``api_time`` when present
         (``t[i] + api_time[i] > t[i+1]``), otherwise non-increasing start
         times. Parallel subagents overlapping each other is intended and
         is not warned here; each agent chain is checked separately.
         """
-        for idx in range(len(events) - 1):
-            t_i, api_time = events[idx]
-            t_next, _ = events[idx + 1]
-            if api_time is not None:
-                overlapped = t_i + api_time > t_next
-            else:
-                overlapped = t_next <= t_i
-            if not overlapped:
-                continue
-            if api_time is not None:
-                logger.debug(
-                    "WEKA conversation '{}' agent '{}' has overlapping requests: "
-                    "the request at t={} will run until t={}, which is after "
-                    "the next request at t={}; they will be serialized on "
-                    "this chain",
-                    conversation_id,
-                    agent_id,
-                    t_i,
-                    t_i + api_time,
-                    t_next,
-                )
-            else:
-                logger.debug(
-                    "WEKA conversation '{}' agent '{}' has overlapping requests: "
-                    "the request at t={} is followed by a request at t={} "
-                    "that does not start later; they will be serialized on "
-                    "this chain",
-                    conversation_id,
-                    agent_id,
-                    t_i,
-                    t_next,
-                )
+        if prev_event is None:
+            return
+        t_i, api_time = prev_event
+        t_next, _ = event
+        overlapped = t_i + api_time > t_next if api_time is not None else t_next <= t_i
+        if not overlapped:
+            return
+        if api_time is not None:
+            logger.debug(
+                "WEKA conversation '{}' agent '{}' has overlapping requests: "
+                "the request at t={} will run until t={}, which is after "
+                "the next request at t={}; they will be serialized on "
+                "this chain",
+                conversation_id,
+                agent_id,
+                t_i,
+                t_i + api_time,
+                t_next,
+            )
+        else:
+            logger.debug(
+                "WEKA conversation '{}' agent '{}' has overlapping requests: "
+                "the request at t={} is followed by a request at t={} "
+                "that does not start later; they will be serialized on "
+                "this chain",
+                conversation_id,
+                agent_id,
+                t_i,
+                t_next,
+            )
