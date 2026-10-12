@@ -97,8 +97,6 @@ Run all four shapes on the same server and compare the results side by side.
 | Code gen      | 128 / 1024      | 2100               | 18            | 14           | Decode (ITL)   |
 | Balanced      | 1000 / 1000     | 1350               | 95            | 13           | Mixed          |
 
-
-
 Key observations:
 
 - **Summarization has the highest TTFT** because the server processes 2048 input tokens before generating the first output token **(prefill-bound)**. But ITL is the lowest because there are very few tokens to decode.

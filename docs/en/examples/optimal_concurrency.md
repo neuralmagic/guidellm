@@ -30,13 +30,13 @@ Adjust `prompt_tokens` and `output_tokens` to match your actual workload. A chat
 
 Open the console output or JSON report. For each strategy, look at these metrics:
 
-| Metric                            | What it tells you                                          |
-| --------------------------------- | ---------------------------------------------------------- |
-| `output_tokens_per_second` (mean) | Server throughput — how much work is getting done          |
+| Metric                            | What it tells you                                         |
+| --------------------------------- | --------------------------------------------------------- |
+| `output_tokens_per_second` (mean) | Server throughput — how much work is getting done         |
 | `time_to_first_token_ms` (p50)    | Median user-perceived wait before they receive a response |
-| `time_to_first_token_ms` (p99)    | Worst-case wait — important for tail latency SLOs          |
-| `inter_token_latency_ms` (p50)    | How smooth the streaming experience feels                  |
-| `request_latency` (p50)           | Total end-to-end time per request                          |
+| `time_to_first_token_ms` (p99)    | Worst-case wait — important for tail latency SLOs         |
+| `inter_token_latency_ms` (p50)    | How smooth the streaming experience feels                 |
+| `request_latency` (p50)           | Total end-to-end time per request                         |
 
 ## Step 3: Identify the Three Zones
 
