@@ -1,5 +1,5 @@
 ---
-title: 한국어
+title: 홈
 weight: 100
 ---
 
@@ -36,7 +36,7 @@ weight: 100
 
   GuideLLM을 설치하고 첫 번째 벤치마크를 설정한 후, 결과를 분석하여 LLM 배포 환경을 최적화합니다.
 
-  [:octicons-arrow-right-24: 시작하기](./getting-started/)
+  [:octicons-arrow-right-24: 시작하기](./getting-started/install.md)
 
 - :material-book-open-variant:{ .lg .middle } 가이드
 
@@ -44,7 +44,7 @@ weight: 100
 
   효과적인 LLM 벤치마킹을 위한 백엔드, 데이터셋, 평가 지표 및 서비스 수준 목표(SLO)를 자세히 다룹니다.
 
-  [:octicons-arrow-right-24: 가이드](./guides/)
+  [:octicons-arrow-right-24: 영어 가이드 보기](../guides/)
 
 - :material-code-tags:{ .lg .middle } 사용 예제
 
@@ -52,7 +52,7 @@ weight: 100
 
   실제 벤치마킹 시나리오와 최적화 기법을 단계별로 설명합니다.
 
-  [:octicons-arrow-right-24: 사용 예제](./examples/)
+  [:octicons-arrow-right-24: 영어 사용 예제 보기](../examples/)
 
 - :material-api:{ .lg .middle } API 레퍼런스
 
@@ -60,6 +60,6 @@ weight: 100
 
   벤치마킹을 기존 워크플로에 통합할 수 있도록 GuideLLM API의 전반적인 내용을 상세히 다룹니다.
 
-  [:octicons-arrow-right-24: API 레퍼런스](./api/)
+  [:octicons-arrow-right-24: 영어 API 레퍼런스 보기](../reference/guidellm/index.md)
 
 </div>

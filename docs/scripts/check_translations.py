@@ -10,10 +10,15 @@ from dataclasses import dataclass
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_MANIFEST_PATH = Path("docs/zh/.translation-sources.json")
 DOCS_ROOT = Path("docs")
 ENGLISH_DOCS_ROOT = DOCS_ROOT / "en"
-TRANSLATIONS_ROOT = DOCS_ROOT / "zh"
+TRANSLATION_MANIFESTS = {
+    "zh": DOCS_ROOT / "zh" / ".translation-sources.json",
+    "ko": DOCS_ROOT / "ko" / ".translation-sources.json",
+}
+
+DEFAULT_LANGUAGE = "zh"
+DEFAULT_MANIFEST_PATH = TRANSLATION_MANIFESTS[DEFAULT_LANGUAGE]
 
 
 @dataclass(frozen=True)
@@ -124,6 +129,8 @@ def validate_translations(
     except (OSError, ValueError, json.JSONDecodeError) as error:
         return TranslationStatus(errors=(str(error),), stale=())
 
+    translations_docs_root = manifest_path.parent
+
     errors: list[str] = []
     stale: list[str] = []
     seen_sources: set[Path] = set()
@@ -136,20 +143,26 @@ def validate_translations(
         seen_sources.add(entry.source)
         seen_translations.add(entry.translation)
 
-        entry_status = _validate_entry(project_root, entry)
+        entry_status = _validate_entry(project_root, entry, translations_docs_root)
         errors.extend(entry_status.errors)
         stale.extend(entry_status.stale)
 
-    errors.extend(_find_unregistered_pages(project_root, seen_translations))
+    errors.extend(
+        _find_unregistered_pages(
+            project_root, seen_translations, translations_docs_root
+        )
+    )
 
     return TranslationStatus(errors=tuple(errors), stale=tuple(stale))
 
 
-def _validate_entry(project_root: Path, entry: TranslationSource) -> TranslationStatus:
+def _validate_entry(
+    project_root: Path, entry: TranslationSource, translations_docs_root: Path
+) -> TranslationStatus:
     errors: list[str] = []
     stale: list[str] = []
     english_root = (project_root / ENGLISH_DOCS_ROOT).resolve()
-    translations_root = (project_root / TRANSLATIONS_ROOT).resolve()
+    translations_root = (project_root / translations_docs_root).resolve()
 
     try:
         source = _repository_path(project_root, entry.source.as_posix())
@@ -160,7 +173,10 @@ def _validate_entry(project_root: Path, entry: TranslationSource) -> Translation
     if not source.is_relative_to(english_root):
         errors.append(f"English source must be under docs/en/: {entry.source}")
     if not translation.is_relative_to(translations_root):
-        errors.append(f"Translation must be under docs/zh/: {entry.translation}")
+        errors.append(
+            f"Translation must be under "
+            f"{translations_docs_root.as_posix()}/: {entry.translation}"
+        )
     if not source.is_file():
         errors.append(f"English source does not exist: {entry.source}")
     if not translation.is_file():
@@ -185,9 +201,9 @@ def _validate_entry(project_root: Path, entry: TranslationSource) -> Translation
 
 
 def _find_unregistered_pages(
-    project_root: Path, registered_paths: set[Path]
+    project_root: Path, registered_paths: set[Path], translations_docs_root: Path
 ) -> tuple[str, ...]:
-    translations_root = (project_root / TRANSLATIONS_ROOT).resolve()
+    translations_root = (project_root / translations_docs_root).resolve()
     registered = {path.as_posix() for path in registered_paths}
     errors: list[str] = []
 
@@ -278,20 +294,33 @@ def main() -> int:
         action="store_true",
         help="Refresh source hashes after reviewing translated pages.",
     )
+    parser.add_argument(
+        "--language",
+        choices=tuple(TRANSLATION_MANIFESTS),
+        help="Check or update one language",
+    )
     args = parser.parse_args()
-
-    if args.update:
-        update_source_hashes()
-
-    status = validate_translations()
-    for message in status.errors:
-        sys.stdout.write(f"ERROR: {message}\n")
-    for message in status.stale:
-        sys.stdout.write(f"WARNING: {message}\n")
-
-    if status.errors or (args.strict and status.stale):
+    languages: tuple[str, ...]
+    if args.language is not None:
+        languages = (args.language,)
+    elif args.update:
+        languages = (DEFAULT_LANGUAGE,)
+    else:
+        languages = tuple(TRANSLATION_MANIFESTS)
+    failed = False
+    for language in languages:
+        manifest_path = TRANSLATION_MANIFESTS[language]
+        if args.update:
+            update_source_hashes(PROJECT_ROOT, manifest_path)
+        status = validate_translations(PROJECT_ROOT, manifest_path)
+        for message in status.errors:
+            sys.stdout.write(f"ERROR [{language}]: {message}\n")
+        for message in status.stale:
+            sys.stdout.write(f"WARNING [{language}]: {message}\n")
+        if status.errors or (args.strict and status.stale):
+            failed = True
+    if failed:
         return 1
-
     sys.stdout.write("Translation metadata is valid.\n")
     return 0
 
