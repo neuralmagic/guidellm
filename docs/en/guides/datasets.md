@@ -125,7 +125,7 @@ guidellm run \
 
 With a standard deviation, token counts follow a normal distribution clipped to the configured bounds. Without one, differing bounds produce a uniform integer distribution. For example, `prompt_tokens=256,prompt_tokens_stdev=16` has default bounds of 176 and 336 tokens.
 
-Synthetic text is generated on demand; `samples` and `source` are not `synthetic_text` options. Use runtime constraints such as `--constraint kind=max_requests,count=1000` to stop the benchmark. To pre-generate a fixed pool of rows and reuse it across dataset iterations, set `samples` on the data loader:
+Synthetic text is generated on demand. Use runtime constraints such as `--constraint kind=max_requests,count=1000` to stop the benchmark. To pre-generate a fixed pool of rows and reuse it across dataset iterations, set `samples` on the data loader:
 
 ```bash
 guidellm run \
