@@ -185,7 +185,9 @@ class GenerativeBenchmarkTimings(StandardBaseModel):
         if not warmup_active:
             # No warmup, set measure_start to first request start
             self.measure_start = self.request_start
-        elif measure_start is not None:
+        elif measure_start is not None and self.measure_start is None:
+            # Record the transition once; later updates for the next request
+            # still match the transition condition but must not move it
             self.measure_start = measure_start
         cooldown_active, measure_end = config.cooldown.compute_transition_time(
             info=info, state=scheduler_state, period="end"

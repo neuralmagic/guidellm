@@ -180,7 +180,7 @@ class TransientPhaseConfig(StandardBaseModel):
                     info.completed_at
                     if info.completed_at is not None
                     and state.progress.remaining_requests is not None
-                    and state.progress.remaining_requests == phase_requests + 1
+                    and state.progress.remaining_requests == phase_requests
                     else -1.0
                 )
 
