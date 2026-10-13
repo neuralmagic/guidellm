@@ -10,7 +10,7 @@ Determine the maximum number of concurrent users your LLM server can handle befo
 
 ## Step 1: Run a Sweep
 
-The [`sweep`](https://docs.vllm.ai/en/stable/benchmarking/sweeps/) profile automatically tests increasing load levels — starting from a single sequential request, ramping up to maximum throughput, and interpolating several rates in between. It stops automatically when it detects the server is over-saturated.
+The `sweep` profile automatically tests increasing load levels; starting from a single sequential request, ramping up to maximum throughput, and interpolating several rates in between.
 
 ```bash
 guidellm run \
@@ -22,7 +22,7 @@ guidellm run \
   --output kind=json,path=sweep_results.json
 ```
 
-This runs up to 10 strategies (synchronous baseline, throughput ceiling, and 8 interpolated rates) for 120 seconds each. The over-saturation detector will skip remaining strategies once the server can no longer keep up.
+This runs up to 10 strategies (synchronous baseline, throughput ceiling, and 8 interpolated rates) for 120 seconds each.
 
 Adjust `prompt_tokens` and `output_tokens` to match your actual workload. A chat application might use `prompt_tokens=256,output_tokens=512`, while a summarization pipeline might use `prompt_tokens=2048,output_tokens=128`.
 
