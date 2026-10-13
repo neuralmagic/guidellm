@@ -7,6 +7,7 @@ Unit tests for guidellm.data.tokenizers.huggingface module.
 from __future__ import annotations
 
 import pytest
+from huggingface_hub.errors import HFValidationError
 
 from guidellm.data.tokenizers.huggingface import HuggingFaceTokenizer
 from guidellm.schemas.data import HuggingFaceTokenizerArgs
@@ -203,8 +204,7 @@ class TestHuggingFaceTokenizer:
         with pytest.raises(ValueError, match=hint) as info:
             tokenizer()
         assert str(info.value).count(name) == 1
-        assert info.value.__cause__ is None
-        assert info.value.__suppress_context__
+        assert isinstance(info.value.__cause__, HFValidationError)
 
     @pytest.mark.sanity
     def test_valid_repo_id_is_passed_through(self, monkeypatch: pytest.MonkeyPatch):

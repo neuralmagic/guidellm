@@ -62,4 +62,4 @@ class HuggingFaceTokenizer(DataTokenizer):
                 "server, which for servers such as Ollama is not a Hugging Face id. "
                 "Pass one explicitly, for example "
                 "--tokenizer kind=huggingface_auto,model=Qwen/Qwen3-4B"
-            ) from None
+            ) from err
