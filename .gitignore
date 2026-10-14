@@ -187,6 +187,10 @@ cython_debug/
 *.json
 *.yaml
 
+# Translation source manifests
+!docs/*/.translation-sources.json
+!docs/*/title_map.json
+
 # But not scenarios
 !src/guidellm/schemas/benchmark/scenarios/*.json
 !src/guidellm/schemas/benchmark/scenarios/**/*.json
