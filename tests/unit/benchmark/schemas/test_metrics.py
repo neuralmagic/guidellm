@@ -1297,6 +1297,8 @@ class TestSchedulerMetricsGenerationDelayCompile:
         """
         metrics = _compile_cached_conversations()
 
+        assert metrics.cached_token_count is not None
+        assert metrics.prefix_cache_hit_rate is not None
         assert metrics.cached_token_count.successful.count == 12
         assert metrics.cached_token_count.successful.mean == pytest.approx(8.0)
         assert metrics.prefix_cache_hit_rate.successful.count == 12
@@ -1314,11 +1316,18 @@ class TestSchedulerMetricsGenerationDelayCompile:
         metrics = _compile_cached_conversations()
 
         assert metrics.turns is not None
-        hit_rates = [turn.prefix_cache_hit_rate for turn in metrics.turns]
+        assert metrics.prefix_cache_hit_rate is not None
+        hit_rates = [
+            turn.prefix_cache_hit_rate
+            for turn in metrics.turns
+            if turn.prefix_cache_hit_rate is not None
+        ]
         assert [rate.successful.mean for rate in hit_rates] == pytest.approx(
             [0.0, 1 / 2, 2 / 3]
         )
         turn_1 = metrics.turns[1]
+        assert turn_1.prefix_cache_hit_rate is not None
+        assert turn_1.cached_token_count is not None
         assert turn_1.request_totals.successful == 5
         assert turn_1.prefix_cache_hit_rate.successful.count == 4
         assert turn_1.cached_token_count.successful.mean == pytest.approx(8.0)
@@ -1329,7 +1338,9 @@ class TestSchedulerMetricsGenerationDelayCompile:
     @pytest.mark.sanity
     def test_prefix_cache_metrics_unreported(self):
         """
-        Leave the cache distributions empty when the server reports no counts.
+        Leave the cache metrics unset when the server reports no counts.
+
+        An empty distribution would read as a 0% hit rate.
 
         ## WRITTEN BY AI ##
         """
@@ -1342,8 +1353,25 @@ class TestSchedulerMetricsGenerationDelayCompile:
 
         assert metrics.turns is not None
         for summary in (metrics, *metrics.turns):
-            assert summary.prefix_cache_hit_rate.successful.count == 0
-            assert summary.cached_token_count.successful.count == 0
+            assert summary.prefix_cache_hit_rate is None
+            assert summary.cached_token_count is None
+
+    @pytest.mark.regression
+    def test_prefix_cache_metrics_absent_from_saved_report(self):
+        """
+        Load metrics saved before the cache metrics existed.
+
+        ## WRITTEN BY AI ##
+        """
+        saved = _compile_cached_conversations().model_dump()
+        for summary in (saved, *saved["turns"]):
+            del summary["cached_token_count"], summary["prefix_cache_hit_rate"]
+
+        loaded = GenerativeMetrics.model_validate(saved)
+
+        assert loaded.prefix_cache_hit_rate is None
+        assert loaded.turns is not None
+        assert loaded.turns[0].prefix_cache_hit_rate is None
 
 
 def _make_streamed_request(  # noqa: PLR0913
