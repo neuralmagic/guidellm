@@ -10,17 +10,17 @@ from __future__ import annotations
 
 import contextlib
 from abc import ABC
-from typing import Any, ClassVar, Literal
+from typing import Any, ClassVar
 
 from pydantic import (
     Field,
     NonNegativeFloat,
-    NonNegativeInt,
     field_validator,
 )
 
 from guidellm.schemas import PydanticClassRegistryMixin, standard_model_config
 from guidellm.schemas.benchmark.transient import TransientPhaseConfig
+from guidellm.schemas.scheduler.prefetch import Prefetch
 from guidellm.utils.imports import json
 
 __all__ = ["ProfileArgs"]
@@ -61,7 +61,7 @@ class ProfileArgs(PydanticClassRegistryMixin["ProfileArgs"], ABC):
         default=0.0,
         description=("Duration in seconds to ramp up the targeted scheduling rate"),
     )
-    prefetch: NonNegativeInt | Literal["start", "all"] = Field(
+    prefetch: Prefetch = Field(
         default=0,
         description=(
             "Number of requests to load before the run starts, 'start' to "
@@ -69,13 +69,6 @@ class ProfileArgs(PydanticClassRegistryMixin["ProfileArgs"], ABC):
             "'all' (-1) to load every request from a finite dataset"
         ),
     )
-
-    @field_validator("prefetch", mode="before")
-    @classmethod
-    def _normalize_prefetch(cls, value: Any) -> Any:
-        if value in (-1, "-1", "all"):
-            return "all"
-        return value
     warmup: TransientPhaseConfig = Field(
         default_factory=TransientPhaseConfig,
         description="Warmup phase to exclude initial transient period",

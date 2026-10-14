@@ -779,9 +779,9 @@ class _GenerativeProgressTaskState:
     def start(self, strategy: SchedulingStrategy):
         self.strategy = strategy
         self.strategy_type = strategy.type_
-        # None means every request is loaded before the run starts.
+        # "all" means every request is loaded before the run starts.
         prefetch_count = strategy.prefetch_count()
-        if prefetch_count is None or prefetch_count > 0:
+        if prefetch_count == "all" or prefetch_count > 0:
             self.benchmark_status = "loading"
 
     def update(

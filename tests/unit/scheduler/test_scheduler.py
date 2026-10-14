@@ -359,28 +359,27 @@ def test_prefetch_requests_leaves_the_remainder():
 
 
 @pytest.mark.smoke
-def test_prefetch_requests_skips_non_positive_counts():
+def test_prefetch_requests_skips_zero():
     """
-    A non-positive count returns the original iterable without consuming it.
+    A count of zero returns the original iterable without consuming it.
 
     ## WRITTEN BY AI ##
     """
     graphs = [_graph(["a"])]
 
     assert _prefetch_requests(graphs, 0) is graphs
-    assert _prefetch_requests(graphs, -1) is graphs
 
 
 @pytest.mark.smoke
 def test_prefetch_all_exhausts_a_finite_dataset():
     """
-    A missing count loads every graph from a finite iterable.
+    ``"all"`` loads every graph from a finite iterable.
 
     ## WRITTEN BY AI ##
     """
     graphs = [_graph(["a"]), _graph(["b"])]
 
-    assert _prefetch_requests(graphs, None) == graphs
+    assert _prefetch_requests(graphs, "all") == graphs
 
 
 @pytest.mark.regression
@@ -399,4 +398,4 @@ def test_prefetch_all_rejects_an_infinite_dataset():
             raise AssertionError("infinite dataset was iterated")
 
     with pytest.raises(ValueError, match="infinite dataset"):
-        _prefetch_requests(_Infinite(), None)
+        _prefetch_requests(_Infinite(), "all")

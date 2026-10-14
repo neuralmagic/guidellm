@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from itertools import chain
-from typing import Generic, Protocol, runtime_checkable
+from typing import Generic, Literal, Protocol, runtime_checkable
 
 from guidellm.scheduler.constraints import (
     Constraint,
@@ -45,21 +45,22 @@ class InfiniteDataset(Protocol):
 
 def _prefetch_requests(
     requests: DatasetIterT[RequestT],
-    count: int | None,
+    count: int | Literal["all"],
 ) -> DatasetIterT[RequestT]:
     """
     Load request graphs until ``count`` request nodes are buffered.
 
-    Graphs that cross the count are kept whole. A count of ``0`` or less
-    returns ``requests`` unchanged. ``None`` loads every graph, and raises
-    when the dataset reports that it is infinite.
+    Graphs that cross the count are kept whole. A count of ``0`` returns
+    ``requests`` unchanged. ``"all"`` loads every graph, and raises when the
+    dataset reports that it is infinite.
 
     :param requests: Dataset iterable of conversation graphs
-    :param count: Number of request nodes to load, or ``None`` to load all
+    :param count: Number of request nodes to load, or ``"all"`` to load every
+        request
     :return: Buffered graphs followed by the remainder of the dataset
-    :raises ValueError: If ``count`` is ``None`` and the dataset is infinite
+    :raises ValueError: If ``count`` is ``"all"`` and the dataset is infinite
     """
-    if count is None:
+    if count == "all":
         if isinstance(requests, InfiniteDataset) and requests.is_infinite():
             raise ValueError(
                 "Cannot prefetch all requests from an infinite dataset. "
@@ -73,7 +74,7 @@ def _prefetch_requests(
             fetched += len(graph.nodes)
         return buffered
 
-    if count <= 0:
+    if count == 0:
         return requests
 
     iterator = iter(requests)
