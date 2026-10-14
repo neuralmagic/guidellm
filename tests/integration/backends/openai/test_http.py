@@ -228,20 +228,24 @@ async def test_streaming_requests_reuse_connections(concurrency: int):
 @pytest.mark.asyncio
 @pytest.mark.timeout(10)
 async def test_response_held_open_after_final_event():
-    """Stop reading a response held open after its final event.
+    """Return before reading a held-open response, and stop reading at shutdown.
 
     ## WRITTEN BY AI ##
     """
     async with _LocalChatServer(hold_open=True) as server:
         backend = _make_backend(server.url)
         request_info = RequestInfo(request_id="test-id")
-        with patch("guidellm.backends.openai.http._READ_TO_END_TIMEOUT", 0.2):
+        with patch("guidellm.backends.openai.http._READ_TO_END_TIMEOUT", 0.5):
+            await backend.process_startup()
             started = time.time()
-            await _resolve_all(backend, request_info)
-            elapsed = time.time() - started
+            await _resolve_once(backend, request_info)
+            resolved = time.time() - started
+            await backend.process_shutdown()
+            shut_down = time.time() - started
 
     timings = request_info.timings
-    assert 0.2 <= elapsed < 1.0
+    assert resolved < 0.3
+    assert 0.5 <= shut_down < 1.5
     assert timings.request_end is not None
     assert timings.last_token_iteration is not None
     assert timings.request_end - timings.last_token_iteration < 0.2

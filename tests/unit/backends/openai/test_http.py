@@ -17,11 +17,7 @@ from pydantic import ValidationError
 from pytest_httpx import HTTPXMock, IteratorStream
 
 from guidellm.backends.backend import Backend
-from guidellm.backends.openai.http import (
-    OpenAIHTTPBackend,
-    _PerRequestPoolTransport,
-    _ReleasingStream,
-)
+from guidellm.backends.openai.http import OpenAIHTTPBackend
 from guidellm.backends.openai.request_handlers import (
     OpenAIRequestHandler,
     OpenAIRequestHandlerFactory,
@@ -1295,58 +1291,3 @@ async def test_stream_read_to_end_only_over_http11(
         await backend.process_shutdown()
 
     assert chunks.read == expected_read
-
-
-@pytest.mark.sanity
-@pytest.mark.asyncio
-async def test_releasing_stream_releases_once():
-    """Release once even when the stream is closed twice.
-
-    ## WRITTEN BY AI ##
-    """
-    released: list[bool] = []
-    stream = _ReleasingStream(httpx.ByteStream(b"data"), lambda: released.append(True))
-
-    assert [chunk async for chunk in stream] == [b"data"]
-    await stream.aclose()
-    await stream.aclose()
-    assert released == [True]
-
-
-@pytest.mark.sanity
-@pytest.mark.asyncio
-async def test_pool_transport_reuses_transport_after_error(httpx_mock: HTTPXMock):
-    """Return a transport to the pool when its request fails.
-
-    ## WRITTEN BY AI ##
-    """
-    httpx_mock.add_exception(httpx.ConnectError("refused"))
-    httpx_mock.add_response(json={})
-    transport = _PerRequestPoolTransport()
-
-    async with httpx.AsyncClient(transport=transport) as client:
-        with pytest.raises(httpx.ConnectError):
-            await client.get("http://test/")
-        await client.get("http://test/")
-        assert len(transport._transports) == 1
-
-
-@pytest.mark.regression
-@pytest.mark.asyncio
-async def test_pool_transport_separates_concurrent_requests(httpx_mock: HTTPXMock):
-    """Use one transport per in-flight request and reuse them afterwards.
-
-    ## WRITTEN BY AI ##
-    """
-
-    async def slow_response(request: httpx.Request) -> httpx.Response:
-        await asyncio.sleep(0.05)
-        return httpx.Response(200, json={})
-
-    httpx_mock.add_callback(slow_response, is_reusable=True)
-    transport = _PerRequestPoolTransport()
-
-    async with httpx.AsyncClient(transport=transport) as client:
-        await asyncio.gather(*(client.get("http://test/") for _ in range(3)))
-        await asyncio.gather(*(client.get("http://test/") for _ in range(3)))
-        assert len(transport._transports) == 3
