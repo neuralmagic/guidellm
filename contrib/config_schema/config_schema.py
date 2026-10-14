@@ -26,6 +26,7 @@ def main() -> None:
     parser.add_argument(
         "--html",
         default=True,
+        action=argparse.BooleanOptionalAction,
         help="Generate HTML documentation at output path",
     )
     args = parser.parse_args()
