@@ -827,19 +827,10 @@ class GenerativeTurnMetrics(StandardBaseDict):
         description="Distribution of inter-token latencies at this turn position"
     )
     cached_token_count: StatusDistributionSummary = Field(
-        description=(
-            "Distribution of prompt tokens served from the prefix cache at this "
-            "turn position, over requests whose server reported a cached count"
-        )
+        description="Distribution of cached prompt token counts at this turn position"
     )
-    prefix_cache_hit_rate: StatusBreakdown[
-        float | None, float | None, float | None, float | None
-    ] = Field(
-        description=(
-            "Cached prompt tokens divided by prompt tokens at this turn position, "
-            "over requests whose server reported a cached count, or None when "
-            "no request reported one"
-        )
+    prefix_cache_hit_rate: StatusDistributionSummary = Field(
+        description="Distribution of prefix cache hit rates at this turn position"
     )
 
     @classmethod
@@ -919,10 +910,6 @@ class GenerativeTurnMetrics(StandardBaseDict):
         turns: list[GenerativeTurnMetrics] = []
         for turn_index in turn_indices:
             successful, incomplete, errored = at_turn(requests, turn_index)
-            cached = [
-                [req for req in group if req.cached_tokens is not None]
-                for group in (successful, incomplete, errored)
-            ]
             ttft_successful, ttft_incomplete, ttft_errored = at_turn(
                 first_token_requests, turn_index
             )
@@ -966,35 +953,21 @@ class GenerativeTurnMetrics(StandardBaseDict):
                         errored=itl_errored,
                     ),
                     cached_token_count=StatusDistributionSummary.from_values_function(
-                        function=lambda req: req.cached_tokens or 0.0,
-                        successful=cached[0],
-                        incomplete=cached[1],
-                        errored=cached[2],
+                        function=lambda req: req.cached_tokens,
+                        successful=successful,
+                        incomplete=incomplete,
+                        errored=errored,
                     ),
-                    prefix_cache_hit_rate=StatusBreakdown(
-                        successful=_prefix_cache_hit_rate(cached[0]),
-                        incomplete=_prefix_cache_hit_rate(cached[1]),
-                        errored=_prefix_cache_hit_rate(cached[2]),
-                        total=_prefix_cache_hit_rate(
-                            [req for group in cached for req in group]
-                        ),
+                    prefix_cache_hit_rate=StatusDistributionSummary.from_values_function(
+                        function=lambda req: req.prefix_cache_hit_rate,
+                        successful=successful,
+                        incomplete=incomplete,
+                        errored=errored,
                     ),
                 )
             )
 
         return turns
-
-
-def _prefix_cache_hit_rate(requests: list[GenerativeRequestStats]) -> float | None:
-    """
-    :param requests: Requests whose server reported a cached token count
-    :return: Total cached tokens over total prompt tokens, or None when the
-        requests have no prompt tokens
-    """
-    prompt = sum(req.prompt_tokens or 0 for req in requests)
-    if not prompt:
-        return None
-    return sum(req.cached_tokens or 0 for req in requests) / prompt
 
 
 def root_dispatch_delay_distribution(
@@ -1102,6 +1075,19 @@ class GenerativeMetrics(StandardBaseDict):
     )
     total_token_count: StatusDistributionSummary = Field(
         description="Distribution of total token counts by request status"
+    )
+    cached_token_count: StatusDistributionSummary = Field(
+        description=(
+            "Distribution of prompt token counts served from the prefix cache, "
+            "over requests whose server reported a cached count"
+        )
+    )
+    prefix_cache_hit_rate: StatusDistributionSummary = Field(
+        description=(
+            "Distribution of the share of each request's prompt tokens served "
+            "from the prefix cache, over requests whose server reported a "
+            "cached count"
+        )
     )
     time_to_first_token_ms: StatusDistributionSummary = Field(
         description="Distribution of first token latencies in milliseconds"
@@ -1456,6 +1442,20 @@ class GenerativeMetrics(StandardBaseDict):
             ),
             total_token_count=StatusDistributionSummary.from_values_function(
                 function=lambda req: req.total_tokens or 0.0,
+                successful=successful,
+                incomplete=incomplete,
+                errored=errored,
+                uncertainty=uncertainty,
+            ),
+            cached_token_count=StatusDistributionSummary.from_values_function(
+                function=lambda req: req.cached_tokens,
+                successful=successful,
+                incomplete=incomplete,
+                errored=errored,
+                uncertainty=uncertainty,
+            ),
+            prefix_cache_hit_rate=StatusDistributionSummary.from_values_function(
+                function=lambda req: req.prefix_cache_hit_rate,
                 successful=successful,
                 incomplete=incomplete,
                 errored=errored,
