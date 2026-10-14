@@ -310,10 +310,14 @@ select = [
     "PLR0915", # allow complex statements in tests
 ]
 "scripts/**/*.py" = [
-    "T201",    # print statements are the primary output mechanism for scripts
+    "T201",    # print statements are allowed
     "INP001",  # scripts/ is not a package
     "S603",    # scripts invoke external programs like git by design
     "S607",    # scripts resolve external programs from PATH on purpose
+]
+"contrib/**/*.py" = [
+    "T201",    # print statements are allowed
+    "INP001",  # contrib/ is not a package
 ]
 "tests/js/**/*.py" = [
     "INP001",  # Node test helpers live beside package.json, not as a Python package
