@@ -6,15 +6,16 @@ from __future__ import annotations
 
 import asyncio
 import json
+from collections.abc import AsyncIterator, Iterable
 from contextlib import nullcontext
 from typing import Literal
 from unittest.mock import MagicMock, Mock, patch
 
-import httpcore
-import httpx
+import httpcore2
+import httpx2
 import pytest
+import respx
 from pydantic import ValidationError
-from pytest_httpx import HTTPXMock, IteratorStream
 
 from guidellm.backends.backend import Backend
 from guidellm.backends.openai.http import OpenAIHTTPBackend
@@ -33,6 +34,12 @@ from guidellm.schemas import (
 )
 from guidellm.schemas.backends import OpenAIHTTPBackendArgs
 from tests.unit.testing_utils import async_timeout
+
+
+async def _async_chunks(chunks: Iterable[bytes]) -> AsyncIterator[bytes]:
+    """Yield the chunks of a mocked streaming response one at a time."""
+    for chunk in chunks:
+        yield chunk
 
 
 def _make_backend(**kwargs) -> OpenAIHTTPBackend:
@@ -328,7 +335,7 @@ class TestOpenAIHTTPBackend:
 
         assert backend._in_process
         assert backend._async_client is not None
-        assert isinstance(backend._async_client, httpx.AsyncClient)
+        assert isinstance(backend._async_client, httpx2.AsyncClient)
 
     @pytest.mark.smoke
     @pytest.mark.asyncio
@@ -370,11 +377,10 @@ class TestOpenAIHTTPBackend:
     @pytest.mark.sanity
     @pytest.mark.asyncio
     @async_timeout(10.0)
-    async def test_available_models(self, httpx_mock: HTTPXMock):
+    async def test_available_models(self, httpx2_mock: respx.Router):
         """Test available_models method."""
-        httpx_mock.add_response(
-            url="http://test/v1/models",
-            json={"data": [{"id": "test-model1"}, {"id": "test-model2"}]},
+        httpx2_mock.route(url="http://test/v1/models").respond(
+            json={"data": [{"id": "test-model1"}, {"id": "test-model2"}]}
         )
 
         backend = _make_backend(target="http://test")
@@ -409,13 +415,9 @@ class TestOpenAIHTTPBackend:
     @pytest.mark.regression
     @pytest.mark.asyncio
     @async_timeout(10.0)
-    async def test_validate_with_model(self, httpx_mock: HTTPXMock):
+    async def test_validate_with_model(self, httpx2_mock: respx.Router):
         """Test validate method when model is set."""
-        httpx_mock.add_response(
-            url="http://test/health",
-            method="GET",
-            headers={},
-        )
+        httpx2_mock.route(url="http://test/health", method="GET").respond(headers={})
 
         backend = _make_backend(target="http://test", model="test-model")
         await backend.process_startup()
@@ -466,7 +468,7 @@ class TestOpenAIHTTPBackend:
         await backend.process_startup()
 
         def mock_fail(*args, **kwargs):
-            raise httpx.HTTPStatusError("Error", request=Mock(), response=Mock())
+            raise httpx2.HTTPStatusError("Error", request=Mock(), response=Mock())
 
         with (
             patch.object(backend._async_client, "request", side_effect=mock_fail),
@@ -477,7 +479,7 @@ class TestOpenAIHTTPBackend:
     @pytest.mark.regression
     @pytest.mark.asyncio
     @async_timeout(10.0)
-    async def test_resolve_with_history(self, httpx_mock: HTTPXMock):
+    async def test_resolve_with_history(self, httpx2_mock: respx.Router):
         """Test resolve method handles conversation history."""
         backend = _make_backend(
             target="http://test",
@@ -486,9 +488,8 @@ class TestOpenAIHTTPBackend:
         )
 
         # Mock the models endpoint
-        httpx_mock.add_response(
-            url="http://test/v1/models",
-            json={"data": [{"id": "test-model"}]},
+        httpx2_mock.route(url="http://test/v1/models").respond(
+            json={"data": [{"id": "test-model"}]}
         )
 
         await backend.process_startup()
@@ -512,12 +513,11 @@ class TestOpenAIHTTPBackend:
         ]
 
         # Mock the completions endpoint
-        httpx_mock.add_response(
-            url="http://test/v1/completions",
+        httpx2_mock.route(url="http://test/v1/completions").respond(
             json={
                 "choices": [{"text": "response"}],
                 "usage": {"prompt_tokens": 5, "completion_tokens": 3},
-            },
+            }
         )
 
         results = []
@@ -526,14 +526,14 @@ class TestOpenAIHTTPBackend:
 
         assert len(results) > 0
         # Verify the prompt includes history
-        last_request = httpx_mock.get_requests()[-1]
+        last_request = httpx2_mock.calls.last.request
         body = json.loads(last_request.content)
         assert "hi world" in body["prompt"]
 
     @pytest.mark.regression
     @pytest.mark.asyncio
     @async_timeout(10.0)
-    async def test_resolve_invalid_request_format(self, httpx_mock: HTTPXMock):
+    async def test_resolve_invalid_request_format(self, httpx2_mock: respx.Router):
         """Test resolve method raises error for invalid request type."""
         with pytest.raises(ValidationError):
             _make_backend(
@@ -544,7 +544,7 @@ class TestOpenAIHTTPBackend:
     @pytest.mark.regression
     @pytest.mark.asyncio
     @async_timeout(10.0)
-    async def test_resolve_not_in_process(self, httpx_mock: HTTPXMock):
+    async def test_resolve_not_in_process(self, httpx2_mock: respx.Router):
         """Test resolve method raises error when backend is not started."""
         backend = _make_backend(target="http://test", request_format="/v1/completions")
 
@@ -567,13 +567,12 @@ class TestOpenAIHTTPBackend:
     @async_timeout(10.0)
     async def test_resolve_text_completions(
         self,
-        httpx_mock: HTTPXMock,
+        httpx2_mock: respx.Router,
         mock_request_handler,
     ):
         """Test resolve method for text completions."""
-        httpx_mock.add_response(
-            url="http://test/v1/completions",
-            json={"choices": [{"text": "Hello world"}]},
+        httpx2_mock.route(url="http://test/v1/completions").respond(
+            json={"choices": [{"text": "Hello world"}]}
         )
 
         backend = _make_backend(
@@ -616,13 +615,12 @@ class TestOpenAIHTTPBackend:
     @async_timeout(10.0)
     async def test_resolve_chat_completions(
         self,
-        httpx_mock: HTTPXMock,
+        httpx2_mock: respx.Router,
         mock_request_handler,
     ):
         """Test resolve method for chat completions."""
-        httpx_mock.add_response(
-            url="http://test/v1/chat/completions",
-            json={"choices": [{"message": {"content": "Response"}}]},
+        httpx2_mock.route(url="http://test/v1/chat/completions").respond(
+            json={"choices": [{"message": {"content": "Response"}}]}
         )
 
         backend = _make_backend(
@@ -668,13 +666,12 @@ class TestOpenAIHTTPBackend:
     @async_timeout(10.0)
     async def test_resolve_with_files(
         self,
-        httpx_mock: HTTPXMock,
+        httpx2_mock: respx.Router,
         mock_request_handler,
     ):
         """Test resolve method with file uploads."""
-        httpx_mock.add_response(
-            url="http://test/v1/audio/transcriptions",
-            json={"choices": [{"message": {"content": "Response"}}]},
+        httpx2_mock.route(url="http://test/v1/audio/transcriptions").respond(
+            json={"choices": [{"message": {"content": "Response"}}]}
         )
 
         backend = _make_backend(
@@ -716,18 +713,17 @@ class TestOpenAIHTTPBackend:
     @async_timeout(10.0)
     async def test_resolve_stream(
         self,
-        httpx_mock: HTTPXMock,
+        httpx2_mock: respx.Router,
         mock_request_handler,
     ):
         """Test resolve method handles asyncio.CancelledError during streaming."""
-        httpx_mock.add_response(
-            url="http://test/v1/chat/completions",
-            stream=IteratorStream(
+        httpx2_mock.route(url="http://test/v1/chat/completions").respond(
+            content=_async_chunks(
                 [
                     b'data: {"choices": [{"delta": {"content": "Hello"}}]}\n\n',
                     b'data: {"choices": [{"delta": {"content": " world"}}]}\n\n',
                 ]
-            ),
+            )
         )
 
         backend = _make_backend(
@@ -772,7 +768,7 @@ class TestOpenAIHTTPBackend:
     @async_timeout(10.0)
     async def test_resolve_filters_none_from_request_body(
         self,
-        httpx_mock: HTTPXMock,
+        httpx2_mock: respx.Router,
         mock_request_handler,
     ):
         """
@@ -783,18 +779,9 @@ class TestOpenAIHTTPBackend:
 
         ### WRITTEN BY AI ###
         """
-        # Track the actual request body sent
-        sent_body = None
-
-        def capture_request(request: httpx.Request):
-            nonlocal sent_body
-            sent_body = json.loads(request.content)
-            return httpx.Response(
-                status_code=200,
-                json={"choices": [{"message": {"content": "Response"}}]},
-            )
-
-        httpx_mock.add_callback(capture_request, url="http://test/v1/chat/completions")
+        route = httpx2_mock.route(url="http://test/v1/chat/completions").respond(
+            json={"choices": [{"message": {"content": "Response"}}]}
+        )
 
         backend = _make_backend(
             target="http://test",
@@ -839,7 +826,7 @@ class TestOpenAIHTTPBackend:
         assert responses[0][0].request_id == "test-id"
 
         # Verify that None values were filtered out from the sent body
-        assert sent_body is not None
+        sent_body = json.loads(route.calls.last.request.content)
         assert "model" in sent_body
         assert "messages" in sent_body
         assert "temperature" in sent_body
@@ -859,7 +846,7 @@ class TestOpenAIHTTPBackend:
     )
     async def test_non_streaming_missing_tool_call_stop_behavior(
         self,
-        httpx_mock: HTTPXMock,
+        httpx2_mock: respx.Router,
         mock_request_handler,
         behavior: Literal["ignore_stop", "error_stop"],
         expected_error: type[BaseException],
@@ -869,9 +856,8 @@ class TestOpenAIHTTPBackend:
 
         ## WRITTEN BY AI ##
         """
-        httpx_mock.add_response(
-            url="http://test/v1/chat/completions",
-            json={"choices": [{"message": {"content": "no tool call"}}]},
+        httpx2_mock.route(url="http://test/v1/chat/completions").respond(
+            json={"choices": [{"message": {"content": "no tool call"}}]}
         )
         backend = _make_backend(
             target="http://test",
@@ -1064,7 +1050,7 @@ class TestCheckToolCallExpectations:
     @async_timeout(10.0)
     async def test_resolve_stream_reasoning_tokens_ttft(
         self,
-        httpx_mock: HTTPXMock,
+        httpx2_mock: respx.Router,
     ):
         """
         Test that TTFT is measured correctly when reasoning tokens arrive first.
@@ -1089,9 +1075,8 @@ class TestCheckToolCallExpectations:
             b"data: [DONE]\n\n",
         ]
 
-        httpx_mock.add_response(
-            url="http://test/v1/chat/completions",
-            stream=IteratorStream(stream_chunks),
+        httpx2_mock.route(url="http://test/v1/chat/completions").respond(
+            content=_async_chunks(stream_chunks)
         )
 
         backend = _make_backend(
@@ -1161,7 +1146,7 @@ class TestCheckToolCallExpectations:
     ],
 )
 async def test_resolve_responses_terminal_error(
-    httpx_mock: HTTPXMock, event_type, error, include_delta, expect_error
+    httpx2_mock: respx.Router, event_type, error, include_delta, expect_error
 ):
     """Propagate explicit Responses failures even after receiving partial text.
 
@@ -1180,10 +1165,9 @@ async def test_resolve_responses_terminal_error(
             },
         }
     )
-    httpx_mock.add_response(
-        url="http://test/v1/responses",
+    httpx2_mock.route(url="http://test/v1/responses").respond(
         headers={"Content-Type": "text/event-stream"},
-        stream=IteratorStream(
+        content=_async_chunks(
             [("data: " + json.dumps(event) + "\n\n").encode() for event in events]
         ),
     )
@@ -1227,8 +1211,8 @@ async def test_trace_request_start_records_first_request_headers(protocol: str):
     """
     request_info = RequestInfo(timings=RequestTimings(request_start=1.0))
     trace = OpenAIHTTPBackend._trace_request_start(request_info)
-    tunnel = httpcore.Request(b"CONNECT", "http://proxy:3128")
-    post = httpcore.Request(b"POST", "http://test/v1/chat/completions")
+    tunnel = httpcore2.Request(b"CONNECT", "http://proxy:3128")
+    post = httpcore2.Request(b"POST", "http://test/v1/chat/completions")
     event = f"{protocol}.send_request_headers.started"
 
     with patch("guidellm.backends.openai.http.time") as mock_time:
@@ -1263,7 +1247,7 @@ class _CountingChunks:
     ("http_version", "expected_read"), [("HTTP/1.1", 3), ("HTTP/2", 2)]
 )
 async def test_stream_read_to_end_only_over_http11(
-    httpx_mock: HTTPXMock, http_version: str, expected_read: int
+    httpx2_mock: respx.Router, http_version: str, expected_read: int
 ):
     """Read past the final event over HTTP/1.1 and stop at it over HTTP/2.
 
@@ -1276,10 +1260,8 @@ async def test_stream_read_to_end_only_over_http11(
             b": end\n\n",
         ]
     )
-    httpx_mock.add_response(
-        url="http://test/v1/chat/completions",
-        http_version=http_version,
-        stream=IteratorStream(chunks),
+    httpx2_mock.route(url="http://test/v1/chat/completions").respond(
+        http_version=http_version, content=_async_chunks(chunks)
     )
     backend = _make_backend(target="http://test", model="test-model", stream=True)
     request = GenerationRequest(columns={"text_column": ["Hello"]})

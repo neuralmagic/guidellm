@@ -16,7 +16,7 @@ import time
 from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Any
 
-import httpx
+import httpx2
 
 from guidellm.backends.backend import Backend
 from guidellm.backends.openai.common import FALLBACK_TIMEOUT
@@ -78,7 +78,7 @@ class OpenAIHTTPBackend(Backend):
 
         # Runtime state
         self._in_process = False
-        self._async_client: httpx.AsyncClient | None = None
+        self._async_client: httpx2.AsyncClient | None = None
         self._read_to_end_tasks: set[asyncio.Task] = set()
 
     async def process_startup(self):
@@ -86,14 +86,14 @@ class OpenAIHTTPBackend(Backend):
         Initialize HTTP client and backend resources.
 
         :raises RuntimeError: If backend is already initialized
-        :raises httpx.RequestError: If HTTP client cannot be created
+        :raises httpx2.RequestError: If HTTP client cannot be created
         """
         if self._in_process:
             raise RuntimeError("Backend already started up for process.")
 
-        self._async_client = httpx.AsyncClient(
+        self._async_client = httpx2.AsyncClient(
             http2=self._args.http2,
-            timeout=httpx.Timeout(
+            timeout=httpx2.Timeout(
                 FALLBACK_TIMEOUT,
                 read=self._args.timeout,
                 connect=self._args.timeout_connect,
@@ -101,7 +101,7 @@ class OpenAIHTTPBackend(Backend):
             follow_redirects=self._args.follow_redirects,
             verify=self._args.verify,
             # Allow unlimited connections
-            limits=httpx.Limits(
+            limits=httpx2.Limits(
                 max_connections=None,
                 max_keepalive_connections=None,
                 keepalive_expiry=5.0,  # default
@@ -114,7 +114,7 @@ class OpenAIHTTPBackend(Backend):
         Clean up HTTP client and backend resources.
 
         :raises RuntimeError: If backend was not properly initialized
-        :raises httpx.RequestError: If HTTP client cannot be closed
+        :raises httpx2.RequestError: If HTTP client cannot be closed
         """
         if not self._in_process:
             raise RuntimeError("Backend not started up for process.")
@@ -157,7 +157,7 @@ class OpenAIHTTPBackend(Backend):
         Get available models from the target server.
 
         :return: List of model identifiers
-        :raises httpx.HTTPError: If models endpoint returns an error
+        :raises httpx2.HTTPError: If models endpoint returns an error
         :raises RuntimeError: If backend is not initialized
         """
         if self._async_client is None:
@@ -415,7 +415,7 @@ class OpenAIHTTPBackend(Backend):
             yield request_handler.compile_streaming(request, arguments), request_info
             raise err
 
-    async def _aiter_lines(self, stream: httpx.Response) -> AsyncIterator[str]:
+    async def _aiter_lines(self, stream: httpx2.Response) -> AsyncIterator[str]:
         """
         Asynchronously iterate over lines in an HTTP response stream.
 
@@ -428,7 +428,7 @@ class OpenAIHTTPBackend(Backend):
             yield line
 
     async def _close_stream(
-        self, stream: httpx.Response, lines: AsyncIterator[str], end_reached: bool
+        self, stream: httpx2.Response, lines: AsyncIterator[str], end_reached: bool
     ) -> None:
         """Close a response, or read the rest of it in a task after its final event."""
         if not end_reached or stream.http_version != "HTTP/1.1":
@@ -439,7 +439,7 @@ class OpenAIHTTPBackend(Backend):
         task.add_done_callback(self._read_to_end_tasks.discard)
 
     @staticmethod
-    async def _read_to_end(stream: httpx.Response, lines: AsyncIterator[str]) -> None:
+    async def _read_to_end(stream: httpx2.Response, lines: AsyncIterator[str]) -> None:
         """Read the rest of a response within the time limit, then close it."""
 
         async def consume() -> None:
@@ -447,7 +447,7 @@ class OpenAIHTTPBackend(Backend):
                 pass
 
         try:
-            with contextlib.suppress(asyncio.TimeoutError, httpx.HTTPError):
+            with contextlib.suppress(asyncio.TimeoutError, httpx2.HTTPError):
                 await asyncio.wait_for(consume(), timeout=_READ_TO_END_TIMEOUT)
         finally:
             await stream.aclose()

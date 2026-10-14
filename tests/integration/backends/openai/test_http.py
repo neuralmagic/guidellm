@@ -8,7 +8,7 @@ import socket
 import time
 from unittest.mock import patch
 
-import httpx
+import httpx2
 import pytest
 
 from guidellm.backends.openai.http import OpenAIHTTPBackend
@@ -94,14 +94,14 @@ class _LocalChatServer:
             writer.close()
 
 
-class _DelayedTransport(httpx.AsyncHTTPTransport):
+class _DelayedTransport(httpx2.AsyncHTTPTransport):
     """Transport that waits before handing each request to httpcore."""
 
     def __init__(self, delay: float):
         super().__init__()
         self.delay = delay
 
-    async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+    async def handle_async_request(self, request: httpx2.Request) -> httpx2.Response:
         await asyncio.sleep(self.delay)
         return await super().handle_async_request(request)
 
@@ -123,14 +123,14 @@ async def _resolve_once(
 async def _resolve_all(
     backend: OpenAIHTTPBackend,
     request_info: RequestInfo,
-    transport: httpx.AsyncBaseTransport | None = None,
+    transport: httpx2.AsyncBaseTransport | None = None,
 ) -> float:
     """Resolve one request and return the time resolve was called."""
     await backend.process_startup()
     if transport is not None:
         assert backend._async_client is not None
         await backend._async_client.aclose()
-        backend._async_client = httpx.AsyncClient(transport=transport)
+        backend._async_client = httpx2.AsyncClient(transport=transport)
     try:
         called = time.time()
         await _resolve_once(backend, request_info)
@@ -194,7 +194,7 @@ async def test_request_start_set_when_connection_fails():
         port = sock.getsockname()[1]
     request_info = RequestInfo(request_id="test-id")
 
-    with pytest.raises(httpx.ConnectError):
+    with pytest.raises(httpx2.ConnectError):
         await _resolve_all(_make_backend(f"http://127.0.0.1:{port}"), request_info)
 
     assert request_info.timings.request_start is not None

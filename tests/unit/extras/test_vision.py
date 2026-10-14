@@ -102,7 +102,7 @@ def test_encode_video_with_url_base64():
     test_url = "https://example.com/video.mp4"
     mock_video_content = b"fake video content"
 
-    with patch("httpx.get") as mock_get:
+    with patch("httpx2.get") as mock_get:
         mock_response = MagicMock()
         mock_response.content = mock_video_content
         mock_response.raise_for_status = MagicMock()
@@ -203,7 +203,7 @@ def test_encode_video_url_with_http_error():
     """Test URL encoding when HTTP request fails"""
     test_url = "https://example.com/video.mp4"
 
-    with patch("httpx.get") as mock_get:
+    with patch("httpx2.get") as mock_get:
         mock_response = MagicMock()
         mock_response.raise_for_status.side_effect = Exception("HTTP Error")
         mock_get.return_value = mock_response
