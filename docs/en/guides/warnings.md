@@ -12,7 +12,7 @@ These three rules run when `metrics.warnings` is omitted:
   - Warn when the mean `generation_delay` is more than 1% of mean \`time_to_first_token_ms.total
   - Means that the data generation is lagging by a great enough fraction of the server's TTFT that it's likely slowing down the benchmark. See [Requests load after they are due](troubleshooting.md#requests-load-after-they-are-due).
 - `root_late`:
-  - Warn when the 95th percentile of `root_dispatch_delay` is greater than 0.2 seconds.
+  - Warn when the 95th percentile of `root_dispatch_delay` is greater than 0.75 seconds, or when the mean is greater than 0.25 seconds.
   - This means that the first turn of conversations arrived later than the scheduler scheduled them. Often due to data lag. See [Requests load after they are due](troubleshooting.md#requests-load-after-they-are-due).
 - `dataset_incomplete`:
   - Warn when `dataset_incomplete` is true during trace strategies.

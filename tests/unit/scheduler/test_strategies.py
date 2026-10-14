@@ -138,7 +138,7 @@ class TestSchedulingStrategy:
 
         ## WRITTEN BY AI ##
         """
-        assert SynchronousStrategy().prefetch == 0
+        assert SynchronousStrategy().prefetch is None
         assert SynchronousStrategy().prefetch_count() == 0
         assert SynchronousStrategy(prefetch=3).prefetch_count() == 3
         assert SynchronousStrategy(prefetch="start").prefetch_count() == 1

@@ -87,12 +87,13 @@ class SchedulingStrategy(PydanticClassRegistryMixin["SchedulingStrategy"], InfoM
         default=None,
         description="Maximum number of concurrent requests to allow",
     )
-    prefetch: Prefetch = Field(
-        default=0,
+    prefetch: Prefetch | None = Field(
+        default=None,
         description=(
             "Number of requests to load before the run starts. "
             "'start' matches this strategy's startup concurrency when it is known. "
-            "'all' or -1 loads every request from a finite dataset."
+            "'all' or -1 loads every request from a finite dataset. "
+            "None uses the Profile's prefetch value."
         ),
     )
 
@@ -125,7 +126,8 @@ class SchedulingStrategy(PydanticClassRegistryMixin["SchedulingStrategy"], InfoM
 
         ``"start"`` uses :attr:`requests_limit` when this strategy defines a
         startup concurrency, and ``0`` when that limit is unset. ``"all"``
-        stays ``"all"``, meaning every request from a finite dataset.
+        stays ``"all"``, meaning every request from a finite dataset. ``None``
+        means the profile has not filled this in yet, so nothing is prefetched.
 
         :return: Number of request nodes to prefetch, or ``"all"`` to load every
             request from a finite dataset
@@ -134,6 +136,8 @@ class SchedulingStrategy(PydanticClassRegistryMixin["SchedulingStrategy"], InfoM
             return "all"
         if self.prefetch == "start":
             return self.requests_limit or 0
+        if self.prefetch is None:
+            return 0
 
         return self.prefetch
 

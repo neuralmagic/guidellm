@@ -571,10 +571,21 @@ class TestReportConclusions:
         assert report.conclusions == [{"a": 1}, {"b": 2}]
 
 
+class _ExplicitPrefetchProfile(Profile):
+    """Yield one strategy that already chose its own prefetch."""
+
+    def next_strategy(self, prev_strategy, prev_benchmark):
+        _ = prev_benchmark
+        if prev_strategy is not None:
+            return None
+        return SynchronousStrategy(prefetch=4)
+
+
 @pytest.mark.smoke
 def test_strategies_generator_copies_prefetch():
     """
-    Profile prefetch is copied onto each generated strategy.
+    An unset strategy prefetch inherits the profile value. An explicit strategy
+    prefetch is left alone.
 
     ## WRITTEN BY AI ##
     """
@@ -588,3 +599,12 @@ def test_strategies_generator_copies_prefetch():
     assert strategy.prefetch_count() == 1
     assert SynchronousProfileArgs(prefetch=-1).prefetch == "all"
     assert SynchronousProfileArgs(prefetch="all").prefetch == "all"
+
+    explicit = _ExplicitPrefetchProfile(
+        SynchronousProfileArgs(prefetch="all"),
+        random_seed=0,
+        constraints=None,
+    )
+    kept, _constraints = next(explicit.strategies_generator())
+    assert kept.prefetch == 4
+    assert kept.prefetch_count() == 4
