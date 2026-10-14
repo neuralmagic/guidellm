@@ -63,9 +63,9 @@ Load request graphs before the run clock starts with `prefetch` on `--profile`:
 - `0` (the default) loads graphs as the run consumes them.
 - A count loads that many request nodes first.
 - `start` matches the strategy's startup concurrency when it defines one.
-- `all` or `-1` loads every request from a finite dataset. An infinite data source will fail unless `--data-loader kind=pytorch,samples=<n>` caps it.
+- `all` loads every request from a finite dataset. An infinite data source will fail unless `--data-loader kind=pytorch,samples=<n>` caps it.
 
-All profiles accept the `--prefetch` parameter. Here is an example of how to use it with a `concurrent` profile:
+All profiles accept the `prefetch` parameter. Here is an example of how to use it with a `concurrent` profile:
 
 ```bash
 --profile kind=concurrent,prefetch=all

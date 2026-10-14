@@ -135,6 +135,7 @@ class TestSchedulingStrategy:
     def test_prefetch_count(self):
         """
         prefetch resolves an integer or the known startup concurrency.
+        ``-1`` is not an alias for loading every request.
 
         ## WRITTEN BY AI ##
         """
@@ -144,8 +145,10 @@ class TestSchedulingStrategy:
         assert SynchronousStrategy(prefetch="start").prefetch_count() == 1
         assert SynchronousStrategy(prefetch="all").prefetch == "all"
         assert SynchronousStrategy(prefetch="all").prefetch_count() == "all"
-        assert SynchronousStrategy(prefetch=-1).prefetch == "all"
-        assert SynchronousStrategy(prefetch=-1).prefetch_count() == "all"
+        with pytest.raises(ValidationError):
+            SynchronousStrategy(prefetch=-1)
+        with pytest.raises(ValidationError):
+            SynchronousStrategy(prefetch="-1")
         assert ThroughputStrategy(prefetch="start").prefetch_count() == 0
         assert (
             ThroughputStrategy(max_concurrency=4, prefetch="start").prefetch_count()

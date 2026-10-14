@@ -36,18 +36,6 @@ class _InfiniteDataset(Protocol):
         """
 
 
-def dataset_is_infinite(dataset: DatasetType) -> bool:
-    """
-    Whether one deserialized dataset iterates without end.
-
-    Sources that do not implement ``is_infinite`` are finite.
-
-    :param dataset: Dataset produced by a deserializer
-    :return: ``True`` when the dataset reports that it does not end
-    """
-    return isinstance(dataset, _InfiniteDataset) and dataset.is_infinite()
-
-
 def datasets_are_infinite(datasets: list[object], samples: int) -> bool:
     """
     Whether a loader over these datasets would iterate without end.
@@ -61,7 +49,9 @@ def datasets_are_infinite(datasets: list[object], samples: int) -> bool:
     """
     if samples > 0:
         return False
-    return bool(datasets) and all(dataset_is_infinite(item) for item in datasets)
+    return bool(datasets) and all(
+        isinstance(item, _InfiniteDataset) and item.is_infinite() for item in datasets
+    )
 
 
 DataT = TypeVar("DataT")

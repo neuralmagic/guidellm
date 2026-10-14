@@ -16,11 +16,6 @@ __all__ = [
 
 WarningStatistic = Literal["mean", "max", "p95", "sum"]
 
-_PREFETCH_GUIDE = (
-    "https://github.com/vllm-project/guidellm/blob/main/docs/en/guides/"
-    "troubleshooting.md#requests-load-after-they-are-due"
-)
-
 
 class MetricRef(StandardBaseModel):
     """A dotted path into the compiled metric schemas, and which summary to read.
@@ -137,7 +132,7 @@ def default_warning_rules() -> list[WarningRuleArgs]:
             threshold=0.01,
             note=(
                 "This means that the benchmark was likely bottlenecked by the "
-                f"data generation. See {_PREFETCH_GUIDE}"
+                "data generation. See the troubleshooting guide for more information."
             ),
         ),
         WarningRuleArgs(
@@ -146,7 +141,7 @@ def default_warning_rules() -> list[WarningRuleArgs]:
             threshold=0.75,
             note=(
                 "This means that some conversations were loaded late. See "
-                f"{_PREFETCH_GUIDE}"
+                "the troubleshooting guide for more information."
             ),
         ),
         WarningRuleArgs(
@@ -154,7 +149,8 @@ def default_warning_rules() -> list[WarningRuleArgs]:
             metric=MetricRef(name="root_dispatch_delay", statistic="mean"),
             threshold=0.25,
             note=(
-                f"This means that conversations were loaded late. See {_PREFETCH_GUIDE}"
+                "This means that conversations were loaded late. See the "
+                "troubleshooting guide for more information."
             ),
         ),
         WarningRuleArgs(
@@ -164,7 +160,8 @@ def default_warning_rules() -> list[WarningRuleArgs]:
             when=WarningCondition(name="strategy_type", equals="trace"),
             note=(
                 "The trace dataset was not fully loaded. This could result in "
-                f"late arrivals of trace conversations. See {_PREFETCH_GUIDE}"
+                "late arrivals of trace conversations. See the troubleshooting "
+                "guide for more information."
             ),
         ),
     ]

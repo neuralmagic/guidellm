@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import random
+import threading
 import uuid
 from typing import Any, Generic
 
@@ -18,6 +19,7 @@ from guidellm.scheduler import (
     SchedulerState,
     SynchronousStrategy,
 )
+from guidellm.scheduler import scheduler as scheduler_module
 from guidellm.scheduler.scheduler import _prefetch_requests
 from guidellm.scheduler.schemas import ConversationGraph, ConversationNode
 from guidellm.schemas import RequestInfo, RequestSettings
@@ -399,3 +401,87 @@ def test_prefetch_all_rejects_an_infinite_dataset():
 
     with pytest.raises(ValueError, match="infinite dataset"):
         _prefetch_requests(_Infinite(), "all")
+
+
+def _wait_for_overlap(event: threading.Event, message: str) -> None:
+    if not event.wait(timeout=2):
+        raise TimeoutError(message)
+
+
+async def _no_request_updates():
+    if False:
+        yield None
+
+
+@pytest.mark.regression
+@pytest.mark.asyncio
+@async_timeout(10.0)
+async def test_prefetch_overlaps_process_creation(monkeypatch: pytest.MonkeyPatch):
+    """
+    Prefetch runs while worker processes are created, and the run clock
+    starts only after both finish.
+
+    ## WRITTEN BY AI ##
+    """
+    graphs = [_graph(["a"]), _graph(["b"])]
+    prefetch_entered = threading.Event()
+    create_entered = threading.Event()
+    prefetch_finished = threading.Event()
+    create_finished = threading.Event()
+    seen_at_start: list[str] = []
+
+    def prefetch(requests, count):
+        prefetch_entered.set()
+        _wait_for_overlap(create_entered, "create_processes did not overlap prefetch")
+        prefetch_finished.set()
+        return requests
+
+    class _FakeWorkerGroup:
+        def __class_getitem__(cls, item):
+            return cls
+
+        def __init__(self, requests, backend, strategy, **constraints):
+            self.requests = iter(requests)
+
+        async def create_processes(self):
+            create_entered.set()
+            await asyncio.to_thread(
+                _wait_for_overlap,
+                prefetch_entered,
+                "prefetch did not overlap process creation",
+            )
+            create_finished.set()
+
+        async def start(self, start_time):
+            seen_at_start.extend(
+                graph.nodes["turn_0"].request.payload for graph in self.requests
+            )
+
+        async def request_updates(self):
+            async for update in _no_request_updates():
+                yield update
+
+        async def shutdown(self):
+            return None
+
+    class _ClockAfterSetup(NonDistributedEnvironment):
+        async def sync_run_start(self) -> float:
+            assert prefetch_finished.is_set()
+            assert create_finished.is_set()
+            return await super().sync_run_start()
+
+    monkeypatch.setattr(scheduler_module, "WorkerProcessGroup", _FakeWorkerGroup)
+    monkeypatch.setattr(scheduler_module, "_prefetch_requests", prefetch)
+
+    results = [
+        update
+        async for update in Scheduler().run(
+            requests=graphs,
+            backend=MockBackend(error_rate=0.0),
+            strategy=SynchronousStrategy(),
+            env=_ClockAfterSetup(),
+        )
+    ]
+
+    assert results == []
+    assert seen_at_start == ["a", "b"]

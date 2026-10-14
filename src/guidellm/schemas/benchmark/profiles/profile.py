@@ -20,7 +20,7 @@ from pydantic import (
 
 from guidellm.schemas import PydanticClassRegistryMixin, standard_model_config
 from guidellm.schemas.benchmark.transient import TransientPhaseConfig
-from guidellm.schemas.scheduler.prefetch import Prefetch
+from guidellm.schemas.scheduler.prefetch import PrefetchType
 from guidellm.utils.imports import json
 
 __all__ = ["ProfileArgs"]
@@ -61,12 +61,12 @@ class ProfileArgs(PydanticClassRegistryMixin["ProfileArgs"], ABC):
         default=0.0,
         description=("Duration in seconds to ramp up the targeted scheduling rate"),
     )
-    prefetch: Prefetch = Field(
+    prefetch: PrefetchType = Field(
         default=0,
         description=(
             "Number of requests to load before the run starts, 'start' to "
             "match the strategy startup concurrency when it is known, or "
-            "'all' (-1) to load every request from a finite dataset"
+            "'all' to load every request from a finite dataset"
         ),
     )
     warmup: TransientPhaseConfig = Field(

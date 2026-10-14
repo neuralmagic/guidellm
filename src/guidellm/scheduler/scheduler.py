@@ -9,6 +9,7 @@ various scenarios including LLM inference benchmarking.
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncIterator
 from itertools import chain
 from typing import Generic, Literal, Protocol, runtime_checkable
@@ -174,18 +175,33 @@ class Scheduler(
                     local_strategy,
                     local_constraints,
                 ) = await env.sync_run_params(requests, strategy, constraints)
-                local_requests = _prefetch_requests(
-                    local_requests, local_strategy.prefetch_count()
+                # Buffer requests off the event loop while worker processes start.
+                # The run clock stays after both so it begins with graphs loaded.
+                prefetch_task = asyncio.create_task(
+                    asyncio.to_thread(
+                        _prefetch_requests,
+                        local_requests,
+                        local_strategy.prefetch_count(),
+                    )
                 )
-
-                # Setup the worker group, sync start with the environment
                 worker_group = WorkerProcessGroup[RequestT, ResponseT](
-                    requests=local_requests,
+                    requests=(),
                     backend=backend,
                     strategy=local_strategy,
                     **local_constraints,  # type: ignore[arg-type]
                 )
-                await worker_group.create_processes()
+                create_task = asyncio.create_task(worker_group.create_processes())
+                try:
+                    prefetched, _ = await asyncio.gather(prefetch_task, create_task)
+                except Exception:  # noqa: BLE001
+                    # Finish the sibling without cancelling process spawn.
+                    await asyncio.gather(
+                        prefetch_task, create_task, return_exceptions=True
+                    )
+                    raise
+                worker_group.requests = iter(prefetched)
+
+                # Sync start only after requests are loaded and workers exist.
                 local_start_time = await env.sync_run_start()
                 await worker_group.start(local_start_time)
 

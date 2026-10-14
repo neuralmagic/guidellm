@@ -15,6 +15,7 @@ Validates that:
 from types import SimpleNamespace
 
 import pytest
+from pydantic import ValidationError
 
 from guidellm.benchmark.profiles import (
     AsyncProfile,
@@ -597,7 +598,10 @@ def test_strategies_generator_copies_prefetch():
 
     assert strategy.prefetch == "start"
     assert strategy.prefetch_count() == 1
-    assert SynchronousProfileArgs(prefetch=-1).prefetch == "all"
+    with pytest.raises(ValidationError):
+        SynchronousProfileArgs(prefetch=-1)
+    with pytest.raises(ValidationError):
+        SynchronousProfileArgs(prefetch="-1")
     assert SynchronousProfileArgs(prefetch="all").prefetch == "all"
 
     explicit = _ExplicitPrefetchProfile(

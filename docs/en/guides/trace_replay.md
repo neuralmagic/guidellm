@@ -112,7 +112,7 @@ Similar to Mooncake, WEKA uses prefix-based cache hash IDs. The original [specif
 
 GuideLLM will generate prompts starting from the first conversation. When the conversation ends, the next conversation will be used. Relative timestamps are offsets from the earliest request in the dataset, so later conversations can start later than the first.
 
-When WEKA session has requests that start at or near time 0, use `--profile kind=replay,prefetch=all` so those graphs finish loading before the run clock starts. See [Requests load after they are due](troubleshooting.md#requests-load-after-they-are-due).
+In general, it is safer to use `prefetch=all` when using WEKA traces. The only situation where you do not need to is when the sessions in a trace are in the correct order without overlap. Otherwise, the data deserializer may fall behind, resulting in sessions being scheduled after their relative trace time. The problem is exacerbated when most or all sessions have requests that start at or near the start of the benchmark. All requests must be pre-fetched to ensure all sessions start when they need to. Use `--profile kind=replay,prefetch=all` so those graphs finish loading before the run clock starts. See [Requests load after they are due](troubleshooting.md#requests-load-after-they-are-due).
 
 Hash IDs follow the per-row `hash_id_scope` field:
 

@@ -287,7 +287,7 @@ Strategically choose between increasing parallelism and affecting request timing
 
 GuideLLM schedules trace rows in timestamp order. Use `--data-loader kind=pytorch,samples=1000` to limit how many trace rows are loaded and replayed. `--constraint kind=max_requests,count=1000` remains a runtime completion constraint; it does not truncate the trace dataset.
 
-Set `prefetch` on the replay profile when requests are due before their graphs are built. `0` (default) does not pre-load requests, and instead loads them as the run consumes them. A positive integer input loads that many request nodes. `start` matches startup concurrency when the strategy defines one. `all` or `-1` loads every request from a finite dataset. WEKA traces should typically use `prefetch=all`.
+Set `prefetch` on the replay profile when requests are due before their graphs are built. `0` (default) does not pre-load requests, and instead loads them as the run consumes them. A positive integer input loads that many request nodes. `start` matches startup concurrency when the strategy defines one. `all` loads every request from a finite dataset. WEKA traces should typically use `prefetch=all`.
 
 Every format by default looks for the columns "timestamp", "input_length", and "output_length". If your trace uses different column names, include `timestamp_column`, `prompt_tokens_column`, and `output_tokens_column` in the data config:
 

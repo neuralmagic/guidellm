@@ -2,29 +2,11 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Any, Literal
+from typing import Literal
 
-from pydantic import BeforeValidator, NonNegativeInt
+from pydantic import NonNegativeInt
 
-__all__ = ["Prefetch"]
-
-
-def normalize_prefetch(value: Any) -> Any:
-    """
-    Map the load-everything aliases onto ``"all"``.
-
-    ``-1``, ``"-1"``, and ``"all"`` are the same input. Other values are left
-    for the field type to validate.
-
-    :param value: Raw prefetch argument
-    :return: ``"all"`` for the load-everything aliases, otherwise ``value``
-    """
-    if value in (-1, "-1", "all"):
-        return "all"
-    return value
+__all__ = ["PrefetchType"]
 
 
-Prefetch = Annotated[
-    NonNegativeInt | Literal["start", "all"],
-    BeforeValidator(normalize_prefetch),
-]
+PrefetchType = NonNegativeInt | Literal["start", "all"]

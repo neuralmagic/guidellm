@@ -33,7 +33,7 @@ from pydantic import (
 )
 
 from guidellm.schemas import PydanticClassRegistryMixin, RequestInfo, RequestSettings
-from guidellm.schemas.scheduler.prefetch import Prefetch
+from guidellm.schemas.scheduler.prefetch import PrefetchType
 from guidellm.utils.mixins import InfoMixin
 
 __all__ = [
@@ -87,12 +87,12 @@ class SchedulingStrategy(PydanticClassRegistryMixin["SchedulingStrategy"], InfoM
         default=None,
         description="Maximum number of concurrent requests to allow",
     )
-    prefetch: Prefetch | None = Field(
+    prefetch: PrefetchType | None = Field(
         default=None,
         description=(
             "Number of requests to load before the run starts. "
             "'start' matches this strategy's startup concurrency when it is known. "
-            "'all' or -1 loads every request from a finite dataset. "
+            "'all' loads every request from a finite dataset. "
             "None uses the Profile's prefetch value."
         ),
     )
