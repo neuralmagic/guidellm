@@ -1,5 +1,6 @@
 ---
 weight: -10
+source_sha256: !!str "7f873ef5f69db141686127994e14cc57ea749975bec748e6b9dfd60b03868d08"
 ---
 
 # 快速开始
