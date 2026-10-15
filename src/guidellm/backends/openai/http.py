@@ -250,7 +250,11 @@ class OpenAIHTTPBackend(Backend):
         arguments: GenerationRequestArguments = request_handler.format(
             data=request,
             history=history,
-            model=(await self.default_model()),
+            model=(
+                request.model
+                if request.model
+                else await self.default_model()
+            ),
             stream=self._args.stream,
             extras=self._args.extras,
             max_tokens=self._args.max_tokens,

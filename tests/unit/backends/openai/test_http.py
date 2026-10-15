@@ -386,6 +386,108 @@ class TestOpenAIHTTPBackend:
     @pytest.mark.sanity
     @pytest.mark.asyncio
     @async_timeout(10.0)
+    async def test_resolve_with_request_model_override(
+        self,
+        httpx_mock: HTTPXMock,
+        mock_request_handler,
+    ):
+        """Backend uses request.model when set, ignoring the backend default."""
+        httpx_mock.add_response(
+            url="http://test/v1/completions",
+            json={"choices": [{"text": "Hello world"}]},
+        )
+
+        backend = _make_backend(
+            target="http://test",
+            model="default-model",
+            request_format="/v1/completions",
+        )
+        await backend.process_startup()
+
+        request = GenerationRequest(model="lora-adapter-01")
+        request_info = RequestInfo(
+            request_id="test-id",
+            status="pending",
+            scheduler_node_id=1,
+            scheduler_process_id=1,
+            scheduler_start_time=123.0,
+            timings=RequestTimings(),
+        )
+
+        mock_handler, handler_patch = mock_request_handler
+        formatted_model = None
+
+        def _capture_format(data, history, model, **kwargs):
+            nonlocal formatted_model
+            formatted_model = model
+            return GenerationRequestArguments(
+                body={"prompt": "test prompt", "model": model}
+            )
+
+        mock_handler.format.side_effect = _capture_format
+        mock_handler.compile_non_streaming.return_value = GenerationResponse(
+            request_id="test-id", request_args="test args"
+        )
+
+        with handler_patch:
+            async for _response, _info in backend.resolve(request, request_info):
+                pass
+
+        assert formatted_model == "lora-adapter-01"
+
+    @pytest.mark.asyncio
+    @async_timeout(10.0)
+    async def test_resolve_without_model_override_uses_default(
+        self,
+        httpx_mock: HTTPXMock,
+        mock_request_handler,
+    ):
+        """Backend falls back to default_model when request.model is None."""
+        httpx_mock.add_response(
+            url="http://test/v1/completions",
+            json={"choices": [{"text": "Hello world"}]},
+        )
+
+        backend = _make_backend(
+            target="http://test",
+            model="default-model",
+            request_format="/v1/completions",
+        )
+        await backend.process_startup()
+
+        request = GenerationRequest()  # no model override
+        request_info = RequestInfo(
+            request_id="test-id",
+            status="pending",
+            scheduler_node_id=1,
+            scheduler_process_id=1,
+            scheduler_start_time=123.0,
+            timings=RequestTimings(),
+        )
+
+        mock_handler, handler_patch = mock_request_handler
+        formatted_model = None
+
+        def _capture_format(data, history, model, **kwargs):
+            nonlocal formatted_model
+            formatted_model = model
+            return GenerationRequestArguments(
+                body={"prompt": "test prompt", "model": model}
+            )
+
+        mock_handler.format.side_effect = _capture_format
+        mock_handler.compile_non_streaming.return_value = GenerationResponse(
+            request_id="test-id", request_args="test args"
+        )
+
+        with handler_patch:
+            async for _response, _info in backend.resolve(request, request_info):
+                pass
+
+        assert formatted_model == "default-model"
+
+    @pytest.mark.asyncio
+    @async_timeout(10.0)
     async def test_default_model(self):
         """Test default_model method."""
         # Test when model is already set
