@@ -11,7 +11,6 @@ performance metrics for request processing and queueing behavior.
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from typing import Literal
 
 from pydantic import Field
@@ -831,15 +830,15 @@ class GenerativeTurnMetrics(StandardBaseDict):
         default=None,
         description=(
             "Distribution of prompt token counts served from the prefix cache at "
-            "this turn position. None when no request reported a cached count"
+            "this turn position. None in reports saved before this field existed"
         ),
     )
     prefix_cache_hit_rate: StatusDistributionSummary | None = Field(
         default=None,
         description=(
             "Distribution of the share of each request's prompt tokens served from "
-            "the prefix cache at this turn position. None when no request reported "
-            "a cached count"
+            "the prefix cache at this turn position. None in reports saved before "
+            "this field existed"
         ),
     )
 
@@ -962,47 +961,22 @@ class GenerativeTurnMetrics(StandardBaseDict):
                         incomplete=itl_incomplete,
                         errored=itl_errored,
                     ),
-                    cached_token_count=_reported_distribution(
-                        lambda req: req.cached_tokens, successful, incomplete, errored
+                    cached_token_count=StatusDistributionSummary.from_values_function(
+                        function=lambda req: req.cached_tokens,
+                        successful=successful,
+                        incomplete=incomplete,
+                        errored=errored,
                     ),
-                    prefix_cache_hit_rate=_reported_distribution(
-                        lambda req: req.prefix_cache_hit_rate,
-                        successful,
-                        incomplete,
-                        errored,
+                    prefix_cache_hit_rate=StatusDistributionSummary.from_values_function(
+                        function=lambda req: req.prefix_cache_hit_rate,
+                        successful=successful,
+                        incomplete=incomplete,
+                        errored=errored,
                     ),
                 )
             )
 
         return turns
-
-
-def _reported_distribution(
-    function: Callable[[GenerativeRequestStats], float | None],
-    successful: list[GenerativeRequestStats],
-    incomplete: list[GenerativeRequestStats],
-    errored: list[GenerativeRequestStats],
-    uncertainty: SampleUncertainty | None = None,
-) -> StatusDistributionSummary | None:
-    """
-    Distribution of a value that a server may not report.
-
-    :param function: Extracts the value from a request, or None when unreported
-    :param successful: Successful requests
-    :param incomplete: Incomplete requests
-    :param errored: Errored requests
-    :param uncertainty: Interval settings, or None to report no intervals
-    :return: The distribution over the requests that report the value, or None
-        when no request reports it, so an unreported value does not read as zero
-    """
-    summary = StatusDistributionSummary.from_values_function(
-        function=function,
-        successful=successful,
-        incomplete=incomplete,
-        errored=errored,
-        uncertainty=uncertainty,
-    )
-    return summary if summary.count else None
 
 
 def root_dispatch_delay_distribution(
@@ -1115,14 +1089,14 @@ class GenerativeMetrics(StandardBaseDict):
         default=None,
         description=(
             "Distribution of prompt token counts served from the prefix cache. "
-            "None when no request reported a cached count"
+            "None in reports saved before this field existed"
         ),
     )
     prefix_cache_hit_rate: StatusDistributionSummary | None = Field(
         default=None,
         description=(
             "Distribution of the share of each request's prompt tokens served from "
-            "the prefix cache. None when no request reported a cached count"
+            "the prefix cache. None in reports saved before this field existed"
         ),
     )
     time_to_first_token_ms: StatusDistributionSummary = Field(
@@ -1483,19 +1457,19 @@ class GenerativeMetrics(StandardBaseDict):
                 errored=errored,
                 uncertainty=uncertainty,
             ),
-            cached_token_count=_reported_distribution(
-                lambda req: req.cached_tokens,
-                successful,
-                incomplete,
-                errored,
-                uncertainty,
+            cached_token_count=StatusDistributionSummary.from_values_function(
+                function=lambda req: req.cached_tokens,
+                successful=successful,
+                incomplete=incomplete,
+                errored=errored,
+                uncertainty=uncertainty,
             ),
-            prefix_cache_hit_rate=_reported_distribution(
-                lambda req: req.prefix_cache_hit_rate,
-                successful,
-                incomplete,
-                errored,
-                uncertainty,
+            prefix_cache_hit_rate=StatusDistributionSummary.from_values_function(
+                function=lambda req: req.prefix_cache_hit_rate,
+                successful=successful,
+                incomplete=incomplete,
+                errored=errored,
+                uncertainty=uncertainty,
             ),
             # TODO: Need to evaluate closed=False vs closed=True for first-token
             # latencies. See github.com/vllm-project/guidellm/issues/1078

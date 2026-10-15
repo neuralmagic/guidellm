@@ -1338,9 +1338,7 @@ class TestSchedulerMetricsGenerationDelayCompile:
     @pytest.mark.sanity
     def test_prefix_cache_metrics_unreported(self):
         """
-        Leave the cache metrics unset when the server reports no counts.
-
-        An empty distribution would read as a 0% hit rate.
+        Report empty cache distributions when the server reports no counts.
 
         ## WRITTEN BY AI ##
         """
@@ -1353,8 +1351,10 @@ class TestSchedulerMetricsGenerationDelayCompile:
 
         assert metrics.turns is not None
         for summary in (metrics, *metrics.turns):
-            assert summary.prefix_cache_hit_rate is None
-            assert summary.cached_token_count is None
+            assert summary.prefix_cache_hit_rate is not None
+            assert summary.cached_token_count is not None
+            assert summary.prefix_cache_hit_rate.count == 0
+            assert summary.cached_token_count.count == 0
 
     @pytest.mark.regression
     def test_prefix_cache_metrics_absent_from_saved_report(self):
