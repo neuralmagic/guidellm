@@ -4,7 +4,7 @@ import base64
 from pathlib import Path
 from typing import Any, Literal
 
-import httpx
+import httpx2
 
 # CRITICAL: Use 'import ... as libs' pattern to preserve lazy loading
 # This defers errors until attributes are actually accessed
@@ -241,7 +241,7 @@ def _decode_audio(  # noqa: C901, PLR0912, PLR0915
     # If str or Path, assume file path or URL to encoded audio
     elif isinstance(audio, str | Path):
         if isinstance(audio, str) and is_url(audio):
-            response = httpx.get(audio)
+            response = httpx2.get(audio)
             response.raise_for_status()
             data = response.content
         else:
