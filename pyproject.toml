@@ -65,7 +65,7 @@ dependencies = [
     "eval_type_backport",
     "faker",
     "ftfy>=6.0.0",
-    "httpx[http2]<1.0.0",
+    "httpx2[http2]~=2.13",
     "loguru",
     "msgpack",
     "numpy>=2.0.0",
@@ -141,7 +141,7 @@ test = [
     "pytest-mock~=3.15.1",
     "pytest-rerunfailures~=16.4",
     "pytest-timeout~=2.4.0",
-    "pytest-httpx~=0.36.2",
+    "pytest-httpx2~=1.0.0",
     "respx~=0.23.1",
     "trio~=0.33.0",
     "logot~=1.7.0",
@@ -310,8 +310,14 @@ select = [
     "PLR0915", # allow complex statements in tests
 ]
 "scripts/**/*.py" = [
-    "T201",    # print statements are the primary output mechanism for scripts
+    "T201",    # print statements are allowed
     "INP001",  # scripts/ is not a package
+    "S603",    # scripts invoke external programs like git by design
+    "S607",    # scripts resolve external programs from PATH on purpose
+]
+"contrib/**/*.py" = [
+    "T201",    # print statements are allowed
+    "INP001",  # contrib/ is not a package
 ]
 "tests/js/**/*.py" = [
     "INP001",  # Node test helpers live beside package.json, not as a Python package

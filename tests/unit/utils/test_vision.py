@@ -2,7 +2,7 @@ import base64
 import io
 from unittest.mock import patch
 
-import httpx
+import httpx2
 import pytest
 from PIL import Image
 
@@ -26,11 +26,11 @@ def test_encode_image_url_preserves_resize_options(resize_kwargs, expected_size)
     Image.new("RGB", (80, 40), color="red").save(image_buffer, format="PNG")
     image_bytes = image_buffer.getvalue()
     url = "https://example.com/image.png"
-    response = httpx.Response(
-        200, content=image_bytes, request=httpx.Request("GET", url)
+    response = httpx2.Response(
+        200, content=image_bytes, request=httpx2.Request("GET", url)
     )
 
-    with patch("guidellm.utils.vision.httpx.get", return_value=response):
+    with patch("guidellm.utils.vision.httpx2.get", return_value=response):
         result = encode_image(url, **resize_kwargs)
     local_result = encode_image(image_bytes, **resize_kwargs)
 
