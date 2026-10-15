@@ -1283,6 +1283,68 @@ class TestSchedulerMetricsGenerationDelayCompile:
         assert last.request_totals.errored == 1
         assert last.request_totals.successful == 0
 
+    @pytest.mark.sanity
+    def test_prefix_cache_metrics(self):
+        """
+        Summarize cached tokens and per-request hit rates over the run.
+
+        Turn ``t`` has a prompt of ``8 * (t + 1)`` tokens, of which the
+        previous turns' ``8 * t`` are cached, so its hit rate is
+        ``t / (t + 1)``. One extra request reports no cached count and is
+        left out of both distributions.
+
+        ## WRITTEN BY AI ##
+        """
+        metrics = _compile_cached_conversations()
+
+        assert metrics.cached_token_count.successful.count == 12
+        assert metrics.cached_token_count.successful.mean == pytest.approx(8.0)
+        assert metrics.prefix_cache_hit_rate.successful.count == 12
+        assert metrics.prefix_cache_hit_rate.successful.mean == pytest.approx(
+            (0.0 + 1 / 2 + 2 / 3) / 3
+        )
+
+    @pytest.mark.sanity
+    def test_turn_prefix_cache_metrics(self):
+        """
+        Report each turn's own hit rate, and partition the run's counts.
+
+        ## WRITTEN BY AI ##
+        """
+        metrics = _compile_cached_conversations()
+
+        assert metrics.turns is not None
+        hit_rates = [turn.prefix_cache_hit_rate for turn in metrics.turns]
+        assert [rate.successful.mean for rate in hit_rates] == pytest.approx(
+            [0.0, 1 / 2, 2 / 3]
+        )
+        turn_1 = metrics.turns[1]
+        assert turn_1.request_totals.successful == 5
+        assert turn_1.prefix_cache_hit_rate.successful.count == 4
+        assert turn_1.cached_token_count.successful.mean == pytest.approx(8.0)
+        assert sum(rate.successful.count for rate in hit_rates) == (
+            metrics.prefix_cache_hit_rate.successful.count
+        )
+
+    @pytest.mark.sanity
+    def test_prefix_cache_metrics_unreported(self):
+        """
+        Report empty cache distributions when the server reports no counts.
+
+        ## WRITTEN BY AI ##
+        """
+        successful = _make_conversations(n_conversations=2, n_turns=2)
+        metrics = GenerativeMetrics.compile(
+            _make_accumulator(
+                successful, SCHEDULE_BASE_TIME, SCHEDULE_BASE_TIME + 100.0
+            )
+        )
+
+        assert metrics.turns is not None
+        for summary in (metrics, *metrics.turns):
+            assert summary.prefix_cache_hit_rate.count == 0
+            assert summary.cached_token_count.count == 0
+
 
 def _make_streamed_request(  # noqa: PLR0913
     request_id: str,
@@ -1518,6 +1580,32 @@ def _make_conversations(
                 )
             )
     return stats
+
+
+def _compile_cached_conversations() -> GenerativeMetrics:
+    """Compile four three-turn conversations whose turns reuse earlier turns.
+
+    Turn ``t`` caches ``8 * t`` of its ``8 * (t + 1)`` prompt tokens. One
+    more request at turn 1 reports no cached count.
+
+    ## WRITTEN BY AI ##
+    """
+    successful = _make_conversations(n_conversations=4, n_turns=3)
+    for req in successful:
+        req.input_metrics.cached_tokens = 8 * req.info.turn_index
+    unreported = _make_turn_stats(
+        request_id="unreported",
+        conversation_id="c9",
+        turn_index=1,
+        request_start=SCHEDULE_BASE_TIME + 50.0,
+        first_token=SCHEDULE_BASE_TIME + 50.1,
+        request_end=SCHEDULE_BASE_TIME + 51.0,
+    )
+    return GenerativeMetrics.compile(
+        _make_accumulator(
+            [*successful, unreported], SCHEDULE_BASE_TIME, SCHEDULE_BASE_TIME + 100.0
+        )
+    )
 
 
 class TestTurnMetrics:
