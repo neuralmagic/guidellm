@@ -365,12 +365,9 @@ class WorkerProcessGroup(Generic[RequestT, ResponseT]):
             error_event=self.error_event,
             messaging=self.messaging,
         )
-        backend_model = ""
-        if self.backend and self.backend._args:  # noqa: SLF001
-            backend_model = self.backend._args.model  # noqa: SLF001
         request_models = (
-            [m.strip() for m in backend_model.split(",") if m.strip()]
-            if backend_model and "," in backend_model
+            self.backend.request_models
+            if self.backend and len(self.backend.request_models) > 1
             else None
         )
         await self.messaging.start(

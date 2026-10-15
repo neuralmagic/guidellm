@@ -168,14 +168,37 @@ class OpenAIHTTPBackend(Backend):
         """
         Get the default model for this backend.
 
+        For comma-separated model lists, this is the first entry — used
+        for tokenizer resolution and benchmark identity.
+
         :return: Model name or None if no model is available
         """
         if self._args.model or not self._in_process:
-            return self._args.model
+            return self.request_models[0] if self._args.model else self._args.model
 
         models = await self.available_models()
         self._args.model = models[0] if models else ""
         return self._args.model
+
+    @property
+    def request_models(self) -> list[str]:
+        """
+        Models that requests are round-robined across.
+
+        The backend ``model`` argument may be a comma-separated list for
+        targets serving multiple models on one endpoint (e.g. a base
+        model with mounted LoRA adapters).
+
+        :return: Non-empty list of model names (single entry when the
+            argument is not a list)
+        """
+        if not self._args.model:
+            return []
+        return [
+            model.strip()
+            for model in self._args.model.split(",")
+            if model.strip()
+        ] or []
 
     async def resolve(  # type: ignore[override, misc]
         self,
