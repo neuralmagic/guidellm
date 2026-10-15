@@ -110,11 +110,19 @@ def generate_translation_map():
     translation_module = runpy.run_path(
         str(project_root / "docs/scripts/check_translations.py")
     )
+    manifests = cast(
+        "dict[str, Path]",
+        translation_module["TRANSLATION_MANIFESTS"],
+    )
     route_builder = cast(
-        "Callable[[Path], TranslationRoutes]",
+        "Callable[[Path, Path], TranslationRoutes]",
         translation_module["translation_routes"],
     )
-    routes = route_builder(project_root)
+    routes = {
+        language: route_builder(project_root, manifest_path)
+        for language, manifest_path in manifests.items()
+    }
+
     content = (
         "// Generated during the MkDocs build. Do not edit.\n"
         "window.GUIDELLM_TRANSLATION_ROUTES = Object.freeze("

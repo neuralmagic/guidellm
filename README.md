@@ -32,40 +32,6 @@ GuideLLM gives teams a clear picture of performance, efficiency, and reliability
 - **Produces standardized, exportable reports for dashboards, analysis, and regression tracking**, ensuring consistency across teams and workflows.
 - **Delivers high-throughput, extensible benchmarking** with multiprocessing, threading, async execution, and a flexible CLI/API for customization or quickstarts.
 
-### Comparisons
-
-Many tools benchmark endpoints, not models, and miss the details that matter for LLMs. GuideLLM focuses exclusively on LLM-specific workloads, measuring TTFT, ITL, output distributions, and dataset-driven variation. It fits into everyday engineering tasks by using standard Python interfaces and HuggingFace datasets instead of custom formats or research-only pipelines. It is also built for performance, supporting high-rate load generation and accurate scheduling far beyond simple scripts or example benchmarks. The table below highlights how this approach compares to other options.
-
-| Tool                                                                         | CLI | API | High Perf | Full Metrics | Data Modalities                | Data Sources                          | Profiles                                                      | Backends                        | Endpoints                                                                 | Output Types             |
-| ---------------------------------------------------------------------------- | --- | --- | --------- | ------------ | ------------------------------ | ------------------------------------- | ------------------------------------------------------------- | ------------------------------- | ------------------------------------------------------------------------- | ------------------------ |
-| GuideLLM                                                                     | ✅  | ✅  | ✅        | ✅           | Text, Image, Audio, Video      | HuggingFace, Files, Synthetic, Custom | Synchronous, Concurrent, Throughput, Constant, Poisson, Sweep | OpenAI-compatible               | /completions, /chat/completions, /audio/translation, /audio/transcription | console, json, csv, html |
-| [inference-perf](https://github.com/kubernetes-sigs/inference-perf)          | ✅  | ❌  | ✅        | ❌           | Text                           | Synthetic, Specific Datasets          | Concurrent, Constant, Poisson, Sweep                          | OpenAI-compatible               | /completions, /chat/completions                                           | json, png                |
-| [genai-bench](https://github.com/sgl-project/genai-bench)                    | ✅  | ❌  | ❌        | ❌           | Text, Image, Embedding, ReRank | Synthetic, File                       | Concurrent                                                    | OpenAI-compatible, Hosted Cloud | /chat/completions, /embeddings                                            | console, xlsx, png       |
-| [llm-perf](https://github.com/ray-project/llmperf)                           | ❌  | ❌  | ✅        | ❌           | Text                           | Synthetic                             | Concurrent                                                    | OpenAI-compatible, Hosted Cloud | /chat/completions                                                         | json                     |
-| [ollama-benchmark](https://github.com/aidatatools/ollama-benchmark)          | ✅  | ❌  | ❌        | ❌           | Text                           | Synthetic                             | Synchronous                                                   | Ollama                          | /completions                                                              | console, json            |
-| [vllm/benchmarks](https://github.com/vllm-project/vllm/tree/main/benchmarks) | ✅  | ❌  | ❌        | ❌           | Text                           | Synthetic, Specific Datasets          | Synchronous, Throughput, Constant, Sweep                      | OpenAI-compatible, vLLM API     | /completions, /chat/completions                                           | console, png             |
-
-## What's New
-
-This section summarizes the newest capabilities available to users and outlines the current areas of development. It helps readers understand how the platform is evolving and what to expect next.
-
-**Recent Additions**
-
-- New CLI interface with improved configuration and validation.
-- New backends for in-process vLLM Python API and websocket audio transcription.
-- Multi-turn conversation capabilities for benchmarking chat agents and dialogue systems.
-- Full tool calling support (client and server side) in chat completions and responses APIs.
-- Synthetic video and image datasets for controlled experimentation.
-- Replay of Mooncake, WEKA, and OTEL trace files for realistic load testing.
-- Support for benchmarking Geospatial LLMs.
-
-**Active Development**
-
-- Improved scenarios for benchmarking standard workflows.
-- Ability to stack scenario files for complex benchmarking workflows.
-- Ability to override constraints for individual benchmarks in a profile.
-- gRPC backend for benchmarking vLLM-native servers.
-
 ## Quick Start
 
 The Quick Start shows how to install GuideLLM, launch a server, and run your first benchmark in a few minutes.
