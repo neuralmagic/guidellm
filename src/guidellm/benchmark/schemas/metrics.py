@@ -826,20 +826,17 @@ class GenerativeTurnMetrics(StandardBaseDict):
     inter_token_latency_ms: StatusDistributionSummary = Field(
         description="Distribution of inter-token latencies at this turn position"
     )
-    cached_token_count: StatusDistributionSummary | None = Field(
-        default=None,
+    cached_token_count: StatusDistributionSummary = Field(
         description=(
             "Distribution of prompt token counts served from the prefix cache at "
-            "this turn position. None in reports saved before this field existed"
-        ),
+            "this turn position"
+        )
     )
-    prefix_cache_hit_rate: StatusDistributionSummary | None = Field(
-        default=None,
+    prefix_cache_hit_rate: StatusDistributionSummary = Field(
         description=(
             "Distribution of the share of each request's prompt tokens served from "
-            "the prefix cache at this turn position. None in reports saved before "
-            "this field existed"
-        ),
+            "the prefix cache at this turn position"
+        )
     )
 
     @classmethod
@@ -1085,19 +1082,17 @@ class GenerativeMetrics(StandardBaseDict):
     total_token_count: StatusDistributionSummary = Field(
         description="Distribution of total token counts by request status"
     )
-    cached_token_count: StatusDistributionSummary | None = Field(
-        default=None,
+    cached_token_count: StatusDistributionSummary = Field(
         description=(
-            "Distribution of prompt token counts served from the prefix cache. "
-            "None in reports saved before this field existed"
-        ),
+            "Distribution of prompt token counts served from the prefix cache by "
+            "request status"
+        )
     )
-    prefix_cache_hit_rate: StatusDistributionSummary | None = Field(
-        default=None,
+    prefix_cache_hit_rate: StatusDistributionSummary = Field(
         description=(
             "Distribution of the share of each request's prompt tokens served from "
-            "the prefix cache. None in reports saved before this field existed"
-        ),
+            "the prefix cache by request status"
+        )
     )
     time_to_first_token_ms: StatusDistributionSummary = Field(
         description="Distribution of first token latencies in milliseconds"
