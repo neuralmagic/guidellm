@@ -24,7 +24,7 @@ translation_module = runpy.run_path(
     str(Path(__file__).resolve().parent / "check_translations.py")
 )
 translation_routes = translation_module["translation_routes"]
-TRANSLATION_MANIFESTS = translation_module["TRANSLATION_MANIFESTS"]
+TRANSLATION_ROOTS = translation_module["TRANSLATION_ROOTS"]
 
 SECTION_TITLES = {
     language: json.loads(
@@ -32,7 +32,7 @@ SECTION_TITLES = {
             encoding="utf-8"
         )
     )
-    for language in TRANSLATION_MANIFESTS
+    for language in TRANSLATION_ROOTS
 }
 
 
@@ -109,7 +109,7 @@ def _clone_page(
 ) -> Any | None:
     """Choose a translated page, English fallback link, or English source page."""
     route = _route(page)
-    if route.split("/", 1)[0] in TRANSLATION_MANIFESTS:
+    if route.split("/", 1)[0] in TRANSLATION_ROOTS:
         return None
     if language == "en":
         return _copy_page(page)
@@ -188,7 +188,7 @@ def _clone_item(
 def _navigation_for_page(nav: Navigation, language: str) -> Navigation:
     """Build the page's navigation using translations for its language."""
     routes = (
-        translation_routes(manifest_path=TRANSLATION_MANIFESTS[language])
+        translation_routes(translations_root=TRANSLATION_ROOTS[language])
         if language != "en"
         else {}
     )
@@ -253,7 +253,7 @@ def on_page_context(context: dict, page: Page, config, nav: Navigation):
     _ = config
     page_route = _route(page)
     language = page_route.split("/", 1)[0]
-    if language not in TRANSLATION_MANIFESTS:
+    if language not in TRANSLATION_ROOTS:
         language = "en"
     localized_nav = _navigation_for_page(nav, language)
     context["nav"] = localized_nav

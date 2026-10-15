@@ -110,17 +110,17 @@ def generate_translation_map():
     translation_module = runpy.run_path(
         str(project_root / "docs/scripts/check_translations.py")
     )
-    manifests = cast(
+    translation_roots = cast(
         "dict[str, Path]",
-        translation_module["TRANSLATION_MANIFESTS"],
+        translation_module["TRANSLATION_ROOTS"],
     )
     route_builder = cast(
         "Callable[[Path, Path], TranslationRoutes]",
         translation_module["translation_routes"],
     )
     routes = {
-        language: route_builder(project_root, manifest_path)
-        for language, manifest_path in manifests.items()
+        language: route_builder(project_root, translations_root)
+        for language, translations_root in translation_roots.items()
     }
 
     content = (
