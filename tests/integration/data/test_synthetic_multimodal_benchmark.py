@@ -22,7 +22,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-import httpx
+import httpx2
 import pytest
 
 from guidellm.mock_server.server import MockServer
@@ -49,13 +49,13 @@ def _free_port() -> int:
 def _wait_for_server(base_url: str, timeout: float = 30.0) -> None:
     async def _poll() -> None:
         backoff = 0.5
-        async with httpx.AsyncClient() as client:
+        async with httpx2.AsyncClient() as client:
             while True:
                 try:
                     resp = await client.get(f"{base_url}/health", timeout=1.0)
                     if resp.status_code == 200:
                         return
-                except (httpx.RequestError, httpx.TimeoutException):
+                except (httpx2.RequestError, httpx2.TimeoutException):
                     pass
                 await asyncio.sleep(backoff)
                 backoff = min(backoff * 1.5, 2.0)
