@@ -1231,7 +1231,7 @@ class TestMockServerFailAfterAndConcurrency:
             "stream": True,
         }
 
-        async def one_stream(client: httpx.AsyncClient) -> float:
+        async def one_stream(client: httpx2.AsyncClient) -> float:
             async with client.stream(
                 "POST",
                 f"{concurrent_limit_mock_server}/v1/chat/completions",
@@ -1243,7 +1243,7 @@ class TestMockServerFailAfterAndConcurrency:
                     pass
             return asyncio.get_running_loop().time()
 
-        async with httpx.AsyncClient() as client:
+        async with httpx2.AsyncClient() as client:
             finished = await asyncio.gather(
                 one_stream(client),
                 one_stream(client),
@@ -1268,7 +1268,7 @@ class TestMockServerFailAfterAndConcurrency:
         }
         url = f"{concurrent_limit_mock_server}/v1/chat/completions"
 
-        async with httpx.AsyncClient() as client:
+        async with httpx2.AsyncClient() as client:
             async with client.stream(
                 "POST", url, json=payload, timeout=30.0
             ) as response:
