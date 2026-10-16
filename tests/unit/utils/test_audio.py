@@ -647,3 +647,29 @@ def test_pcm16_append_b64_chunks_invalid_decoder_sample_rate_raises(mock_decode)
 
     with pytest.raises(ValueError, match="invalid sample_rate"):
         _audio_mod.pcm16_append_b64_chunks({"audio": b"x"})
+
+
+@pytest.mark.regression
+@pytest.mark.parametrize("status_code", [301, 302, 303, 307, 308])
+def test_encode_audio_follows_redirects(httpx2_mock, status_code):
+    """Decode the final audio payload after a relative redirect. ## WRITTEN BY AI ##"""
+    buffer = io.BytesIO()
+    with wave.open(buffer, "wb") as audio:
+        audio.setnchannels(1)
+        audio.setsampwidth(2)
+        audio.setframerate(16000)
+        audio.writeframes(b"\x00\x00" * 1600)
+    url = "https://media.example/audio"
+    httpx2_mock.route(url=url).respond(
+        status_code=status_code, headers={"Location": "/asset"}
+    )
+    httpx2_mock.route(url="https://media.example/asset").respond(
+        content=buffer.getvalue()
+    )
+
+    result = _audio_mod.encode_audio(url)
+
+    assert result["audio_samples"] == 1600
+    assert result["audio_seconds"] == pytest.approx(0.1)
+    assert result["format"] == "wav"
+    assert len(httpx2_mock.calls) == 2
