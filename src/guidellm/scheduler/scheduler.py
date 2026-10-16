@@ -9,8 +9,10 @@ various scenarios including LLM inference benchmarking.
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncIterator
-from typing import Generic
+from itertools import chain
+from typing import Generic, Literal, Protocol, runtime_checkable
 
 from guidellm.scheduler.constraints import (
     Constraint,
@@ -30,6 +32,64 @@ from guidellm.schemas import RequestInfo
 from guidellm.utils.singleton import ThreadSafeSingletonMixin
 
 __all__ = ["Scheduler"]
+
+
+@runtime_checkable
+class InfiniteDataset(Protocol):
+    """Iterable that can report whether iteration ends."""
+
+    def is_infinite(self) -> bool:
+        """
+        :return: ``True`` when iteration does not stop on its own
+        """
+
+
+def _prefetch_requests(
+    requests: DatasetIterT[RequestT],
+    count: int | Literal["all"],
+) -> DatasetIterT[RequestT]:
+    """
+    Load request graphs until ``count`` request nodes are buffered.
+
+    Graphs that cross the count are kept whole. A count of ``0`` returns
+    ``requests`` unchanged. ``"all"`` loads every graph, and raises when the
+    dataset reports that it is infinite.
+
+    :param requests: Dataset iterable of conversation graphs
+    :param count: Number of request nodes to load, or ``"all"`` to load every
+        request
+    :return: Buffered graphs followed by the remainder of the dataset
+    :raises ValueError: If ``count`` is ``"all"`` and the dataset is infinite
+    """
+    if count == "all":
+        if isinstance(requests, InfiniteDataset) and requests.is_infinite():
+            raise ValueError(
+                "Cannot prefetch all requests from an infinite dataset. "
+                "Set data_loader.samples to a positive limit or choose a "
+                "finite dataset."
+            )
+        buffered = []
+        fetched = 0
+        for graph in requests:
+            buffered.append(graph)
+            fetched += len(graph.nodes)
+        return buffered
+
+    if count == 0:
+        return requests
+
+    iterator = iter(requests)
+    buffered = []
+    fetched = 0
+    while fetched < count:
+        try:
+            graph = next(iterator)
+        except StopIteration:
+            break
+        buffered.append(graph)
+        fetched += len(graph.nodes)
+
+    return chain(buffered, iterator)
 
 
 class Scheduler(
@@ -115,6 +175,11 @@ class Scheduler(
                     local_strategy,
                     local_constraints,
                 ) = await env.sync_run_params(requests, strategy, constraints)
+                local_requests = await asyncio.to_thread(
+                    _prefetch_requests,
+                    local_requests,
+                    local_strategy.prefetch_count(),
+                )
 
                 # Setup the worker group, sync start with the environment
                 worker_group = WorkerProcessGroup[RequestT, ResponseT](
