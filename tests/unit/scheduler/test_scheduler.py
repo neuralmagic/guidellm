@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import random
+import threading
 import uuid
 from typing import Any, Generic
 
@@ -18,6 +19,7 @@ from guidellm.scheduler import (
     SchedulerState,
     SynchronousStrategy,
 )
+from guidellm.scheduler.scheduler import _prefetch_requests
 from guidellm.scheduler.schemas import ConversationGraph, ConversationNode
 from guidellm.schemas import RequestInfo, RequestSettings
 from guidellm.schemas.scheduler import (
@@ -291,3 +293,120 @@ class TestScheduler:
             results.append((response, request, info, state))
 
         assert len(results) > 0
+
+
+def _graph(payloads: list[str]) -> MockConversationGraph:
+    return MockConversationGraph(
+        graph_id=str(uuid.uuid4()),
+        nodes={
+            f"turn_{index}": ConversationNode(
+                node_id=f"turn_{index}",
+                agent_id="default",
+                request=MockRequest(payload=payload),
+                settings=RequestSettings(),
+            )
+            for index, payload in enumerate(payloads)
+        },
+        edges=[],
+    )
+
+
+@pytest.mark.smoke
+def test_prefetch_requests_buffers_nodes_and_keeps_crossing_graph():
+    """
+    Prefetch stops once the node count is reached and keeps a crossing graph whole.
+
+    ## WRITTEN BY AI ##
+    """
+    graphs = [_graph(["a", "b", "c"]), _graph(["d"])]
+    pulled: list[str] = []
+
+    def source():
+        yield graphs[0]
+        pulled.append("d")
+        yield graphs[1]
+
+    prefetched = _prefetch_requests(source(), 2)
+
+    assert pulled == []
+    assert next(prefetched) is graphs[0]
+    assert pulled == []
+    assert next(prefetched) is graphs[1]
+
+
+@pytest.mark.smoke
+def test_prefetch_requests_leaves_the_remainder():
+    """
+    Graphs past the prefetch count stay available on the returned iterator.
+
+    ## WRITTEN BY AI ##
+    """
+    graphs = [_graph(["a"]), _graph(["b"]), _graph(["c"])]
+    seen: list[str] = []
+
+    def source():
+        for graph in graphs:
+            seen.append(graph.nodes["turn_0"].request.payload)
+            yield graph
+
+    prefetched = _prefetch_requests(source(), 2)
+
+    assert seen == ["a", "b"]
+    assert next(prefetched).nodes["turn_0"].request.payload == "a"
+    assert next(prefetched).nodes["turn_0"].request.payload == "b"
+    assert seen == ["a", "b"]
+    assert next(prefetched).nodes["turn_0"].request.payload == "c"
+    assert seen == ["a", "b", "c"]
+
+
+@pytest.mark.smoke
+def test_prefetch_requests_skips_zero():
+    """
+    A count of zero returns the original iterable without consuming it.
+
+    ## WRITTEN BY AI ##
+    """
+    graphs = [_graph(["a"])]
+
+    assert _prefetch_requests(graphs, 0) is graphs
+
+
+@pytest.mark.smoke
+def test_prefetch_all_exhausts_a_finite_dataset():
+    """
+    ``"all"`` loads every graph from a finite iterable.
+
+    ## WRITTEN BY AI ##
+    """
+    graphs = [_graph(["a"]), _graph(["b"])]
+
+    assert _prefetch_requests(graphs, "all") == graphs
+
+
+@pytest.mark.regression
+def test_prefetch_all_rejects_an_infinite_dataset():
+    """
+    An iterable that reports itself as infinite is rejected before iteration.
+
+    ## WRITTEN BY AI ##
+    """
+
+    class _Infinite:
+        def is_infinite(self) -> bool:
+            return True
+
+        def __iter__(self):
+            raise AssertionError("infinite dataset was iterated")
+
+    with pytest.raises(ValueError, match="infinite dataset"):
+        _prefetch_requests(_Infinite(), "all")
+
+
+def _wait_for_overlap(event: threading.Event, message: str) -> None:
+    if not event.wait(timeout=2):
+        raise TimeoutError(message)
+
+
+async def _no_request_updates():
+    if False:
+        yield None

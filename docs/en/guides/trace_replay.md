@@ -32,7 +32,7 @@ guidellm run \
 ```bash
 guidellm run \
   --backend kind=openai_http,target=http://localhost:8000 \
-  --profile kind=replay \
+  --profile kind=replay,prefetch=all \
   --data kind=weka,source.kind=huggingface,source.source=semianalysisai/cc-traces-weka-no-subagents-051226 \
   --constraint kind=max_requests,count=30
 ```
@@ -111,6 +111,8 @@ The WEKA format expects a column with conversation UUIDs that is not wrapped wit
 Similar to Mooncake, WEKA uses prefix-based cache hash IDs. The original [specification](https://github.com/callanjfox/agentic-coding-analysis/blob/master/docs/TRACE_FORMAT.md) for the trace requires hash IDs to be 1 or greater, and for trailing hash IDs to be dropped if there are not enough input tokens to fill the hash ID block size. To accommodate for datasets which may not follow the specification exactly (ex. [semianalysisai/cc-traces-weka-no-subagents-051226](https://huggingface.co/datasets/semianalysisai/cc-traces-weka-no-subagents-051226)), GuideLLM will accept any non-negative integer as a valid hash ID, and will drop partially filled hash IDs if they exist.
 
 GuideLLM will generate prompts starting from the first conversation. When the conversation ends, the next conversation will be used. Relative timestamps are offsets from the earliest request in the dataset, so later conversations can start later than the first.
+
+In general, it is safer to use `prefetch=all` when using WEKA traces. The only situation where you do not need to is when the sessions in a trace are in the correct order without overlap. Otherwise, the data deserializer may fall behind, resulting in sessions being scheduled after their relative trace time. The problem is exacerbated when most or all sessions have requests that start at or near the start of the benchmark. All requests must be pre-fetched to ensure all sessions start when they need to. Use `--profile kind=replay,prefetch=all` so those graphs finish loading before the run clock starts. See [Requests load after they are due](troubleshooting.md#requests-load-after-they-are-due).
 
 Hash IDs follow the per-row `hash_id_scope` field:
 
