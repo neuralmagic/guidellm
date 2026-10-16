@@ -294,26 +294,15 @@ In-memory datasets allow you to directly pass data as Python objects, making the
 
 - **Dictionary of columns and values**: Where each key is a column name and the values are lists of data points. The keys should include `prompt` or other common names for the prompt which will be used as the prompt column. Additional columns can be included based on the previously mentioned aliases for the `--data-column-mapper` argument.
   ```python
-  {
-      "column1": ["value1", "value2"],
-      "column2": ["value3", "value4"]
-  }
+  {"column1": ["value1", "value2"], "column2": ["value3", "value4"]}
   ```
 - **List of dictionaries**: Where each dictionary represents a single data point with key-value pairs. The dictionaries should include `prompt` or other common names for the prompt which will be used as the prompt column. Additional fields can be included based on the previously mentioned aliases for the `--data-column-mapper` argument.
   ```python
-  [
-      {"column1": "value1", "column2": "value3"},
-      {"column1": "value2", "column2": "value4"}
-  ]
+  [{"column1": "value1", "column2": "value3"}, {"column1": "value2", "column2": "value4"}]
   ```
 - **List of items**: Where each item is a single data point. The items should include `prompt` or other common names for the prompt which will be used as the prompt column. Additional fields can be included based on the previously mentioned aliases for the `--data-column-mapper` argument.
   ```python
-  [
-      "value1",
-      "value2",
-      "value3"
-  ]
-
+  ["value1", "value2", "value3"]
   ```
 
 #### Example Usage
