@@ -11,6 +11,7 @@ from guidellm.collectors.collector import (
     OneshotCollector,
     PeriodicCollector,
 )
+from guidellm.collectors.process import CollectorProcess
 from guidellm.collectors.prometheus import (
     PrometheusCollector,
     PrometheusSnapshot,
@@ -21,6 +22,7 @@ from guidellm.collectors.prometheus import (
 
 __all__ = [
     "Collector",
+    "CollectorProcess",
     "OneshotCollector",
     "PeriodicCollector",
     "PrometheusCollector",
