@@ -1421,14 +1421,12 @@ class GenerativeMetrics(StandardBaseDict):
             request_scheduled_latency=scheduled_latency,
             turn_predecessor_delay=predecessor_delay,
             turn_scheduling_delay=scheduling_delay,
-            # Throughput targets every request at the run start, so its delay
-            # is elapsed run time rather than lateness.
             root_dispatch_delay=(
-                None
-                if accumulator.config.strategy.type_ == "throughput"
-                else root_dispatch_delay_distribution(
+                root_dispatch_delay_distribution(
                     [*successful, *incomplete, *errored],
                 )
+                if accumulator.config.strategy.defines_root_dispatch_delay
+                else None
             ),
             request_streaming_iterations_count=StatusDistributionSummary.from_values_function(
                 function=lambda req: req.info.timings.request_iterations or 0.0,
