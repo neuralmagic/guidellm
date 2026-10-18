@@ -63,16 +63,16 @@ GuideLLM은 벤치마크를 원하는 대로 구성할 수 있도록 다양한 �
 
 ### 핵심 파라미터
 
-| 파라미터        | 설명                                   | 예제                                                                                       |
-| --------------- | -------------------------------------- | ------------------------------------------------------------------------------------------ |
-| `--backend`     | 백엔드 유형 및 연결 설정                | `--backend kind=openai_http,target=http://localhost:8000,model=Meta-Llama-3.1-8B-Instruct`     |
-| `--data`        | 데이터 유형 및 설정                     | `--data kind=synthetic_text,prompt_tokens=256,output_tokens=128`                              |
-| `--profile`     | 벤치마크 프로파일 유형 및 파라미터       | `--profile kind=sweep,sweep_size=10`                                                         |
-| `--constraint`  | 실행 제한 (여러 번 지정 가능)           | `--constraint kind=max_requests,count=1000`                                                  |
-| `--seed`        | 재현성을 위한 난수 시드                 | `--seed kind=static,value=42`                                                                |
-| `--data-loader` | 샘플 수 및 loader 설정                    | `--data-loader kind=pytorch,samples=1000`                                                    |
-| `--output`      | 출력 형식 및 경로 (여러 번 지정 가능)    | `--output kind=json,path=results/benchmark.json`                                             |
-| `--tokenizer`   | 토큰 수 계산에 사용할 토크나이저        | `--tokenizer kind=huggingface_auto,model=gpt2`                                                |
+| 파라미터        | 설명                                  | 예제                                                                                       |
+| --------------- | ------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `--backend`     | 백엔드 유형 및 연결 설정              | `--backend kind=openai_http,target=http://localhost:8000,model=Meta-Llama-3.1-8B-Instruct` |
+| `--data`        | 데이터 유형 및 설정                   | `--data kind=synthetic_text,prompt_tokens=256,output_tokens=128`                           |
+| `--profile`     | 벤치마크 프로파일 유형 및 파라미터    | `--profile kind=sweep,sweep_size=10`                                                       |
+| `--constraint`  | 실행 제한 (여러 번 지정 가능)         | `--constraint kind=max_requests,count=1000`                                                |
+| `--seed`        | 재현성을 위한 난수 시드               | `--seed kind=static,value=42`                                                              |
+| `--data-loader` | 샘플 수 및 loader 설정                | `--data-loader kind=pytorch,samples=1000`                                                  |
+| `--output`      | 출력 형식 및 경로 (여러 번 지정 가능) | `--output kind=json,path=results/benchmark.json`                                           |
+| `--tokenizer`   | 토큰 수 계산에 사용할 토크나이저      | `--tokenizer kind=huggingface_auto,model=gpt2`                                             |
 
 ### 난수 시드 (`--seed`)
 
@@ -86,15 +86,15 @@ GuideLLM은 벤치마크를 원하는 대로 구성할 수 있도록 다양한 �
 
 제약 조건은 프로파일에 포함된 각 실행 구성의 종료 시점을 제어합니다. 하나 이상의 `--constraint` 옵션을 추가하세요. 제약 조건은 프로파일의 각 실행 구성에 개별적으로 적용됩니다. 여러 실행 구성을 포함하는 프로파일에는 `sweep`과 주요 파라미터가 리스트로 지정된 프로파일이 있습니다(예: `concurrent`에서 `{"streams":[10,20]}`로 지정한 경우).
 
-| 제약 조건 유형          | 설정 파라미터        | 예제                                                             |
-| ----------------------- | -------------------- | ---------------------------------------------------------------- |
-| `max_duration`          | `seconds`            | `--constraint kind=max_duration,seconds=30`                       |
-| `max_requests`          | `count`              | `--constraint kind=max_requests,count=1000`                       |
-| `min_requests`          | `count`              | `--constraint kind=min_requests,count=1000`                       |
-| `max_errors`            | `count`              | `--constraint kind=max_errors,count=10`                           |
-| `max_error_rate`        | `rate`, `window`     | `--constraint kind=max_error_rate,rate=0.05,window=10`             |
-| `max_global_error_rate` | `rate`, `minimum`    | `--constraint kind=max_global_error_rate,rate=0.05,minimum=1000`    |
-| `over_saturation`       | 감지 파라미터        | `--constraint kind=over_saturation,min_seconds=30,mode=enforce`     |
+| 제약 조건 유형          | 설정 파라미터     | 예제                                                             |
+| ----------------------- | ----------------- | ---------------------------------------------------------------- |
+| `max_duration`          | `seconds`         | `--constraint kind=max_duration,seconds=30`                      |
+| `max_requests`          | `count`           | `--constraint kind=max_requests,count=1000`                      |
+| `min_requests`          | `count`           | `--constraint kind=min_requests,count=1000`                      |
+| `max_errors`            | `count`           | `--constraint kind=max_errors,count=10`                          |
+| `max_error_rate`        | `rate`, `window`  | `--constraint kind=max_error_rate,rate=0.05,window=10`           |
+| `max_global_error_rate` | `rate`, `minimum` | `--constraint kind=max_global_error_rate,rate=0.05,minimum=1000` |
+| `over_saturation`       | 감지 파라미터     | `--constraint kind=over_saturation,min_seconds=30,mode=enforce`  |
 
 예를 들어, `--constraint kind=max_requests,count=1000`을 `--profile kind=sweep`과 함께 사용하면 Sweep의 각 실행 구성(동기식, 처리량, 중간 요청률)에 대해 최대 1000개의 요청을 실행합니다. `--constraint kind=min_requests,count=1000`은 `max_requests`와 비슷하지만, 요청 1000개가 처리될 때까지 큐에 요청을 계속 추가하여 요청률 기반 벤치마크의 종료 시점에 처리량이 감소하는 현상을 방지합니다. `--constraint kind=max_duration,seconds=30`을 `--profile '{"kind":"concurrent","streams":[10,20]}'`과 함께 사용하면 동시 스트림 10개로 30초 동안 실행한 다음, 동시 스트림 20개로 30초 동안 실행합니다.
 
@@ -116,9 +116,9 @@ GuideLLM은 아래에서 자세히 설명하는 여러 벤치마크 프로파일
 guidellm run --profile kind=synchronous
 ```
 
-| 프로파일 파라미터 | 설명                 | 예제    |
-| ----------------- | -------------------- | ------- |
-| —                 | 요청률 파라미터 없음 |         |
+| 프로파일 파라미터 | 설명                 | 예제 |
+| ----------------- | -------------------- | ---- |
+| —                 | 요청률 파라미터 없음 |      |
 
 #### 처리량 프로파일
 
@@ -128,10 +128,10 @@ guidellm run --profile kind=synchronous
 guidellm run --profile kind=throughput,max_concurrency=10
 ```
 
-| 프로파일 파라미터 | 설명                                                | 예제                                                              |
-| ----------------- | --------------------------------------------------- | ----------------------------------------------------------------- |
-| `max_concurrency` | 동시 요청 스트림 수                                 | `--profile kind=throughput,max_concurrency=10`                      |
-| `rampup_duration` | 최대 처리량까지 부하를 점진적으로 높이는 시간(초)    | `--profile kind=throughput,max_concurrency=10,rampup_duration=10`   |
+| 프로파일 파라미터 | 설명                                              | 예제                                                              |
+| ----------------- | ------------------------------------------------- | ----------------------------------------------------------------- |
+| `max_concurrency` | 동시 요청 스트림 수                               | `--profile kind=throughput,max_concurrency=10`                    |
+| `rampup_duration` | 최대 처리량까지 부하를 점진적으로 높이는 시간(초) | `--profile kind=throughput,max_concurrency=10,rampup_duration=10` |
 
 #### 동시 실행 프로파일
 
@@ -141,11 +141,11 @@ guidellm run --profile kind=throughput,max_concurrency=10
 guidellm run --profile kind=concurrent,streams=10
 ```
 
-| 프로파일 파라미터 | 설명                                          | 예제                                                                                               |
-| ----------------- | --------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `streams`         | 유지할 동시 스트림 수; 리스트로 지정 가능     | `--profile kind=concurrent,streams=10` 또는 `--profile '{"kind":"concurrent","streams":[16,32]}'`     |
-| `rampup_duration` | 초기 요청을 분산하여 전송하는 시간(초)        | `--profile kind=concurrent,streams=10,rampup_duration=10`                                            |
-| `max_concurrency` | 스케줄링할 최대 동시 요청 수                  | `--profile kind=concurrent,streams=10,max_concurrency=10`                                            |
+| 프로파일 파라미터 | 설명                                      | 예제                                                                                              |
+| ----------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `streams`         | 유지할 동시 스트림 수; 리스트로 지정 가능 | `--profile kind=concurrent,streams=10` 또는 `--profile '{"kind":"concurrent","streams":[16,32]}'` |
+| `rampup_duration` | 초기 요청을 분산하여 전송하는 시간(초)    | `--profile kind=concurrent,streams=10,rampup_duration=10`                                         |
+| `max_concurrency` | 스케줄링할 최대 동시 요청 수              | `--profile kind=concurrent,streams=10,max_concurrency=10`                                         |
 
 `--override` 옵션으로 스트림 수를 리스트로 지정하면, 서로 다른 스트림 수를 사용하는 여러 동시 실행 구성(하위 벤치마크)을 실행할 수 있습니다. 예를 들어, `--profile kind=concurrent --override profile.streams 10,20,30`은 스트림 수가 각각 10개, 20개, 30개인 동시 실행 구성을 실행합니다.
 
@@ -172,11 +172,11 @@ guidellm run \
 guidellm run --profile '{"kind":"constant","rate":[16,32]}'
 ```
 
-| 프로파일 파라미터 | 설명                                                       | 예제                                                                                     |
-| ----------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `rate`            | 초당 요청 수; 리스트로 지정 가능                           | `--profile kind=constant,rate=10` 또는 `--profile '{"kind":"constant","rate":[16,32]}'`     |
-| `rampup_duration` | 요청률을 0에서 목표값까지 선형적으로 높이는 시간(초)        | `--profile kind=constant,rate=10,rampup_duration=10`                                        |
-| `max_concurrency` | 스케줄링할 최대 동시 요청 수                                | `--profile kind=constant,rate=10,max_concurrency=32`                                       |
+| 프로파일 파라미터 | 설명                                                 | 예제                                                                                    |
+| ----------------- | ---------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `rate`            | 초당 요청 수; 리스트로 지정 가능                     | `--profile kind=constant,rate=10` 또는 `--profile '{"kind":"constant","rate":[16,32]}'` |
+| `rampup_duration` | 요청률을 0에서 목표값까지 선형적으로 높이는 시간(초) | `--profile kind=constant,rate=10,rampup_duration=10`                                    |
+| `max_concurrency` | 스케줄링할 최대 동시 요청 수                         | `--profile kind=constant,rate=10,max_concurrency=32`                                    |
 
 `--override` 옵션으로 요청률을 리스트로 지정하면, 서로 다른 요청률을 사용하는 여러 실행 구성(하위 벤치마크)을 실행할 수 있습니다. 예를 들어, `--profile kind=constant --override profile.rate 10,20,30`은 초당 요청 수가 각각 10개, 20개, 30개인 고정 요청률 실행 구성을 실행합니다.
 
@@ -188,10 +188,10 @@ guidellm run --profile '{"kind":"constant","rate":[16,32]}'
 guidellm run --profile kind=poisson,rate=16 --seed kind=static,value=42
 ```
 
-| 프로파일 파라미터 | 설명                                    | 예제                                                                                   |
-| ----------------- | --------------------------------------- | -------------------------------------------------------------------------------------- |
-| `rate`            | 목표 초당 요청 수(하나 이상)             | `--profile kind=poisson,rate=10` 또는 `--profile '{"kind":"poisson","rate":[10,20]}'`     |
-| `max_concurrency` | 스케줄링할 최대 동시 요청 수             | `--profile kind=poisson,rate=10,max_concurrency=32`                                      |
+| 프로파일 파라미터 | 설명                         | 예제                                                                                  |
+| ----------------- | ---------------------------- | ------------------------------------------------------------------------------------- |
+| `rate`            | 목표 초당 요청 수(하나 이상) | `--profile kind=poisson,rate=10` 또는 `--profile '{"kind":"poisson","rate":[10,20]}'` |
+| `max_concurrency` | 스케줄링할 최대 동시 요청 수 | `--profile kind=poisson,rate=10,max_concurrency=32`                                   |
 
 여러 요청률을 지정하고 `stopping_scope="all"`이 설정된 제약 조건(예: 과포화 또는 오류율 제한)을 사용하면, 해당 제약 조건으로 실행이 중단될 때 목록에 남은 모든 요청률을 건너뜁니다. 더 높은(부하가 큰) 요청률만 건너뛰도록 요청률을 오름차순으로 지정하는 것이 좋습니다. 오름차순이 아니라면 중단이 발생한 요청률 뒤에 있는 더 낮은(부하가 작은) 요청률도 건너뜁니다.
 
@@ -213,12 +213,12 @@ Sweep 프로파일은 일련의 벤치마크 실행 구성을 순서대로 적�
 guidellm run --profile kind=sweep,sweep_size=10,rampup_duration=10,strategy_type=poisson
 ```
 
-| 프로파일 파라미터 | 설명                                                                           | 예제                                                    |
-| ----------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------- |
-| `sweep_size`      | Sweep에 포함할 실행 구성의 수(동기식 및 처리량 실행 구성 포함)                  | `--profile kind=sweep,sweep_size=10`                     |
-| `rampup_duration` | 처리량 및 고정 요청률 실행 단계에서 요청률을 점진적으로 높이는 시간(초)         | `--profile kind=sweep,sweep_size=10,rampup_duration=10`   |
-| `strategy_type`   | 중간 요청률을 적용하는 단계의 실행 구성 유형(`constant` 또는 `poisson`)          | `--profile kind=sweep,strategy_type=poisson`              |
-| `max_concurrency` | 스케줄링할 최대 동시 요청 수                                                  | `--profile kind=sweep,max_concurrency=10`                |
+| 프로파일 파라미터 | 설명                                                                    | 예제                                                    |
+| ----------------- | ----------------------------------------------------------------------- | ------------------------------------------------------- |
+| `sweep_size`      | Sweep에 포함할 실행 구성의 수(동기식 및 처리량 실행 구성 포함)          | `--profile kind=sweep,sweep_size=10`                    |
+| `rampup_duration` | 처리량 및 고정 요청률 실행 단계에서 요청률을 점진적으로 높이는 시간(초) | `--profile kind=sweep,sweep_size=10,rampup_duration=10` |
+| `strategy_type`   | 중간 요청률을 적용하는 단계의 실행 구성 유형(`constant` 또는 `poisson`) | `--profile kind=sweep,strategy_type=poisson`            |
+| `max_concurrency` | 스케줄링할 최대 동시 요청 수                                            | `--profile kind=sweep,max_concurrency=10`               |
 
 #### Replay 프로파일
 
@@ -228,11 +228,11 @@ Trace 파일 데이터셋의 타임스탬프에 따라 trace 이벤트를 재생
 guidellm run --profile kind=replay,time_scale=1.0
 ```
 
-| 프로파일 파라미터 | 설명                                                                                                                                        | 예제                                            |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
-| `time_scale`      | Trace 이벤트 사이의 시간 간격에 적용할 배율                                                                                                | `--profile kind=replay,time_scale=2.0`           |
-| `schedule_turn`   | `idle_gap`(기본값)은 기록된 각 요청의 소요 시간 이후에 이어지는 유휴 간격을 유지합니다. `timestamp`는 각 trace 타임스탬프에 맞춰 실행합니다. | `--profile kind=replay,schedule_turn=timestamp`  |
-| `prefetch`        | 실행 시간 측정을 시작하기 전에 미리 불러올 요청 수. 기본값은 0(미리 불러오지 않음)                                                              | `--profile kind=replay,prefetch=all`             |
+| 프로파일 파라미터 | 설명                                                                                                                                         | 예제                                            |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| `time_scale`      | Trace 이벤트 사이의 시간 간격에 적용할 배율                                                                                                  | `--profile kind=replay,time_scale=2.0`          |
+| `schedule_turn`   | `idle_gap`(기본값)은 기록된 각 요청의 소요 시간 이후에 이어지는 유휴 간격을 유지합니다. `timestamp`는 각 trace 타임스탬프에 맞춰 실행합니다. | `--profile kind=replay,schedule_turn=timestamp` |
+| `prefetch`        | 실행 시간 측정을 시작하기 전에 미리 불러올 요청 수. 기본값은 0(미리 불러오지 않음)                                                           | `--profile kind=replay,prefetch=all`            |
 
 대기 시간의 상한과 데이터에 적용할 `time_scale`은 `--data`에서 설정합니다. 프로파일의 `time_scale`은 이러한 설정에 따라 데이터셋의 타임스탬프가 생성된 후 스케줄러에서 적용되므로, 서로 다른 시간 배율로 여러 번 실행할 수 있습니다.
 
