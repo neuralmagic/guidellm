@@ -37,7 +37,7 @@ GuideLLM은 대규모 언어 모델의 배포 환경을 손쉽게 평가하고 �
 
   다양한 부하 조건에서 LLM 서버를 대상으로 성능 벤치마크를 설정하고 실행하는 방법을 설명합니다.
 
-  [:octicons-arrow-right-24: 벤치마킹 가이드(영문)](../../getting-started/benchmark.md)
+  [:octicons-arrow-right-24: 벤치마킹 가이드](benchmark.md)
 
 - :material-chart-bar:{ .lg .middle } 결과 분석
 

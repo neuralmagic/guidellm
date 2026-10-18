@@ -31,11 +31,11 @@ vllm serve "neuralmagic/Meta-Llama-3.1-8B-Instruct-quantized.w4a16"
 
 ## **다른 서버**
 
-GuideLLM은 TGI, SG Lang 등 모든 OpenAI 호환 서버를 지원합니다. 지원되는 모든 백엔드에 대한 자세한 내용은 [백엔드 문서(영문)](../../guides/backends.md)를 참고하세요.
+GuideLLM은 TGI, SGLang 등 모든 OpenAI 호환 서버를 지원합니다. 지원되는 모든 백엔드에 대한 자세한 내용은 [백엔드 문서(영문)](../../guides/backends.md)를 참고하세요.
 
 ## **서버 동작 확인**
 
-서버가 실행되면 간단한 curl 명령어로 서버가 정상적으로 동작하고 벤치마크를 실행하는 서버에서 접근할 수 있는지 확인할 수 있습니다 (모델 서버가 다른 장비에서 실행 중이라면 `localhost`를 해당 서버의 IP 주소로 변경하세요):
+서버가 실행되면 간단한 curl 명령어로 서버가 정상적으로 동작하고 벤치마크를 실행하는 서버에서 접근할 수 있는지 확인할 수 있습니다(모델 서버가 다른 장비에서 실행 중이라면 `localhost`를 해당 서버의 IP 주소로 변경하세요):
 
 ```bash
 curl http://localhost:8000/v1/models
