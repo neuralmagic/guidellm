@@ -99,6 +99,83 @@ def test_multimodal_usage_preserves_server_totals(
     assert output_metrics.audio_tokens == 25
 
 
+@pytest.mark.regression
+@pytest.mark.parametrize(
+    "handler_type",
+    [
+        TextCompletionsRequestHandler,
+        ChatCompletionsRequestHandler,
+        PoolingRequestHandler,
+    ],
+)
+@pytest.mark.parametrize(
+    ("input_details", "expected_tokens"),
+    [
+        pytest.param({"image_tokens": 80}, (20, 80, None, None), id="flat-image"),
+        pytest.param(
+            {
+                "cached_tokens": 0,
+                "created_cache_tokens": None,
+                "multimodal_tokens": {"image": 80},
+            },
+            (20, 80, None, None),
+            id="nested-image",
+        ),
+        pytest.param(
+            {"multimodal_tokens": {"image": 40, "audio": 40}},
+            (20, 40, None, 40),
+            id="nested-image-audio",
+        ),
+        pytest.param(
+            {"multimodal_tokens": {"video": 80}},
+            (20, None, 80, None),
+            id="nested-video",
+        ),
+        pytest.param(
+            {
+                "multimodal_tokens": {"image": 80, "audio": 60},
+                "image_tokens": 0,
+                "audio_tokens": 40,
+            },
+            (60, 0, None, 40),
+            id="flat-keys-win",
+        ),
+        pytest.param(
+            {"multimodal_tokens": {"image": 80, "cached": 50}},
+            (20, 80, None, None),
+            id="unknown-modality",
+        ),
+        pytest.param(
+            {"multimodal_tokens": None}, (100, None, None, None), id="null-nested"
+        ),
+        pytest.param(
+            {"multimodal_tokens": []}, (100, None, None, None), id="non-dict-nested"
+        ),
+        pytest.param(None, (100, None, None, None), id="no-details"),
+    ],
+)
+def test_vllm_multimodal_usage(handler_type, input_details, expected_tokens):
+    """Split vLLM placeholder tokens without overriding explicit flat counts.
+
+    ## WRITTEN BY AI ##
+    """
+    usage = {"prompt_tokens": 100, "completion_tokens": 30}
+    if input_details is not None:
+        usage["prompt_tokens_details"] = input_details
+
+    input_metrics, output_metrics = handler_type().extract_metrics(usage, "Hello")
+
+    assert (
+        input_metrics.text_tokens,
+        input_metrics.image_tokens,
+        input_metrics.video_tokens,
+        input_metrics.audio_tokens,
+    ) == expected_tokens
+    assert input_metrics.total_tokens == 100
+    assert input_metrics.cached_tokens == (input_details or {}).get("cached_tokens")
+    assert output_metrics.total_tokens == 30
+
+
 class TestOpenAIRequestHandler:
     """Test cases for OpenAIRequestHandler protocol.
 

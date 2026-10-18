@@ -295,7 +295,21 @@ async def test_requests_use_environment_proxy(monkeypatch: pytest.MonkeyPatch):
 @pytest.mark.asyncio
 @pytest.mark.timeout(10)
 @pytest.mark.parametrize("stream", [True, False])
-async def test_multimodal_usage_reaches_request_stats(stream: bool):
+@pytest.mark.parametrize(
+    "prompt_details",
+    [
+        pytest.param({"image_tokens": 10, "audio_tokens": 80}, id="flat"),
+        pytest.param(
+            {
+                "cached_tokens": 0,
+                "created_cache_tokens": None,
+                "multimodal_tokens": {"image": 10, "audio": 80},
+            },
+            id="vllm",
+        ),
+    ],
+)
+async def test_multimodal_usage_reaches_request_stats(stream: bool, prompt_details):
     """Preserve server totals through HTTP parsing and request-stat serialization.
 
     ## WRITTEN BY AI ##
@@ -304,7 +318,7 @@ async def test_multimodal_usage_reaches_request_stats(stream: bool):
         "prompt_tokens": 100,
         "completion_tokens": 30,
         "total_tokens": 130,
-        "prompt_tokens_details": {"image_tokens": 10, "audio_tokens": 80},
+        "prompt_tokens_details": prompt_details,
         "completion_tokens_details": {"audio_tokens": 25},
     }
     async with _LocalChatServer(usage=usage) as server:
@@ -330,6 +344,8 @@ async def test_multimodal_usage_reaches_request_stats(stream: bool):
     assert serialized["output_tokens"] == 30
     assert serialized["total_tokens"] == 130
     assert serialized["input_metrics"]["text_tokens"] == 10
+    assert serialized["input_metrics"]["image_tokens"] == 10
+    assert serialized["input_metrics"]["audio_tokens"] == 80
     assert serialized["output_metrics"]["text_tokens"] == 5
     assert stats.request_latency is not None
     assert stats.output_tokens_per_second == pytest.approx(30 / stats.request_latency)

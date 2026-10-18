@@ -794,6 +794,9 @@ class TextCompletionsRequestHandler(OpenAIRequestHandler):
         """
         Extract input and output usage metrics from API response usage data.
 
+        Prompt modality counts may be flat or nested in vLLM's
+        ``multimodal_tokens``. Explicit flat counts take precedence.
+
         :param usage: Usage data dictionary from API response
         :param text: Generated text for calculating word and character counts.
             None means text is not applicable (metrics will be None);
@@ -817,6 +820,16 @@ class TextCompletionsRequestHandler(OpenAIRequestHandler):
         input_details: dict[str, int] = cast(
             "dict[str, int]", usage.get("prompt_tokens_details", {}) or {}
         )
+        multimodal = input_details.get("multimodal_tokens")
+        if isinstance(multimodal, dict):
+            input_details = {
+                **{
+                    f"{key}_tokens": count
+                    for key, count in multimodal.items()
+                    if key in ("image", "video", "audio")
+                },
+                **input_details,
+            }
         output_details: dict[str, int] = cast(
             "dict[str, int]", usage.get("completion_tokens_details", {}) or {}
         )
