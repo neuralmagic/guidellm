@@ -159,3 +159,61 @@ class TestTransientPhaseConfigRequestTransitions:
 
         assert active is True
         assert transition_time is None
+
+    @pytest.mark.regression
+    @pytest.mark.parametrize(
+        ("total_requests", "warmup", "cooldown", "expected_measured"),
+        [
+            (10, 0, None, 10),
+            (10, None, 0, 10),
+            (10, 0, 0, 10),
+            (1, 0, 0, 1),
+            (3, 1, 1, 1),
+            (3, 2, None, 1),
+            (3, None, 2, 1),
+        ],
+    )
+    def test_zero_phases_and_single_measured_request(
+        self, total_requests, warmup, cooldown, expected_measured
+    ):
+        """
+        Keep all requests for zero phases and retain a one-request window.
+
+        ## WRITTEN BY AI ##
+        """
+        measure_start, measure_end, requests = _run_synchronous(
+            total_requests=total_requests,
+            warmup=TransientPhaseConfig(mode="requests", value=warmup),
+            cooldown=TransientPhaseConfig(mode="requests", value=cooldown),
+        )
+
+        assert _count_measured(measure_start, measure_end, requests) == (
+            expected_measured
+        )
+        if warmup is not None:
+            assert measure_start == requests[warmup][0]
+        if cooldown is not None:
+            assert measure_end == requests[total_requests - cooldown - 1][1]
+
+    @pytest.mark.regression
+    @pytest.mark.parametrize(
+        ("warmup", "cooldown", "expected_measured"),
+        [(2, None, 8), (None, 2, 8), (2, 2, 6)],
+    )
+    def test_default_mode_falls_back_to_request_count(
+        self, warmup, cooldown, expected_measured
+    ):
+        """
+        Apply the same boundaries without a duration budget in the default mode.
+
+        ## WRITTEN BY AI ##
+        """
+        measure_start, measure_end, requests = _run_synchronous(
+            total_requests=10,
+            warmup=TransientPhaseConfig(value=warmup),
+            cooldown=TransientPhaseConfig(value=cooldown),
+        )
+
+        assert _count_measured(measure_start, measure_end, requests) == (
+            expected_measured
+        )
