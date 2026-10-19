@@ -131,6 +131,30 @@ class TestSchedulingStrategy:
         strategy = TestStrategy()
         assert isinstance(strategy, SchedulingStrategy)
 
+    @pytest.mark.smoke
+    def test_prefetch_count(self):
+        """
+        prefetch resolves an integer or the known startup concurrency.
+        ``-1`` is not an alias for loading every request.
+
+        ## WRITTEN BY AI ##
+        """
+        assert SynchronousStrategy().prefetch is None
+        assert SynchronousStrategy().prefetch_count() == 0
+        assert SynchronousStrategy(prefetch=3).prefetch_count() == 3
+        assert SynchronousStrategy(prefetch="start").prefetch_count() == 1
+        assert SynchronousStrategy(prefetch="all").prefetch == "all"
+        assert SynchronousStrategy(prefetch="all").prefetch_count() == "all"
+        with pytest.raises(ValidationError):
+            SynchronousStrategy(prefetch=-1)
+        with pytest.raises(ValidationError):
+            SynchronousStrategy(prefetch="-1")
+        assert ThroughputStrategy(prefetch="start").prefetch_count() == 0
+        assert (
+            ThroughputStrategy(max_concurrency=4, prefetch="start").prefetch_count()
+            == 4
+        )
+
 
 class TestSynchronousStrategy:
     @pytest.mark.smoke

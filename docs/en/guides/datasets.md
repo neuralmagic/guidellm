@@ -23,6 +23,8 @@ The following arguments configure datasets and their processing:
   - `db_file` — loads rows from a database using `load_kwargs.sql`. Required field: `uri`, using a SQLAlchemy-style URI. GuideLLM currently supports only SQLite URIs, such as `sqlite:///prompts.db`.
   - `trace_synthetic`, `mooncake`, `weka`, `otel` — replay traces with `--profile kind=replay`. Required field: nested `source` pointing at another dataset kind, for example `source.kind=json_file,source.path=trace.jsonl` or `source.kind=huggingface,source.source=org/dataset`. Optional: `timestamp_column`, `prompt_tokens_column`, `output_tokens_column`, `time_scale`, `copies`, and other format-specific options. See [Trace File Formats](./trace_replay.md).
 
+For the `*_file` dataset kinds that take a local `path`, the path identifies one exact file. Glob characters in file or directory names are treated literally.
+
 In addition, you can specify additional arguments to the dataset loading with the data argument `load_kwargs`:
 
 - load_kwargs: Additional arguments to the dataset loading. For example, dataset splits can be specified with `--data '{"kind":"huggingface","source":"my/dataset","load_kwargs":{"split":"test"}}'`. Trace kinds accept `load_kwargs` the same way and forward them to the source loader.
@@ -292,26 +294,15 @@ In-memory datasets allow you to directly pass data as Python objects, making the
 
 - **Dictionary of columns and values**: Where each key is a column name and the values are lists of data points. The keys should include `prompt` or other common names for the prompt which will be used as the prompt column. Additional columns can be included based on the previously mentioned aliases for the `--data-column-mapper` argument.
   ```python
-  {
-      "column1": ["value1", "value2"],
-      "column2": ["value3", "value4"]
-  }
+  {"column1": ["value1", "value2"], "column2": ["value3", "value4"]}
   ```
 - **List of dictionaries**: Where each dictionary represents a single data point with key-value pairs. The dictionaries should include `prompt` or other common names for the prompt which will be used as the prompt column. Additional fields can be included based on the previously mentioned aliases for the `--data-column-mapper` argument.
   ```python
-  [
-      {"column1": "value1", "column2": "value3"},
-      {"column1": "value2", "column2": "value4"}
-  ]
+  [{"column1": "value1", "column2": "value3"}, {"column1": "value2", "column2": "value4"}]
   ```
 - **List of items**: Where each item is a single data point. The items should include `prompt` or other common names for the prompt which will be used as the prompt column. Additional fields can be included based on the previously mentioned aliases for the `--data-column-mapper` argument.
   ```python
-  [
-      "value1",
-      "value2",
-      "value3"
-  ]
-
+  ["value1", "value2", "value3"]
   ```
 
 #### Example Usage
