@@ -180,25 +180,25 @@ def merge_scenario_files(
         or does not contain a mapping
     """
     merged_config: dict[str, Any] = {}
-    merged_metadata = []
+    includes = []
     for scenario in scenario_files:
         scenario_path = _resolve_scenario_path(scenario)
         scenario_data = _load_scenario_file(scenario_path)
         scenario_metadata = scenario_data.get("metadata", {})
         metadata = {
-            "name": scenario_path.name,
+            "scenario": scenario_path.name,
             "metadata": scenario_metadata,
         }
         if isinstance(scenario_metadata, dict) and isinstance(
             scenario_metadata.get("config_files"), list
         ):
-            merged_metadata.extend(scenario_metadata["config_files"])
+            includes.extend(scenario_metadata["config_files"])
         else:
-            merged_metadata.append(metadata)
+            includes.append(metadata)
         merged_config = _merge_config_values(merged_config, scenario_data)
 
     if isinstance(merged_config.get("metadata"), dict):
-        merged_config["metadata"] = {"config_files": merged_metadata}
+        merged_config["metadata"] = {"includes": includes}
     return merged_config
 
 
@@ -399,8 +399,35 @@ class BenchmarkMetadata(StandardBaseModel):
     purposes but does not affect benchmark execution.
     """
 
-    # Allow arbitrary metadata fields
-    model_config = args_model_config() | ConfigDict(extra="allow")
+    model_config = args_model_config()
+
+    name: str | None = Field(
+        default=None,
+        description="The name of a benchmark scenario",
+        examples=[{"name": "benchmark"}],
+    )
+
+    description: str | None = Field(
+        default=None,
+        description="The description of a benchmark scenario",
+        examples=[{"description": "Benchmark description"}],
+    )
+
+    includes: list[dict[str, Any]] | None = Field(
+        default=None,
+        description=(
+            "When importing a series of config files, GuideLLM builds "
+            "a list of the BenchmarkMetadata defined in each"
+        ),
+        examples=[
+            {
+                "includes": [
+                    {"name": "a", "description": "a config file", "labels": {}},
+                    {"name": "b", "description": "another", "labels": {"key": "value"}},
+                ]
+            }
+        ],
+    )
 
     labels: dict[str, str] = Field(
         default_factory=dict,
@@ -408,7 +435,7 @@ class BenchmarkMetadata(StandardBaseModel):
             "Key-value pairs of metadata labels which will be written to the "
             "output reports."
         ),
-        examples=[{"name": "benchmark", "description": "Benchmark description"}],
+        examples=[{"labels": {"gpu": "gpu1", "owner": "me"}}],
     )
 
 
