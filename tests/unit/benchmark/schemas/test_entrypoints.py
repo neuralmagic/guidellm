@@ -508,8 +508,8 @@ class TestBenchmarkScenario:
             yaml.safe_dump(
                 {
                     "metadata": {
-                        "config_files": [
-                            {"name": "second-entry", "priority": 2},
+                        "includes": [
+                            {"scenario": "second-entry", "priority": 2},
                         ]
                     }
                 }
@@ -519,9 +519,16 @@ class TestBenchmarkScenario:
         merged = merge_scenario_files([first_file, second_file])
 
         assert merged["metadata"] == {
-            "config_files": [
+            "includes": [
                 {"name": "first-entry", "owner": "first"},
-                {"name": "second-entry", "priority": 2},
+                {
+                    "scenario": "second.yaml",
+                    "metadata": {
+                        "includes": [
+                            {"priority": 2, "scenario": "second-entry"},
+                        ]
+                    },
+                },
             ]
         }
 
@@ -542,9 +549,9 @@ class TestBenchmarkScenario:
         merged = merge_scenario_files([first_file, second_file])
 
         assert merged["metadata"] == {
-            "config_files": [
-                {"name": "first.yaml", "metadata": first_metadata},
-                {"name": "second.yaml", "metadata": second_metadata},
+            "includes": [
+                {"scenario": "first.yaml", "metadata": first_metadata},
+                {"scenario": "second.yaml", "metadata": second_metadata},
             ]
         }
 
