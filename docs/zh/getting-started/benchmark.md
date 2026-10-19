@@ -55,7 +55,7 @@ guidellm run \
 
 ![基准测试进度](../../assets/sample-benchmarks.gif)
 
-要进一步了解数据集选项和后端配置，请参阅英文版[数据集文档](../../guides/datasets.md)和[后端文档](../../guides/backends.md)。
+要进一步了解数据集选项和后端配置，请参阅[数据集文档（英文）](../../guides/datasets.md)和[后端指南](../guides/backends.md)。
 
 ## 了解基准测试选项
 
@@ -330,7 +330,7 @@ Rich 进度显示可以与日志同时使用。`--disable-console` 和 `--disabl
 
 ## 身份验证
 
-对需要身份验证的服务器（例如 OpenAI API）运行基准测试时，请在后端配置中提供 API key。详细信息请参阅英文版 Backends 文档中的 [API Key Configuration](../../guides/backends.md#api-key-configuration) 部分。
+对需要身份验证的服务器（例如 OpenAI API）运行基准测试时，请在后端配置中提供 API key。详细信息请参阅[后端指南中的“配置 API Key”章节](../guides/backends.md#api-key-configuration)。
 
 ## 故障排除
 
