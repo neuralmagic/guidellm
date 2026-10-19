@@ -10,13 +10,13 @@ These three rules run when `metrics.warnings` is omitted:
 
 - `generation_delay_ttft`:
   - Warn when the mean `generation_delay` is more than 1% of mean \`time_to_first_token_ms.total
-  - Means that the data generation is lagging by a great enough fraction of the server's TTFT that it's likely slowing down the benchmark.
+  - Means that the data generation is lagging by a great enough fraction of the server's TTFT that it's likely slowing down the benchmark. See [Requests load after they are due](troubleshooting.md#requests-load-after-they-are-due).
 - `root_late`:
-  - Warn when the 95th percentile of `root_dispatch_delay` is greater than 0.2 seconds.
-  - This means that the first turn of conversations arrived later than the scheduler scheduled them. Often due to data lag.
+  - Warn when the 95th percentile of `root_dispatch_delay` is greater than 0.75 seconds, or when the mean is greater than 0.25 seconds.
+  - This means that the first turn of conversations arrived later than the scheduler scheduled them. Often due to data lag. See [Requests load after they are due](troubleshooting.md#requests-load-after-they-are-due).
 - `dataset_incomplete`:
   - Warn when `dataset_incomplete` is true during trace strategies.
-  - This means that the trace dataset was not fully loaded, which can result in late and missing arrivals of trace conversations, as many trace conversations have turns that are supposed to start at the beginning of the benchmark.
+  - This means that the trace dataset was not fully loaded, which can result in late and missing arrivals of trace conversations, as many trace conversations have turns that are supposed to start at the beginning of the benchmark. See [Requests load after they are due](troubleshooting.md#requests-load-after-they-are-due).
 
 See `default_warning_rules()` in `src/guidellm/schemas/benchmark/warnings.py` for where the defaults are set.
 
@@ -140,3 +140,7 @@ Warnings (constant@2.00)
 ```
 
 The JSON report stores the same record on each benchmark under `warnings`, including `code`, `message`, `observed`, `threshold`, `unit`, `sample_count`, and `note`.
+
+The HTML report shows each warning as a card under the header. The card shows the message, and the note when one is set. A report with more than one run labels the card with that run's strategy.
+
+The CSV report stores that list in a single `Warnings` column. The cell is a JSON list of the same records, or `[]` when the run has none.

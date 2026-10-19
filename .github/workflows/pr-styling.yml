@@ -16,6 +16,10 @@ concurrency:
 
 jobs:
   update-description:
+    # Skip formatting Mergify queues
+    if: >-
+      ${{ !(github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name &&
+            startsWith(github.head_ref, 'mergify/merge-queue/')) }}
     runs-on: ubuntu-slim
     steps:
       - name: Checkout code
@@ -23,12 +27,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Skip dependabot PRs
-        if: github.actor == 'dependabot[bot]'
-        run: echo "Skipping PR styling for dependabot PRs"
-
       - name: Update PR description
-        if: github.actor != 'dependabot[bot]'
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -43,7 +42,7 @@ jobs:
 
           NEW_BODY_FILE="$(mktemp)"
           printf '%s' "$CURRENT_BODY" \
-            | ./scripts/format_pr.sh "origin/$PR_BASE_REF" "$PR_HEAD_SHA" \
+            | python3 scripts/format_pr.py "origin/$PR_BASE_REF" "$PR_HEAD_SHA" \
             > "$NEW_BODY_FILE"
           NEW_BODY="$(cat "$NEW_BODY_FILE")"
 
