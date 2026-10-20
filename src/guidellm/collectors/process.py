@@ -121,8 +121,9 @@ def _run_collectors(connection: Connection, args: list[dict[str, Any]]) -> None:
 
 async def _serve_collectors(connection: Connection, args: list[dict[str, Any]]) -> None:
     try:
+        parsed = [CollectorArgs.model_validate(arg) for arg in args]
         host = _CollectorHost(
-            [Collector.resolve(CollectorArgs.model_validate(arg)) for arg in args]
+            [Collector.resolve(arg) for arg in parsed], [arg.kind for arg in parsed]
         )
     except Exception as err:  # noqa: BLE001
         connection.send(("error", repr(err)))
@@ -152,11 +153,13 @@ class _CollectorHost:
     Drive the collectors inside the child process.
 
     A collector that fails to start or stop still reports a result, an error
-    message, so the results keep lining up with the configured collectors.
+    message, so the results keep lining up with the configured collectors. Each
+    result starts with its collector's ``kind``.
     """
 
-    def __init__(self, collectors: list[Collector]):
+    def __init__(self, collectors: list[Collector], kinds: list[str]):
         self.collectors = collectors
+        self.kinds = kinds
         self.errors: list[str | None] = [None] * len(collectors)
 
     async def start(self) -> None:
@@ -181,14 +184,15 @@ class _CollectorHost:
     def results(self, start_time: float, end_time: float) -> list[dict[str, Any]]:
         results: list[dict[str, Any]] = []
         for index, collector in enumerate(self.collectors):
+            kind = self.kinds[index]
             if (error := self.errors[index]) is not None:
-                results.append({"error": error})
+                results.append({"kind": kind, "error": error})
                 continue
             try:
-                results.append(collector.result(start_time, end_time))
+                results.append({"kind": kind, **collector.result(start_time, end_time)})
             except Exception as err:  # noqa: BLE001
                 logger.warning("Collector {} failed to report: {}", index, err)
-                results.append({"error": f"result failed: {err}"})
+                results.append({"kind": kind, "error": f"result failed: {err}"})
         return results
 
     async def close(self) -> None:
