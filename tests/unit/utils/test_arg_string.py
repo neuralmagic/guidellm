@@ -499,7 +499,7 @@ class TestArgStringLoads:
         Test that a value split apart at its comma raises a parse error.
         """
         with pytest.raises(
-            arg_string.ArgStringParseError,
+            arg_string.ArgStringValueError,
             match=(
                 f"Could not parse the value for '{key}' "
                 f"in key=value expression at {position}:"

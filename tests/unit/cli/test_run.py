@@ -81,6 +81,7 @@ def test_run_data_list_value_shows_usage_error():
 
     assert result.exit_code == 2, result.output
     assert "--data" in result.output
+    assert "Could not parse the value for 'tool_call_turns'" in result.output
 
 
 @pytest.mark.regression

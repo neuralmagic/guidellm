@@ -24,6 +24,7 @@ import yaml
 __all__ = [
     "ArgStringParseError",
     "ArgStringParser",
+    "ArgStringValueError",
     "loads",
 ]
 
@@ -32,6 +33,10 @@ _ListValuePaths = set[tuple[tuple[str, int | None], ...]]
 
 class ArgStringParseError(Exception):
     """Exception raised for errors during argument string parsing."""
+
+
+class ArgStringValueError(ArgStringParseError):
+    """Exception raised when a value in a key=value pair cannot be parsed."""
 
 
 class ArgStringParser:
@@ -150,7 +155,7 @@ class ArgStringParser:
             except yaml.YAMLError as err:
                 if self.skip_invalid:
                     continue
-                raise ArgStringParseError(
+                raise ArgStringValueError(
                     f"Could not parse the value for '{key}' in key=value expression "
                     f"at {idx}: '{s}'. If the value contains "
                     f"'{self.split_delimiter}', set list items with "
