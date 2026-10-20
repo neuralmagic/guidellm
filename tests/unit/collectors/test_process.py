@@ -73,6 +73,7 @@ async def test_process_returns_one_result_per_collector(metrics_url: str):
         await process.shutdown()
 
     for up, down in results:
+        assert up["kind"] == down["kind"] == "prometheus"
         assert up["source"] == metrics_url
         assert up["scrapes"] >= 2
         assert up["gauges"]["vllm:num_requests_running"][0]["summary"]["mean"] == 2
