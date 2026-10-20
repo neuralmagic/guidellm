@@ -2,6 +2,8 @@
 Tests for arg string parsing utilities.
 """
 
+import re
+
 import pytest
 
 from guidellm.utils import arg_string
@@ -488,13 +490,13 @@ class TestArgStringLoads:
 
     @pytest.mark.regression
     @pytest.mark.parametrize(
-        ("value", "key", "position"),
+        ("value", "key", "position", "parsed"),
         [
-            ("turns=4,tool_call_turns=[0,2]", "tool_call_turns", 1),
-            ('a="x,y"', "a", 0),
+            ("turns=4,tool_call_turns=[0,2]", "tool_call_turns", 1, "[0"),
+            ('a="x,y"', "a", 0, '"x'),
         ],
     )
-    def test_invalid_yaml_value(self, value, key, position):
+    def test_invalid_yaml_value(self, value, key, position, parsed):
         """
         Test that a value split apart at its comma raises a parse error.
         """
@@ -502,7 +504,8 @@ class TestArgStringLoads:
             arg_string.ArgStringValueError,
             match=(
                 f"Could not parse the value for '{key}' "
-                f"in key=value expression at {position}:"
+                f"in key=value expression at {position}: '{re.escape(parsed)}' "
+                "\\(pairs are split at ','"
             ),
         ):
             arg_string.loads(value)

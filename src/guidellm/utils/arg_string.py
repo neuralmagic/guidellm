@@ -155,10 +155,11 @@ class ArgStringParser:
             except yaml.YAMLError as err:
                 if self.skip_invalid:
                     continue
-                reason = getattr(err, "problem", None) or str(err)
+                # Show the value as parsed, since splitting can cut it short.
                 raise ArgStringValueError(
                     f"Could not parse the value for '{key}' in key=value expression "
-                    f"at {idx}: '{s}' ({reason})"
+                    f"at {idx}: '{value}' (pairs are split at "
+                    f"'{self.split_delimiter}'; full string: '{s}')"
                 ) from err
 
             # Set the value in the nested structure
