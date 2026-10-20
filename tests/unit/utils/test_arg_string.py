@@ -487,6 +487,35 @@ class TestArgStringLoads:
         assert result == {"key": "value2"}
 
     @pytest.mark.regression
+    @pytest.mark.parametrize(
+        ("value", "key", "position"),
+        [
+            ("turns=4,tool_call_turns=[0,2]", "tool_call_turns", 1),
+            ('a="x,y"', "a", 0),
+        ],
+    )
+    def test_invalid_yaml_value(self, value, key, position):
+        """
+        Test that a value split apart at its comma raises a parse error.
+        """
+        with pytest.raises(
+            arg_string.ArgStringParseError,
+            match=(
+                f"Could not parse the value for '{key}' "
+                f"in key=value expression at {position}:"
+            ),
+        ):
+            arg_string.loads(value)
+
+    @pytest.mark.regression
+    def test_invalid_yaml_value_skip(self):
+        """
+        Test that values that fail to parse are skipped when skip_invalid is True.
+        """
+        result = arg_string.loads("turns=4,tool_call_turns=[0,2]", skip_invalid=True)
+        assert result == {"turns": 4}
+
+    @pytest.mark.regression
     def test_empty_value(self):
         """
         Test handling of empty values.

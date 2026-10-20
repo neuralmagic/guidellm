@@ -145,7 +145,17 @@ class ArgStringParser:
             segments = self._parse_key(key)
 
             # Convert value to appropriate type
-            parsed_value = yaml.safe_load(value)
+            try:
+                parsed_value = yaml.safe_load(value)
+            except yaml.YAMLError as err:
+                if self.skip_invalid:
+                    continue
+                raise ArgStringParseError(
+                    f"Could not parse the value for '{key}' in key=value expression "
+                    f"at {idx}: '{s}'. If the value contains "
+                    f"'{self.split_delimiter}', set list items with "
+                    f"{key}[0]=...,{key}[1]=... or pass the whole argument as JSON."
+                ) from err
 
             # Set the value in the nested structure
             self._value_set_nested(
