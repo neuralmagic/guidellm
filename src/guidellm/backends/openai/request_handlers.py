@@ -2235,15 +2235,17 @@ class ResponsesRequestHandler(OpenAIRequestHandler):
 
         # Final arguments payload: the server sends the complete argument
         # string once streaming is finished.  We overwrite whatever was
-        # accumulated from deltas to guarantee consistency.
+        # accumulated from deltas to guarantee consistency.  It repeats the
+        # arguments already received, so it is only counted as a token
+        # iteration when no arguments were received before it.
         if event_type == "response.function_call_arguments.done":
             idx = data.get("output_index", -1)
+            known = ""
             if idx in self.streaming_tool_calls:
-                self.streaming_tool_calls[idx].function.arguments = data.get(
-                    "arguments",
-                    self.streaming_tool_calls[idx].function.arguments,
-                )
-            return 1
+                function = self.streaming_tool_calls[idx].function
+                known = function.arguments
+                function.arguments = data.get("arguments", known)
+            return 0 if known else 1
 
         # Not a function-call event; let the caller handle it.
         return None
