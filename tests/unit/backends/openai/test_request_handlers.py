@@ -420,6 +420,7 @@ class TestRealtimeTranscriptionWSRequestHandler:
         assert resp.input_metrics.audio_tokens == 5
         assert resp.output_metrics.text_tokens == 1
 
+
 class TestResponseMetricsPassthrough:
     """A backend's own per-request metrics survive into the compiled stats."""
 
@@ -6682,11 +6683,9 @@ class TestSpeechRequestHandler:
         handler = SpeechRequestHandler()
 
         with pytest.raises(
-                ValueError, match="Streaming response returned an error: failed"
+            ValueError, match="Streaming response returned an error: failed"
         ):
-            handler.add_streaming_line(
-                'data: {"error":{"message":"failed"}}'
-            )
+            handler.add_streaming_line('data: {"error":{"message":"failed"}}')
 
     @pytest.mark.regression
     @pytest.mark.parametrize(
@@ -6969,7 +6968,11 @@ class TestChatAudioOutput:
         handler = ChatCompletionsRequestHandler()
         pcm = mock_pcm16(sample_rate=16000, seconds=0.1)
         packets = [
-            {"modality": "audio", "data": mock_wav(pcm, sample_rate=16000), "format": "wav"}
+            {
+                "modality": "audio",
+                "data": mock_wav(pcm, sample_rate=16000),
+                "format": "wav",
+            }
             for _ in range(2)
         ]
         metrics = UsageMetrics()
