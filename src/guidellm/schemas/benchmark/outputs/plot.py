@@ -37,11 +37,14 @@ class PlotBenchmarkOutputArgs(BenchmarkOutputArgs):
     @field_validator("path", mode="after")
     @classmethod
     def validate_plot_suffix(cls, v: Path) -> Path:
-        """Ensures the output file path ends with a supported plotting format extension.
+        """Preserve directories and validate the plot filename extension.
 
-        If the suffix is missing, it defaults to .png.
-        If an unsupported suffix is provided, it raises a ValueError.
+        :param v: Output file or existing directory path
+        :return: Directory path, or a filename with a supported extension
+        :raises ValueError: If a filename has an unsupported extension
         """
+        if v.is_dir():
+            return v
         if not v.suffix:
             return v.with_suffix(".png")
         suffix = v.suffix.lower()

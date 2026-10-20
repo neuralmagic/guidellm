@@ -199,19 +199,23 @@ async def test_finalize_writes_valid_image(tmp_path: Path):
 
 
 @pytest.mark.asyncio
-@pytest.mark.sanity
-async def test_finalize_resolves_directory_path(tmp_path: Path):
+@pytest.mark.regression
+@pytest.mark.parametrize("directory_name", ["results", "results.v1", "results.png"])
+async def test_finalize_resolves_directory_path(tmp_path: Path, directory_name: str):
     """
-    Test that if output_path is a directory, it resolves to benchmarks.png inside it.
+    Test that plot arguments preserve directories through image generation.
 
     ## WRITTEN BY AI ##
     """
     report = SimpleNamespace(benchmarks=[MockBenchmark()])
-    plot_output = GenerativeBenchmarkerPlot(output_path=tmp_path, dpi=80)
+    output_directory = tmp_path / directory_name
+    output_directory.mkdir()
+    args = PlotBenchmarkOutputArgs(path=output_directory, dpi=80)
+    plot_output = GenerativeBenchmarkerPlot.from_args(args)
 
     path = await plot_output.finalize(report)  # type: ignore[arg-type]
 
-    expected_path = tmp_path / "benchmarks.png"
+    expected_path = output_directory / "benchmarks.png"
     assert path == expected_path
     assert path.exists()
     assert path.stat().st_size > 0
