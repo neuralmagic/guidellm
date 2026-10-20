@@ -1,4 +1,4 @@
-# E2E tests for the sweep profile's ramp peak detection
+# E2E tests for the sweep_next profile's ramp peak detection
 
 from collections.abc import Iterator
 from pathlib import Path
@@ -41,7 +41,7 @@ def _run_ramp_sweep(server: E2EServer, tmp_path: Path, max_seconds: int) -> dict
         outputs=report_name,
     )
     client.start_benchmark(
-        profile="sweep,sweep_size=3,peak_detection=ramp",
+        profile="sweep_next,sweep_size=3",
         rate=None,
         max_seconds=max_seconds,
         data="kind=synthetic_text,prompt_tokens=32,output_tokens=8",
