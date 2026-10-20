@@ -121,7 +121,7 @@ Dispatch Delay, Turn Predecessor Delay, Turn Scheduling Delay, and Scheduled Lat
 ### Collector Metrics
 
 - **Definition**: Data gathered from outside GuideLLM while each benchmark runs, such as queued requests, KV cache usage and server-measured latencies scraped from a server's Prometheus endpoint. They are only collected when `--collector` is set.
-- **Use Case**: Explains client-side results from the server's point of view, for example whether latency rose because requests were queuing or the KV cache was full. See the [Collectors Guide](collectors.md).
+- **Use Case**: Adds context from outside GuideLLM that helps explain the benchmark results but isn't produced by the benchmark itself. For example, the `prometheus` collector can show whether latency rose because requests were queuing or the KV cache was full. See the [Collectors Guide](collectors.md).
 
 ## Measurement Window, Warmup, and Cooldown
 

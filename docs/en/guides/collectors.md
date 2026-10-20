@@ -15,13 +15,13 @@ guidellm run \
   --collector kind=prometheus,url=http://localhost:8000/metrics
 ```
 
-Each benchmark in the JSON or YAML report gets a `collectors` list with one result per collector, in the order they were passed. The console, CSV and HTML outputs don't include them yet.
+Each benchmark in the JSON or YAML report gets a `collectors` list with one result per collector, in the order they were passed (`jq '.benchmarks[].collectors' benchmarks.json`). Each result starts with a `kind` field naming the collector that produced it. The console, CSV and HTML outputs don't include them yet.
 
 ## How Collectors Run
 
 All collectors share one separate process, so they don't take time away from the process that sends requests. That process is told when each benchmark's requests start and end, and then asked for each collector's result over the benchmark's measurement window (warmup and cooldown are excluded).
 
-If a collector fails, for example because its endpoint is down, the benchmark keeps going and the collector reports an error instead, so the list still matches the collectors you passed.
+If a collector fails, for example because its endpoint is down, the benchmark keeps going and the collector reports its `kind` and an `error` instead, so the list still matches the collectors you passed.
 
 ## Prometheus Collector
 
@@ -59,6 +59,7 @@ The result looks like this (shortened):
 ```json
 "collectors": [
   {
+    "kind": "prometheus",
     "source": "http://localhost:8000/metrics",
     "scrapes": 62,
     "scrape_errors": 0,
