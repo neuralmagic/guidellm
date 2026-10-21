@@ -15,7 +15,7 @@ guidellm run \
   --collector kind=prometheus,url=http://localhost:8000/metrics
 ```
 
-Each benchmark in the JSON or YAML report gets a `collectors` list with one result per collector, in the order they were passed (`jq '.benchmarks[].collectors' benchmarks.json`). Each result contains a `kind` field naming the collector that produced it. The console, CSV and HTML outputs don't include them yet.
+Each benchmark in the JSON or YAML report gets a `collectors` list with one result per collector, in the order they were passed (`jq '.benchmarks[].collectors' benchmarks.json`). Each result contains a `kind` field naming the collector that produced it. The console, CSV and HTML outputs don't report results from collectors.
 
 ## How Collectors Run
 
