@@ -80,7 +80,7 @@ Whether you're interested in understanding the system architecture, exploring su
 
   ______________________________________________________________________
 
-  Gather data from outside GuideLLM while benchmarks run, such as a server's Prometheus metrics, and read it next to the client results.
+  Gather data from outside GuideLLM while benchmarks run, such as a server's Prometheus metrics, and store it next to the client results.
 
   [:octicons-arrow-right-24: Collectors Guide](collectors.md)
 
