@@ -221,7 +221,42 @@ def build_report_view(report: GenerativeBenchmarksReport) -> dict[str, Any]:
         "turn_samples": turn_samples,
         "turn_peak_note": turn_peak_note,
         "details": details,
+        "requests": [_build_request_samples(benchmark) for benchmark in benchmarks],
     }
+
+
+def _build_request_samples(benchmark: GenerativeBenchmark) -> list[dict[str, Any]]:
+    """
+    Per-request points for the report scatter plot.
+
+    Only successful requests have meaningful latency breakdowns, so errored
+    and incomplete requests are excluded. Timestamps are shifted so the
+    earliest request starts at 0 to avoid leaking wall-clock epochs into the
+    embedded report and to keep the x-axis readable.
+
+    :param benchmark: Benchmark whose successful requests are sampled
+    :return: One dict per request with latency, size, and offset fields
+    """
+    requests = benchmark.requests
+    if requests is None:
+        return []
+    successful = requests.successful
+    if not successful:
+        return []
+    start = min(req.request_start_time for req in successful)
+    samples = [
+        {
+            "t": req.request_start_time - start,
+            "ttft_ms": req.time_to_first_token_ms,
+            "latency_s": req.request_latency,
+            "output_tokens": req.output_tokens,
+            "prompt_tokens": req.prompt_tokens,
+        }
+        for req in successful
+        if req.request_start_time is not None and req.request_latency is not None
+    ]
+    samples.sort(key=lambda sample: sample["t"])
+    return samples
 
 
 def _nonempty_str(value: Any) -> str | None:

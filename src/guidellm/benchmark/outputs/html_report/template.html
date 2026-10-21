@@ -176,6 +176,21 @@ __GUIDELLM_REPORT_CSS__
           <p class="hint" id="hint-tps">Total, input, and output tokens per second.</p>
           <div class="chart chart-hbar" id="chart-tps-conc"></div>
         </article>
+        <article class="card card-scatter" id="card-scatter">
+          <h2>
+            <span class="card-heading">Per-request latency</span>
+            <button type="button" class="help-q" data-help="scatter" aria-label="About Per-request latency">?</button>
+          </h2>
+          <p class="hint" id="hint-scatter">Each successful request — lower is better. Marker size follows output tokens.</p>
+          <div class="scatter-controls" id="scatter-controls">
+            <label for="scatter-metric">Y axis</label>
+            <select id="scatter-metric" aria-label="Scatter plot metric">
+              <option value="ttft_ms">TTFT (ms)</option>
+              <option value="latency_s">Request latency (s)</option>
+            </select>
+          </div>
+          <div class="chart chart-scatter" id="chart-scatter"></div>
+        </article>
         <article class="card" id="card-efficiency">
           <h2 id="title-efficiency">Throughput efficiency</h2>
           <p class="hint" id="hint-efficiency">Total tokens/sec per concurrent request.</p>

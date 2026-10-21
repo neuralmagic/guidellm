@@ -593,6 +593,33 @@ h1 {
   height: 160px;
 }
 
+/* Per-request scatter spans the full performance grid row. */
+.card-scatter {
+  grid-column: 1 / -1;
+}
+
+.chart.chart-scatter {
+  height: clamp(280px, 32vw, 380px);
+}
+
+.scatter-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.scatter-controls select {
+  font-size: 12px;
+  padding: 2px 6px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #fff;
+  color: var(--ink);
+}
+
 /* Solo full-width turn chart: taller on wide viewports, compact on narrow. */
 .chart.chart-turn {
   height: clamp(280px, 36vw, 400px);

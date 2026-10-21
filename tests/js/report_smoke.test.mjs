@@ -65,4 +65,29 @@ test("multi-run HTML populates KPIs, comparison rows, and Performance SVGs", asy
   );
   assert.ok(perfSvg, "expected an SVG after switching to Performance");
   assert.equal(perfSvg.getAttribute("role"), "img");
+
+  const scatterSvg = await waitFor(() =>
+    document.querySelector("#chart-scatter svg")
+  );
+  assert.ok(scatterSvg, "expected a per-request scatter SVG");
+  assert.ok(
+    scatterSvg.querySelectorAll("circle").length > 0,
+    "expected scatter markers for the fixture requests"
+  );
+  assert.ok(
+    scatterSvg.querySelector("line[stroke-dasharray]"),
+    "expected a median reference line in the scatter plot"
+  );
+
+  const metricSelect = document.getElementById("scatter-metric");
+  assert.ok(metricSelect, "expected the scatter metric switcher");
+  metricSelect.value = "latency_s";
+  metricSelect.dispatchEvent(new window.Event("change", { bubbles: true }));
+  const latencySvg = await waitFor(() =>
+    document.querySelector("#chart-scatter svg")
+  );
+  assert.ok(
+    latencySvg.querySelectorAll("circle").length > 0,
+    "expected scatter markers after switching the Y axis"
+  );
 });

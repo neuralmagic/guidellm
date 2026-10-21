@@ -244,6 +244,65 @@ def test_build_report_view_multi_turn():
 
 
 @pytest.mark.sanity
+def test_build_report_view_request_samples():
+    """
+    Per-request scatter samples should cover successful requests with
+    start times shifted so the earliest request is at t=0.
+
+    ## WRITTEN BY AI ##
+    """
+    requests = [
+        _make_request(
+            0,
+            latency_s=0.2,
+            ttft_ms=80.0,
+            itl_ms=10.0,
+            prompt_tokens=50,
+            history_len=0,
+            start_time=20.0,
+        ),
+        _make_request(
+            1,
+            latency_s=0.3,
+            ttft_ms=90.0,
+            itl_ms=11.0,
+            prompt_tokens=60,
+            history_len=0,
+            start_time=24.5,
+        ),
+    ]
+    view = build_report_view(
+        _report(
+            _make_benchmark(
+                strategy=AsyncConstantStrategy(rate=1.0),
+                rps=1.0,
+                tps=30.0,
+                requests=requests,
+            )
+        )
+    )
+    samples = view["requests"][0]
+    assert [s["t"] for s in samples] == [0.0, 4.5]
+    assert [s["ttft_ms"] for s in samples] == pytest.approx([80.0, 90.0])
+    assert [s["latency_s"] for s in samples] == pytest.approx([0.2, 0.3])
+    assert [s["output_tokens"] for s in samples] == [
+        requests[0].output_tokens,
+        requests[1].output_tokens,
+    ]
+    # A run without request records yields an empty sample list.
+    empty_view = build_report_view(
+        _report(
+            _make_benchmark(
+                strategy=AsyncConstantStrategy(rate=1.0),
+                rps=1.0,
+                tps=30.0,
+            )
+        )
+    )
+    assert empty_view["requests"][0] == []
+
+
+@pytest.mark.sanity
 def test_build_report_view_multi_turn_subagents_only_defaults_to_all():
     """
     When every agent is a subagent, default by_turn uses all requests.
@@ -507,6 +566,10 @@ def test_render_html_includes_embedded_assets():
     assert "Specific agents" not in html
     assert "turn-agent-checks" not in html
     assert 'class="warning-card"' not in html
+    assert 'id="chart-scatter"' in html
+    assert 'id="scatter-metric"' in html
+    assert "function renderScatter" in html
+    assert "scatterMetric" in html
 
 
 def _sample_warning(*, message: str | None = None) -> BenchmarkWarning:

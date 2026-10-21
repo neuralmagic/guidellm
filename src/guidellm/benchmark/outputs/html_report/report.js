@@ -5,6 +5,8 @@
   var kpiRunIndex = null;
   // Active By-turn rows (may be re-aggregated from turn_samples via the agent filter).
   var turnRows = Array.isArray(data.by_turn) ? data.by_turn.slice() : [];
+  // Active Y-axis metric for the per-request scatter plot ("ttft_ms" | "latency_s").
+  var scatterMetric = "ttft_ms";
   var COLORS = {
     // Red Hat information + secondary palette (brand red reserved for UI chrome).
     p95: "#37a3a3", // teal-50
@@ -176,6 +178,16 @@
         "Differs from TTFT when the model thinks before showing text.",
       ],
       also: ["p95", "p99"],
+    },
+    scatter: {
+      title: "Per-request latency",
+      lines: [
+        "Each marker is one successful request over the benchmark run.",
+        defLine("Time to First Token (TTFT)", "ttft"),
+        defLine("End-to-end (E2E) latency", "e2e"),
+        "The dashed line marks the median of the plotted metric; marker size follows output tokens.",
+        "Outliers and multi-modal clusters hidden by percentiles stay visible here.",
+      ],
     },
     error_rate: {
       title: "Error rate",
@@ -2255,6 +2267,134 @@
   }
 
 
+  function scatterSamples() {
+    var all = data.requests;
+    if (!Array.isArray(all)) return [];
+    var idx = selectedRunIndex();
+    return all[idx] || [];
+  }
+
+  function renderScatter() {
+    var host = el("chart-scatter");
+    var card = el("card-scatter");
+    if (!host) return;
+    var samples = scatterSamples();
+    if (card) card.style.display = samples.length ? "" : "none";
+    if (!samples.length) {
+      clear(host);
+      return;
+    }
+    var isLatency = scatterMetric === "latency_s";
+    var values = samples
+      .map(function (s) {
+        return s[scatterMetric];
+      })
+      .filter(function (v) {
+        return v != null;
+      });
+    clear(host);
+    var width = host.clientWidth || 640;
+    var height = host.clientHeight || 320;
+    var plot = {
+      left: 64,
+      top: 16,
+      width: Math.max(160, width - 96),
+      height: height - 64,
+    };
+    var xs = samples.map(function (s) {
+      return s.t;
+    });
+    var xExt = extent(xs);
+    if (xExt.min === xExt.max) {
+      xExt.min -= 1;
+      xExt.max += 1;
+    }
+    var yExt = extent(values);
+    if (yExt.min === yExt.max) {
+      yExt.min -= 1;
+      yExt.max += 1;
+    }
+    var svg = svgEl("svg", {
+      viewBox: "0 0 " + width + " " + height,
+      width: String(width),
+      height: String(height),
+      preserveAspectRatio: "xMidYMid meet",
+      role: "img",
+      "aria-label": "Per-request latency scatter",
+    });
+    drawAxes(
+      svg,
+      plot,
+      xExt,
+      yExt,
+      "Request start (s)",
+      isLatency ? "Latency (s)" : "TTFT (ms)"
+    );
+    var outputs = samples.map(function (s) {
+      return s.output_tokens || 0;
+    });
+    var outMax = Math.max.apply(null, outputs.concat([1]));
+    var median = safeMedian(values);
+    if (median != null) {
+      var my = scale(median, yExt.min, yExt.max, plot.top + plot.height, plot.top);
+      svg.appendChild(
+        svgEl("line", {
+          x1: plot.left,
+          y1: my,
+          x2: plot.left + plot.width,
+          y2: my,
+          stroke: COLORS.p99,
+          "stroke-dasharray": "5 4",
+          "stroke-width": "1.5",
+        })
+      );
+      var mlab = svgEl("text", {
+        x: plot.left + plot.width - 4,
+        y: my - 5,
+        "text-anchor": "end",
+        fill: COLORS.p99,
+        "font-size": "11",
+      });
+      mlab.textContent = "median " + fmt(median);
+      svg.appendChild(mlab);
+    }
+    samples.forEach(function (s) {
+      var yVal = s[scatterMetric];
+      if (yVal == null) return;
+      var radius = 3 + 5 * Math.sqrt((s.output_tokens || 0) / outMax);
+      var x = scale(s.t, xExt.min, xExt.max, plot.left, plot.left + plot.width);
+      var y = scale(yVal, yExt.min, yExt.max, plot.top + plot.height, plot.top);
+      var dot = svgEl("circle", {
+        cx: x,
+        cy: y,
+        r: radius,
+        fill: COLORS.input,
+        "fill-opacity": "0.55",
+        stroke: COLORS.input,
+        "stroke-opacity": "0.85",
+        "stroke-width": "1",
+      });
+      svg.appendChild(dot);
+      bindChartTip(dot, isLatency ? "Request latency" : "TTFT", [
+        "Started: +" + fmt(s.t) + " s",
+        (isLatency ? "Latency: " : "TTFT: ") + fmt(yVal) + (isLatency ? " s" : " ms"),
+        "Output tokens: " + fmtInt(s.output_tokens || 0),
+        "Prompt tokens: " + fmtInt(s.prompt_tokens || 0),
+      ]);
+    });
+    host.appendChild(svg);
+  }
+
+  function setupScatterControls() {
+    var select = el("scatter-metric");
+    if (!select) return;
+    select.value = scatterMetric;
+    select.onchange = function () {
+      scatterMetric = select.value === "latency_s" ? "latency_s" : "ttft_ms";
+      renderScatter();
+    };
+  }
+
   function renderSelectedRunCharts() {
     var details = data.details || {};
     var multi = isMultiRun();
@@ -2292,6 +2432,7 @@
       ],
       { xLabel: "Latency (ms)" }
     );
+    renderScatter();
   }
 
   function renderCharts() {
@@ -3012,6 +3153,7 @@
     renderHeader();
     setupTabs();
     setupTurnAgentFilter();
+    setupScatterControls();
     renderTables();
     renderCharts();
     window.addEventListener("resize", function () {
