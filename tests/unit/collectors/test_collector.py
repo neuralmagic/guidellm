@@ -13,7 +13,7 @@ from guidellm.schemas.benchmark import CollectorArgs
 
 class _Oneshot(OneshotCollector):
     def __init__(self) -> None:
-        super().__init__()
+        super().__init__("oneshot")
         self.calls = 0
 
     @classmethod
@@ -31,7 +31,7 @@ class _UnregisteredArgs(CollectorArgs):
 
 class _Periodic(PeriodicCollector):
     def __init__(self, interval: float) -> None:
-        super().__init__(interval)
+        super().__init__("periodic", interval)
         self.samples: list[str] = []
 
     @classmethod
