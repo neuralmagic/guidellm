@@ -84,6 +84,7 @@ def test_run_data_list_value_shows_usage_error():
     assert "key 'tool_call_turns' was assigned a value that cannot be parsed" in (
         result.output
     )
+    assert "(read as 'tool_call_turns=[0')" in result.output
 
 
 @pytest.mark.regression

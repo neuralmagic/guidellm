@@ -156,7 +156,8 @@ class ArgStringParser:
                 if self.skip_invalid:
                     continue
                 raise ArgStringValueError(
-                    f"key '{key}' was assigned a value that cannot be parsed in '{s}'"
+                    f"key '{key}' was assigned a value that cannot be parsed in "
+                    f"'{s}' (read as '{pair}')"
                 ) from err
 
             # Set the value in the nested structure
