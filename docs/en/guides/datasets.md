@@ -76,7 +76,7 @@ Use `--seed` with a configuration string to control how sequences (in scheduling
 ```bash
 guidellm run \
   --backend kind=openai_http,target=http://localhost:8000 \
-  --profile kind=throughput \
+  --profile kind=concurrent,streams=10 \
   --constraint kind=max_requests,count=1000 \
   --data '{"kind":"huggingface","source":"my/dataset","load_kwargs":{"split":"test"}}' \
   --data-column-mapper '{"kind":"generative_column_mapper","column_mappings":{"text_column":"prompt"}}' \
@@ -99,7 +99,7 @@ GuideLLM supports both synthetic *text* — described below — and synthetic *v
 ```bash
 guidellm run \
   --backend kind=openai_http,target=http://localhost:8000 \
-  --profile kind=throughput \
+  --profile kind=concurrent,streams=10 \
   --constraint kind=max_requests,count=1000 \
   --data kind=synthetic_text,prompt_tokens=256,output_tokens=128
 ```
@@ -109,7 +109,7 @@ Or using a JSON config string:
 ```bash
 guidellm run \
   --backend kind=openai_http,target=http://localhost:8000 \
-  --profile kind=throughput \
+  --profile kind=concurrent,streams=10 \
   --constraint kind=max_requests,count=1000 \
   --data '{"kind":"synthetic_text","prompt_tokens":256,"output_tokens":128}'
 ```
@@ -132,7 +132,7 @@ Synthetic text is generated on demand. Use runtime constraints such as `--constr
 ```bash
 guidellm run \
   --backend kind=openai_http,target=http://localhost:8000 \
-  --profile kind=throughput \
+  --profile kind=concurrent,streams=10 \
   --constraint kind=max_requests,count=1000 \
   --data kind=synthetic_text,prompt_tokens=256,output_tokens=128 \
   --data-loader kind=pytorch,samples=100
@@ -153,7 +153,7 @@ GuideLLM supports datasets from the Hugging Face Hub or local directories that f
 ```bash
 guidellm run \
   --backend kind=openai_http,target=http://localhost:8000 \
-  --profile kind=throughput \
+  --profile kind=concurrent,streams=10 \
   --constraint kind=max_requests,count=1000 \
   --data kind=huggingface,source=garage-bAInd/Open-Platypus
 ```
@@ -163,7 +163,7 @@ Or using a local dataset directory:
 ```bash
 guidellm run \
   --backend kind=openai_http,target=http://localhost:8000 \
-  --profile kind=throughput \
+  --profile kind=concurrent,streams=10 \
   --constraint kind=max_requests,count=1000 \
   --data kind=huggingface,source=path/to/dataset
 ```
@@ -272,7 +272,7 @@ GuideLLM supports various file formats for datasets, including text, CSV, JSON, 
 ```bash
 guidellm run \
   --backend kind=openai_http,target=http://localhost:8000 \
-  --profile kind=throughput \
+  --profile kind=concurrent,streams=10 \
   --constraint kind=max_requests,count=1000 \
   --data kind=json_file,path=path/to/dataset.json \
   --data-column-mapper '{"kind":"generative_column_mapper","column_mappings":{"text_column":"prompt"}}'
