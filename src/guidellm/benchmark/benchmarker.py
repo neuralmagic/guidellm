@@ -10,6 +10,7 @@ singleton operations for consistent state management across concurrent workflows
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from abc import ABC
 from collections.abc import AsyncIterator
@@ -32,6 +33,7 @@ from guidellm.scheduler import (
     ResponseT,
     Scheduler,
     SchedulingStrategy,
+    prefetch_requests,
 )
 from guidellm.schemas.benchmark import GoodputSLO, TransientPhaseConfig
 from guidellm.schemas.benchmark.warnings import (
@@ -117,6 +119,13 @@ class Benchmarker(
                 if progress:
                     await progress.on_benchmark_start(strategy)
 
+                strategy_requests = await asyncio.to_thread(
+                    prefetch_requests,
+                    requests,
+                    strategy.prefetch_count(),
+                    on_fetched=(progress.on_requests_prefetched if progress else None),
+                )
+
                 config = BenchmarkConfig(
                     run_id=run_id,
                     run_index=len(profile.completed_strategies),
@@ -155,7 +164,7 @@ class Benchmarker(
                     request_info,
                     scheduler_state,
                 ) in scheduler.run(
-                    requests=requests,
+                    requests=strategy_requests,
                     backend=backend,
                     strategy=strategy,
                     env=environment,
