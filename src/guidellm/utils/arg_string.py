@@ -155,11 +155,8 @@ class ArgStringParser:
             except yaml.YAMLError as err:
                 if self.skip_invalid:
                     continue
-                # Show the pair as split, since splitting can cut a value short.
                 raise ArgStringValueError(
-                    f"Could not parse the value in key=value expression at {idx}: "
-                    f"'{pair}' (pairs are split at '{self.split_delimiter}'; "
-                    f"full string: '{s}')"
+                    f"key '{key}' was assigned a value that cannot be parsed in '{s}'"
                 ) from err
 
             # Set the value in the nested structure

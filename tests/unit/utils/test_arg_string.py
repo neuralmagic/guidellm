@@ -490,22 +490,21 @@ class TestArgStringLoads:
 
     @pytest.mark.regression
     @pytest.mark.parametrize(
-        ("value", "position", "parsed"),
+        ("value", "key"),
         [
-            ("turns=4,tool_call_turns=[0,2]", 1, "tool_call_turns=[0"),
-            ('a="x,y"', 0, 'a="x'),
+            ("turns=4,tool_call_turns=[0,2]", "tool_call_turns"),
+            ('a="x,y"', "a"),
         ],
     )
-    def test_invalid_yaml_value(self, value, position, parsed):
+    def test_invalid_yaml_value(self, value, key):
         """
         Test that a value split apart at its comma raises a parse error.
         """
         with pytest.raises(
             arg_string.ArgStringValueError,
             match=(
-                "Could not parse the value in key=value expression "
-                f"at {position}: '{re.escape(parsed)}' "
-                "\\(pairs are split at ','"
+                f"key '{key}' was assigned a value that cannot be parsed "
+                f"in '{re.escape(value)}'"
             ),
         ):
             arg_string.loads(value)

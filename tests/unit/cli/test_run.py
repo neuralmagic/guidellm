@@ -81,7 +81,9 @@ def test_run_data_list_value_shows_usage_error():
 
     assert result.exit_code == 2, result.output
     assert "--data" in result.output
-    assert "'tool_call_turns=[0' (pairs are split at ','" in result.output
+    assert "key 'tool_call_turns' was assigned a value that cannot be parsed" in (
+        result.output
+    )
 
 
 @pytest.mark.regression
