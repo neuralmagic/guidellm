@@ -135,7 +135,7 @@
         defLine("End-to-end", "e2e"),
         "Lower is better for snappy UX.",
       ],
-      also: ["p95", "p99"],
+      also: ["median", "p95", "p99"],
     },
     e2e: {
       title: "E2E latency",
@@ -143,7 +143,7 @@
         defLine("End-to-end (E2E) latency", "e2e"),
         "Same idea as “request latency.”",
       ],
-      also: ["p95", "p99"],
+      also: ["median", "p95", "p99"],
     },
     ttft: {
       title: "TTFT",
@@ -151,7 +151,7 @@
         defLine("Time to First Token (TTFT)", "ttft"),
         "High TTFT feels like the UI is stuck before any text shows.",
       ],
-      also: ["p95", "p99"],
+      also: ["median", "p95", "p99"],
     },
     itl: {
       title: "ITL",
@@ -159,7 +159,7 @@
         defLine("Inter-Token Latency (ITL)", "itl"),
         "High ITL makes streaming feel choppy or sluggish.",
       ],
-      also: ["p95", "p99"],
+      also: ["median", "p95", "p99"],
     },
     tpot: {
       title: "TPOT",
@@ -167,7 +167,7 @@
         defLine("Time Per Output Token (TPOT)", "tpot"),
         "A single “cost per token” speed figure; lower is better.",
       ],
-      also: ["p95", "p99"],
+      also: ["median", "p95", "p99"],
     },
     ttfot: {
       title: "TTFOT",
@@ -175,7 +175,7 @@
         defLine("Time to First Output Token (TTFOT)", "ttfot"),
         "Differs from TTFT when the model thinks before showing text.",
       ],
-      also: ["p95", "p99"],
+      also: ["median", "p95", "p99"],
     },
     error_rate: {
       title: "Error rate",
@@ -768,10 +768,13 @@
     setText("kpi-rps", fmt(run.request_rate));
     setText("kpi-out-tps", fmt(run.output_tps));
     setText("kpi-total-tps", fmt(run.total_tps));
+    setText("kpi-lat-median", fmt(run.request_latency_median_ms));
     setText("kpi-lat-p95", fmt(run.request_latency_p95_ms));
     setText("kpi-lat-p99", fmt(run.request_latency_p99_ms));
+    setText("kpi-ttft-median", fmt(run.ttft_median_ms));
     setText("kpi-ttft-p95", fmt(run.ttft_p95_ms));
     setText("kpi-ttft-p99", fmt(run.ttft_p99_ms));
+    setText("kpi-itl-median", fmt(run.itl_median_ms));
     setText("kpi-itl-p95", fmt(run.itl_p95_ms));
     setText("kpi-itl-p99", fmt(run.itl_p99_ms));
     setText("kpi-error", pct(run.error_rate));

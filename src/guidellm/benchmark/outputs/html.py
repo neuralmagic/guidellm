@@ -350,14 +350,21 @@ def _static_text_defaults(view: dict[str, Any]) -> dict[str, str]:
         "__GUIDELLM_KPI_RPS__": _html_escape(_fmt_num(run.get("request_rate"))),
         "__GUIDELLM_KPI_OUT_TPS__": _html_escape(_fmt_num(run.get("output_tps"))),
         "__GUIDELLM_KPI_TOTAL_TPS__": _html_escape(_fmt_num(run.get("total_tps"))),
+        "__GUIDELLM_KPI_LAT_MEDIAN__": _html_escape(
+            _fmt_num(run.get("request_latency_median_ms"))
+        ),
         "__GUIDELLM_KPI_LAT_P95__": _html_escape(
             _fmt_num(run.get("request_latency_p95_ms"))
         ),
         "__GUIDELLM_KPI_LAT_P99__": _html_escape(
             _fmt_num(run.get("request_latency_p99_ms"))
         ),
+        "__GUIDELLM_KPI_TTFT_MEDIAN__": _html_escape(
+            _fmt_num(run.get("ttft_median_ms"))
+        ),
         "__GUIDELLM_KPI_TTFT_P95__": _html_escape(_fmt_num(run.get("ttft_p95_ms"))),
         "__GUIDELLM_KPI_TTFT_P99__": _html_escape(_fmt_num(run.get("ttft_p99_ms"))),
+        "__GUIDELLM_KPI_ITL_MEDIAN__": _html_escape(_fmt_num(run.get("itl_median_ms"))),
         "__GUIDELLM_KPI_ITL_P95__": _html_escape(_fmt_num(run.get("itl_p95_ms"))),
         "__GUIDELLM_KPI_ITL_P99__": _html_escape(_fmt_num(run.get("itl_p99_ms"))),
         "__GUIDELLM_KPI_ERROR__": _html_escape(_fmt_pct(run.get("error_rate"))),
@@ -507,12 +514,15 @@ def _build_run_row(benchmark: GenerativeBenchmark, index: int) -> dict[str, Any]
         "total_tps": _mean(metrics.tokens_per_second, status="total"),
         "input_tps": _mean(metrics.prompt_tokens_per_second, status="total"),
         "output_tps": _mean(metrics.output_tokens_per_second, status="total"),
+        "request_latency_median_ms": _ms(_median(metrics.request_latency)),
         "request_latency_p95_ms": _ms(req_lat_p95),
         "request_latency_p99_ms": _ms(req_lat_p99),
+        "ttft_median_ms": _median(metrics.time_to_first_token_ms),
         "ttft_p95_ms": _percentile(metrics.time_to_first_token_ms, "p95"),
         "ttft_p99_ms": _percentile(metrics.time_to_first_token_ms, "p99"),
         "ttfot_p95_ms": _percentile(metrics.time_to_first_output_token_ms, "p95"),
         "ttfot_p99_ms": _percentile(metrics.time_to_first_output_token_ms, "p99"),
+        "itl_median_ms": _median(metrics.inter_token_latency_ms),
         "itl_p95_ms": _percentile(metrics.inter_token_latency_ms, "p95"),
         "itl_p99_ms": _percentile(metrics.inter_token_latency_ms, "p99"),
         "tpot_p95_ms": _percentile(metrics.time_per_output_token_ms, "p95"),

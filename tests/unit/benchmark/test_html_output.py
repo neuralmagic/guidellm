@@ -83,6 +83,9 @@ def test_build_report_view_single_and_multi_run():
     single_view = build_report_view(single_report)
     assert single_view["header"]["multi_run"] is False
     assert single_view["header"]["has_multi_turn"] is False
+    assert single_view["runs"][0]["request_latency_median_ms"] == 220.0
+    assert single_view["runs"][0]["ttft_median_ms"] == 90.0
+    assert single_view["runs"][0]["itl_median_ms"] == 14.0
     assert single_view["runs"][0]["ttft_p95_ms"] == 150.0
     assert single_view["runs"][0]["ttft_p99_ms"] == 180.0
     assert single_view["runs"][0]["label"] == "constant@2.00"
@@ -482,12 +485,15 @@ def test_render_html_includes_embedded_assets():
     assert "constant@1.50" in html
     # Peak-run defaults are embedded for no-JS viewers.
     assert re.search(r'id="kpi-rps">[^<—]+</div>', html)
+    assert re.search(r'id="kpi-lat-median">[^<—]+</span>', html)
+    assert re.search(r'id="kpi-ttft-median">[^<—]+</span>', html)
+    assert re.search(r'id="kpi-itl-median">[^<—]+</span>', html)
     assert re.search(r'id="meta-model">[^<—]+</span>', html)
     assert 'class="help-q"' in html
     assert "Time to First Token (TTFT)" in html
     assert "var HELP" in html
     assert "help-tip-also" in html
-    assert 'also: ["p95", "p99"]' in html
+    assert 'also: ["median", "p95", "p99"]' in html
     assert 'role="tablist"' in html
     assert "Latency components" in html
     assert "prompt_vs_turn" not in html

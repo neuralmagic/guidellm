@@ -217,15 +217,15 @@ h1 {
 }
 
 .kpi-latency {
-  flex: 0 1 152px;
-  max-width: 168px;
-  min-width: 132px;
+  flex: 0 1 232px;
+  max-width: 248px;
+  min-width: 208px;
 }
 
-/* Side-by-side P95/P99 tiles with light brand tint. */
+/* Side-by-side Median/P95/P99 tiles with light brand tint. */
 .kpi-pair {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr;
   gap: 5px;
   margin-top: 2px;
 }
