@@ -217,6 +217,20 @@ guidellm run --profile kind=sweep,sweep_size=10,rampup_duration=10,strategy_type
 | `strategy_type`   | Strategy type for interpolated steps (`constant` or `poisson`)             | `--profile kind=sweep,strategy_type=poisson`            |
 | `max_concurrency` | Maximum concurrent requests to schedule                                    | `--profile kind=sweep,max_concurrency=10`               |
 
+#### Sweep Next Profile
+
+`sweep_next` is an experimental take on the sweep profile, and may replace it in a future release. Instead of the `throughput` step, which always runs at a concurrency of 512, it finds the top of the range with a ramp. On a small server, 512 concurrent requests mostly sit in a queue, and on a large one they may not be enough to reach capacity. The ramp adapts to the server instead.
+
+The ramp starts at the synchronous rate and doubles every four synchronous latencies, or every two seconds if that is longer. Once completions fall more than 25% behind what was sent one latency earlier, it stops sending, keeps measuring for three more latencies while the server catches up, and takes the highest completion rate it saw as the peak.
+
+```bash
+guidellm run --profile kind=sweep_next,sweep_size=10
+```
+
+It accepts the same `sweep_size`, `rampup_duration` and `strategy_type` parameters as `sweep`. There is no concurrency limit unless you set `max_concurrency`.
+
+Larger servers need more doublings to saturate, so the ramp takes longer on them. If something like `--max-seconds` ends the ramp first, the console warns that the server was not saturated, and the sweep range may stop short of the real capacity.
+
 #### Replay Profile
 
 Replays trace events using timestamps from a trace file dataset. See [Trace Replay Benchmarking](#trace-replay-benchmarking) below for data setup.

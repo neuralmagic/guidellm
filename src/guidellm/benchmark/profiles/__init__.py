@@ -18,6 +18,7 @@ from .knee import KneeProfile
 from .profile import Profile, ProfileFactory
 from .replay import ReplayProfile
 from .sweep import SweepProfile
+from .sweep_next import SweepNextProfile
 from .synchronous import SynchronousProfile
 from .throughput import ThroughputProfile
 
@@ -29,6 +30,7 @@ __all__ = [
     "Profile",
     "ProfileFactory",
     "ReplayProfile",
+    "SweepNextProfile",
     "SweepProfile",
     "SynchronousProfile",
     "ThroughputProfile",
