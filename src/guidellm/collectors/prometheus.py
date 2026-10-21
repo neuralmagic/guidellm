@@ -420,6 +420,7 @@ class PrometheusCollector(PeriodicCollector):
         timeout: float,
         metrics: list[str],
         transport: httpx.AsyncBaseTransport | None = None,
+        kind: str = "prometheus",
     ):
         """
         :param url: URL of the Prometheus metrics endpoint
@@ -427,8 +428,9 @@ class PrometheusCollector(PeriodicCollector):
         :param timeout: Seconds to wait for a single scrape
         :param metrics: Metric family names to collect
         :param transport: Optional httpx transport, used to substitute the server
+        :param kind: The kind this collector was configured with
         """
-        super().__init__(interval)
+        super().__init__(kind, interval)
         self.url = url
         self.timeout = timeout
         self.metrics = metrics
@@ -456,6 +458,7 @@ class PrometheusCollector(PeriodicCollector):
             interval=args.interval,
             timeout=args.timeout,
             metrics=args.metrics,
+            kind=args.kind,
         )
 
     async def reset(self) -> None:

@@ -122,9 +122,7 @@ def _run_collectors(connection: Connection, args: list[dict[str, Any]]) -> None:
 async def _serve_collectors(connection: Connection, args: list[dict[str, Any]]) -> None:
     try:
         parsed = [CollectorArgs.model_validate(arg) for arg in args]
-        host = _CollectorHost(
-            [Collector.resolve(arg) for arg in parsed], [arg.kind for arg in parsed]
-        )
+        host = _CollectorHost([Collector.resolve(arg) for arg in parsed])
     except Exception as err:  # noqa: BLE001
         connection.send(("error", repr(err)))
         return
@@ -154,12 +152,11 @@ class _CollectorHost:
 
     A collector that fails to start or stop still reports a result, an error
     message, so the results keep lining up with the configured collectors. Each
-    result starts with its collector's ``kind``.
+    result contains its collector's ``kind``.
     """
 
-    def __init__(self, collectors: list[Collector], kinds: list[str]):
+    def __init__(self, collectors: list[Collector]):
         self.collectors = collectors
-        self.kinds = kinds
         self.errors: list[str | None] = [None] * len(collectors)
 
     async def start(self) -> None:
@@ -184,7 +181,7 @@ class _CollectorHost:
     def results(self, start_time: float, end_time: float) -> list[dict[str, Any]]:
         results: list[dict[str, Any]] = []
         for index, collector in enumerate(self.collectors):
-            kind = self.kinds[index]
+            kind = collector.kind
             if (error := self.errors[index]) is not None:
                 results.append({"kind": kind, "error": error})
                 continue

@@ -32,6 +32,12 @@ class Collector(RegistryMixin[type["Collector"]], ABC):
     with the order the collectors were configured in.
     """
 
+    def __init__(self, kind: str) -> None:
+        """
+        :param kind: The kind this collector was configured with
+        """
+        self.kind = kind
+
     @classmethod
     @abstractmethod
     def from_args(cls, args: CollectorArgs) -> Collector:
@@ -96,7 +102,11 @@ class OneshotCollector(Collector, ABC):
     benchmarks may be configured differently.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, kind: str) -> None:
+        """
+        :param kind: The kind this collector was configured with
+        """
+        super().__init__(kind)
         self._result: dict[str, Any] = {}
 
     @abstractmethod
@@ -134,10 +144,12 @@ class PeriodicCollector(Collector, ABC):
     both ends. Subclasses summarize the samples in :meth:`result`.
     """
 
-    def __init__(self, interval: float) -> None:
+    def __init__(self, kind: str, interval: float) -> None:
         """
+        :param kind: The kind this collector was configured with
         :param interval: Seconds between samples while a benchmark runs
         """
+        super().__init__(kind)
         self.interval = interval
         self._task: asyncio.Task[None] | None = None
 
