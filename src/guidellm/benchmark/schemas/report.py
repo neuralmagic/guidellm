@@ -20,6 +20,7 @@ import yaml
 from pydantic import Field
 
 from guidellm.benchmark.schemas.benchmark import GenerativeBenchmark
+from guidellm.logger import logger
 from guidellm.schemas import StandardBaseModel
 from guidellm.schemas.benchmark import BenchmarkScenario
 
@@ -88,31 +89,43 @@ class GenerativeBenchmarksReport(StandardBaseModel):
 
     def save_file(
         self,
-        path: str | Path | None = None,
-        type_: Literal["json", "yaml"] | None = None,
+        path: str | Path | None,
+        type_: Literal["json", "yaml"],
     ) -> Path:
         """
         Save report to file in JSON or YAML format.
 
+        The format is the caller's to choose, not the path's: ``--output kind=``
+        already says what the user asked for, so the suffix is never consulted and
+        any path can be written. A suffix that names the other format is only a
+        warning, since writing JSON to ``foo.yaml`` is odd but still what was asked.
+
         :param path: File path or directory for saving, defaults to current directory
             with DEFAULT_FILE name
-        :param type_: File format override ('json' or 'yaml'), auto-detected from
-            extension if None
+        :param type_: File format to write ('json' or 'yaml')
         :return: Resolved path to the saved file
-        :raises ValueError: If file type is unsupported or cannot be determined
+        :raises ValueError: If file type is unsupported
         """
         file_path = GenerativeBenchmarksReport._resolve_path(
             path if path is not None else Path.cwd()
         )
         file_path.parent.mkdir(parents=True, exist_ok=True)
-        file_type = type_ or file_path.suffix.lower()[1:]
         model_dict = self.model_dump(mode="json")
-        if file_type == "json":
+        if type_ == "json":
             save_str = json.dumps(model_dict)
-        elif file_type in ["yaml", "yml"]:
+        elif type_ in ["yaml", "yml"]:
             save_str = yaml.dump(model_dict)
         else:
-            raise ValueError(f"Unsupported file type: {file_type} for {file_path}.")
+            raise ValueError(f"Unsupported file type: {type_} for {file_path}.")
+
+        suffix = file_path.suffix.lower().removeprefix(".")
+        if suffix in ("json", "yaml", "yml") and (suffix == "json") != (
+            type_ == "json"
+        ):
+            logger.warning(
+                f"Writing {type_} to {file_path}, whose .{suffix} suffix names a "
+                f"different format."
+            )
 
         with file_path.open("w") as file:
             file.write(save_str)
