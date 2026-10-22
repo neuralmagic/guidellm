@@ -123,15 +123,15 @@ guidellm run \
 
 合成数据中的工具调用配置字段：
 
-| 字段                         | 类型               | 默认值  | 说明 |
-| ---------------------------- | ------------------ | ------- | ---- |
-| `tool_call_turns`            | `int \| list[int]` | `0`     | 哪些用户轮次包含工具定义并预期收到工具调用响应。索引以用户轮次为准，从 0 开始（不是展开后的请求列表索引）。整数 N 表示前 N 个用户轮次；列表用于指定索引（例如 `[0, 2]`）；`-1` 表示所有轮次。每个工具调用用户轮次都会额外生成一个注入请求，因此 `turns=3` 且 `tool_call_turns=[0,1]` 时总共会产生 5 个请求。设为 `0` 或 `[]` 时不调用工具。 |
-| `server_tool_call_turns`     | `int \| list[int]` | `0`     | 哪些用户轮次使用服务端工具调用。这些轮次会标记为 `server_tool_call`，因此不会设置 `tool_choice="none"`，服务器可以使用其已配置的工具。不会创建注入轮次。不得与 `tool_call_turns` 重叠。整数 N 表示前 N 个用户轮次；列表用于指定索引；`-1` 表示所有轮次。 |
-| `tools`                      | `list`             | `None`  | 工具定义，格式可以是 [Chat Completions](https://platform.openai.com/docs/api-reference/chat/create#chat-create-tools)（包含嵌套的 `function` 键）或 [Responses API](https://platform.openai.com/docs/api-reference/responses/create#responses-create-tools)（扁平格式）。GuideLLM 会在发送请求时自动转换为与 `request_format` 匹配的格式。建议使用与目标端点相同的格式。若为 `None`，则使用内置占位工具。 |
-| `tool_response_tokens`       | `int`              | `None`  | 合成工具调用响应的平均 token 数。若为 `None`，则使用简短占位内容（`{"status": "ok"}`）。 |
-| `tool_response_tokens_stdev` | `int`              | `None`  | 工具响应 token 数量的标准差。 |
-| `tool_response_tokens_min`   | `int`              | `None`  | 工具响应的最小 token 数。 |
-| `tool_response_tokens_max`   | `int`              | `None`  | 工具响应的最大 token 数。 |
+| 字段                         | 类型               | 默认值 | 说明                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ---------------------------- | ------------------ | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tool_call_turns`            | `int \| list[int]` | `0`    | 哪些用户轮次包含工具定义并预期收到工具调用响应。索引以用户轮次为准，从 0 开始（不是展开后的请求列表索引）。整数 N 表示前 N 个用户轮次；列表用于指定索引（例如 `[0, 2]`）；`-1` 表示所有轮次。每个工具调用用户轮次都会额外生成一个注入请求，因此 `turns=3` 且 `tool_call_turns=[0,1]` 时总共会产生 5 个请求。设为 `0` 或 `[]` 时不调用工具。                                                               |
+| `server_tool_call_turns`     | `int \| list[int]` | `0`    | 哪些用户轮次使用服务端工具调用。这些轮次会标记为 `server_tool_call`，因此不会设置 `tool_choice="none"`，服务器可以使用其已配置的工具。不会创建注入轮次。不得与 `tool_call_turns` 重叠。整数 N 表示前 N 个用户轮次；列表用于指定索引；`-1` 表示所有轮次。                                                                                                                                                  |
+| `tools`                      | `list`             | `None` | 工具定义，格式可以是 [Chat Completions](https://platform.openai.com/docs/api-reference/chat/create#chat-create-tools)（包含嵌套的 `function` 键）或 [Responses API](https://platform.openai.com/docs/api-reference/responses/create#responses-create-tools)（扁平格式）。GuideLLM 会在发送请求时自动转换为与 `request_format` 匹配的格式。建议使用与目标端点相同的格式。若为 `None`，则使用内置占位工具。 |
+| `tool_response_tokens`       | `int`              | `None` | 合成工具调用响应的平均 token 数。若为 `None`，则使用简短占位内容（`{"status": "ok"}`）。                                                                                                                                                                                                                                                                                                                  |
+| `tool_response_tokens_stdev` | `int`              | `None` | 工具响应 token 数量的标准差。                                                                                                                                                                                                                                                                                                                                                                             |
+| `tool_response_tokens_min`   | `int`              | `None` | 工具响应的最小 token 数。                                                                                                                                                                                                                                                                                                                                                                                 |
+| `tool_response_tokens_max`   | `int`              | `None` | 工具响应的最大 token 数。                                                                                                                                                                                                                                                                                                                                                                                 |
 
 注意：这里的 token 数量只计算模拟工具调用响应中某个字段的内容。JSON 结构本身还会为模拟工具调用响应增加约 5 个 token。
 
@@ -182,10 +182,10 @@ guidellm run \
 
 有两个后端设置会控制运行时如何处理工具调用轮次，二者都在 `--backend` 配置中设置：
 
-| 设置                         | 取值                                            | 默认值        | 说明 |
-| ---------------------------- | ----------------------------------------------- | ------------- | ---- |
-| `extras.body.tool_choice`    | `required`、`auto`、`none`                      | `required`    | 在 `client_tool_call` 轮次中作为 `tool_choice` API 参数发送。当请求体中存在工具时，处理器会自动在非工具调用轮次设置 `tool_choice="none"`。 |
-| `tool_call_missing_behavior`  | `ignore_continue`、`ignore_stop`、`error_stop`  | `error_stop`  | 预期发生工具调用但模型返回普通文本时，后端的处理方式。 |
+| 设置                         | 取值                                           | 默认值       | 说明                                                                                                                                       |
+| ---------------------------- | ---------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `extras.body.tool_choice`    | `required`、`auto`、`none`                     | `required`   | 在 `client_tool_call` 轮次中作为 `tool_choice` API 参数发送。当请求体中存在工具时，处理器会自动在非工具调用轮次设置 `tool_choice="none"`。 |
+| `tool_call_missing_behavior` | `ignore_continue`、`ignore_stop`、`error_stop` | `error_stop` | 预期发生工具调用但模型返回普通文本时，后端的处理方式。                                                                                     |
 
 **通过后端配置设置 `tool_choice`：**
 
@@ -224,11 +224,11 @@ guidellm run \
 
 ### 推荐场景
 
-| 工具选择   | 缺少调用时的行为  | 当前轮次状态 | 说明 |
-| ---------- | ----------------- | ------------ | ---- |
-| `required` | `error_stop`       | errored      | （默认）适合使用合成数据获得一致且可预测的行为，但可能会降低服务器速度。 |
-| `auto`     | `ignore_continue`  | completed    | 适合测试 `auto` 模式，避免模型选择不调用工具而导致错误。 |
-| `auto`     | `ignore_stop`      | cancelled    | 适合测试 `auto` 模式；模型生成普通文本而非工具调用时，对话会提前结束。 |
+| 工具选择   | 缺少调用时的行为  | 当前轮次状态 | 说明                                                                     |
+| ---------- | ----------------- | ------------ | ------------------------------------------------------------------------ |
+| `required` | `error_stop`      | errored      | （默认）适合使用合成数据获得一致且可预测的行为，但可能会降低服务器速度。 |
+| `auto`     | `ignore_continue` | completed    | 适合测试 `auto` 模式，避免模型选择不调用工具而导致错误。                 |
+| `auto`     | `ignore_stop`     | cancelled    | 适合测试 `auto` 模式；模型生成普通文本而非工具调用时，对话会提前结束。   |
 
 ## 工具调用轮次的输出 token 限制
 
