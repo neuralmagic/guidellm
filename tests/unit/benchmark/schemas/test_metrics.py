@@ -809,6 +809,8 @@ class TestGoodputMetrics:
         assert metrics.slo_attainment is None
         assert metrics.request_goodput is None
         assert metrics.slo_determined_requests == 0
+        assert metrics.output_token_goodput is None
+        assert metrics.slo_attainment_by_metric is None
 
     @pytest.mark.sanity
     def test_attainment_is_the_conforming_fraction(self):
@@ -904,7 +906,13 @@ class TestGoodputMetrics:
         )
 
         payload = metrics.model_dump()
-        for name in ("slo_attainment", "slo_determined_requests", "request_goodput"):
+        for name in (
+            "slo_attainment",
+            "slo_determined_requests",
+            "request_goodput",
+            "output_token_goodput",
+            "slo_attainment_by_metric",
+        ):
             del payload[name]
 
         restored = GenerativeMetrics.model_validate(payload)
@@ -912,6 +920,250 @@ class TestGoodputMetrics:
         assert restored.slo_attainment is None
         assert restored.request_goodput is None
         assert restored.slo_determined_requests == 0
+        assert restored.output_token_goodput is None
+        assert restored.slo_attainment_by_metric is None
+
+
+class TestDetailedGoodputMetrics:
+    """Exercise token accounting and independent objective populations."""
+
+    @pytest.mark.regression
+    def test_token_goodput_weights_only_conforming_outputs(self):
+        """Count unequal output lengths and bundled streaming tokens correctly.
+
+        ## WRITTEN BY AI ##
+        """
+        base = SCHEDULE_BASE_TIME
+        short = _make_latency_stats("short", base, base + 0.1, base + 1.0, 5)
+        long = _make_latency_stats("long", base, base + 0.1, base + 1.5, 15)
+        long.info.timings.token_iterations = 3
+        slow = _make_latency_stats("slow", base, base + 0.1, base + 5.0, 99)
+        accumulator = _make_goodput_accumulator(
+            [short, long, slow], base, base + 10.0, GoodputSLO(e2el_ms=2000)
+        )
+        accumulator.errored.requests_stats = [_make_errored_stats("error", base)]
+        accumulator.incomplete.requests_stats = [
+            _make_latency_stats("cancelled", base, base + 0.1, base + 1.0, 500)
+        ]
+
+        metrics = GenerativeMetrics.compile(accumulator)
+
+        assert metrics.slo_attainment == pytest.approx(0.5)
+        assert metrics.request_goodput.successful.mean == pytest.approx(0.2)
+        assert metrics.output_token_goodput.successful.mean == pytest.approx(2.0)
+        assert metrics.output_token_goodput.errored.mean == 0.0
+        assert metrics.output_token_goodput.incomplete.mean == 0.0
+        assert metrics.slo_attainment_by_metric["e2el_ms"].model_dump() == {
+            "conforming_requests": 2,
+            "determined_requests": 4,
+            "attainment": 0.5,
+        }
+
+    @pytest.mark.regression
+    def test_individual_attainment_differs_from_the_intersection(self):
+        """Attribute breaches to each objective without averaging their fractions.
+
+        ## WRITTEN BY AI ##
+        """
+        base = SCHEDULE_BASE_TIME
+        accumulator = _make_goodput_accumulator(
+            [
+                _make_latency_stats("all", base, base + 0.1, base + 1.0, 10),
+                _make_latency_stats("ttft", base, base + 0.4, base + 1.3, 10),
+                _make_latency_stats("tpot-e2el", base, base + 0.1, base + 2.8, 10),
+            ],
+            base,
+            base + 10.0,
+            GoodputSLO(ttft_ms=200, tpot_ms=150, e2el_ms=2000),
+        )
+        accumulator.errored.requests_stats = [_make_errored_stats("error", base)]
+
+        metrics = GenerativeMetrics.compile(accumulator)
+
+        assert metrics.slo_attainment == pytest.approx(0.25)
+        assert metrics.slo_determined_requests == 4
+        assert metrics.output_token_goodput.successful.mean == pytest.approx(1.0)
+        assert set(metrics.slo_attainment_by_metric) == {
+            "ttft_ms",
+            "tpot_ms",
+            "e2el_ms",
+        }
+        for summary in metrics.slo_attainment_by_metric.values():
+            assert summary.conforming_requests == 2
+            assert summary.determined_requests == 4
+            assert summary.attainment == pytest.approx(0.5)
+
+    @pytest.mark.regression
+    def test_each_objective_has_its_own_evaluated_population(self):
+        """Keep measurable objectives on non-streaming and single-token requests.
+
+        ## WRITTEN BY AI ##
+        """
+        base = SCHEDULE_BASE_TIME
+        accumulator = _make_goodput_accumulator(
+            [
+                _make_latency_stats("stream", base, base + 0.1, base + 1.0, 10),
+                _make_scheduled_stats("nonstream", base, base, base + 1.0),
+                _make_latency_stats("single", base, base + 0.1, base + 0.2, 1),
+            ],
+            base,
+            base + 10.0,
+            GoodputSLO(ttft_ms=200, tpot_ms=150, e2el_ms=2000),
+        )
+        accumulator.errored.requests_stats = [_make_errored_stats("error", base)]
+
+        metrics = GenerativeMetrics.compile(accumulator)
+
+        assert metrics.slo_attainment == pytest.approx(0.5)
+        assert metrics.slo_determined_requests == 2
+        for name, passing, evaluated in (
+            ("ttft_ms", 2, 3),
+            ("tpot_ms", 1, 2),
+            ("e2el_ms", 3, 4),
+        ):
+            summary = metrics.slo_attainment_by_metric[name]
+            assert summary.conforming_requests == passing
+            assert summary.determined_requests == evaluated
+            assert summary.attainment == pytest.approx(passing / evaluated)
+
+    @pytest.mark.regression
+    @pytest.mark.parametrize("conforms", [True, False])
+    def test_missing_token_usage_uses_existing_iteration_fallback(self, conforms):
+        """Use the output-throughput fallback only for SLO-conforming requests.
+
+        ## WRITTEN BY AI ##
+        """
+        base = SCHEDULE_BASE_TIME
+        missing = _make_latency_stats(
+            "missing", base, base + 0.1, base + (1.0 if conforms else 5.0)
+        )
+        missing.output_metrics = UsageMetrics()
+        assert missing.output_tokens == 9  # Existing iteration fallback.
+        metrics = GenerativeMetrics.compile(
+            _make_goodput_accumulator(
+                [
+                    _make_latency_stats("known", base, base + 0.1, base + 1.0, 20),
+                    missing,
+                ],
+                base,
+                base + 10.0,
+                GoodputSLO(e2el_ms=2000),
+            )
+        )
+
+        assert metrics.output_tokens_per_second.successful.mean == pytest.approx(2.9)
+        assert metrics.output_token_goodput.successful.mean == pytest.approx(
+            2.9 if conforms else 2.0
+        )
+        assert metrics.request_goodput.successful.mean == pytest.approx(
+            0.2 if conforms else 0.1
+        )
+
+    @pytest.mark.regression
+    @pytest.mark.parametrize("zero_usage", [True, False])
+    def test_zero_token_goodput_is_distinct_from_unavailable(self, zero_usage):
+        """Report zero for known empty outputs and for an evaluated failing run.
+
+        ## WRITTEN BY AI ##
+        """
+        base = SCHEDULE_BASE_TIME
+        stats = _make_latency_stats("request", base, base + 0.1, base + 1.0)
+        stats.output_metrics = (
+            UsageMetrics(text_tokens=0) if zero_usage else UsageMetrics()
+        )
+        metrics = GenerativeMetrics.compile(
+            _make_goodput_accumulator(
+                [stats],
+                base,
+                base + 10.0,
+                GoodputSLO(e2el_ms=2000 if zero_usage else 500),
+            )
+        )
+
+        assert metrics.output_token_goodput is not None
+        assert metrics.output_token_goodput.successful.mean == 0.0
+        assert metrics.slo_attainment == (1.0 if zero_usage else 0.0)
+
+    @pytest.mark.regression
+    @pytest.mark.parametrize("empty", [True, False])
+    def test_no_combined_population_preserves_individual_results(self, empty):
+        """Keep null combined metrics distinct from a measurable E2EL objective.
+
+        ## WRITTEN BY AI ##
+        """
+        base = SCHEDULE_BASE_TIME
+        successful = (
+            []
+            if empty
+            else [_make_scheduled_stats("nonstream", base, base, base + 1.0)]
+        )
+        metrics = GenerativeMetrics.compile(
+            _make_goodput_accumulator(
+                successful,
+                base,
+                base + 10.0,
+                GoodputSLO(ttft_ms=200, e2el_ms=2000),
+            )
+        )
+
+        assert metrics.slo_attainment is None
+        assert metrics.request_goodput is None
+        assert metrics.output_token_goodput is None
+        assert metrics.slo_attainment_by_metric["ttft_ms"].attainment is None
+        assert metrics.slo_attainment_by_metric["ttft_ms"].determined_requests == 0
+        e2el = metrics.slo_attainment_by_metric["e2el_ms"]
+        assert e2el.attainment == (None if empty else 1.0)
+        assert e2el.determined_requests == (0 if empty else 1)
+
+    @pytest.mark.regression
+    def test_token_goodput_clips_events_to_the_measurement_window(self):
+        """Exclude warmup and cooldown tokens even for conforming requests.
+
+        ## WRITTEN BY AI ##
+        """
+        metrics = GenerativeMetrics.compile(
+            _make_goodput_accumulator(
+                [
+                    _make_latency_stats("warmup", 5.0, 8.0, 12.0, 3),
+                    _make_latency_stats("inside", 11.0, 12.0, 16.0, 3),
+                    _make_latency_stats("cooldown", 18.0, 22.0, 24.0, 3),
+                    _make_latency_stats("outside", 1.0, 2.0, 3.0, 100),
+                ],
+                10.0,
+                20.0,
+                GoodputSLO(e2el_ms=20000),
+            )
+        )
+
+        # Warmup contributes its events at 10 and 12; inside contributes three.
+        assert metrics.output_token_goodput.successful.mean == pytest.approx(0.5)
+        assert metrics.output_tokens_per_second.successful.mean == pytest.approx(0.5)
+        assert metrics.slo_determined_requests == 3
+
+    @pytest.mark.regression
+    def test_detailed_metrics_survive_json_round_trip(self):
+        """Persist objective counts, derived fractions and token rate summaries.
+
+        ## WRITTEN BY AI ##
+        """
+        base = SCHEDULE_BASE_TIME
+        metrics = GenerativeMetrics.compile(
+            _make_goodput_accumulator(
+                [_make_latency_stats("ok", base, base + 0.1, base + 1.0, 20)],
+                base,
+                base + 10.0,
+                GoodputSLO(e2el_ms=1000),
+            )
+        )
+
+        restored = GenerativeMetrics.model_validate_json(metrics.model_dump_json())
+
+        assert restored.slo_attainment_by_metric["e2el_ms"].model_dump() == {
+            "conforming_requests": 1,
+            "determined_requests": 1,
+            "attainment": 1.0,
+        }
+        assert restored.output_token_goodput.successful.mean == pytest.approx(2.0)
 
 
 class TestGoodputObjectiveMapping:
@@ -1316,6 +1568,68 @@ class TestSchedulerMetricsGenerationDelayCompile:
         assert last.request_totals.errored == 1
         assert last.request_totals.successful == 0
 
+    @pytest.mark.sanity
+    def test_prefix_cache_metrics(self):
+        """
+        Summarize cached tokens and per-request hit rates over the run.
+
+        Turn ``t`` has a prompt of ``8 * (t + 1)`` tokens, of which the
+        previous turns' ``8 * t`` are cached, so its hit rate is
+        ``t / (t + 1)``. One extra request reports no cached count and is
+        left out of both distributions.
+
+        ## WRITTEN BY AI ##
+        """
+        metrics = _compile_cached_conversations()
+
+        assert metrics.cached_token_count.successful.count == 12
+        assert metrics.cached_token_count.successful.mean == pytest.approx(8.0)
+        assert metrics.prefix_cache_hit_rate.successful.count == 12
+        assert metrics.prefix_cache_hit_rate.successful.mean == pytest.approx(
+            (0.0 + 1 / 2 + 2 / 3) / 3
+        )
+
+    @pytest.mark.sanity
+    def test_turn_prefix_cache_metrics(self):
+        """
+        Report each turn's own hit rate, and partition the run's counts.
+
+        ## WRITTEN BY AI ##
+        """
+        metrics = _compile_cached_conversations()
+
+        assert metrics.turns is not None
+        hit_rates = [turn.prefix_cache_hit_rate for turn in metrics.turns]
+        assert [rate.successful.mean for rate in hit_rates] == pytest.approx(
+            [0.0, 1 / 2, 2 / 3]
+        )
+        turn_1 = metrics.turns[1]
+        assert turn_1.request_totals.successful == 5
+        assert turn_1.prefix_cache_hit_rate.successful.count == 4
+        assert turn_1.cached_token_count.successful.mean == pytest.approx(8.0)
+        assert sum(rate.successful.count for rate in hit_rates) == (
+            metrics.prefix_cache_hit_rate.successful.count
+        )
+
+    @pytest.mark.sanity
+    def test_prefix_cache_metrics_unreported(self):
+        """
+        Report empty cache distributions when the server reports no counts.
+
+        ## WRITTEN BY AI ##
+        """
+        successful = _make_conversations(n_conversations=2, n_turns=2)
+        metrics = GenerativeMetrics.compile(
+            _make_accumulator(
+                successful, SCHEDULE_BASE_TIME, SCHEDULE_BASE_TIME + 100.0
+            )
+        )
+
+        assert metrics.turns is not None
+        for summary in (metrics, *metrics.turns):
+            assert summary.prefix_cache_hit_rate.count == 0
+            assert summary.cached_token_count.count == 0
+
 
 def _make_streamed_request(  # noqa: PLR0913
     request_id: str,
@@ -1551,6 +1865,32 @@ def _make_conversations(
                 )
             )
     return stats
+
+
+def _compile_cached_conversations() -> GenerativeMetrics:
+    """Compile four three-turn conversations whose turns reuse earlier turns.
+
+    Turn ``t`` caches ``8 * t`` of its ``8 * (t + 1)`` prompt tokens. One
+    more request at turn 1 reports no cached count.
+
+    ## WRITTEN BY AI ##
+    """
+    successful = _make_conversations(n_conversations=4, n_turns=3)
+    for req in successful:
+        req.input_metrics.cached_tokens = 8 * req.info.turn_index
+    unreported = _make_turn_stats(
+        request_id="unreported",
+        conversation_id="c9",
+        turn_index=1,
+        request_start=SCHEDULE_BASE_TIME + 50.0,
+        first_token=SCHEDULE_BASE_TIME + 50.1,
+        request_end=SCHEDULE_BASE_TIME + 51.0,
+    )
+    return GenerativeMetrics.compile(
+        _make_accumulator(
+            [*successful, unreported], SCHEDULE_BASE_TIME, SCHEDULE_BASE_TIME + 100.0
+        )
+    )
 
 
 class TestTurnMetrics:

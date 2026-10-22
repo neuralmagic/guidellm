@@ -53,7 +53,7 @@ __all__ = [
 
 
 BenchmarkStatus: TypeAlias = Literal[
-    "pending", "warmup", "active", "cooldown", "compile", "completed"
+    "pending", "loading", "warmup", "active", "cooldown", "compile", "completed"
 ]
 
 
@@ -603,7 +603,10 @@ class _GenerativeProgressTaskState:
 
     @property
     def formatted_progress_status(self) -> str:
-        if self.benchmark_status == "warmup":
+        if self.benchmark_status == "loading":
+            status = "loading"
+            color = Colors.progress
+        elif self.benchmark_status == "warmup":
             status = "warmup"
             color = Colors.progress
         elif self.benchmark_status == "active":
@@ -626,7 +629,7 @@ class _GenerativeProgressTaskState:
 
     @property
     def formatted_requests_summary(self) -> str:
-        if self.benchmark_status == "pending":
+        if self.benchmark_status in {"pending", "loading"}:
             return " "
 
         return (
@@ -683,7 +686,7 @@ class _GenerativeProgressTaskState:
 
     @property
     def formatted_tokens_summary(self) -> str:
-        if self.benchmark_status == "pending":
+        if self.benchmark_status in {"pending", "loading"}:
             return " "
 
         return (
@@ -741,7 +744,7 @@ class _GenerativeProgressTaskState:
 
     @property
     def formatted_scheduler_stats(self) -> str:
-        if self.benchmark_status == "pending":
+        if self.benchmark_status in {"pending", "loading"}:
             return " "
 
         return (
@@ -776,6 +779,10 @@ class _GenerativeProgressTaskState:
     def start(self, strategy: SchedulingStrategy):
         self.strategy = strategy
         self.strategy_type = strategy.type_
+        # "all" means every request is loaded before the run starts.
+        prefetch_count = strategy.prefetch_count()
+        if prefetch_count == "all" or prefetch_count > 0:
+            self.benchmark_status = "loading"
 
     def update(
         self,
@@ -800,7 +807,7 @@ class _GenerativeProgressTaskState:
             request_latency=accumulator.completed_metrics.request_latency.mean,
         )
         self._update_token_stats(
-            output_tokens=accumulator.completed_metrics.total_tokens.mean,
+            output_tokens=accumulator.completed_metrics.output_tokens.mean,
             output_tokens_rate=accumulator.completed_metrics.output_tokens.rate_per_second,
             prompt_tokens=accumulator.completed_metrics.prompt_tokens.mean,
             total_tokens_rate=accumulator.completed_metrics.total_tokens.rate_per_second,

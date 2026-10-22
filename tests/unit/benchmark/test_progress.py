@@ -15,13 +15,20 @@ from guidellm.benchmark.progress import (
     CompositeBenchmarkerProgress,
     GenerativeConsoleBenchmarkerProgress,
     GenerativeLoggingBenchmarkerProgress,
+    _GenerativeProgressTaskState,
 )
 from guidellm.benchmark.schemas import (
     BenchmarkConfig,
     GenerativeBenchmark,
     GenerativeBenchmarkAccumulator,
 )
-from guidellm.scheduler import SchedulerState, SynchronousStrategy
+from guidellm.scheduler import ConcurrentStrategy, SchedulerState, SynchronousStrategy
+from guidellm.schemas import (
+    GenerativeRequestStats,
+    RequestInfo,
+    RequestTimings,
+    UsageMetrics,
+)
 from guidellm.schemas.benchmark.profiles import SynchronousProfileArgs
 
 
@@ -226,3 +233,62 @@ async def test_queued_logs_share_rich_terminal(monkeypatch, accumulator):
     assert ": started |" in output.getvalue()
     assert ": completed |" in output.getvalue()
     assert sys.stderr is output
+
+
+@pytest.mark.smoke
+def test_prefetch_shows_loading_until_update(accumulator):
+    """
+    Prefetch renders loading with blank summaries until the first update.
+
+    ## WRITTEN BY AI ##
+    """
+    task_state = _GenerativeProgressTaskState(strategy_type="concurrent")
+    task_state.start(ConcurrentStrategy(streams=4, prefetch=4))
+
+    assert task_state.benchmark_status == "loading"
+    assert "loading" in task_state.formatted_progress_status
+    assert task_state.formatted_requests_summary == " "
+    assert task_state.formatted_tokens_summary == " "
+    assert task_state.formatted_scheduler_stats == " "
+
+    task_state.update(accumulator, SchedulerState())
+
+    assert task_state.benchmark_status == "active"
+
+    loading_all = _GenerativeProgressTaskState(strategy_type="synchronous")
+    loading_all.start(SynchronousStrategy(prefetch="all"))
+
+    assert loading_all.benchmark_status == "loading"
+    assert loading_all.formatted_requests_summary == " "
+
+
+@pytest.mark.regression
+def test_live_update_shows_output_tokens(accumulator):
+    """The live "Gen" figure is the mean output tokens, not the mean total tokens.
+
+    ## WRITTEN BY AI ##
+    """
+    for index in range(4):
+        timings = RequestTimings(
+            resolve_start=1.0 + index,
+            resolve_end=2.0 + index,
+            request_start=1.0 + index,
+            request_end=2.0 + index,
+        )
+        accumulator.completed_metrics.update_estimate(
+            GenerativeRequestStats(
+                request_id=f"req-{index}",
+                info=RequestInfo(
+                    request_id=f"req-{index}", status="completed", timings=timings
+                ),
+                input_metrics=UsageMetrics(text_tokens=100),
+                output_metrics=UsageMetrics(text_tokens=10),
+            ),
+            duration=10.0,
+        )
+
+    state = _GenerativeProgressTaskState(strategy_type="synchronous")
+    state.update(accumulator, SchedulerState(start_time=1.0))
+
+    assert state.prompt_tokens == 100
+    assert state.output_tokens == 10

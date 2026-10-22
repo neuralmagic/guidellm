@@ -1,6 +1,7 @@
 ---
 title: 首页
 weight: 100
+source_sha256: !!str "a6f2f3095aa6b6b3c6b30f40f988275e264ae73c50a40590bba6441583ed9b36"
 ---
 
 # 首页
@@ -44,7 +45,7 @@ weight: 100
 
   深入了解后端、数据集、指标和服务级别目标等 GuideLLM 基准测试主题。
 
-  [:octicons-arrow-right-24: 阅读英文使用指南](../guides/)
+  [:octicons-arrow-right-24: 阅读使用指南](./guides/index.md)
 
 - :material-code-tags:{ .lg .middle } 示例
 
