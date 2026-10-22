@@ -37,7 +37,7 @@ dynamic = ["version"]
 name = "guidellm"
 description = "Guidance platform for deploying and managing large language models."
 readme = { file = "README.md", content-type = "text/markdown" }
-requires-python = ">=3.10.0,<4.0"
+requires-python = ">=3.11.0,<4.0"
 license = { text = "Apache-2.0" }
 authors = [{ name = "Red Hat" }]
 keywords = [
@@ -191,7 +191,7 @@ profile = "black"
 
 [tool.mypy]
 files = ["src/guidellm"]
-python_version = '3.10'
+python_version = '3.11'
 warn_redundant_casts = true
 warn_unused_ignores = false
 show_error_codes = true
@@ -216,7 +216,7 @@ ignore_missing_imports = true
 
 
 [tool.ruff]
-target-version = "py310"
+target-version = "py311"
 line-length = 88
 indent-width = 4
 exclude = ["build", "dist", "env", ".venv*"]
