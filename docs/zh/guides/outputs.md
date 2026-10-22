@@ -1,6 +1,6 @@
 ---
 weight: 2
-source_sha256: !!str "67d75e71d896e65fe7db8233b15a985888751455cf2a321d20dd7eca3d8cf79e"
+source_sha256: !!str "a92596617cad147aa021099b7ce2be22fc83304a85246db2e031f478dd401ad5"
 ---
 
 # 输出类型
@@ -102,8 +102,9 @@ guidellm run \
 | `0`               | 删除所有请求数据（仅保留统计数据）    |
 | `N`（例如 `100`） | 每组随机抽样保留 `N` 个请求的完整数据 |
 
+例如，如需每种状态组仅保留 100 个随机抽样请求的完整数据，可以运行：
+
 ```bash
-# Keep full data for only 100 sampled requests per group
 guidellm run \
   --backend kind=openai_http,target=http://localhost:8000 \
   --profile kind=sweep \
