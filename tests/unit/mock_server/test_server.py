@@ -1525,6 +1525,8 @@ class TestOmniAudioMock:
             )
 
         response.raise_for_status()
+        assert response.headers["Content-Type"].startswith("text/event-stream")
+
         events = [
             json.loads(line[6:])
             for line in response.text.splitlines()
