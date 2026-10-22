@@ -215,7 +215,7 @@ ignore_missing_imports = true
 target-version = "py311"
 line-length = 88
 indent-width = 4
-exclude = ["build", "dist", "env", ".venv*"]
+extend-exclude = ["build", "dist", "*.md"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -237,6 +237,7 @@ ignore = [
     "FIX002",   # Allow TODO comments
     "FIX004",   # Allow HACK comments
     "ASYNC109", # Overzealous rule about functions with `timeout` argument
+    "PLR0917",  # Don't judge my positional arguments
 ]
 select = [
     # Rules reference: https://docs.astral.sh/ruff/rules/
