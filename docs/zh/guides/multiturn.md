@@ -523,7 +523,7 @@ guidellm run \
 
 ### 常见模型搭配
 
-| Model Family                                                       | Recommended Value                                              |
+|                                                        模型家族|                                               推荐值|
 | ------------------------------------------------------------------ | -------------------------------------------------------------- |
 | DeepSeek R1, QwQ, Qwen3, Gemma 4, GLM-4.5, Holo2, Cohere Command A | `true`                                                         |
 | IBM Granite 3.2                                                    | `"Here is my thought process:{reasoning}Here is my response:"` |
