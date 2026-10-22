@@ -114,7 +114,7 @@ build = [
 ]
 quality = [
     # code quality
-    "mypy~=2.1.0",
+    "mypy~=2.4.0",
     "ruff~=0.15.20",
     "import-linter~=2.13.0",
 
@@ -196,6 +196,7 @@ warn_redundant_casts = true
 warn_unused_ignores = false
 show_error_codes = true
 namespace_packages = true
+num_workers = "auto"
 exclude = ["venv", ".tox"]
 
 # Silence "type import errors" as our 3rd-party libs does not have types
@@ -205,11 +206,6 @@ follow_imports = 'silent'
 [[tool.mypy.overrides]]
 module = [
     "datasets.*",
-    "transformers.*",
-    "setuptools.*",
-    "setuptools_git_versioning.*",
-    "torchcodec.*",
-    "vllm",
     "vllm.*"
 ]
 ignore_missing_imports = true
