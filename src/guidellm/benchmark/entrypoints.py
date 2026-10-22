@@ -405,22 +405,9 @@ async def _finalize_outputs(
         try:
             results.append((args.kind, await output.finalize(report)))
         except Exception as err:  # noqa: BLE001 - reported per output below
-            logger.error(f"Output '{args.kind}' failed to finalize: {err}")
+            logger.error("Output '{}' failed to finalize: {}", args.kind, err)
             errors.append((args.kind, err))
     return results, errors
-
-
-def _raise_for_output_errors(errors: list[tuple[str, Exception]]) -> None:
-    """
-    Fail the run if any output could not be written, after all were attempted.
-
-    :param errors: The ``(kind, error)`` failures collected by :func:`_finalize_outputs`
-    :raises RuntimeError: If *errors* is non-empty
-    """
-    if not errors:
-        return
-    kinds = ", ".join(kind for kind, _ in errors)
-    raise RuntimeError(f"Failed to write output(s): {kinds}") from errors[0][1]
 
 
 def _assert_fields_equal(
@@ -698,7 +685,9 @@ async def benchmark_generative_text(  # noqa: C901
         for kind, error in output_errors:
             console.print_update(title=f"  {kind:<8}: {error}", status="error")
 
-    _raise_for_output_errors(output_errors)
+    if output_errors:
+        kinds = ", ".join(kind for kind, _ in output_errors)
+        raise RuntimeError(f"Failed to write output(s): {kinds}")
 
     return report, output_format_results
 
@@ -740,6 +729,8 @@ async def reimport_benchmarks_report(
     for kind, error in output_errors:
         console.print_update(title=f"  {kind:<8}: {error}", status="error")
 
-    _raise_for_output_errors(output_errors)
+    if output_errors:
+        kinds = ", ".join(kind for kind, _ in output_errors)
+        raise RuntimeError(f"Failed to write output(s): {kinds}")
 
     return report, output_results

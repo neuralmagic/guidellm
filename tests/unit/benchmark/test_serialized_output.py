@@ -4,7 +4,6 @@ from pathlib import Path
 import pytest
 import yaml
 
-import guidellm.benchmark.schemas.report as report_module
 from guidellm.benchmark.outputs.output import GenerativeBenchmarkerOutput
 from guidellm.benchmark.outputs.serialized import (
     GenerativeBenchmarkerSerialized,
@@ -312,20 +311,13 @@ class TestFinalizeFormats:
 
         ## WRITTEN BY AI ##
         """
-        records = []
-        sink = report_module.logger.add(
-            lambda message: records.append(message.record), level="WARNING"
+        handler = GenerativeBenchmarkerSerialized(
+            output_path=tmp_path / "report.yaml", format_type="json"
         )
-        try:
-            handler = GenerativeBenchmarkerSerialized(
-                output_path=tmp_path / "report.yaml", format_type="json"
-            )
+        with pytest.warns(UserWarning, match="different format"):
             result_path = await handler.finalize(minimal_report)
-        finally:
-            report_module.logger.remove(sink)
 
         assert json.loads(result_path.read_text())
-        assert any("different format" in record["message"] for record in records)
 
 
 @pytest.mark.regression

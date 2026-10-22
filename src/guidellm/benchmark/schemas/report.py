@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import platform
+import warnings
 from importlib.metadata import version
 from pathlib import Path
 from typing import Any, ClassVar, Literal
@@ -20,7 +21,6 @@ import yaml
 from pydantic import Field
 
 from guidellm.benchmark.schemas.benchmark import GenerativeBenchmark
-from guidellm.logger import logger
 from guidellm.schemas import StandardBaseModel
 from guidellm.schemas.benchmark import BenchmarkScenario
 
@@ -93,12 +93,7 @@ class GenerativeBenchmarksReport(StandardBaseModel):
         type_: Literal["json", "yaml"],
     ) -> Path:
         """
-        Save report to file in JSON or YAML format.
-
-        The format is the caller's to choose, not the path's: ``--output kind=``
-        already says what the user asked for, so the suffix is never consulted and
-        any path can be written. A suffix that names the other format is only a
-        warning, since writing JSON to ``foo.yaml`` is odd but still what was asked.
+        Save the report using the specified path and file type.
 
         :param path: File path or directory for saving, defaults to current directory
             with DEFAULT_FILE name
@@ -122,9 +117,11 @@ class GenerativeBenchmarksReport(StandardBaseModel):
         if suffix in ("json", "yaml", "yml") and (suffix == "json") != (
             type_ == "json"
         ):
-            logger.warning(
+            warnings.warn(
                 f"Writing {type_} to {file_path}, whose .{suffix} suffix names a "
-                f"different format."
+                f"different format.",
+                category=UserWarning,
+                stacklevel=2,
             )
 
         with file_path.open("w") as file:
