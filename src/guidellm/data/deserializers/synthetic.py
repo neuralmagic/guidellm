@@ -142,7 +142,8 @@ class _SyntheticTextExamplesIterable(_BaseExamplesIterable):
                     variance=self.config.tool_response_tokens_stdev,
                     min_value=self.config.tool_response_tokens_min,
                     max_value=self.config.tool_response_tokens_max,
-                    random_seed=iter_random_seed + 2,
+                    # ensure diff dist from delays, which use iter_random_seed + 2
+                    random_seed=iter_random_seed + 6,
                 )
             )
 
