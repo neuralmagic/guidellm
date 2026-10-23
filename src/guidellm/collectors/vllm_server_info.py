@@ -9,7 +9,7 @@ import time
 from typing import Any
 from urllib.parse import urlsplit
 
-import httpx
+import httpx2
 
 from guidellm.collectors.collector import Collector, OneshotCollector
 from guidellm.logger import logger
@@ -166,7 +166,7 @@ class VLLMServerInfoCollector(OneshotCollector):
         self,
         url: str,
         redact_hosts: bool = True,
-        transport: httpx.AsyncBaseTransport | None = None,
+        transport: httpx2.AsyncBaseTransport | None = None,
     ):
         """
         :param url: Explicit server-info endpoint URL
@@ -207,8 +207,8 @@ class VLLMServerInfoCollector(OneshotCollector):
             )
         except (
             TimeoutError,
-            httpx.HTTPError,
-            httpx.InvalidURL,
+            httpx2.HTTPError,
+            httpx2.InvalidURL,
             ValueError,
             RecursionError,
         ) as exc:
@@ -221,7 +221,7 @@ class VLLMServerInfoCollector(OneshotCollector):
 
     async def _fetch_config(self) -> dict[str, Any]:
         async with (
-            httpx.AsyncClient(
+            httpx2.AsyncClient(
                 transport=self._transport,
                 timeout=_SERVER_CONFIG_TIMEOUT,
                 follow_redirects=False,

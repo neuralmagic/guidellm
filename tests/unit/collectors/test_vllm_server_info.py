@@ -4,7 +4,7 @@ import asyncio
 import gzip
 import json
 
-import httpx
+import httpx2
 import pytest
 
 from guidellm.collectors import Collector, VLLMServerInfoCollector
@@ -37,7 +37,7 @@ async def test_collects_config_after_each_benchmark():
 
     def respond(request):
         requests.append(request)
-        return httpx.Response(
+        return httpx2.Response(
             200,
             json={
                 "vllm_config": {
@@ -49,7 +49,7 @@ async def test_collects_config_after_each_benchmark():
             },
         )
 
-    collector = VLLMServerInfoCollector(URL, transport=httpx.MockTransport(respond))
+    collector = VLLMServerInfoCollector(URL, transport=httpx2.MockTransport(respond))
     for count in (1, 2):
         await collector.start()
         assert collector.result(0, 1) == {}
@@ -73,14 +73,14 @@ async def test_collects_config_after_each_benchmark():
 @pytest.mark.parametrize(
     "response",
     [
-        httpx.Response(404, text="private-value"),
-        httpx.Response(401, text="private-value"),
-        httpx.Response(500, text="private-value"),
-        httpx.Response(302, headers={"Location": "http://private-value/"}),
-        httpx.Response(200, text="private-value"),
-        httpx.Response(200, json=[]),
-        httpx.Response(200, json={"vllm_config": "legacy config"}),
-        httpx.Response(200, json={"system_env": {"SECRET": "private-value"}}),
+        httpx2.Response(404, text="private-value"),
+        httpx2.Response(401, text="private-value"),
+        httpx2.Response(500, text="private-value"),
+        httpx2.Response(302, headers={"Location": "http://private-value/"}),
+        httpx2.Response(200, text="private-value"),
+        httpx2.Response(200, json=[]),
+        httpx2.Response(200, json={"vllm_config": "legacy config"}),
+        httpx2.Response(200, json={"system_env": {"SECRET": "private-value"}}),
     ],
 )
 async def test_failed_capture_has_safe_error_and_does_not_follow_redirects(response):
@@ -94,7 +94,7 @@ async def test_failed_capture_has_safe_error_and_does_not_follow_redirects(respo
         requests.append(request)
         return response
 
-    collector = VLLMServerInfoCollector(URL, transport=httpx.MockTransport(respond))
+    collector = VLLMServerInfoCollector(URL, transport=httpx2.MockTransport(respond))
     result = await collector.collect()
     assert "error" in result
     assert "vllm_config" not in result
@@ -102,7 +102,7 @@ async def test_failed_capture_has_safe_error_and_does_not_follow_redirects(respo
     assert len(requests) == 1
 
 
-class _Chunks(httpx.AsyncByteStream):
+class _Chunks(httpx2.AsyncByteStream):
     def __init__(self, chunks):
         self.chunks = chunks
 
@@ -123,15 +123,15 @@ async def test_limits_decoded_body_size(compressed):
         {"vllm_config": {"model": "a" * module._SERVER_CONFIG_MAX_BYTES}}
     ).encode()
     if compressed:
-        response = httpx.Response(
+        response = httpx2.Response(
             200,
             headers={"Content-Encoding": "gzip"},
             stream=_Chunks([gzip.compress(body)]),
         )
     else:
-        response = httpx.Response(200, stream=_Chunks([body[:100], body[100:]]))
+        response = httpx2.Response(200, stream=_Chunks([body[:100], body[100:]]))
     collector = VLLMServerInfoCollector(
-        URL, transport=httpx.MockTransport(lambda _: response)
+        URL, transport=httpx2.MockTransport(lambda _: response)
     )
     result = await collector.collect()
     assert result["error"] == "ValueError"
@@ -147,7 +147,7 @@ async def test_total_timeout_cancels_trickling_response(monkeypatch):
     """
     closed = asyncio.Event()
 
-    class SlowStream(httpx.AsyncByteStream):
+    class SlowStream(httpx2.AsyncByteStream):
         async def __aiter__(self):
             while True:
                 yield b" "
@@ -159,8 +159,8 @@ async def test_total_timeout_cancels_trickling_response(monkeypatch):
     monkeypatch.setattr(module, "_SERVER_CONFIG_TIMEOUT", 0.05)
     collector = VLLMServerInfoCollector(
         URL,
-        transport=httpx.MockTransport(
-            lambda _: httpx.Response(200, stream=SlowStream())
+        transport=httpx2.MockTransport(
+            lambda _: httpx2.Response(200, stream=SlowStream())
         ),
     )
     result = await asyncio.wait_for(collector.collect(), timeout=1)
@@ -176,10 +176,10 @@ async def test_failure_does_not_reuse_previous_snapshot():
     ## WRITTEN BY AI ##
     """
     responses = iter(
-        [httpx.Response(200, json={"vllm_config": {}}), httpx.Response(404)]
+        [httpx2.Response(200, json={"vllm_config": {}}), httpx2.Response(404)]
     )
     collector = VLLMServerInfoCollector(
-        URL, transport=httpx.MockTransport(lambda _: next(responses))
+        URL, transport=httpx2.MockTransport(lambda _: next(responses))
     )
     await collector.start()
     await collector.stop()
