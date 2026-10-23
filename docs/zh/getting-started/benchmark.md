@@ -55,7 +55,7 @@ guidellm run \
 
 ![基准测试进度](../../assets/sample-benchmarks.gif)
 
-要进一步了解数据集选项和后端配置，请参阅[数据集文档（英文）](../../guides/datasets.md)和[后端指南](../guides/backends.md)。
+要进一步了解数据集选项和后端配置，请参阅[数据集指南](../guides/datasets.md)和[后端指南](../guides/backends.md)。
 
 ## 了解基准测试选项
 
@@ -255,7 +255,7 @@ guidellm run \
   --profile kind=constant,rate=5
 ```
 
-你可以使用标准差、最小值和最大值等其他参数，自定义合成数据生成方式。更多信息请参阅英文版[数据集文档中的 Synthetic data 部分](../../guides/datasets.md#synthetic-data)。
+你可以使用标准差、最小值和最大值等其他参数，自定义合成数据生成方式。更多信息请参阅[数据集指南中的合成数据部分](../guides/datasets.md#synthetic-data)。
 
 ### Trace 回放基准测试 {#trace-replay-benchmarking}
 
