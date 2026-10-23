@@ -76,6 +76,7 @@ Use `--seed` with a configuration string to control how sequences (in scheduling
 The `guidellm run` examples in this guide send requests to an OpenAI-compatible server at `http://localhost:8000`. To run them as written, start one of:
 
 - **A real model server**, such as vLLM. See [Start a Server](../getting-started/server.md).
+
 - **The bundled mock server**, which needs no GPU and listens on `http://127.0.0.1:8000` by default:
 
   ```bash
@@ -240,7 +241,7 @@ GuideLLM supports various file formats for datasets, including text, CSV, JSON, 
 
   In this example, the second request is scheduled 0.5 seconds after the first request. Trace rows are ordered by timestamp before GuideLLM schedules requests and generates synthetic payloads. This keeps each scheduled event aligned with the prompt and output token lengths from the same row.
 
-  Use a supported [trace file format](./trace_replay.md#supported-formats) to enable trace loading. For example, save the two rows above as `trace.jsonl`:
+  Use a supported [trace file format](./trace_replay.md#supported-formats) to enable trace loading. For example, save the two rows as `trace.jsonl`:
 
   ```bash
   cat > trace.jsonl <<'EOF'
@@ -301,7 +302,7 @@ GuideLLM supports various file formats for datasets, including text, CSV, JSON, 
 
 #### Example Commands
 
-Create a small JSON Lines file:
+Save two rows as `prompts.jsonl`:
 
 ```bash
 cat > prompts.jsonl <<'EOF'
