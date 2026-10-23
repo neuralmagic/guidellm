@@ -285,6 +285,20 @@ class OpenAIHTTPBackend(Backend):
             multiturn_reasoning=self._args.multiturn_reasoning,
         )
 
+        # Per-model session affinity header for multi-model round-robin:
+        # requests carrying a model override also carry the configured
+        # header set to that model, so session-pinning routers (e.g.
+        # llm-d's inference scheduler) keep each model's traffic on one
+        # backend. Default-model requests get no header and spread.
+        affinity_header = getattr(
+            self._args, "model_affinity_header", None
+        )
+        if affinity_header and request.model:
+            arguments.headers = {
+                **(arguments.headers or {}),
+                affinity_header: request.model,
+            }
+
         request_url = f"{self._args.target}/{request_path}"
         request_files = (
             {

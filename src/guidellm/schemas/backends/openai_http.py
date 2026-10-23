@@ -51,6 +51,22 @@ class OpenAIHTTPBackendArgs(BackendArgs):
         ),
         examples=["gpt-4o", "Qwen/Qwen3-0.6B", "zai-org/GLM-5.3,agent-01,agent-02"],
     )
+    model_affinity_header: str | None = Field(
+        default=None,
+        description=(
+            "Optional header name for per-model session affinity during "
+            "multi-model round-robin. When set, each request carrying a "
+            "round-robin model override also carries this header set to "
+            "that model's name. Routers that pin sessions to a backend "
+            "(e.g. the llm-d inference scheduler's session-affinity "
+            "scorer) can use it to keep each model's traffic — and its "
+            "weights, for LoRA-serving targets — cached on one backend. "
+            "Requests without a model override (the default model) get "
+            "no header and spread across backends freely. Disabled when "
+            "unset."
+        ),
+        examples=["x-session-id"],
+    )
     request_format: Literal[
         "/v1/completions",
         "/v1/chat/completions",
