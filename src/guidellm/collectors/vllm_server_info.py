@@ -206,11 +206,11 @@ class VLLMServerInfoCollector(OneshotCollector):
                 self._fetch_config(), timeout=_SERVER_CONFIG_TIMEOUT
             )
         except (
+            TimeoutError,
             httpx.HTTPError,
             httpx.InvalidURL,
             ValueError,
             RecursionError,
-            asyncio.TimeoutError,
         ) as exc:
             # Exception messages may include credentials, URLs or response bodies.
             result["error"] = type(exc).__name__
