@@ -3,6 +3,7 @@ Unit tests for guidellm.data.deserializers.synthetic module.
 """
 
 import json
+import statistics
 import tempfile
 from pathlib import Path
 from unittest.mock import Mock
@@ -1644,3 +1645,57 @@ class TestSyntheticDataToolResponseColumns:
         )
         iterable = _SyntheticTextExamplesIterable(config, processor, random_seed=42)
         assert set(iterable.features) == {"conversation_turns"}
+
+
+class TestSyntheticDataToolResponseSampling:
+    """Verify tool response sizes are drawn independently of think-time delays."""
+
+    @pytest.fixture
+    def processor(self):
+        """Mock processor that maps each word to one token."""
+        proc = Mock()
+        proc.encode.side_effect = lambda text: list(range(len(text.split())))
+        proc.decode.side_effect = lambda tokens, skip_special_tokens=False: " ".join(
+            "word" for _ in tokens
+        )
+        return proc
+
+    @staticmethod
+    def _delays_and_sizes(
+        processor, random_seed: int, count: int = 15
+    ) -> list[tuple[int, int]]:
+        config = SyntheticTextDataArgs(
+            prompt_tokens=10,
+            output_tokens=5,
+            turns=1,
+            tool_call_turns=[0],
+            delay=50,
+            delay_stdev=10,
+            tool_response_tokens=50,
+            tool_response_tokens_stdev=10,
+        )
+        rows = iter(
+            _SyntheticTextExamplesIterable(config, processor, random_seed=random_seed)
+        )
+        pairs = []
+        for _ in range(count):
+            _, row = next(rows)
+            turn = _main_turn_map(row)["main_0"]
+            body = json.loads(turn.columns["tool_response_column"][0])["result"]
+            pairs.append((round(turn.settings.requeue_delay), len(body.split())))
+        return pairs
+
+    @pytest.mark.regression
+    def test_tool_response_sizes_do_not_follow_delays(self, processor):
+        """Tool response sizes are not correlated with the delay of each turn."""
+        pairs = self._delays_and_sizes(processor, random_seed=3, count=50)
+        delays, sizes = zip(*pairs, strict=True)
+
+        assert abs(statistics.correlation(delays, sizes)) < 0.5
+
+    @pytest.mark.sanity
+    def test_tool_response_sizes_repeat_for_same_seed(self, processor):
+        """The same seed gives the same delays and tool response sizes."""
+        assert self._delays_and_sizes(processor, 3) == self._delays_and_sizes(
+            processor, 3
+        )
