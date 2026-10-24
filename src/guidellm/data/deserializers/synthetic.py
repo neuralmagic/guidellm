@@ -147,6 +147,28 @@ class _SyntheticTextExamplesIterable(_BaseExamplesIterable):
                 )
             )
 
+        # Per-branch first_* samplers, built once so that each conversation
+        # draws its own values
+        branch_first_samplers = [
+            (
+                _integer_range_sampler(
+                    average=branch.first_prompt_tokens,
+                    variance=branch.first_prompt_tokens_stdev,
+                    min_value=branch.first_prompt_tokens_min,
+                    max_value=branch.first_prompt_tokens_max,
+                    random_seed=iter_random_seed + 10 + b_idx * 2,
+                ),
+                _integer_range_sampler(
+                    average=branch.first_output_tokens,
+                    variance=branch.first_output_tokens_stdev,
+                    min_value=branch.first_output_tokens_min,
+                    max_value=branch.first_output_tokens_max,
+                    random_seed=iter_random_seed + 11 + b_idx * 2,
+                ),
+            )
+            for b_idx, branch in enumerate(self.config.branches)
+        ]
+
         while True:
             delay = next(delay_sampler) if delay_sampler is not None else None
             row = self._create_conversation_row(
@@ -160,7 +182,7 @@ class _SyntheticTextExamplesIterable(_BaseExamplesIterable):
                 prefix=next(prefix_iter),
                 tools_defs=tools_defs,
                 tool_response_sampler=tool_response_sampler,
-                iter_random_seed=iter_random_seed,
+                branch_first_samplers=branch_first_samplers,
             )
             # Count logical main turns, client-tool injection nodes (added by
             # the shared finalizer expander), and branch turns.
@@ -219,7 +241,7 @@ class _SyntheticTextExamplesIterable(_BaseExamplesIterable):
         prefix: str,
         tools_defs: list[dict[str, Any]] | None,
         tool_response_sampler: Iterator[int] | None,
-        iter_random_seed: int,
+        branch_first_samplers: list[tuple[Iterator[int] | None, Iterator[int] | None]],
     ) -> dict[str, Any]:
         """
         Build a ``conversation_turns`` payload for linear or branched graphs.
@@ -244,7 +266,8 @@ class _SyntheticTextExamplesIterable(_BaseExamplesIterable):
         :param prefix: Optional system prefix applied to the first main turn.
         :param tools_defs: Tool definitions for client tool-call turns.
         :param tool_response_sampler: Optional sampler for tool response size.
-        :param iter_random_seed: Seed base for per-branch first-turn samplers.
+        :param branch_first_samplers: Per-branch first-turn (prompt, output)
+            samplers, ``None`` where a branch does not override its parent.
         :return: A dataset row with a JSON ``conversation_turns`` column.
         """
         tool_call_turns = set(self.config.tool_call_turns)
@@ -329,20 +352,7 @@ class _SyntheticTextExamplesIterable(_BaseExamplesIterable):
 
         for b_idx, branch in enumerate(self.config.branches):
             # Branch-local first_* overrides; otherwise inherit parent first_* samplers
-            branch_first_prompt = _integer_range_sampler(
-                average=branch.first_prompt_tokens,
-                variance=branch.first_prompt_tokens_stdev,
-                min_value=branch.first_prompt_tokens_min,
-                max_value=branch.first_prompt_tokens_max,
-                random_seed=iter_random_seed + 10 + b_idx * 2,
-            )
-            branch_first_output = _integer_range_sampler(
-                average=branch.first_output_tokens,
-                variance=branch.first_output_tokens_stdev,
-                min_value=branch.first_output_tokens_min,
-                max_value=branch.first_output_tokens_max,
-                random_seed=iter_random_seed + 11 + b_idx * 2,
-            )
+            branch_first_prompt, branch_first_output = branch_first_samplers[b_idx]
             resolved_first_prompt = (
                 branch_first_prompt
                 if branch_first_prompt is not None
